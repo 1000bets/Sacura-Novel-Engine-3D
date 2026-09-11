@@ -48,7 +48,7 @@ export default function Scene({objects,state,selected,onSelect,onLetter}){
   a.characters.forEach((mesh,id)=>{if(!objects.some(o=>o.id===id))mesh.visible=false;});
   const selectedMesh=a.characters.get(selected)|| (selected==='letter'?a.letter:null);a.ring.visible=!!selectedMesh;if(selectedMesh){a.ring.position.x=selectedMesh.position.x;a.ring.position.z=selectedMesh.position.z;}
   a.letter.visible=!!objects.find(o=>o.id==='letter')?.active&&state.visible?.letter!==false;a.rain.visible=state.weather!=='Ясно';a.sunlight.intensity=state.time==='Ночь'?.7:3;a.glass.material.color.set(state.time==='Ночь'?0x465b77:state.time==='Рассвет'?0xcbb39c:0x7b9eac);
-  if(state.camera==='Крупный план'){a.camera.position.set(5,4,7);a.controls.target.set(-.7,.8,.3);}else{a.camera.position.set(9,7.8,12);a.controls.target.set(0,1,0);}
+  if(a.lastCamera!==state.camera){a.lastCamera=state.camera;if(state.camera==='Крупный план'){a.camera.position.set(5,4,7);a.controls.target.set(-.7,.8,.3);}else{a.camera.position.set(9,7.8,12);a.controls.target.set(0,1,0);}}
  },[objects,state,selected]);
  return <div className="scene-canvas" ref={host} aria-label="Интерактивная 3D-гостиная. Вращайте мышью; нажмите на персонажа или письмо."/>;
 }
