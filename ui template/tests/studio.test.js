@@ -64,3 +64,32 @@ test('real audio transport ducks music and restores it on pause, resume, end and
 test('interrupting fade settles its promise and does not deadlock AFTER',async()=>{
  for(const command of ['pause','stop','setVolume']){const desk=new SoundDesk(()=>new FakeAudio());desk.play('music-main',{key:'bg',volume:.6});await tick();const fade=desk.fade('bg',0,2);desk[command]('bg',.3);const result=await Promise.race([fade.then(()=>true),new Promise(resolve=>setTimeout(()=>resolve(false),100))]);assert.equal(result,true,command);desk.stopAll();}
 });
+
+
+test('stopping one running instance cancels its remaining actions and releases its join',async()=>{
+ const e=newEvent('move','alice','окно');e.groups[0].actions[0].duration=.1;e.groups.push(newEvent('variable','trust','+1').groups[0]);
+ const rt=new PreviewRuntime(new AudioMock()),p=sceneProject([e],[line('a',[binding('b',e.id)])]);
+ const work=rt.start(p,'a');await new Promise(r=>setTimeout(r,35));
+ const instance=Object.values(rt.snapshot.instances)[0];assert.equal(instance.status,'running');rt.controlInstance(instance.id,'stop');await work;
+ assert.equal(rt.snapshot.world.positions.alice,undefined);assert.equal(rt.snapshot.variables.trust,0);assert.equal(rt.snapshot.instances[instance.id].status,'stopped');assert.equal(rt.snapshot.ready,true);assert.equal(rt.snapshot.error,null);rt.stop();
+});
+test('paused instance does not finish a movement or enter the next group until resumed',async()=>{
+ const e=newEvent('move','alice','окно');e.groups[0].actions[0].duration=.1;e.groups.push(newEvent('variable','trust','+1').groups[0]);
+ const rt=new PreviewRuntime(new AudioMock()),p=sceneProject([e],[line('a',[binding('b',e.id)])]);
+ const work=rt.start(p,'a');await new Promise(r=>setTimeout(r,25));const instance=Object.values(rt.snapshot.instances)[0];rt.controlInstance(instance.id,'pause');
+ await new Promise(r=>setTimeout(r,170));assert.equal(rt.snapshot.world.positions.alice,undefined);assert.equal(rt.snapshot.variables.trust,0);assert.equal(rt.snapshot.ready,false);
+ rt.controlInstance(instance.id,'resume');await work;assert.equal(rt.snapshot.world.positions.alice,'окно');assert.equal(rt.snapshot.variables.trust,1);rt.stop();
+});
+test('stopping an event also stops all effects owned by that exact instance',async()=>{
+ const e=newEvent('weather','world','Гроза');e.retention='HOLD_UNTIL_STOPPED';e.groups[0].actions.push(newEvent('time','world','Ночь').groups[0].actions[0]);
+ const rt=new PreviewRuntime(new AudioMock()),p=sceneProject([e],[line('a',[binding('b',e.id,'ON_START','FLOW_END')])]);await rt.start(p,'a');const instance=Object.values(rt.snapshot.instances)[0];
+ rt.controlInstance(instance.id,'stop');assert.equal(rt.snapshot.effects.weather.status,'stopped');assert.equal(rt.snapshot.effects.time.status,'stopped');assert.equal(rt.snapshot.world.weather,'Ясно');assert.equal(rt.snapshot.world.time,'День');rt.stop();
+});
+
+
+test('new actions have valid targets and values for their specialized editors',()=>{
+ for(const [type,target,value]of[['weather','world','Дождь'],['time','world','Ночь'],['camera','camera','Общий план'],['variable','trust','+1'],['move','alice','окно']]){
+  const action=newEvent(type).groups[0].actions[0];assert.equal(action.target,target);assert.equal(action.value,value);
+ }
+ const explicit=newEvent('move','bob','камин').groups[0].actions[0];assert.equal(explicit.target,'bob');assert.equal(explicit.value,'камин');
+});

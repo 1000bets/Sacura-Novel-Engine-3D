@@ -11,11 +11,12 @@ export const TYPES = {
  weather:{label:'Изменить погоду',icon:'CloudRain',domain:'Погода',completion:'INSTANT'},
  time:{label:'Изменить время суток',icon:'Sun',domain:'Время суток',completion:'INSTANT'},
  sound:{label:'Проиграть звук',icon:'Volume2',domain:'Звук',completion:'FINITE'},
- wait:{label:'Дождаться сигнала',icon:'Hourglass',domain:null,completion:'FINITE'},
+ wait:{label:'Пауза / ожидание',icon:'Hourglass',domain:null,completion:'FINITE'},
  variable:{label:'Изменить условие',icon:'SlidersHorizontal',domain:null,completion:'INSTANT'},
  visibility:{label:'Показать объект',icon:'Box',domain:'Видимость',completion:'INSTANT'},
 };
-export const makeAction = (type='move',target='alice',value='окно') => ({id:uid('action'),type,target,value,wait:TYPES[type].completion==='CONTINUOUS'?'STARTED':'COMPLETED',scope:TYPES[type].completion==='CONTINUOUS'?'EVENT':'SELF',conflict:['camera','music','weather'].includes(type)?'REPLACE_CURRENT':'FAIL_NEW',duration:2,queueTimeout:10,startTimeout:5,executionTimeout:30,stopTimeout:3,onFailure:'Остановить событие',finalState:'Сохранить результат',fallback:'Безопасное исходное состояние'});
+const actionDefaults={move:['alice','окно'],pose:['alice','улыбка'],camera:['camera','Общий план'],music:['audio','Главная тема'],pause:['audio','Пауза'],resume:['audio','Продолжить'],stop:['audio','Остановить'],duck:['audio','Под голос'],weather:['world','Дождь'],time:['world','Ночь'],sound:['world','Звук'],wait:['world','Пауза'],variable:['trust','+1'],visibility:['letter','Показать']};
+export const makeAction = (type='move',target,value) => ({id:uid('action'),type,target:target??actionDefaults[type][0],value:value??actionDefaults[type][1],wait:TYPES[type].completion==='CONTINUOUS'?'STARTED':'COMPLETED',scope:TYPES[type].completion==='CONTINUOUS'?'EVENT':'SELF',conflict:['camera','music','weather'].includes(type)?'REPLACE_CURRENT':'FAIL_NEW',duration:2,queueTimeout:10,startTimeout:5,executionTimeout:30,stopTimeout:3,onFailure:'Остановить событие',finalState:'Сохранить результат',fallback:'Безопасное исходное состояние'});
 const event = (id,name,actions,more={})=>({id,name,description:'Готовая постановка для повторного использования',groups:[{id:`${id}-g1`,name:'Основное действие',actions}],retention:'AUTO_CLOSE_ON_FLOW_END',owner:'SubScene',...more});
 const bind=(eventId,extra={})=>({id:uid('binding'),eventId,hook:'ON_START',join:'EVENT_END',overrides:{},...extra});
 export function createProject(){
