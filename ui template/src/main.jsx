@@ -1,5 +1,5 @@
 import React from 'react';
 import {createRoot} from 'react-dom/client';
-import App from './Studio.jsx';
-import './studio.css';
+import App from './Editor.jsx';
+import './editor.css';
 createRoot(document.getElementById('root')).render(<App/>);

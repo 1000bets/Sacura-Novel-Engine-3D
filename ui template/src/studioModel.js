@@ -17,7 +17,7 @@ export function normalizeBatches(b){
 }
 const newBinding=(eventId,hook='ON_START',join='EVENT_END')=>({id:uid('bind'),eventId,hook,join,overrides:{},actionOverrides:{}});
 export function addToBatch(p,beatId,phase,batchId,eventId){const b=allBeats(p).find(x=>x.id===beatId),e=p.events.find(x=>x.id===eventId);if(!b||!e)return;normalizeBatches(b);const binding=newBinding(eventId,phase,e.retention==='AUTO_CLOSE_ON_FLOW_END'?'EVENT_END':'FLOW_END');b.bindings.push(binding);let g=b.batches[phase].find(x=>x.id===batchId);if(!g){g={id:uid('batch'),mode:'SEQUENTIAL',bindingIds:[]};b.batches[phase].push(g);}g.bindingIds.push(binding.id);return binding;}
-export function newEvent(type='move',target='alice',value='окно',name){return {id:uid('event'),name:name||TYPES[type].label,description:'',retention:TYPES[type].completion==='CONTINUOUS'?'HOLD_UNTIL_STOPPED':'AUTO_CLOSE_ON_FLOW_END',owner:'SubScene',groups:[{id:uid('group'),name:'Основное действие',actions:[makeAction(type,target,value)]}]};}
+export function newEvent(type='move',target,value,name){return {id:uid('event'),name:name||TYPES[type].label,description:'',retention:TYPES[type].completion==='CONTINUOUS'?'HOLD_UNTIL_STOPPED':'AUTO_CLOSE_ON_FLOW_END',owner:'SubScene',groups:[{id:uid('group'),name:'Основное действие',actions:[makeAction(type,target,value)]}]};}
 export function upgradeProject(source){
  const p=structuredClone(source||createProject());if(p.version===2){allBeats(p).forEach(normalizeBatches);return p;}
  const original=structuredClone(p);p.version=2;p.revision=2;p.audioAssets=AUDIO_ASSETS;p.subscenes=[
