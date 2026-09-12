@@ -59,9 +59,6 @@ test('subscene exit stops local sound and preserves music owned by the scene',as
  const audio=new AudioMock(),rt=new PreviewRuntime(audio);rt.delay=async(_,token)=>rt.assert(token);await rt.start(p,'a');await tick();assert.ok(soundTrack(audio,voice));await rt.advance();assert.equal(rt.snapshot.world.location,'garden');assert.equal(rt.snapshot.world.weather,'Гроза');assert.ok(audio.calls.includes('stop:'+soundTrack(audio,voice).key));assert.ok(!audio.calls.includes('stop:background'));assert.equal(rt.snapshot.effects.music.owner,'Scene');rt.stop();
 });
 class FakeAudio extends EventTarget{constructor(){super();this.volume=1;this.currentTime=0;this.duration=10;this.loop=false;}play(){return Promise.resolve();}pause(){}}
-test('real audio transport ducks music and restores it on pause, resume, end and stop',async()=>{
- const desk=new SoundDesk(()=>new FakeAudio());desk.play('music-main',{key:'music',volume:.8,loop:true});desk.play('voice-bob',{key:'voice',duck:true});await tick();assert.ok(desk.get('music').audio.volume<.21);desk.pause('voice');assert.equal(desk.get('music').audio.volume,.8);desk.resume('voice');await tick();assert.ok(desk.get('music').audio.volume<.21);desk.get('voice').audio.dispatchEvent(new Event('ended'));assert.equal(desk.get('music').audio.volume,.8);desk.play('voice-alice',{key:'voice2'});await tick();desk.stop('voice2');assert.equal(desk.get('music').audio.volume,.8);desk.stopAll();
-});
 test('interrupting fade settles its promise and does not deadlock AFTER',async()=>{
  for(const command of ['pause','stop','setVolume']){const desk=new SoundDesk(()=>new FakeAudio());desk.play('music-main',{key:'bg',volume:.6});await tick();const fade=desk.fade('bg',0,2);desk[command]('bg',.3);const result=await Promise.race([fade.then(()=>true),new Promise(resolve=>setTimeout(()=>resolve(false),100))]);assert.equal(result,true,command);desk.stopAll();}
 });

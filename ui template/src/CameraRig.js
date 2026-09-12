@@ -4,7 +4,7 @@ import {cameraPose,cameraFromView,resolveCamera} from './cameraModel.js';
 
 export function createCameraRig(scene,view,orbit,canvas,getLive){
  const markers=new Map(),control=new TransformControls(view,canvas),gizmo=control.getHelper();scene.add(gizmo);control.setSize(.75);
- let lastKey,editorView,ignoreUntil=0,pending,previousPilotData;
+ let lastKey,editorView,ignoreUntil=0,pending,previousPilotData,dialogueKey,dialogueElapsed=0;
  const freeLimits={min:orbit.minPolarAngle,max:orbit.maxPolarAngle};
  const capture=()=>({position:view.position.toArray(),target:orbit.target.toArray(),fov:view.fov});
  const apply=(pose,k=1)=>{view.position.lerp(new THREE.Vector3(...pose.position),k);orbit.target.lerp(new THREE.Vector3(...pose.target),k);view.fov=THREE.MathUtils.lerp(view.fov,pose.fov||58,k);view.updateProjectionMatrix();view.lookAt(orbit.target);};
@@ -33,6 +33,7 @@ export function createCameraRig(scene,view,orbit,canvas,getLive){
   pick(ray){const live=getLive();if(live.mode!=='scene'||live.cameraPilotId)return null;const hit=ray.intersectObjects([...markers.values()].filter(m=>m.body.visible).map(m=>m.body),true)[0];let o=hit?.object;while(o&&!o.userData.cameraId)o=o.parent;return o?.userData.cameraId||null;},
   update(dt,objectDragging=false){
    const live=getLive(),definition=live.cameraScene||{kind:live.kind,cameras:[]},cameras=definition.cameras||[],pilot=cameras.find(c=>c.id===live.cameraPilotId),key=live.sceneId+'|'+live.mode+'|'+(pilot?.id||'')+'|'+(live.cameraPreviewId||'');
+   if(dialogueKey!==live.state.dialogue?.key){dialogueKey=live.state.dialogue?.key;dialogueElapsed=0;}
    orbit.minPolarAngle=pilot?0:freeLimits.min;orbit.maxPolarAngle=pilot?Math.PI:freeLimits.max;
    if(key!==lastKey){
     const changedScene=lastKey&&lastKey.split('|')[0]!==live.sceneId;
@@ -45,7 +46,11 @@ export function createCameraRig(scene,view,orbit,canvas,getLive){
     previousPilotData=pilot?JSON.stringify(pilot):null;lastKey=key;
    }
    if(pilot&&live.mode==='scene'&&JSON.stringify(pilot)!==previousPilotData){apply(cameraPose(pilot,live.state,live.objects,live.kind));previousPilotData=JSON.stringify(pilot);}
-   if(live.mode==='game'&&!live.state.paused){const pose=resolveCamera(definition,live.state,live.objects,live.cameraPreviewId);apply(pose,pose.smoothing?1-Math.exp(-dt/pose.smoothing):1);}
+   if(live.mode==='game'&&!live.state.paused){
+    const pose=resolveCamera(definition,live.state,live.objects,live.cameraPreviewId,dialogueElapsed);
+    if(pose.automatic)dialogueElapsed+=dt;
+    apply(pose,pose.smoothing?1-Math.exp(-dt/pose.smoothing):1);
+   }
    orbit.enabled=live.mode==='scene'&&!control.dragging&&!objectDragging;
    if(orbit.enabled)orbit.update();
    for(const [id,m]of markers)if(!cameras.some(c=>c.id===id)){if(control.object===m.body)control.detach();remove(m);markers.delete(id);}

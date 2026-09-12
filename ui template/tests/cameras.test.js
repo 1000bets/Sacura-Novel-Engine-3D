@@ -63,3 +63,72 @@ test('piloting preserves an upward-looking camera and restores free limits',()=>
   live.cameraPilotId=null;rig.update(.016);assert.ok(view.position.distanceTo(new THREE.Vector3(...free.position))<1e-9);assert.equal(orbit.maxPolarAngle,Math.PI*.47);
  }finally{rig.dispose();orbit.dispose();}
 });
+
+const dialogueState=(speakerId='alice',index=0)=>({...state,dialogue:{key:'run:'+index,beatId:'line-'+index,kind:'dialogue',speakerId,index}});
+
+test('dialogue follows the speaker, varies shot sizes and finishes one bounded camera move',()=>{
+ const p=upgradeProject(),s=p.subscenes[0],alice=dialogueState(),bob=dialogueState('bob',1);
+ const first=resolveCamera(s,alice,p.objects),reply=resolveCamera(s,bob,p.objects),close=resolveCamera(s,dialogueState('alice',2),p.objects);
+ assert.equal(first.automatic,true);assert.match(first.name,/Алиса/);assert.match(reply.name,/Боб/);
+ assert.ok(first.target[0]<reply.target[0]);assert.ok(close.fov<first.fov);assert.ok(first.smoothing>=.5);
+ const end=resolveCamera(s,alice,p.objects,null,9);
+ assert.ok(Math.hypot(...end.position.map((v,i)=>v-first.position[i]))>.25);
+ assert.deepEqual(end,resolveCamera(s,alice,p.objects,null,90));
+ const moving={...alice,motions:{alice:{from:[-1,0,0],to:[1,0,0],progress:.5}}};
+ assert.equal(resolveCamera(s,moving,p.objects).target[0],0);
+ setObjectTransform(p,'alice',s.id,{position:[2,0,0],scale:[1,1.5,1]});
+ assert.ok(Math.abs(resolveCamera(s,alice,p.objects).target[1]-1.62)<1e-8);
+});
+
+test('automatic dialogue respects authored cameras, cue lifetime, visibility and object inspection',()=>{
+ const p=upgradeProject(),s=p.subscenes[0],live=dialogueState(),main=s.cameras[0];
+ const authored={...live,camera:'Общий план',cameraCueKey:live.dialogue.key};
+ assert.equal(resolveCamera(s,authored,p.objects).name,'Общий план диалога');
+ assert.match(resolveCamera(s,{...authored,dialogue:{...live.dialogue,key:'next'}},p.objects).name,/Алиса/);
+ assert.equal(resolveCamera(s,{...live,interactionTarget:'letter'},p.objects).temporary,true);
+ assert.equal(resolveCamera(s,{...live,cameraId:main.id},p.objects).id,main.id);
+ assert.equal(resolveCamera(s,live,p.objects,main.id).id,main.id);
+ for(const visibility of [{...live,visible:{alice:false}},live]){
+  if(visibility===live)s.excludedObjectIds=['alice'];
+  assert.equal(resolveCamera(s,visibility,p.objects).name,'Общий план диалога');
+ }
+ delete s.excludedObjectIds;
+ for(const kind of ['choice','gate'])assert.ok(!resolveCamera(s,{...live,dialogue:{...live.dialogue,kind}},p.objects).name.includes('Алиса'));
+ main.position[0]+=.5;assert.equal(resolveCamera(s,live,p.objects).id,main.id);
+});
+
+test('runtime publishes a new shot when each line appears and advances beyond an authored preset',async()=>{
+ const p=upgradeProject(),a5=allBeats(p).find(b=>b.id==='a5'),a6=allBeats(p).find(b=>b.id==='a6');
+ const e=newEvent('camera','camera','Общий план','Общий перед разговором');p.events.push(e);addToBatch(p,a5.id,'BEFORE',null,e.id);
+ const rt=new PreviewRuntime({stopAll(){}});
+ try{
+  await rt.start(p,a5.id);const first=rt.snapshot.world.dialogue;
+  assert.equal(first.speakerId,'alice');assert.equal(first.beatId,a5.id);assert.equal(first.index,0);
+  assert.equal(rt.snapshot.world.cameraCueKey,first.key);
+  assert.equal(resolveCamera(p.subscenes[0],rt.snapshot.world,p.objects).name,'Общий план диалога');
+  await rt.advance();const next=rt.snapshot.world.dialogue;
+  assert.equal(next.speakerId,'bob');assert.equal(next.beatId,a6.id);assert.equal(next.index,1);assert.notEqual(next.key,first.key);
+  assert.match(resolveCamera(p.subscenes[0],rt.snapshot.world,p.objects).name,/Боб/);
+ }finally{rt.stop();}
+});
+
+test('dialogue camera changes glide and pausing freezes both the view and its travel clock',()=>{
+ const p=upgradeProject(),s=p.subscenes[0];
+ const makeRig=()=>{
+  const scene=new THREE.Scene(),view=new THREE.PerspectiveCamera(58,1,.05,100),canvas=new EventTarget();canvas.style={};
+  const orbit={target:new THREE.Vector3(0,1,0),enabled:true,update(){}};
+  const live={sceneId:s.id,kind:s.kind,cameraScene:s,state:dialogueState(),objects:p.objects,mode:'game'};
+  return {live,rig:createCameraRig(scene,view,orbit,canvas,()=>live)};
+ };
+ const a=makeRig(),b=makeRig();
+ try{
+  a.rig.update(.016);b.rig.update(.016);const start=a.rig.capture();
+  for(let i=0;i<120;i++){a.rig.update(.016);b.rig.update(.016);}
+  assert.notDeepEqual(a.rig.capture().position,start.position);
+  const frozen=a.rig.capture();a.live.state={...a.live.state,paused:true};a.rig.update(30);assert.deepEqual(a.rig.capture(),frozen);
+  a.live.state={...a.live.state,paused:false};a.rig.update(.016);b.rig.update(.016);assert.deepEqual(a.rig.capture(),b.rig.capture());
+  const previous=a.rig.capture();a.live.state=dialogueState('bob',1);a.rig.update(.016);const next=a.rig.capture();
+  assert.ok(Math.hypot(...next.position.map((v,i)=>v-previous.position[i]))<.2);
+  assert.notDeepEqual(next.position,previous.position);
+ }finally{a.rig.dispose();b.rig.dispose();}
+});

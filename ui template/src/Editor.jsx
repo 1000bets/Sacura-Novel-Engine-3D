@@ -1,3 +1,4 @@
+import {SIDECHAIN} from './audioSettings.js';
 import React, {
   useCallback,
   useEffect,
@@ -2308,7 +2309,7 @@ export default function Editor() {
               </span>
               <div className="flex-space" />
               {soundDesk.ducks.size > 0 && (
-                <span className="duck-label">Голос → музыка −12 dB</span>
+                <span className="duck-label">Голос → музыка −{SIDECHAIN.reductionDb} dB</span>
               )}
               {[...soundDesk.tracks.values()].some(t=>t.status==='error')&&<button className="audio-error" onClick={()=>setDock('sound')}>Ошибка аудио · открыть</button>}
               <button onClick={() => setDock("active")}>

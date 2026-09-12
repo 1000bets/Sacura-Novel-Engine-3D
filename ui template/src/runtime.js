@@ -9,7 +9,7 @@ import {
   TYPES,
   conditionPass,
 } from "./studioModel.js";
-import {ANCHORS,objectTransform,resolvedPosition} from './sceneEditing.js';
+import {ANCHORS,isObjectInScene,objectTransform,resolvedPosition} from './sceneEditing.js';
 
 export class PreviewRuntime {
   constructor(audio, onChange = () => {}) {
@@ -149,6 +149,7 @@ export class PreviewRuntime {
     if (!b) throw new Error("Реплика назначения удалена");
     const scene = sceneFor(this.project, id),
       old = this.snapshot.world.location;
+    const dialogueIndex=scene.id===old?(this.snapshot.world.dialogue?.index??-1)+1:0;
     if (scene.id !== old) {
       for (const i of Object.values(this.snapshot.instances || {}))
         if (i.owner === "SubScene" && i.sceneId !== scene.id) {
@@ -167,6 +168,7 @@ export class PreviewRuntime {
         time: scene.time,
         camera: "Общий план",
         cameraId:null,
+        dialogue:null,cameraCueKey:null,
         positions: {},
         poses: {},
         visible: {},
@@ -204,6 +206,10 @@ export class PreviewRuntime {
     );
     if (errors.length) throw new Error(errors.map((i) => i.title).join(" · "));
     await this.phase(b, "BEFORE", token);
+    this.snapshot.world.dialogue={
+      key:token+':'+this.snapshot.history.length,beatId:id,index:dialogueIndex,kind:b.kind,
+      speakerId:this.project.objects.find(o=>o.type==='Персонаж'&&o.name===b.speaker&&isObjectInScene(o,scene))?.id||null,
+    };
     this.snapshot.textVisible = true;
     this.snapshot.phase = "ON_START";
     this.emit();
@@ -256,6 +262,7 @@ export class PreviewRuntime {
             ...definition,
             originScene: this.snapshot.world.location,
             originBeat: this.snapshot.beatId,
+            originShotKey: token+':'+this.snapshot.history.length,
           }
         : null;
     if (!event) throw new Error("Событие удалено");
@@ -376,6 +383,7 @@ export class PreviewRuntime {
       case "camera":
         world.camera = a.value;
         world.cameraId = a.cameraId || null;
+        world.cameraCueKey = event.originShotKey;
         break;
       case "weather":
         world.weather = a.value;

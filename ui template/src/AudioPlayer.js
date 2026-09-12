@@ -31,13 +31,18 @@ export class BufferPlayer extends EventTarget {
   get currentTime(){const t=this.offset+(this.paused?0:this.output.context.currentTime-this.began);return this.loop&&this.duration?t%this.duration:Math.min(t,this.duration||0);}
   set currentTime(value){const playing=!this.paused;this.pause();this.offset=Math.max(0,Number(value));if(playing)this.play().catch(()=>{});}
   get volume(){return this._volume;}
-  set volume(value){this._volume=value;if(this.gain)this.gain.gain.value=value*(this.output.normalized?this.data.gain:1);}
+  set volume(value){this._volume=value;this.updateGain(!this.paused);}
+  updateGain(smooth=false){
+    if(!this.gain)return;const param=this.gain.gain,value=this._volume*(this.output.normalized?this.data.gain:1);
+    // Smooth the small envelope/fader steps on the audio clock as well.
+    if(smooth&&param.setTargetAtTime)param.setTargetAtTime(value,this.output.context.currentTime,.008);else param.value=value;
+  }
   async play(){
     const serial=++this.serial;await this.output.unlock();this.data=await this.output.load(this.url);if(serial!==this.serial)return;
     this.dispatchEvent(new Event('loadedmetadata'));if(this.offset>=this.duration)this.offset=0;
     if(this.source){this.source.onended=null;this.source.stop();this.source.disconnect();}this.gain?.disconnect();
     const ctx=this.output.context,source=ctx.createBufferSource();this.gain=ctx.createGain();this.source=source;source.buffer=this.data.buffer;source.loop=this.loop;
-    this.volume=this._volume;source.connect(this.gain);this.gain.connect(this.output.master);this.began=ctx.currentTime;this.paused=false;
+    this.updateGain();source.connect(this.gain);this.gain.connect(this.output.master);this.began=ctx.currentTime;this.paused=false;
     source.onended=()=>{if(serial!==this.serial||this.paused)return;this.offset=this.duration;this.paused=true;clearInterval(this.timer);source.disconnect();this.gain.disconnect();this.dispatchEvent(new Event('ended'));};
     source.start(0,this.offset);clearInterval(this.timer);this.timer=setInterval(()=>this.dispatchEvent(new Event('timeupdate')),80);
   }

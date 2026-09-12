@@ -1,6 +1,7 @@
 import {uid} from './model.js';
 import {resolvedPosition,objectTransform} from './sceneEditing.js';
 import {gameCamera} from './sceneEffects.js';
+import {dialogueCamera,isDefaultCamera} from './dialogueCamera.js';
 
 const finite=(v,fallback)=>Number.isFinite(Number(v))?Number(v):fallback;
 const vector=(v,fallback)=>fallback.map((n,i)=>finite(v?.[i],n));
@@ -26,12 +27,16 @@ export function cameraFromView(camera,view,state,objects,kind){
  }
  return cleanCamera(c);
 }
-export function resolveCamera(scene,state,objects,previewId){
+export function resolveCamera(scene,state,objects,previewId,elapsed=0){
  const cameras=scene.cameras||[],explicit=cameras.find(c=>c.id===(previewId||state.cameraId));
  if(!previewId&&state.interactionTarget){const [position,target]=gameCamera(scene.kind,state,objects);return {position,target,fov:58,smoothing:.14,name:'Осмотр предмета',temporary:true};}
  if(explicit)return cameraPose(explicit,state,objects,scene.kind);
+ const main=cameras.find(c=>c.id===scene.defaultCameraId)||cameras[0];
+ if(!previewId&&(!state.camera||['Общий план','Крупный план'].includes(state.camera))&&isDefaultCamera(main,scene.kind)){
+  const directed=dialogueCamera(scene,state,objects,elapsed);if(directed)return directed;
+ }
  if(!state.camera||state.camera==='Общий план'){
-  const main=cameras.find(c=>c.id===scene.defaultCameraId)||cameras[0];if(main)return cameraPose(main,state,objects,scene.kind);
+  if(main)return cameraPose(main,state,objects,scene.kind);
  }
  const [position,target]=gameCamera(scene.kind,state,objects);return {position,target,fov:58,smoothing:.14,name:state.camera||'Общий план'};
 }

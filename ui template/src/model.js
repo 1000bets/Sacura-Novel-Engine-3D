@@ -1,3 +1,4 @@
+import {SIDECHAIN} from './audioSettings.js';
 export const uid = (prefix='id') => `${prefix}-${globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)}`;
 export const TYPES = {
  move: {label:'Переместить',icon:'Footprints',domain:'Положение',completion:'FINITE'},
@@ -31,7 +32,7 @@ export function createProject(){
  event('look','Боб замечает письмо',[makeAction('pose','bob','задумчивость'),makeAction('camera','camera','Крупный план')]),
  event('bgm','Тихое фортепиано',[makeAction('music','audio','After the rain')],{retention:'HOLD_UNTIL_REPLACED',channel:'Audio.BGM',owner:'Scene'}),
  event('rain','Дождь за окном',[makeAction('weather','world','Дождь'),makeAction('sound','world','Шум дождя')]),
- event('voice','Голос поверх музыки',[makeAction('sound','alice','Реплика Алисы'),makeAction('duck','audio','−12 dB')]),
+ event('voice','Голос поверх музыки',[makeAction('sound','alice','Реплика Алисы'),makeAction('duck','audio',`−${SIDECHAIN.reductionDb} dB`)]),
  event('music-pause','Пауза в музыке',[makeAction('pause','audio','Сохранить позицию')]),
  event('music-resume','Вернуть музыку',[makeAction('resume','audio','С сохранённой позиции')]),
  event('music-stop','Музыка затихает',[makeAction('stop','audio','Плавно за 2 секунды')]),
