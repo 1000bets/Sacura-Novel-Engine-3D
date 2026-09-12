@@ -257,7 +257,7 @@ export function stagingGraph(project, beatId, phaseFilter = "ALL") {
                 .slice(0, 3)
                 .map(
                   (a) =>
-                    `${project.objects.find((o) => o.id === a.target)?.name || TYPES[a.type]?.label} → ${a.value}`,
+                    `${project.objects.find((o) => o.id === a.target)?.name || TYPES[a.type]?.label} → ${a.type==='camera'&&a.cameraId?project.subscenes.flatMap(s=>s.cameras||[]).find(c=>c.id===a.cameraId)?.name||'Камера удалена':a.value}`,
                 )
                 .join("\n"),
               {
@@ -306,7 +306,7 @@ export function stagingGraph(project, beatId, phaseFilter = "ALL") {
               .slice(0, 3)
               .map(
                 (a) =>
-                  `${project.objects.find((o) => o.id === a.target)?.name || TYPES[a.type]?.label} → ${a.value}`,
+                  `${project.objects.find((o) => o.id === a.target)?.name || TYPES[a.type]?.label} → ${a.type==='camera'&&a.cameraId?project.subscenes.flatMap(s=>s.cameras||[]).find(c=>c.id===a.cameraId)?.name||'Камера удалена':a.value}`,
               )
               .join("\n"),
             {

@@ -1,6 +1,11 @@
+import {updateObjectHighlight} from './sceneEffects.js';
 import React, { useEffect, useRef } from "react";
 import * as THREE from "three";
+import {createSceneGizmo,groupObjects,meshGeometry,cloneSceneObject} from './SceneGizmo.js';
+import {BUILTIN_TRANSFORMS,resolvedPosition} from './sceneEditing.js';
+import {createCameraRig} from './CameraRig.js';
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import {atmosphere,gameCamera,decoratePaper,objectPosition,addCharacterDetails,animatePose} from './sceneEffects.js';
 
 export default function Scene({
   objects,
@@ -10,12 +15,12 @@ export default function Scene({
   onLetter,
   onInteract,
   mode = "scene",
-  showGrid = true,
+  showGrid = true, sceneId="living", editTool, editSpace, snap, onTransform, focusRequest, editing=true, cameraScene, selectedCameraId, cameraPreviewId, cameraPilotId, onCameraChange, onCameraSelect, cameraApi, showCameras=true,
 }) {
   const host = useRef(),
     api = useRef();
   const callbacks = useRef();
-  callbacks.current = { onSelect, onLetter, onInteract, mode, state };
+  callbacks.current = { onSelect, onLetter, onInteract, mode, state,objects,selected,sceneId,kind:"living",editTool,editSpace,snap,onTransform,focusRequest,editing,cameraScene,selectedCameraId,cameraPreviewId,cameraPilotId,onCameraChange,onCameraSelect,showCameras };
   useEffect(() => {
     const element = host.current;
     let renderer;
@@ -36,16 +41,16 @@ export default function Scene({
     element.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
     scene.fog = new THREE.Fog(0x191c22, 20, 40);
-    const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
-    camera.position.set(9, 7.8, 12);
+    const camera = new THREE.PerspectiveCamera(58, 1, 0.05, 100);
+    camera.position.set(-2.8,1.65,2.8);
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.set(0, 1, 0);
+    controls.target.set(.3,1.02,-1.3);
     controls.enableDamping = true;
     controls.maxPolarAngle = Math.PI * 0.47;
-    controls.minDistance = 6;
+    controls.minDistance = .8;
     controls.maxDistance = 22;
-    controls.enablePan = false;
-    scene.add(new THREE.HemisphereLight(0xbfcce7, 0x3d292d, 2));
+    controls.enablePan = true;
+    const hemi=new THREE.HemisphereLight(0xbfcce7, 0x3d292d, 2);scene.add(hemi);
     const sunlight = new THREE.DirectionalLight(0xa5b8e9, 3);
     sunlight.position.set(-3, 9, -4);
     sunlight.castShadow = true;
@@ -71,6 +76,8 @@ export default function Scene({
     box(9, 0.22, 6.5, 0, -0.15, 0, 0x49404a);
     box(9, 3, 0.16, 0, 1.3, -3.2, 0x515c63);
     box(0.16, 3, 6.5, -4.5, 1.3, 0, 0x515961);
+    box(.16,3.3,6.5,4.5,1.45,0,0x666067);
+    box(9,.12,6.5,0,3.04,0,0x8b8180);
     for (let x = -4; x < 4.5; x += 0.45)
       box(0.014, 0.012, 6.5, x, -0.024, 0, 0x6c6263);
     box(9, 0.08, 0.13, 0, 0.05, -3.05, 0x777c79);
@@ -82,6 +89,7 @@ export default function Scene({
     box(0.07, 2, 0.09, 1.35, 1.53, -2.9, 0x9ca4a3);
     box(2.15, 0.07, 0.09, 1.35, 1.55, -2.9, 0x9ca4a3);
     box(2.6, 0.14, 0.48, 1.35, 0.48, -2.9, 0x88918d);
+    const fireplaceStart=scene.children.length;
     box(1.45, 1.75, 0.72, -3.1, 0.85, -2.65, 0x8d7c74);
     box(1.68, 0.18, 0.94, -3.1, 1.67, -2.57, 0xa39485);
     box(0.95, 1, 0.05, -3.1, 0.64, -2.26, 0x29282b);
@@ -97,27 +105,34 @@ export default function Scene({
       flame.position.set(-3.42 + i * 0.16, 0.43, -2.2);
       scene.add(flame);
     }
+    const fireplace=groupObjects(scene,scene.children.slice(fireplaceStart),"fireplace",BUILTIN_TRANSFORMS.fireplace);pickables.push(fireplace);
     box(3, 0.18, 2.2, -0.6, 0.01, 0.8, 0x776370);
     for (let i = 0; i < 4; i++)
       box(3, 0.005, 0.023, -0.6, 0.11, 0.05 + i * 0.45, 0x99858c);
+    const sofaStart=scene.children.length;
     box(2.55, 0.4, 0.9, 2.8, 0.38, 0.6, 0x9e8175);
     box(2.55, 0.67, 0.26, 2.8, 0.74, 0.97, 0xa58c7b);
     box(0.24, 0.63, 0.95, 1.56, 0.58, 0.6, 0xb49b85);
     box(0.24, 0.63, 0.95, 4.04, 0.58, 0.6, 0xb49b85);
     for (let i = 0; i < 3; i++)
       box(0.72, 0.14, 0.7, 2.02 + i * 0.77, 0.63, 0.51, 0xc0a48e);
+    const sofa=groupObjects(scene,scene.children.slice(sofaStart),"room-sofa",BUILTIN_TRANSFORMS["room-sofa"]);pickables.push(sofa);
+    const tableStart=scene.children.length;
     box(1.8, 0.12, 1.05, -0.25, 0.71, 1.7, 0xa58568);
     for (const x of [-0.98, 0.48])
       for (const z of [1.3, 2.1]) box(0.09, 0.66, 0.09, x, 0.34, z, 0x605450);
+    const table=groupObjects(scene,scene.children.slice(tableStart),"room-table",BUILTIN_TRANSFORMS["room-table"]);pickables.push(table);
     const letter = box(0.47, 0.012, 0.3, -0.35, 0.782, 1.55, 0xf4e4bd);
     letter.rotation.y = 0.18;
     letter.userData.id = "letter";
+    decoratePaper(letter,'Письмо · осмотреть');
     pickables.push(letter);
     const door = box(1, 2.5, 0.08, 3.55, 1.13, -3.08, 0x718c87);
+    door.geometry.translate(.5,0,0);door.position.x=3.05;
     door.userData.id = "door";
     pickables.push(door);
-    box(0.07, 0.07, 0.1, 3.88, 1, -2.99, 0xbda477);
-    box(0.23, 0.23, 0.23, 0.2, 0.85, 1.72, 0xadb6b3);
+    door.attach(box(0.07, 0.07, 0.1, 3.88, 1, -2.99, 0xbda477));
+    table.attach(box(0.23, 0.23, 0.23, 0.2, 0.85, 1.72, 0xadb6b3));
     box(0.75, 0.12, 0.75, -3.65, 0.78, 0.85, 0x7a6655);
     box(0.15, 0.9, 0.15, -3.65, 0.38, 0.85, 0x605047);
     const shade = new THREE.Mesh(
@@ -156,7 +171,7 @@ export default function Scene({
         opacity: 0.35,
       }),
     );
-    scene.add(rain);
+    const updateAtmosphere=atmosphere(scene,{kind:'living',renderer,sun:sunlight,hemi});
     const resize = () => {
       const { width, height } = element.getBoundingClientRect();
       if (width < 1 || height < 1) return;
@@ -167,14 +182,17 @@ export default function Scene({
     const ro = new ResizeObserver(resize);
     ro.observe(element);
     resize();
+    const gizmo=createSceneGizmo(scene,camera,renderer.domElement,controls,()=>callbacks.current,()=>pickables);
+    const cameraRig=createCameraRig(scene,camera,controls,renderer.domElement,()=>callbacks.current);if(cameraApi)cameraApi.current=cameraRig;
     const ray = new THREE.Raycaster(),
       mouse = new THREE.Vector2();
     let down;
     const pointerDown = (e) => {
       down = [e.clientX, e.clientY];
+      renderer.domElement.closest(".scene-viewport")?.focus({preventScroll:true});
     };
     const click = (e) => {
-      if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5)
+      if (cameraRig.blocksClick() || gizmo.blocksClick() || !down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5)
         return;
       const r = element.getBoundingClientRect();
       mouse.set(
@@ -182,10 +200,11 @@ export default function Scene({
         (-(e.clientY - r.top) / r.height) * 2 + 1,
       );
       ray.setFromCamera(mouse, camera);
+      const cameraHit=cameraRig.pick(ray);if(cameraHit){callbacks.current.onCameraSelect?.(cameraHit);return;}
       const h = ray.intersectObjects(
         pickables.filter((m) => m.visible),
         true,
-      )[0];
+      ).find(h=>{let o=h.object;while(o){if(!o.visible)return false;o=o.parent;}return true;});
       if (h) {
         let o = h.object;
         while (!o.userData.id && o.parent) o = o.parent;
@@ -196,7 +215,7 @@ export default function Scene({
             else if (o.userData.id === "letter") callbacks.current.onLetter?.();
           } else callbacks.current.onSelect?.(o.userData.id);
         }
-      }
+      }else if(callbacks.current.mode==='game')callbacks.current.onInteract?.(null);
     };
     renderer.domElement.addEventListener("pointerdown", pointerDown);
     renderer.domElement.addEventListener("pointerup", click);
@@ -207,6 +226,7 @@ export default function Scene({
       grid,
       door,
       characters,
+      gizmo,
       pickables,
       ring,
       rain,
@@ -216,19 +236,36 @@ export default function Scene({
       mat,
       box,
     };
-    let frame;
+    let frame,previous=performance.now(),animTime=0;
     const render = () => {
       frame = requestAnimationFrame(render);
-      if (controls.enabled) controls.update();
+      const now=performance.now(),dt=Math.min(.05,(now-previous)/1000);previous=now;
+
       const live = callbacks.current.state;
-      if (!live.paused && !live.weatherPaused)
-        rain.position.y = -((performance.now() % 900) / 900) * 0.12;
+      animTime=updateAtmosphere(live,dt);
+      pickables.forEach(mesh=>{const o=callbacks.current.objects.find(o=>o.id===mesh.userData.id);if(!o){mesh.visible=false;return;}mesh.visible=o.active&&live.visible?.[o.id]!==false;
+        gizmo.apply(mesh,o,resolvedPosition(o,live,'living'));
+        if((o.builtin||o.id)==='door'&&callbacks.current.mode==='game'){mesh.userData.openAngle=THREE.MathUtils.damp(mesh.userData.openAngle||0,live.doors?.[o.id]==='Открыть'?-1.25:0,3,live.paused||live.pausedDoors?.[o.id]?0:dt);mesh.rotation.y+=mesh.userData.openAngle;}
+        if(mesh.userData.marker)mesh.userData.marker.visible=live.interactionTarget===o.id||live.highlights?.[o.id];
+        updateObjectHighlight(mesh,!!live.highlights?.[o.id],animTime);
+        if(callbacks.current.mode==='scene'&&callbacks.current.editing)animatePose(mesh,null,0,false,true);
+        else animatePose(mesh,live.poses?.[o.id],animTime,!!live.motions?.[o.id]&&!live.motions[o.id].stopped&&!live.motions[o.id].paused&&live.motions[o.id].progress<1,live.paused);
+      });
+      gizmo.update();
+      cameraRig.update(dt,gizmo.dragging);
+      letter.userData.marker.visible=live.interactionTarget==='letter'||live.highlights?.letter;
+      ring.scale.setScalar(live.interactionTarget?1+Math.sin(animTime*3)*.06:1);
+      lamp.intensity=live.lighting==='Выключить'?0:live.lighting==='Холодный свет'?12:35;
+      lamp.color.set(live.lighting==='Холодный свет'?'#98beff':'#ffa553');
       renderer.render(scene, camera);
     };
     render();
     return () => {
       cancelAnimationFrame(frame);
       ro.disconnect();
+      if(cameraApi?.current===cameraRig)cameraApi.current=null;
+      cameraRig.dispose();
+      gizmo.dispose();
       controls.dispose();
       scene.traverse((o) => {
         o.geometry?.dispose();
@@ -252,6 +289,7 @@ export default function Scene({
       диван: [2.7, 0, -0.4],
     };
     objects.forEach((o, i) => {
+      if(o.builtin&&!a.pickables.some(m=>m.userData.id===o.id)){const original=a.pickables.find(m=>m.userData.id===o.builtin);if(original){const copy=cloneSceneObject(original,o.id);a.scene.add(copy);a.characters.set(o.id,copy);a.pickables.push(copy);}}
       if (o.type === "Персонаж" && !a.characters.has(o.id)) {
         const group = new THREE.Group();
         const body = new THREE.Mesh(
@@ -267,47 +305,40 @@ export default function Scene({
         head.position.y = 1.26;
         head.castShadow = true;
         group.add(body, head);
+        addCharacterDetails(group,body.material);
         group.userData.id = o.id;
         a.scene.add(group);
         a.characters.set(o.id, group);
         a.pickables.push(group);
       } else if (
-        !["alice", "bob", "letter", "fireplace", "door"].includes(o.id) &&
+        !a.pickables.some(m=>m.userData.id===o.id) &&
         !a.characters.has(o.id)
       ) {
         const m = a.box(0.5, 0.5, 0.5, 0, 0.25, 0, o.color || "#98b4ac");
+        m.geometry.dispose();m.geometry=meshGeometry(o.primitive);m.userData.primitive=o.primitive||"box";
         m.userData.id = o.id;
         a.characters.set(o.id, m);
         a.pickables.push(m);
       }
       const mesh = a.characters.get(o.id);
       if (mesh) {
-        const pos = coords[state.positions?.[o.id] || o.position] || [
-          -2 + i * 0.7,
-          0,
-          2,
-        ];
-        mesh.position.set(...pos);
-        if (o.type !== "Персонаж") mesh.position.y += 0.25;
         mesh.visible = o.active && state.visible?.[o.id] !== false;
-        if (o.type === "Персонаж") {
-          mesh.children[0].material.color.set(o.color);
-          mesh.rotation.y = state.poses?.[o.id] === "задумчивость" ? 0.4 : 0;
-        }
+
       }
     });
     a.characters.forEach((mesh, id) => {
       if (!objects.some((o) => o.id === id)) mesh.visible = false;
     });
+    const highlighted=Object.keys(state.highlights||{}).find(id=>state.highlights[id]);
     const selectedMesh =
-      a.characters.get(state.interactionTarget || selected) ||
-      ((state.interactionTarget || selected) === "letter"
+      a.characters.get(state.interactionTarget || highlighted || selected) ||
+      ((state.interactionTarget || highlighted || selected) === "letter"
         ? a.letter
-        : (state.interactionTarget || selected) === "door"
+        : (state.interactionTarget || highlighted || selected) === "door"
           ? a.door
           : null);
     a.ring.visible =
-      (mode === "scene" || !!state.interactionTarget) && !!selectedMesh;
+      (mode === "scene" || !!state.interactionTarget || !!highlighted) && !!selectedMesh;
     a.ring.material.color.set(state.interactionTarget ? 0xe1c48d : 0xc69eb2);
     a.ring.position.y = state.interactionTarget === "letter" ? 0.8 : 0.02;
     a.grid.visible = showGrid && mode === "scene";
@@ -321,8 +352,7 @@ export default function Scene({
     a.letter.visible =
       !!objects.find((o) => o.id === "letter")?.active &&
       state.visible?.letter !== false;
-    a.rain.visible = state.weather !== "Ясно";
-    a.sunlight.intensity = state.time === "Ночь" ? 0.7 : 3;
+    a.rain.visible = false;
     a.glass.material.color.set(
       state.time === "Ночь"
         ? 0x465b77
@@ -330,31 +360,7 @@ export default function Scene({
           ? 0xcbb39c
           : 0x7b9eac,
     );
-    if (a.mode !== mode) {
-      if (a.mode === "scene")
-        a.editorCamera = {
-          position: a.camera.position.clone(),
-          target: a.controls.target.clone(),
-        };
-      a.controls.enabled = mode === "scene";
-      a.mode = mode;
-      if (mode === "scene" && a.editorCamera) {
-        a.camera.position.copy(a.editorCamera.position);
-        a.controls.target.copy(a.editorCamera.target);
-      }
-      a.lastCamera = null;
-    }
-    if (mode === "game" && a.lastCamera !== state.camera) {
-      a.lastCamera = state.camera;
-      if (state.camera === "Крупный план") {
-        a.camera.position.set(5, 4, 7);
-        a.controls.target.set(-0.7, 0.8, 0.3);
-      } else {
-        a.camera.position.set(8, 6.8, 10.5);
-        a.controls.target.set(0, 1, 0);
-      }
-      a.camera.lookAt(a.controls.target);
-    }
+
   }, [objects, state, selected, mode, showGrid]);
   return (
     <div

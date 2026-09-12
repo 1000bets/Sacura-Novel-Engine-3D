@@ -1,8 +1,12 @@
-import {createProject,allBeats,makeAction,uid,nextNode,routeTo,resolvedActions,TYPES,validate as legacyValidate} from './model.js';
+import {createProject,allBeats,makeAction,uid,nextNode,routeTo,resolvedActions,TYPES,validActionTarget,validate as legacyValidate} from './model.js';
+import {extendVisualExamples} from './visualExamples.js';
+import {ensureCreationLibrary} from './authoringModel.js';
+import {ensureSceneEditing,isObjectInScene} from './sceneEditing.js';
+import {ensureCameras} from './cameraModel.js';
 export {allBeats,makeAction,uid,TYPES};
 export const PHASES=[{id:'BEFORE',label:'До реплики',hint:'Подготовить сцену, затем показать текст',color:'blue'},{id:'ON_START',label:'Во время реплики',hint:'Текст уже виден · постановка продолжается',color:'violet'},{id:'AFTER',label:'После реплики',hint:'Игрок продолжил · завершаем постановку',color:'amber'}];
 export const AUDIO_ASSETS=[
- {id:'music-main',name:'Главная тема',file:'MainMenuSound.mp3',kind:'music',speaker:'Музыка',caption:'Основная музыкальная тема'},
+ {id:'music-main',name:'Главная тема',file:'MainMenuSound.wav',kind:'music',speaker:'Музыка',caption:'Основная музыкальная тема'},
  {id:'voice-narrator',name:'Дом встретил её…',file:'The_house_greeted_her_with_the_scent_of_wet_wood.mp3',kind:'voice',speaker:'Рассказчик',caption:'Дом встретил её запахом мокрого дерева.'},
  {id:'voice-bob',name:'Ты всё-таки вернулась',file:'You_came_back_after_all.mp3',kind:'voice',speaker:'Боб',caption:'Ты всё-таки вернулась.'},
  {id:'voice-alice',name:'Я обещала прийти…',file:'I_promised_return_before_rain_goes.mp3',kind:'voice',speaker:'Алиса',caption:'Я обещала прийти до дождя.'},
@@ -19,7 +23,7 @@ const newBinding=(eventId,hook='ON_START',join='EVENT_END')=>({id:uid('bind'),ev
 export function addToBatch(p,beatId,phase,batchId,eventId){const b=allBeats(p).find(x=>x.id===beatId),e=p.events.find(x=>x.id===eventId);if(!b||!e)return;normalizeBatches(b);const binding=newBinding(eventId,phase,e.retention==='AUTO_CLOSE_ON_FLOW_END'?'EVENT_END':'FLOW_END');b.bindings.push(binding);let g=b.batches[phase].find(x=>x.id===batchId);if(!g){g={id:uid('batch'),mode:'SEQUENTIAL',bindingIds:[]};b.batches[phase].push(g);}g.bindingIds.push(binding.id);return binding;}
 export function newEvent(type='move',target,value,name){return {id:uid('event'),name:name||TYPES[type].label,description:'',retention:TYPES[type].completion==='CONTINUOUS'?'HOLD_UNTIL_STOPPED':'AUTO_CLOSE_ON_FLOW_END',owner:'SubScene',groups:[{id:uid('group'),name:'Основное действие',actions:[makeAction(type,target,value)]}]};}
 export function upgradeProject(source){
- const p=structuredClone(source||createProject());if(p.version===2){allBeats(p).forEach(normalizeBatches);return p;}
+ const p=structuredClone(source||createProject());if(p.version===2){allBeats(p).forEach(normalizeBatches);return ensureCameras(ensureSceneEditing(ensureCreationLibrary(extendVisualExamples(p))));}
  const original=structuredClone(p);p.version=2;p.revision=2;p.audioAssets=AUDIO_ASSETS;p.subscenes=[
  {id:'living',name:'Вечер в гостиной',location:'Гостиная',kind:'living',entry:'a1',sceneId:'chapter1',weather:'Дождь',time:'Закат',color:'#afa1e2'},
  {id:'garden',name:'Следы в саду',location:'Старый сад',kind:'garden',entry:'garden-entry',sceneId:'chapter1',weather:'Гроза',time:'Ночь',color:'#8ec2ab'},
@@ -63,7 +67,7 @@ export function upgradeProject(source){
  for(const nodes of[garden,station])for(const b of nodes)for(const binding of b.bindings){const e=p.events.find(e=>e.id===binding.eventId);if(e?.retention!=='AUTO_CLOSE_ON_FLOW_END')binding.join='FLOW_END';}
  p.chapters.push({id:'garden-chapter',subsceneId:'garden',name:'Следы под дождём',beats:garden},{id:'station-chapter',subsceneId:'station',name:'Билет в один конец',beats:station});
  p.objects.push({id:'garden-note',name:'Записка на скамье',type:'Активный меш',color:'#e6d4a2',active:true,position:'стол',subsceneId:'garden',interaction:'Прочитать записку'},{id:'ticket',name:'Билет',type:'Активный меш',color:'#9ebed2',active:true,position:'стол',subsceneId:'station',interaction:'Предъявить билет'});
- const end=allBeats(p).find(b=>b.id==='d6');if(end)end.ending='Дом, в котором ждут';return p;
+ const end=allBeats(p).find(b=>b.id==='d6');if(end)end.ending='Дом, в котором ждут';return ensureCameras(ensureSceneEditing(ensureCreationLibrary(extendVisualExamples(p))));
 }
 export function sceneFor(p,beatId){const c=p.chapters.find(c=>c.beats.some(b=>b.id===beatId));return p.subscenes.find(s=>s.id===c?.subsceneId)||p.subscenes[0];}
 export function edgesFor(p,b){if(b.kind==='choice')return b.choices.map(c=>({from:b.id,to:c.next,label:c.label,condition:c.condition,choiceId:c.id}));return b.next?[{from:b.id,to:b.next,label:b.kind==='gate'?'После взаимодействия':'Продолжить'}]:[];}
@@ -72,7 +76,12 @@ export function conditionPass(c,vars){return !c.condition||c.condition==='always
 export function validateStudio(p){
  const clone=structuredClone(p);allBeats(clone).forEach(b=>{b.mode='SEQUENTIAL';b.bindings.forEach(x=>x.join=x.join==='NONE'?'FLOW_END':x.join);});
  const issues=legacyValidate(clone).filter(i=>!i.id.startsWith('parallel-'));
+ for(const scene of p.subscenes||[])for(const c of scene.cameras||[])if(c.mode==='follow'&&!p.objects.some(o=>o.id===c.followTargetId&&o.type==='Персонаж'&&o.active!==false&&isObjectInScene(o,scene)))issues.push({id:`camera-target-${c.id}`,beatId:scene.entry,level:'warning',title:'Камере не за кем следить',detail:`«${c.name}»: выберите доступного персонажа во вкладке «Камеры». Пока используется сохранённый кадр.`});
  for(const b of allBeats(p)){
+  const location=sceneFor(p,b.id),gateObject=p.objects.find(o=>o.id===b.signal);
+  if(b.kind==='gate'&&gateObject&&!isObjectInScene(gateObject,location))issues.push({id:`gate-location-${b.id}`,beatId:b.id,level:'error',title:'Предмет ожидания отсутствует в сабсцене',detail:`«${gateObject.name}» недоступен в «${location.name}». Выберите предмет этой локации: иначе игрок не сможет продолжить.`});
+  for(const binding of b.bindings)for(const a of bindingActions(p,binding)){const object=p.objects.find(o=>o.id===a.target);if(object&&!isObjectInScene(object,location))issues.push({id:`action-location-${binding.id}-${a.id}`,beatId:b.id,eventId:binding.eventId,level:['move','pose','visibility','highlight','door'].includes(a.type)?'error':'warning',title:'Цель действия отсутствует в сабсцене',detail:`«${object.name}» недоступен в «${location.name}». Выберите объект этой локации или добавьте персонажа в её состав.`});}
+  for(const binding of b.bindings)for(const a of bindingActions(p,binding))if(a.type==='camera'&&a.cameraId&&!sceneFor(p,b.id).cameras?.some(c=>c.id===a.cameraId))issues.push({id:`camera-missing-${b.id}-${binding.id}-${a.id}`,beatId:b.id,eventId:binding.eventId,level:'error',title:'Камера недоступна в этой сабсцене',detail:'Камера удалена или относится к другой локации. Выберите камеру этой сабсцены в действии «Сменить план».'});
   for(const phase of PHASES)for(const batch of batchesFor(b,phase.id)){
    const resources=new Map();for(const binding of batch.bindings){for(const a of bindingActions(p,binding)){const domain=TYPES[a.type]?.domain;if(!domain||['sound','pause','resume','stop','duck'].includes(a.type))continue;const key=`${a.target}/${domain}`;const prev=resources.get(key);if(prev&&prev!==binding.id)issues.push({id:`overlap-${b.id}-${batch.id}-${key}`,beatId:b.id,eventId:binding.eventId,batchId:batch.id,phase:phase.id,level:'error',title:'Два события управляют одним ресурсом',detail:`${p.objects.find(o=>o.id===a.target)?.name||a.target} · ${domain}. Две команды пересекаются. Разнесите их по шагам или измените объект.`,fix:'sequence-batch'});if(batch.mode==='PARALLEL'||['NONE','STARTED'].includes(binding.join))resources.set(key,binding.id);}}
   }
@@ -80,7 +89,7 @@ export function validateStudio(p){
   const pending=new Map();
   for(const phase of PHASES)for(const batch of batchesFor(b,phase.id))for(const binding of batch.bindings){
    for(const a of bindingActions(p,binding)){
-    if(!p.objects.some(o=>o.id===a.target)&&!['world','audio','camera','trust'].includes(a.target))issues.push({id:`override-target-${binding.id}-${a.id}`,beatId:b.id,eventId:binding.eventId,level:'error',title:'В размещении выбран удалённый объект',detail:a.target,fix:'reset-overrides'});
+    if(!validActionTarget(p,a))issues.push({id:`override-target-${binding.id}-${a.id}`,beatId:b.id,eventId:binding.eventId,level:'error',title:a.type==='variable'?'Переменная не найдена':'В размещении выбран удалённый объект',detail:a.target,fix:'reset-overrides'});
     if(TYPES[a.type]?.completion!=='FINITE'||!TYPES[a.type]?.domain||['sound','duck'].includes(a.type))continue;
     const key=`${a.target}/${TYPES[a.type].domain}`,previous=pending.get(key);
     if(previous&&previous.binding.id!==binding.id&&previous.batch!==batch.id)issues.push({id:`unjoined-${b.id}-${key}`,beatId:b.id,eventId:previous.binding.eventId,phase:previous.phase,batchId:previous.batch,level:'error',title:'Предыдущий шаг ещё управляет объектом',detail:`${key}: поток не дождался завершения в «${PHASES.find(p=>p.id===previous.phase).label}». Поэтому стрелка «затем» не гарантирует свободный ресурс.`,fix:'wait-previous',bindingId:previous.binding.id});

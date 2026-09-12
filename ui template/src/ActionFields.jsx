@@ -43,7 +43,7 @@ export default function ActionFields({
       (type === "sound" && !a.assetId);
   return (
     <div className={"typed-action-fields " + (compact ? "compact" : "")}>
-      {["move", "pose", "visibility"].includes(type) &&
+      {["move", "pose", "visibility", "highlight", "door"].includes(type) &&
         field(
           type === "pose" ? "Персонаж" : "Объект",
           select(
@@ -54,7 +54,7 @@ export default function ActionFields({
           ),
         )}
       {type === "move" &&
-        field("К точке", select("value", ["стол", "камин", "окно", "диван"]))}
+        field("К точке", select("value", ["стол", "камин", "окно", "диван", "вход"]))}
       {type === "pose" &&
         field(
           "Поза",
@@ -66,10 +66,16 @@ export default function ActionFields({
             "грусть",
           ]),
         )}
-      {type === "camera" &&
-        field("План", select("value", ["Общий план", "Крупный план"]))}
+      {type === "camera" && <>
+        {field("Камера",select("cameraId",[["","План по умолчанию"],...(a.cameraId&&!project.subscenes.some(s=>s.cameras?.some(c=>c.id===a.cameraId))?[[a.cameraId,"Камера удалена · выберите другую"]]:[]),...project.subscenes.flatMap(s=>(s.cameras||[]).map(c=>[c.id,`${s.location} · ${c.name}${c.mode==='follow'?' · слежение':''}`]))]))}
+        {!a.cameraId&&field("План", select("value", ["Общий план", "Крупный план", "План предмета"]))}
+      </>}
       {type === "weather" &&
-        field("Погода", select("value", ["Ясно", "Дождь", "Гроза", "Туман"]))}
+        field("Погода", select("value", ["Ясно", "Дождь", "Гроза", "Туман", "Снег"]))}
+      {type==='lighting'&&field('Освещение',select('value',['Тёплый свет','Холодный свет','Приглушить','Яркий свет','Выключить']))}
+      {type==='particles'&&field('Частицы',select('value',['Светлячки','Лепестки','Выключить']))}
+      {type==='door'&&field('Дверь',select('value',['Открыть','Закрыть']))}
+      {type==='highlight'&&field('Подсказка',select('value',['Подсветить','Выключить']))}
       {type === "time" &&
         field(
           "Время суток",

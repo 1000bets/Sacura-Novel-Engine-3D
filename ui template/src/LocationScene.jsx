@@ -1,7 +1,12 @@
+import {updateObjectHighlight} from './sceneEffects.js';
 import React, { useEffect, useRef } from "react";
 import * as THREE from "three";
+import {createCameraRig} from './CameraRig.js';
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import {createSceneGizmo,groupObjects,meshGeometry,cloneSceneObject} from './SceneGizmo.js';
+import {BUILTIN_TRANSFORMS,resolvedPosition} from './sceneEditing.js';
 import Scene from "./Scene.jsx";
+import {atmosphere,gameCamera,decoratePaper,objectPosition,addCharacterDetails,animatePose} from './sceneEffects.js';
 
 function Exterior({
   kind,
@@ -10,11 +15,11 @@ function Exterior({
   onSelect,
   onInteract,
   mode = "scene",
-  showGrid = true,
+  showGrid = true, selected, sceneId, editTool, editSpace, snap, onTransform, focusRequest, editing=true, cameraScene, selectedCameraId, cameraPreviewId, cameraPilotId, onCameraChange, onCameraSelect, cameraApi, showCameras=true,
 }) {
   const host = useRef(),
     live = useRef();
-  live.current = { state, onSelect, onInteract, mode, showGrid };
+  live.current = { state, onSelect, onInteract, mode, showGrid,objects,selected,sceneId,kind,editTool,editSpace,snap,onTransform,focusRequest,editing,cameraScene,selectedCameraId,cameraPreviewId,cameraPilotId,onCameraChange,onCameraSelect,showCameras };
   useEffect(() => {
     let renderer;
     try {
@@ -26,17 +31,17 @@ function Exterior({
     }
     const element = host.current;
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-    renderer.setClearColor("#18212a");
+    renderer.setClearColor("#18212a");renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.shadowMap.enabled=true;
     element.appendChild(renderer.domElement);
     const scene = new THREE.Scene(),
-      camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
-    camera.position.set(8, 7, 10);
+      camera = new THREE.PerspectiveCamera(58, 1, 0.05, 100);
+    camera.position.set(...gameCamera(kind,{})[0]);
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.set(0, 0.6, 0);
+    controls.target.set(...gameCamera(kind,{})[1]);controls.minDistance=.5;controls.maxDistance=25;
     controls.enableDamping = true;
-    controls.enablePan = false;
+    controls.enablePan = true;
     controls.maxPolarAngle = 1.45;
-    scene.add(new THREE.HemisphereLight(0xc5d7ea, 0x253831, 2));
+    const hemi=new THREE.HemisphereLight(0xc5d7ea, 0x253831, 2);scene.add(hemi);
     const sun = new THREE.DirectionalLight(0xffd5ac, 2);
     sun.position.set(-4, 9, 3);
     scene.add(sun);
@@ -47,6 +52,7 @@ function Exterior({
         new THREE.MeshStandardMaterial({ color, roughness: 0.8 }),
       );
       mesh.position.set(x, y, z);
+      mesh.castShadow=true;mesh.receiveShadow=true;
       scene.add(mesh);
       if (id) {
         mesh.userData.id = id;
@@ -55,13 +61,13 @@ function Exterior({
       return mesh;
     };
     if (kind === "garden") {
-      box(9, 0.2, 7, 0, -0.15, 0, "#3c544b");
-      box(1.6, 0.025, 7, 0, 0, 0, "#899286");
+      box(70, 0.2, 70, 0, -0.15, 0, "#3c544b");
+      box(1.6, 0.025, 35, 0, 0, -10, "#899286");
       for (const [x, z] of [
         [-3, -2],
         [3, -2],
         [-3, 2],
-        [3, 2],
+        [5, 1],[-5,-7],[0,-9],[5,-8],[-6,4],
       ]) {
         box(0.25, 2, 0.25, x, 0.9, z, "#776358");
         const leaves = new THREE.Mesh(
@@ -71,23 +77,27 @@ function Exterior({
         leaves.position.set(x, 2.7, z);
         scene.add(leaves);
       }
+      const benchStart=scene.children.length;
       box(2, 0.18, 0.6, 2, 0.65, 0.5, "#a49076");
-      box(2, 0.65, 0.12, 2, 1, 0.8, "#887861");
-      box(0.4, 0.018, 0.25, 2, 0.76, 0.4, "#efdfb7", "garden-note");
+      box(2, 0.65, 0.12, 2, 1, 0.16, "#887861");
       for (const x of [1.25, 2.75]) box(0.12, 0.6, 0.4, x, 0.3, 0.5, "#6c6b68");
+      picks.push(groupObjects(scene,scene.children.slice(benchStart),"garden-bench",BUILTIN_TRANSFORMS["garden-bench"]));
+      decoratePaper(box(0.4, 0.018, 0.25, 2, 0.77, 0.4, "#efdfb7", "garden-note"),'Записка · осмотреть');
       box(3, 0.6, 0.2, -2, 0.3, -3, "#6e8272");
     } else {
-      box(9, 0.2, 6, 0, -0.1, 0, "#687575");
+      box(70, 0.2, 35, 0, -0.1, 0, "#687575");
       for (const z of [-1.6, -2.4]) box(10, 0.07, 0.08, 0, 0.06, z, "#b7b6ab");
       for (let x = -4; x < 5; x += 0.7)
         box(0.12, 0.06, 1, x, 0.02, -2, "#5c534e");
+      const trainStart=scene.children.length;
       box(7, 1.8, 1.5, 0, 1, -2, "#638c8c");
       for (let x = -2.5; x < 3; x += 1.2)
         box(0.8, 0.65, 0.05, x, 1.2, -1.22, "#e3c58d");
+      picks.push(groupObjects(scene,scene.children.slice(trainStart),"station-train",BUILTIN_TRANSFORMS["station-train"]));
       box(5, 0.14, 2, 0, 2.8, 1, "#9aaba3");
       for (const x of [-2, 2]) box(0.12, 2.8, 0.12, x, 1.4, 1.4, "#829a91");
       box(0.65, 0.8, 0.4, 1.4, 0.4, 1.2, "#aaa39a");
-      box(0.4, 0.018, 0.26, 1.4, 0.82, 1.2, "#e6d6b5", "ticket");
+      decoratePaper(box(0.4, 0.018, 0.26, 1.4, 0.83, 1.2, "#e6d6b5", "ticket"),'Билет · предъявить');
     }
     const chars = [];
     objects
@@ -106,22 +116,24 @@ function Exterior({
         );
         head.position.y = 1.26;
         g.add(body, head);
+        addCharacterDetails(g,mat);
         g.position.set(-0.6 + i * 1.3, 0, 0.4);
         g.userData.id = o.id;
         scene.add(g);
         picks.push(g);
         chars.push(g);
       });
+    objects.filter(o=>o.builtin&&!picks.some(m=>m.userData.id===o.id)).forEach(o=>{const source=picks.find(m=>m.userData.id===o.builtin);if(source){const copy=cloneSceneObject(source,o.id);scene.add(copy);picks.push(copy);}});
     objects
       .filter(
-        (o) =>
+        (o) => !picks.some(m=>m.userData.id===o.id)&&
           o.type !== "Персонаж" &&
-          !["garden-note", "ticket", "letter", "door", "fireplace"].includes(
+          !["garden-note", "ticket", "letter", "door", "fireplace", "room-table", "room-sofa", "garden-bench", "station-train"].includes(
             o.id,
           ),
       )
       .forEach((o) =>
-        box(0.5, 0.5, 0.5, 0, 0.25, 1, o.color || "#a3969f", o.id),
+        (()=>{const mesh=box(0.5, 0.5, 0.5, 0, 0.25, 1, o.color || "#a3969f", o.id);mesh.geometry.dispose();mesh.geometry=meshGeometry(o.primitive);mesh.userData.primitive=o.primitive||"box";return mesh;})(),
       );
     const grid = new THREE.GridHelper(20, 20, 0x344d4d, 0x293b3d);
     grid.position.y = -0.25;
@@ -146,7 +158,7 @@ function Exterior({
         opacity: 0.3,
       }),
     );
-    scene.add(rain);
+    const updateAtmosphere=atmosphere(scene,{kind,renderer,sun,hemi});
     const ro = new ResizeObserver(() => {
       const { width, height } = element.getBoundingClientRect();
       if (width < 1 || height < 1) return;
@@ -155,11 +167,13 @@ function Exterior({
       camera.updateProjectionMatrix();
     });
     ro.observe(element);
+    const gizmo=createSceneGizmo(scene,camera,renderer.domElement,controls,()=>live.current,()=>picks);
+    const cameraRig=createCameraRig(scene,camera,controls,renderer.domElement,()=>live.current);if(cameraApi)cameraApi.current=cameraRig;
     let down;
     const ray = new THREE.Raycaster();
-    const press = (e) => (down = [e.clientX, e.clientY]);
+    const press = (e) => {down=[e.clientX,e.clientY];renderer.domElement.closest(".scene-viewport")?.focus({preventScroll:true});};
     const click = (e) => {
-      if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5)
+      if (cameraRig.blocksClick() || gizmo.blocksClick() || !down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5)
         return;
       const r = element.getBoundingClientRect();
       ray.setFromCamera(
@@ -169,46 +183,25 @@ function Exterior({
         ),
         camera,
       );
+      const cameraHit=cameraRig.pick(ray);if(cameraHit){live.current.onCameraSelect?.(cameraHit);return;}
       let hit = ray.intersectObjects(
         picks.filter((m) => m.visible),
         true,
-      )[0]?.object;
+      ).find(h=>{let o=h.object;while(o){if(!o.visible)return false;o=o.parent;}return true;})?.object;
       if (hit) {
         while (!hit.userData.id && hit.parent) hit = hit.parent;
         if (live.current.mode === "game")
           live.current.onInteract?.(hit.userData.id);
         else live.current.onSelect?.(hit.userData.id);
-      }
+      }else if(live.current.mode==='game')live.current.onInteract?.(null);
     };
     renderer.domElement.addEventListener("pointerdown", press);
     renderer.domElement.addEventListener("pointerup", click);
-    let frame, lastMode, editorCamera, lastCamera;
+    let frame, lastMode, editorCamera, lastCamera,previous=performance.now(),cameraReady=false;
     const render = () => {
       frame = requestAnimationFrame(render);
-      const { state, mode, showGrid } = live.current;
-      if (lastMode !== mode) {
-        if (lastMode === "scene")
-          editorCamera = {
-            position: camera.position.clone(),
-            target: controls.target.clone(),
-          };
-        if (mode === "scene" && editorCamera) {
-          camera.position.copy(editorCamera.position);
-          controls.target.copy(editorCamera.target);
-        }
-        controls.enabled = mode === "scene";
-        lastMode = mode;
-        lastCamera = null;
-      }
-      if (mode === "game" && lastCamera !== state.camera) {
-        camera.position.set(
-          ...(state.camera === "Крупный план" ? [4, 3.6, 6] : [8, 7, 10]),
-        );
-        controls.target.set(0, 0.6, 0);
-        camera.lookAt(controls.target);
-        lastCamera = state.camera;
-      }
-      if (controls.enabled) controls.update();
+      const { state, mode, showGrid,objects } = live.current;
+      const now=performance.now(),dt=Math.min(.05,(now-previous)/1000);previous=now;const animTime=updateAtmosphere(state,dt);
       grid.visible = showGrid && mode === "scene";
       const anchors = {
         камин: [-2, 0, 0.3],
@@ -223,28 +216,24 @@ function Exterior({
           return;
         }
         mesh.visible = o.active && state.visible?.[o.id] !== false;
-        if (mesh.material) {
-          mesh.material.emissive.set(
-            state.interactionTarget === o.id ? "#967554" : "#000000",
-          );
-          mesh.material.emissiveIntensity = 0.8;
-        }
-        if (!["garden-note", "ticket"].includes(o.id)) {
-          const position = anchors[state.positions?.[o.id] || o.position];
-          if (position) mesh.position.set(...position);
-          mesh.rotation.y = state.poses?.[o.id] === "задумчивость" ? 0.4 : 0;
-        }
+        if(mesh.userData.marker)mesh.userData.marker.visible=state.interactionTarget===o.id||state.highlights?.[o.id];
+        gizmo.apply(mesh,o,resolvedPosition(o,state,kind));
+        updateObjectHighlight(mesh,state.interactionTarget===o.id||!!state.highlights?.[o.id],animTime);
+        if(mode==='scene'&&live.current.editing)animatePose(mesh,null,0,false,true);
+        else animatePose(mesh,state.poses?.[o.id],animTime,!!state.motions?.[o.id]&&!state.motions[o.id].stopped&&!state.motions[o.id].paused&&state.motions[o.id].progress<1,state.paused);
+
       });
-      sun.intensity = live.current.state.time === "Ночь" ? 0.7 : 2.6;
-      rain.visible = live.current.state.weather !== "Ясно";
-      if (!state.paused && !state.weatherPaused)
-        rain.position.y = (-(Date.now() % 900) / 900) * 0.2;
+      gizmo.update();
+      cameraRig.update(dt,gizmo.dragging);
       renderer.render(scene, camera);
     };
     render();
     return () => {
       cancelAnimationFrame(frame);
       ro.disconnect();
+      if(cameraApi?.current===cameraRig)cameraApi.current=null;
+      cameraRig.dispose();
+      gizmo.dispose();
       controls.dispose();
       scene.traverse((o) => {
         o.geometry?.dispose();
@@ -253,7 +242,7 @@ function Exterior({
       renderer.dispose();
       renderer.domElement.remove();
     };
-  }, [kind, objects]);
+  }, [kind, objects.map(o=>o.id+o.type).join('|')]);
   return (
     <div
       ref={host}

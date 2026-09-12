@@ -14,8 +14,12 @@ export const TYPES = {
  wait:{label:'Пауза / ожидание',icon:'Hourglass',domain:null,completion:'FINITE'},
  variable:{label:'Изменить условие',icon:'SlidersHorizontal',domain:null,completion:'INSTANT'},
  visibility:{label:'Показать объект',icon:'Box',domain:'Видимость',completion:'INSTANT'},
+ lighting:{label:'Настроить свет',icon:'Lamp',domain:'Освещение',completion:'INSTANT'},
+ particles:{label:'Частицы в воздухе',icon:'Sparkles',domain:'Частицы',completion:'INSTANT'},
+ door:{label:'Открыть / закрыть дверь',icon:'DoorOpen',domain:'Дверь',completion:'INSTANT'},
+ highlight:{label:'Подсветить предмет',icon:'Scan',domain:'Подсказка',completion:'INSTANT'},
 };
-const actionDefaults={move:['alice','окно'],pose:['alice','улыбка'],camera:['camera','Общий план'],music:['audio','Главная тема'],pause:['audio','Пауза'],resume:['audio','Продолжить'],stop:['audio','Остановить'],duck:['audio','Под голос'],weather:['world','Дождь'],time:['world','Ночь'],sound:['world','Звук'],wait:['world','Пауза'],variable:['trust','+1'],visibility:['letter','Показать']};
+const actionDefaults={move:['alice','окно'],pose:['alice','улыбка'],camera:['camera','Общий план'],music:['audio','Главная тема'],pause:['audio','Пауза'],resume:['audio','Продолжить'],stop:['audio','Остановить'],duck:['audio','Под голос'],weather:['world','Дождь'],time:['world','Ночь'],sound:['world','Звук'],wait:['world','Пауза'],variable:['trust','+1'],visibility:['letter','Показать'],lighting:['world','Тёплый свет'],particles:['world','Светлячки'],door:['door','Открыть'],highlight:['letter','Подсветить']};
 export const makeAction = (type='move',target,value) => ({id:uid('action'),type,target:target??actionDefaults[type][0],value:value??actionDefaults[type][1],wait:TYPES[type].completion==='CONTINUOUS'?'STARTED':'COMPLETED',scope:TYPES[type].completion==='CONTINUOUS'?'EVENT':'SELF',conflict:['camera','music','weather'].includes(type)?'REPLACE_CURRENT':'FAIL_NEW',duration:2,queueTimeout:10,startTimeout:5,executionTimeout:30,stopTimeout:3,onFailure:'Остановить событие',finalState:'Сохранить результат',fallback:'Безопасное исходное состояние'});
 const event = (id,name,actions,more={})=>({id,name,description:'Готовая постановка для повторного использования',groups:[{id:`${id}-g1`,name:'Основное действие',actions}],retention:'AUTO_CLOSE_ON_FLOW_END',owner:'SubScene',...more});
 const bind=(eventId,extra={})=>({id:uid('binding'),eventId,hook:'ON_START',join:'EVENT_END',overrides:{},...extra});
@@ -101,6 +105,7 @@ export function createProject(){
 export const allBeats=p=>p.chapters.flatMap(c=>c.beats);
 export const resolvedActions=(p,b)=>{const e=p.events.find(e=>e.id===b.eventId);const first=e?.groups[0]?.actions[0]?.id;return e?.groups.flatMap(g=>g.actions.map(a=>({...a,...(a.id===first?b.overrides:{}),groupId:g.id})))||[]};
 export const targetName=(p,id)=>p.objects.find(x=>x.id===id)?.name||({world:'Мир',audio:'Музыка',camera:'Главная камера',trust:'Доверие'}[id]||id);
+export const validActionTarget=(p,a)=>a.type==='variable'?Object.hasOwn(p.variables||{},a.target):p.objects.some(o=>o.id===a.target)||['world','audio','camera','trust'].includes(a.target);
 export function routeTo(p,id){const result={},seen=new Set();let b=allBeats(p).find(b=>b.id===id);while(b?.branch&&!seen.has(b.branch)){seen.add(b.branch);const owner=allBeats(p).find(n=>n.choices?.some(c=>c.id===b.branch));if(!owner)break;result[owner.id]=b.branch;b=owner;}return result;}
 const resource = a=>TYPES[a.type]?.domain?`${a.target}/${TYPES[a.type].domain}`:null;
 export function validate(p){
@@ -124,14 +129,14 @@ export function validate(p){
   if(b.kind==='choice'&&!b.choices.some(c=>c.condition==='always'))add(`choice-${b.id}`,'Игрок может остаться без ответа','У каждого ответа есть условие. Добавьте вариант, доступный всегда.',b.id,null,'fallback');
   if(b.kind==='choice')for(const c of b.choices){if(c.next&&!allBeats(p).some(n=>n.id===c.next))add(`edge-${c.id}`,'Ответ ведёт в удалённый блок','Выберите существующий блок или общий путь.',b.id,null,'edge');}
   if(b.kind==='gate'&&!p.objects.some(o=>o.id===b.signal&&o.active&&o.type==='Активный меш'))add(`gate-${b.id}`,'Игрок не может выполнить ожидание','Объект для взаимодействия удалён, выключен или не является активным мешем.',b.id,null,'gate');
-  for(const binding of b.bindings)for(const a of resolvedActions(p,binding)){if(!validTargets.includes(a.target))add(`binding-target-${binding.id}`,'В размещении выбран удалённый объект','Измените локальную цель события.',b.id,binding.eventId,'binding-target');}
+  for(const binding of b.bindings)for(const a of resolvedActions(p,binding)){if(!validActionTarget(p,a))add(`binding-target-${binding.id}`,a.type==='variable'?'Переменная не найдена':'В размещении выбран удалённый объект','Измените локальную цель события.',b.id,binding.eventId,'binding-target');}
   for(const binding of b.bindings){if(!Object.keys(binding.overrides).length)continue;const claims=new Set();for(const a of resolvedActions(p,binding)){const key=`${a.groupId}/${resource(a)}`;if(resource(a)&&a.type!=='sound'&&claims.has(key))add(`local-group-${binding.id}-${key}`,'Локальная настройка создаёт конфликт действий','После изменения объекта два действия одного шага управляют одним свойством. Верните параметры шаблона.',b.id,binding.eventId,'reset-overrides');claims.add(key);}}
  }
  for(const ev of p.events){
   const beat=allBeats(p).find(b=>b.bindings.some(x=>x.eventId===ev.id));
   if(ev.retention==='HOLD_UNTIL_REPLACED'&&!ev.channel)add(`channel-${ev.id}`,'Не задана роль для замены','Событию «до замены» нужна общая роль, например «Фоновая музыка».',beat?.id,ev.id,'channel');
   for(const g of ev.groups){const claimed=new Map();for(const a of g.actions){
-   if(!validTargets.includes(a.target))add(`target-${a.id}`,'Объект действия не найден',`«${ev.name}» ссылается на удалённый объект ${a.target}.`,beat?.id,ev.id,'target');
+   if(!validActionTarget(p,a))add(`target-${a.id}`,a.type==='variable'?'Переменная не найдена':'Объект действия не найден',`«${ev.name}»: цель ${a.target} недоступна.`,beat?.id,ev.id,'target');
    if(TYPES[a.type]?.completion==='CONTINUOUS'&&(a.wait==='COMPLETED'||a.scope==='SELF'))add(`continuous-${a.id}`,'Бесконечное действие не может закончиться само','Для музыки выберите «дождаться запуска» и «до закрытия события».',beat?.id,ev.id,'continuous');
    if(a.conflict==='QUEUE'&&!Number(a.queueTimeout))add(`queue-${a.id}`,'Очередь без ограничения ожидания','Укажите время ожидания ресурса и действие при ошибке.',beat?.id,ev.id,'timeout');
    const key=resource(a);if(key&&a.type!=='sound'&&claimed.has(key))add(`group-${g.id}-${key}`,'Два действия одновременно меняют одно свойство',`${targetName(p,a.target)} → ${TYPES[a.type].domain}. Действия внутри одного шага запускаются вместе. Разнесите их по шагам.`,beat?.id,ev.id,'split-group');claimed.set(key,a.id);

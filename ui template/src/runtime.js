@@ -9,6 +9,7 @@ import {
   TYPES,
   conditionPass,
 } from "./studioModel.js";
+import {ANCHORS,objectTransform,resolvedPosition} from './sceneEditing.js';
 
 export class PreviewRuntime {
   constructor(audio, onChange = () => {}) {
@@ -67,7 +68,9 @@ export class PreviewRuntime {
     if (runId && this.snapshot.instances[runId]?.status === "stopped")
       throw new Error("INSTANCE_STOPPED");
   }
+  ownsAudio(key,runId){return this.audio.get?.(key)?.runId===runId;}
   async start(project, beatId) {
+    this.audio.unlock?.().catch(()=>{});
     this.stop();
     this.project = structuredClone(project);
     this.running = true;
@@ -84,6 +87,7 @@ export class PreviewRuntime {
       instances: {},
       variables: { ...project.variables },
       history: [],
+      activity: [],audition:false,
       world: { positions: {}, poses: {}, visible: {} },
     };
     try {
@@ -91,6 +95,22 @@ export class PreviewRuntime {
     } catch (e) {
       this.handle(e);
     }
+  }
+  async previewEvent(project,eventId,beatId){
+    this.audio.unlock?.().catch(()=>{});
+    if(!this.running||!this.snapshot.audition||this.snapshot.world.location!==sceneFor(project,beatId).id){
+      this.stop();this.running=true;this.project=structuredClone(project);const scene=sceneFor(project,beatId);
+      this.snapshot={...this.snapshot,beatId,phase:'EVENT_PREVIEW',audition:true,paused:false,ready:false,textVisible:false,error:null,activity:[],variables:{...project.variables},world:{location:scene.id,weather:scene.weather,time:scene.time,camera:'Общий план',cameraId:null,positions:{},poses:{},visible:{},motions:{}}};
+      for(const type of ['weather','time'])this.snapshot.effects[type]={key:type,type,name:scene[type],status:'held',owner:'SubScene',origin:scene.name};
+    }else {this.project.events=structuredClone(project.events);}
+    this.snapshot.auditionName=this.project.events.find(e=>e.id===eventId)?.name;this.snapshot.error=null;this.emit();
+    const token=this.generation,b={id:'audition-'+eventId,eventId,hook:'ON_START',join:'FLOW_END',overrides:{},actionOverrides:{}};
+    const candidate=structuredClone(this.project),beat=allBeats(candidate).find(x=>x.id===beatId);beat.bindings=[b];beat.batches={ON_START:[{id:'audition',mode:'SEQUENTIAL',bindingIds:[b.id]}]};
+    try{const issue=validateStudio(candidate).find(i=>i.level==='error'&&(i.beatId===beatId||i.eventId===eventId));if(issue)throw new Error(issue.title);
+      const claims=bindingActions(candidate,b).filter(a=>TYPES[a.type]?.domain).map(a=>a.target+'/'+TYPES[a.type].domain);
+      const conflict=Object.values(this.snapshot.instances).find(i=>['running','paused'].includes(i.status)&&this.project.events.find(e=>e.id===i.eventId)?.groups.some(g=>g.actions.some(a=>claims.includes(a.target+'/'+TYPES[a.type]?.domain))));
+      if(conflict){this.snapshot.error='«'+conflict.name+'» ещё выполняется. Дождитесь завершения или остановите его во вкладке «Активные».';this.emit();return;}
+      await this.binding(b,token);}catch(e){this.handle(e);}
   }
   stop() {
     this.generation++;
@@ -100,6 +120,7 @@ export class PreviewRuntime {
       ...this.snapshot,
       phase: "EDIT",
       paused: false,
+      audition:false,activity:[],
       ready: false,
       textVisible: true,
       effects: {},
@@ -131,12 +152,12 @@ export class PreviewRuntime {
     if (scene.id !== old) {
       for (const i of Object.values(this.snapshot.instances || {}))
         if (i.owner === "SubScene" && i.sceneId !== scene.id) {
-          i.audioKeys.forEach((k) => this.audio.stop(k));
+          i.audioKeys.forEach((k) => {if(this.ownsAudio(k,i.id))this.audio.stop(k);});
           i.status = "stopped";
         }
       for (const [key, e] of Object.entries(this.snapshot.effects))
         if (e.owner === "SubScene") {
-          this.audio.stop(e.audioKey);
+          if(e.audioKey&&this.ownsAudio(e.audioKey,e.runId))this.audio.stop(e.audioKey);
           delete this.snapshot.effects[key];
         }
       this.snapshot.world = {
@@ -145,10 +166,19 @@ export class PreviewRuntime {
         weather: scene.weather,
         time: scene.time,
         camera: "Общий план",
+        cameraId:null,
         positions: {},
         poses: {},
+        visible: {},
+        motions:{},lighting:null,particles:null,doors:{},highlights:{},pausedDoors:{},door:null,highlight:null,
       };
+      for(const e of Object.values(this.snapshot.effects))if(['Scene','GameSession'].includes(e.owner)&&e.status!=='stopped'){
+        if(e.type==='door')this.snapshot.world.doors[e.target]=e.name;
+        else if(e.type==='highlight')this.snapshot.world.highlights[e.target]=e.name!=='Выключить';
+        else if(['weather','time','lighting','particles'].includes(e.type))this.snapshot.world[e.type]=e.name;
+      }
       for (const key of ["weather", "time"])
+        if(!this.snapshot.effects[key]||this.snapshot.effects[key].status==='stopped')
         this.snapshot.effects[key] = {
           key,
           name: scene[key],
@@ -160,6 +190,8 @@ export class PreviewRuntime {
         };
     }
     this.snapshot.beatId = id;
+    this.snapshot.hint=null;
+    if(id==='a1'&&!this.snapshot.history.length&&!this.project.objects.find(o=>o.id==='alice')?.transforms?.[scene.id])this.snapshot.world.positions.alice='вход';
     this.snapshot.ready = false;
     this.snapshot.error = null;
     this.snapshot.textVisible = false;
@@ -300,13 +332,17 @@ export class PreviewRuntime {
     )
       throw new Error("CANCELLED");
     this.snapshot.states[a.id] = "running";
+    const activity={id:event.runId+':'+a.id,runId:event.runId,actionId:a.id,type:a.type,target:a.target,value:a.value,name:event.name,status:'running',progress:0};
+    this.snapshot.activity=[...(this.snapshot.activity||[]).slice(-11),activity];
     this.emit();
     const world = this.snapshot.world;
-    const effect = (type, name, audioKey) => {
-      this.snapshot.effects[type] = {
-        key: type,
+    const effect = (type, name, audioKey, target) => {
+      const key=target?type+':'+target:type;
+      this.snapshot.effects[key] = {
+        key,
         runId: event.runId,
         type,
+        target,
         name,
         status: "held",
         owner: event.owner || "SubScene",
@@ -319,11 +355,14 @@ export class PreviewRuntime {
     };
     switch (a.type) {
       case "move":
-        await this.delay(
-          Math.max(0.1, Number(a.duration || 2)) * 1000,
-          token,
-          event.runId,
-        );
+        {const duration=Math.max(.1,Number(a.duration||2))*1000;
+        const previous=world.motions?.[a.target],anchors=ANCHORS[sceneFor(this.project,this.snapshot.beatId).kind||world.location]||ANCHORS.living;
+        const movingObject=this.project.objects.find(o=>o.id===a.target);
+        let from=world.positions?.[a.target]||(movingObject?objectTransform(movingObject,world.location,sceneFor(this.project,this.snapshot.beatId).kind).position:'стол');
+        if(previous&&movingObject)from=resolvedPosition(movingObject,world,sceneFor(this.project,this.snapshot.beatId).kind);
+        const motion={from,to:a.value,progress:0,runId:event.runId};
+        world.motions={...world.motions,[a.target]:motion};
+        for(let elapsed=0;elapsed<duration;elapsed+=50){await this.delay(Math.min(50,duration-elapsed),token,event.runId);motion.progress=Math.min(1,(elapsed+50)/duration);activity.progress=motion.progress;this.emit();}}
         if (
           event.owner === "SubScene" &&
           event.originScene !== this.snapshot.world.location
@@ -336,6 +375,7 @@ export class PreviewRuntime {
         break;
       case "camera":
         world.camera = a.value;
+        world.cameraId = a.cameraId || null;
         break;
       case "weather":
         world.weather = a.value;
@@ -353,7 +393,11 @@ export class PreviewRuntime {
           loop: a.loop !== false,
           fade: a.fade ?? 1,
         });
+        if(this.audio.get('background'))this.audio.get('background').runId=event.runId;
         effect("music", a.value, "background");
+        await this.audio.get('background')?.started;
+        this.assert(token,event.runId);
+        if(this.audio.get('background')?.error)throw new Error(this.audio.get('background').error);
         break;
       case "pause":
         this.audio.pause("background");
@@ -368,35 +412,41 @@ export class PreviewRuntime {
             volume: 0.42,
             loop: true,
           });
+        if(this.audio.get('background'))this.audio.get('background').runId=event.runId;
+        this.snapshot.instances[event.runId].audioKeys.push('background');
         effect("music", "Главная тема", "background");
         break;
-      case "stop":
+      case "stop": {
+        const track=this.audio.get('background');
         await this.audio.fade("background", 0, Number(a.duration || 2));
         await this.delay(1, token, event.runId);
-        this.audio.stop("background");
-        if (this.snapshot.effects.music)
-          this.snapshot.effects.music.status = "stopped";
+        if(this.audio.get('background')===track){this.audio.stop("background");
+          if (this.snapshot.effects.music)this.snapshot.effects.music.status = "stopped";}
         break;
+      }
       case "sound":
         if (a.assetId) {
-          this.snapshot.instances[event.runId].audioKeys.push(a.id);
-          await this.audio.play(a.assetId, {
-            key: a.id,
+          const key=event.runId+':'+a.id;
+          this.snapshot.instances[event.runId].audioKeys.push(key);
+          const done=this.audio.play(a.assetId, {
+            key,
             volume: a.volume ?? 1,
             duck: a.duck !== false,
           });
+          if(this.audio.get(key))this.audio.get(key).runId=event.runId;
+          await done;
           this.assert(token, event.runId);
-          if (this.audio.get(a.id)?.error)
-            throw new Error(this.audio.get(a.id).error);
+          if (this.audio.get(key)?.error)
+            throw new Error(this.audio.get(key).error);
         } else
           await this.delay(Number(a.duration || 1) * 1000, token, event.runId);
         break;
       case "duck":
-        this.audio.duck(a.id, true);
+        this.audio.duck(event.runId+':'+a.id, true);
         try {
           await this.delay(Number(a.duration || 2) * 1000, token, event.runId);
         } finally {
-          this.audio.duck(a.id, false);
+          this.audio.duck(event.runId+':'+a.id, false);
         }
         break;
       case "variable": {
@@ -413,6 +463,10 @@ export class PreviewRuntime {
       case "visibility":
         world.visible = { ...world.visible, [a.target]: a.value !== "Скрыть" };
         break;
+      case 'lighting':world.lighting=a.value;effect('lighting',a.value);break;
+      case 'particles':world.particles=a.value;effect('particles',a.value);break;
+      case 'door':world.doors={...world.doors,[a.target]:a.value};world.pausedDoors={...world.pausedDoors,[a.target]:false};effect('door',a.value,null,a.target);break;
+      case 'highlight':world.highlights={...world.highlights,[a.target]:a.value!=='Выключить'};effect('highlight',a.value,null,a.target);break;
       case "wait":
         if (a.waitFor)
           throw new Error(
@@ -429,9 +483,11 @@ export class PreviewRuntime {
     await this.delay(0, token, event.runId);
     this.snapshot.states[a.id] =
       TYPES[a.type]?.completion === "CONTINUOUS" ? "held" : "done";
+    activity.status=this.snapshot.states[a.id];activity.progress=1;
     this.emit();
   }
   async advance(choiceId, objectId) {
+    this.audio.unlock?.().catch(()=>{});
     if (!this.running || !this.snapshot.ready || this.snapshot.paused) return;
     const b = allBeats(this.project).find((b) => b.id === this.snapshot.beatId),
       token = this.generation;
@@ -439,7 +495,8 @@ export class PreviewRuntime {
     if (b.kind === "gate" && objectId !== b.signal) return;
     if (b.kind === "gate") {
       this.snapshot.variables[b.signal] = true;
-      if (b.signal === "letter") this.snapshot.variables.letter = true;
+      const item=this.project.objects.find(o=>o.id===b.signal);
+      if ((item?.builtin||item?.id) === "letter") this.snapshot.variables.letter = true;
     }
     const next = chooseNext(
       this.project,
@@ -472,10 +529,9 @@ export class PreviewRuntime {
     this.snapshot.paused = !this.snapshot.paused;
     if (this.snapshot.paused) {
       this.pausedAudio = [...this.audio.tracks.values()]
-        .filter((t) => t.status === "playing")
-        .map((t) => t.key);
-      this.pausedAudio.forEach((k) => this.audio.pause(k));
-    } else this.pausedAudio?.forEach((k) => this.audio.resume(k));
+        .filter((t) => ['playing','loading'].includes(t.status));
+      this.pausedAudio.forEach((t) => this.audio.pause(t.key));
+    } else this.pausedAudio?.forEach((t) => {if(this.audio.get(t.key)===t&&t.status==='paused')this.audio.resume(t.key);});
     this.emit();
   }
   controlInstance(id, command) {
@@ -486,12 +542,11 @@ export class PreviewRuntime {
       i.status = "paused";
     } else if (command === "resume") i.status = i.resumeStatus || "running";
     else i.status = "stopped";
+    for(const m of Object.values(this.snapshot.world.motions||{}))if(m.runId===id){m.paused=command==='pause';if(command==='stop')m.stopped=true;}
+    for(const a of this.snapshot.activity||[])if(a.runId===id&&a.status==='running'&&command==='stop')a.status='stopped';
     // A shared music output may already belong to a newer instance.
     i.audioKeys.forEach((k) => {
-      const owner = Object.values(this.snapshot.effects).find(
-        (e) => e.audioKey === k,
-      );
-      if (!owner || owner.runId === id) this.audio[command](k);
+      if(this.ownsAudio(k,id))this.audio[command](k);
     });
     for (const [key, e] of Object.entries(this.snapshot.effects))
       if (e.runId === id) this.controlEffect(key, command);
@@ -501,6 +556,13 @@ export class PreviewRuntime {
   controlEffect(key, command, value) {
     const e = this.snapshot.effects[key];
     if (!e) return;
+    if(['door','highlight'].includes(e.type)){
+      e.status=command==='pause'?'paused':command==='stop'?'stopped':'held';if(command==='set')e.name=value;
+      if(e.type==='door')this.snapshot.world.pausedDoors={...this.snapshot.world.pausedDoors,[e.target]:command==='pause'};
+      const field=e.type==='door'?'doors':'highlights';this.snapshot.world[field]||={};
+      if(command!=='pause')this.snapshot.world[field][e.target]=command==='stop'?(e.type==='door'?null:false):(e.type==='door'?e.name:e.name!=='Выключить');
+      this.emit();return;
+    }
     if (command === "set") {
       e.name = value;
       this.snapshot.world[key] = value;
@@ -517,6 +579,8 @@ export class PreviewRuntime {
         this.snapshot.world.weather = "Ясно";
       if (key === "time" && command === "stop")
         this.snapshot.world.time = "День";
+      if(command==='stop'&&['lighting','particles','door','highlight'].includes(key))this.snapshot.world[key]=null;
+      if(command==='resume')this.snapshot.world[key]=e.name;
     }
     this.emit();
   }

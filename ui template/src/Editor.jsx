@@ -25,6 +25,7 @@ import {
   fixStudio,
 } from "./studioModel.js";
 import { fixIssue } from "./model.js";
+import {readProject} from './projectFiles.js';
 import { PreviewRuntime } from "./runtime.js";
 import { soundDesk, clockLabel } from "./audio.js";
 import {
@@ -40,6 +41,14 @@ import LocationScene from "./LocationScene.jsx";
 import EditorGraph from "./EditorGraph.jsx";
 import ActionFields from "./ActionFields.jsx";
 import FailureLab from "./FailureLab.jsx";
+import SubsceneWorkspace from './SubsceneWorkspace.jsx';
+import {createSubscene,cloneSubscene,setSceneEntry,connectSubscene,changeSceneLocation,newSceneDraft} from './subsceneModel.js';
+import EventPlayground from './EventPlayground.jsx';
+import AuthoringWorkspace from './AuthoringWorkspace.jsx';
+import TransformInspector from './TransformInspector.jsx';
+import CameraWorkspace from './CameraWorkspace.jsx';
+import {newCamera,cleanCamera,cameraFromView,cameraPose,resolveCamera} from './cameraModel.js';
+import {objectTransform,setObjectTransform,isObjectInScene} from './sceneEditing.js';
 
 const PROJECT_KEY = "sacura-studio-v2",
   LAYOUT_KEY = "sacura-workspace-v3";
@@ -67,7 +76,7 @@ function loadProject() {
     throw new Error("Неподдерживаемый формат сохранения");
   if (p.version === 1 && !localStorage.getItem("sacura-ui-project-v1-backup"))
     localStorage.setItem("sacura-ui-project-v1-backup", raw);
-  return upgradeProject(p);
+  return readProject(p);
 }
 function Fold({ title, icon, children, open = true, extra }) {
   return (
@@ -151,6 +160,8 @@ function GameDialogue({
       </div>
     );
   const ready = !running || (preview.ready && !preview.paused);
+  const canAdvance=ready&&!['choice','gate'].includes(beat.kind);
+  const next=()=>{if(canAdvance)running?onAdvance():onStart();};
   return (
     <div
       className="game-ui"
@@ -178,7 +189,7 @@ function GameDialogue({
           ))}
         </div>
       )}
-      <div className="game-dialogue">
+      <div className={'game-dialogue '+(canAdvance?'can-advance':'')} role={canAdvance?'button':undefined} tabIndex={canAdvance?0:undefined} aria-label={canAdvance?'Продолжить диалог':undefined} onClick={next} onKeyDown={e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();e.stopPropagation();next();}}}>
         <p>{beat.text}</p>
         {beat.kind === "gate" ? (
           <div className="game-wait">
@@ -189,14 +200,13 @@ function GameDialogue({
             </span>
           </div>
         ) : (
-          <button
+          <span
             className="game-next"
             title={running ? "Следующая реплика" : "Запустить сцену"}
-            disabled={!ready || beat.kind === "choice"}
-            onClick={() => (running ? onAdvance() : onStart())}
+            aria-hidden="true"
           >
             <Icon name={ready ? "ChevronDown" : "LoaderCircle"} size={20} />
-          </button>
+          </span>
         )}
         <div className="game-dialogue-footer">
           <span>
@@ -258,6 +268,7 @@ export default function Editor() {
     [follow, setFollow] = useState(true),
     [query, setQuery] = useState(""),
     [treeTab, setTreeTab] = useState("hierarchy"),
+    [compactPanel,setCompactPanel]=useState('workspace'),
     [picker, setPicker] = useState(null),
     [menu, setMenu] = useState(null),
     [notice, setNotice] = useState(""),
@@ -265,10 +276,21 @@ export default function Editor() {
     [audioTick, setAudioTick] = useState(0),
     [inspectorPinned, setInspectorPinned] = useState(false),
     [detailEditor, setDetailEditor] = useState(false),
-    [history, setHistory] = useState([]);
+    [history, setHistory] = useState([]),
+    [authorRequest,setAuthorRequest]=useState(null),
+    [subsceneRequest,setSubsceneRequest]=useState(null),
+    [subsceneDraft,setSubsceneDraft]=useState(null),
+    [editTool,setEditTool]=useState("translate"),
+    [editSpace,setEditSpace]=useState("world"),
+    [snap,setSnap]=useState(false),
+    [focusRequest,setFocusRequest]=useState(0),
+    [cameraPilotId,setCameraPilotId]=useState(null),
+    [cameraPreviewId,setCameraPreviewId]=useState(null),
+    [showCameras,setShowCameras]=useState(true);
   const root = useRef(),
     fileInput = useRef(),
     graphApi = useRef(),
+    cameraApi = useRef(),
     previewRef = useRef(),
     runtime = useRef();
   if (!runtime.current)
@@ -288,6 +310,7 @@ export default function Editor() {
       : beat,
     playScene = sceneFor(playProject, playBeat.id),
     displayScene = running ? playScene : scene;
+  useEffect(()=>setCompactPanel('workspace'),[dock,maximized,displayScene.id]);
   const world = useMemo(
     () =>
       running
@@ -295,6 +318,7 @@ export default function Editor() {
             ...preview.world,
             paused: preview.paused,
             weatherPaused: preview.effects.weather?.status === "paused",
+            particlesPaused:preview.effects.particles?.status==='paused',
             interactionTarget:
               preview.phase === "WAITING_OBJECT" ? playBeat.signal : null,
           }
@@ -312,9 +336,9 @@ export default function Editor() {
   const objects = useMemo(
     () =>
       playProject.objects.filter(
-        (o) => !o.subsceneId || o.subsceneId === displayScene.id,
+        (o) => isObjectInScene(o,displayScene),
       ),
-    [playProject, displayScene.id],
+    [playProject, displayScene],
   );
   const issues = useMemo(() => validateStudio(project), [project]),
     variables = running ? preview.variables : project.variables,
@@ -331,6 +355,10 @@ export default function Editor() {
             : event?.groups.flatMap((g) => g.actions)
           )?.find((a) => a.id === selection.id)
         : null;
+  useEffect(() => {
+    if (!project.actionTemplates || !project.groupTemplates || !project.sceneEditingVersion || project.subscenes.some(s=>!Array.isArray(s.cameras)))
+      setProject(p => upgradeProject(p));
+  }, [project]);
   useEffect(() => {
     if (seed.current.error) return;
     try {
@@ -362,6 +390,7 @@ export default function Editor() {
         const next = structuredClone(p);
         fn(next);
         allBeats(next).forEach(normalizeBatches);
+        if (JSON.stringify(next) === JSON.stringify(p)) return p;
         setHistory((h) => [...h.slice(-19), p]);
         return next;
       }),
@@ -531,15 +560,20 @@ export default function Editor() {
       ),
     );
   const start = () => {
+    setCameraPreviewId(null);setCameraPilotId(null);
+    soundDesk.unlock().catch(()=>{});
     setFollow(true);
     setMode("game");
     setShowDialogue(true);
     rt.start(project, beat.id);
   };
+  const audition=(eventId)=>{setCameraPreviewId(null);setCameraPilotId(null);soundDesk.unlock().catch(()=>{});setMode('game');setFollow(false);rt.previewEvent(project,eventId,beat.id);};
+  const editSample=(eventId)=>{setEventContext({eventId});setSelection({kind:'event',id:eventId});setDock('event');setDetailEditor(false);};
   const selectObject = (id) => {
     if (!inspectorPinned) setSelection({ kind: "object", id });
   };
   const interact = (id) => {
+    if(mode==='game'&&running&&preview.phase==='WAITING_INPUT'){rt.advance();return;}
     const o = objects.find((o) => o.id === id);
     if (
       mode === "game" &&
@@ -564,20 +598,15 @@ export default function Editor() {
     setMenu(null);
   };
   const importProject = async (e) => {
+    if(!e.target.files?.length)return;
     try {
-      const raw = JSON.parse(await e.target.files[0].text());
-      if (
-        ![1, 2].includes(raw.version) ||
-        !raw.events ||
-        !raw.objects ||
-        !raw.chapters
-      )
-        throw new Error("Неизвестный формат");
+      const next=readProject(await e.target.files[0].text()),entry=allBeats(next)[0].id;
       localStorage.setItem(PROJECT_KEY + "-backup-v3", JSON.stringify(project));
+      rt.stop();setHistory([]);setEventContext(null);setAuthorRequest(null);setSubsceneRequest(null);setSubsceneDraft(null);
+      setCameraPilotId(null);setCameraPreviewId(null);setPicker(null);setDetailEditor(false);setDock('story');setMaximized(null);setMode('game');
       seed.current.error = null;
-      const next = upgradeProject(raw);
       setProject(next);
-      setSelectedBeat(allBeats(next)[0].id);
+      setSelectedBeat(entry);setSelection({kind:'beat',id:entry});
       setNotice("Проект загружен.");
     } catch (err) {
       setNotice(err.message);
@@ -586,6 +615,7 @@ export default function Editor() {
   };
   const undo = () => {
     if (!history.length) return;
+    rt.stop();setCameraPilotId(null);setCameraPreviewId(null);
     setProject(history.at(-1));
     setHistory((h) => h.slice(0, -1));
   };
@@ -631,7 +661,7 @@ export default function Editor() {
           },
         ];
       if (kind === "gate") {
-        b.signal = "letter";
+        b.signal = objects.find(o=>o.type==='Активный меш'&&o.active!==false)?.id || 'letter';
         b.timeout = 30;
       }
       if (kind === "end") {
@@ -665,15 +695,52 @@ export default function Editor() {
     setDock("staging");
     setNotice("Событие добавлено в постановку реплики.");
   };
-  const createEvent = () => {
-    const e = newEvent("move", "alice", "окно", "Новое событие");
-    mutate((p) => p.events.push(e));
-    setEventContext({ eventId: e.id });
-    setDock("event");
-    setSelection({ kind: "event", id: e.id });
-    setPicker(null);
+  const openAuthoring=(kind='event',options={})=>{setAuthorRequest({kind,...options,token:uid('request')});setDock('create');setMaximized('graph');setDetailEditor(false);setEventContext(null);setPicker(null);setMenu(null);};
+  const createEvent = () => openAuthoring('event');
+  const editScene=()=>{if(rt.running)rt.stop();setCameraPilotId(null);setCameraPreviewId(null);setMode('scene');setMaximized(null);setTreeTab('hierarchy');};
+  const openSubscenes=(mode='edit',id=displayScene.id)=>{
+    if(rt.running)rt.stop();const target=project.subscenes.find(s=>s.id===id);
+    if(target&&mode!=='create'){setSelectedBeat(target.entry);setSelection({kind:'scene',id});}
+    if(mode==='create')setSubsceneDraft({...newSceneDraft(project),choiceId:beat.choices?.[0]?.id||'',fromBeatId:beat.id});
+    setCameraPilotId(null);setCameraPreviewId(null);setDock('subscenes');setDetailEditor(false);setMenu(null);setPicker(null);
+    setSubsceneRequest({mode,token:uid('request')});setMaximized(value=>mode==='create'?'graph':value==='scene'?null:value);
   };
-  const addObject = (type) => {
+  const saveNewSubscene=(draft,copyId)=>{
+    if(rt.running)return 'Остановите воспроизведение перед созданием сабсцены.';
+    try{
+      const next=structuredClone(project),created=copyId?cloneSubscene(next,copyId):createSubscene(next,draft,draft.fromBeatId||beat.id);
+      mutate(p=>Object.assign(p,next));setSelectedBeat(created.entry);setSelection({kind:'scene',id:created.id});setMode('game');
+      setCameraPilotId(null);setCameraPreviewId(null);setMaximized(null);setSubsceneRequest({mode:'edit',token:uid('request')});
+      setNotice(copyId?'Копия создана: сценарий, объекты и камеры независимы. Шаблоны событий общие.':'Сабсцена создана. Настройте её здесь или откройте сценарий.');return null;
+    }catch(e){setNotice(e.message);return e.message;}
+  };
+  const openSubsceneBeat=id=>{if(rt.running)rt.stop();setCameraPilotId(null);setCameraPreviewId(null);selectBeat(id);setDock('story');setMaximized(null);};
+  const editSubscene=fn=>{if(!rt.running)mutate(fn);};
+  const openCameras=()=>{setDock('cameras');setMaximized(null);setDetailEditor(false);if(selection.kind!=='camera')setSelection({kind:'camera',id:displayScene.defaultCameraId||displayScene.cameras?.[0]?.id});};
+  const selectCamera=id=>{setSelection({kind:'camera',id});setDock('cameras');setDetailEditor(false);};
+  const changeCamera=(id,patch)=>{if(rt.running)return;mutate(p=>{const sc=p.subscenes.find(s=>s.id===displayScene.id),i=sc?.cameras?.findIndex(c=>c.id===id);if(i>=0)sc.cameras[i]=cleanCamera({...sc.cameras[i],...patch});});};
+  const createCamera=(followTarget)=>{
+    if(rt.running)return;const view=cameraApi.current?.capture();if(!view){setNotice('Дождитесь загрузки 3D-сцены.');return;}
+    const c=newCamera(view,followTarget?'Слежение · '+followTarget.name:'Камера '+((scene.cameras?.length||0)+1));
+    if(followTarget)Object.assign(c,{mode:'follow',followTargetId:followTarget.id,distance:3,height:1.7,yaw:-15,targetHeight:1.08});
+    mutate(p=>{const sc=p.subscenes.find(s=>s.id===scene.id);sc.cameras||=[];sc.cameras.push(c);if(followTarget||!sc.defaultCameraId)sc.defaultCameraId=c.id;});
+    setSelection({kind:'camera',id:c.id});setDock('cameras');setMaximized(null);setDetailEditor(false);setShowCameras(true);setNotice(followTarget?'Следящая камера назначена основной.':'Камера создана из текущего вида.');
+    if(followTarget){setMode('game');setCameraPreviewId(c.id);}else{setCameraPilotId(null);setMode('scene');}
+  };
+  const followCharacter=()=>{const target=objects.find(o=>o.id===selection.id&&o.type==='Персонаж')||objects.find(o=>o.type==='Персонаж'&&o.active);if(target)createCamera(target);};
+  const captureCamera=id=>{const c=scene.cameras?.find(c=>c.id===id),view=cameraApi.current?.capture();if(c&&view){changeCamera(id,cameraFromView(c,view,world,objects,scene.kind));setCameraPilotId(null);setNotice('Ракурс сохранён.');}};
+  const pilotCamera=id=>{editScene();setCameraPilotId(id);setSelection({kind:'camera',id});setDock('cameras');};
+  const viewCamera=id=>{setCameraPilotId(null);setCameraPreviewId(id);setMode('game');};
+  const deleteCamera=id=>{if(rt.running)return;mutate(p=>{const sc=p.subscenes.find(s=>s.id===scene.id);sc.cameras=sc.cameras.filter(c=>c.id!==id);if(sc.defaultCameraId===id)sc.defaultCameraId=sc.cameras[0]?.id||null;});if(cameraPilotId===id)setCameraPilotId(null);if(cameraPreviewId===id)setCameraPreviewId(null);setSelection({kind:'scene',id:scene.id});setNotice('Камера удалена. Ctrl+Z — отменить.');};
+  useEffect(()=>{setCameraPilotId(null);setCameraPreviewId(null);},[displayScene.id]);
+  const transformObject=(id,value)=>{if(rt.running)return;mutate(p=>setObjectTransform(p,id,scene.id,value));};
+  const duplicateObject=(object)=>{
+    const copy=structuredClone(object);copy.id=uid('object');copy.name=object.name+' · копия';copy.subsceneId=scene.id;copy.builtin=object.builtin||(['letter','door','fireplace','garden-note','ticket'].includes(object.id)?object.id:undefined);const t=objectTransform(object,scene.id,scene.kind);t.position[0]+=.65;copy.transforms={[scene.id]:t};
+    mutate(p=>p.objects.push(copy));setSelection({kind:'object',id:copy.id});setFocusRequest(n=>n+1);
+  };
+  const deleteObject=id=>{mutate(p=>p.objects=p.objects.filter(o=>o.id!==id));setSelection({kind:'scene',id:scene.id});setNotice('Объект удалён. Ctrl+Z — вернуть; ссылки в событиях видны во вкладке «Ошибки».');};
+  const addObject = (type,primitive="box") => {
+    editScene();
     const id = uid("object");
     mutate((p) =>
       p.objects.push({
@@ -685,9 +752,12 @@ export default function Editor() {
         active: true,
         subsceneId: scene.id,
         interaction: "Осмотреть",
+        primitive,
+        transforms:{[scene.id]:{position:[0,type==="Персонаж"?0:.3,1],rotation:[0,0,0],scale:[1,1,1]}},
       }),
     );
     setSelection({ kind: "object", id });
+    setFocusRequest(n=>n+1);
     setPicker(null);
   };
   const attachSound = (asset, cfg) => {
@@ -756,6 +826,7 @@ export default function Editor() {
   useEffect(() => {
     const listener = (e) => {
       if (e.key === "Escape") {
+        setCompactPanel('workspace');
         setPicker(null);
         setMenu(null);
         setDetailEditor(false);
@@ -772,6 +843,7 @@ export default function Editor() {
       ) {
         e.preventDefault();
         if (history.length) {
+          rt.stop();setCameraPilotId(null);setCameraPreviewId(null);
           setProject(history.at(-1));
           setHistory((h) => h.slice(0, -1));
         }
@@ -782,6 +854,10 @@ export default function Editor() {
   }, [history]);
 
   const renderInspector = () => {
+    if(selection.kind==='camera'){
+      const c=displayScene.cameras?.find(c=>c.id===selection.id);
+      if(c)return <><div className="inspector-identity"><Icon name="Video" size={25}/><div><strong>{c.name}</strong><small>{displayScene.location}</small></div></div><Fold title="Кадр" icon="ScanLine"><p>{c.mode==='follow'?'Следует за персонажем: '+(objects.find(o=>o.id===c.followTargetId)?.name||'цель недоступна'):'Фиксированная камера'}</p><p>Угол обзора {c.fov}°</p><Button icon="Settings2" onClick={openCameras}>Открыть настройки камеры</Button><Button icon="Eye" onClick={()=>viewCamera(c.id)}>Посмотреть через камеру</Button></Fold></>;
+    }
     if (selection.kind === "batch") {
       const ph = PHASES.find((ph) =>
           beat.batches?.[ph.id]?.some((g) => g.id === selection.id),
@@ -903,12 +979,16 @@ export default function Editor() {
               title="Объект активен"
             />
           </div>
-          <Fold title="Положение" icon="Move">
+          <TransformInspector object={o} scene={scene} disabled={running} onChange={value=>transformObject(o.id,value)}
+            onReset={()=>mutate(p=>{const x=p.objects.find(x=>x.id===o.id);if(x.transforms)delete x.transforms[scene.id];})}
+            onFocus={()=>{editScene();setFocusRequest(n=>n+1);}} onDuplicate={()=>duplicateObject(o)} onDelete={()=>deleteObject(o.id)}/>
+          {running&&<Button icon="Square" onClick={editScene}>Остановить и редактировать сцену</Button>}
+          <Fold title="Объект сцены" icon="Box">
             <Field label="Опорная точка">
               <Select
                 value={o.position || "стол"}
                 options={["стол", "камин", "окно", "диван"]}
-                onChange={(position) => patch({ position })}
+                onChange={(position) => {const transforms={...o.transforms};delete transforms[scene.id];patch({position,transforms});}}
               />
             </Field>
             <Field label="Локация">
@@ -921,6 +1001,7 @@ export default function Editor() {
                 onChange={(subsceneId) => patch({ subsceneId })}
               />
             </Field>
+            {!o.builtin&&!['letter','door','fireplace','garden-note','ticket'].includes(o.id)&&o.type!=='Персонаж'&&<Field label="Форма"><Select value={o.primitive||'box'} options={[["box","Куб"],["sphere","Сфера"],["cylinder","Цилиндр"]]} onChange={primitive=>patch({primitive})}/></Field>}
             <Field label="Цвет в макете">
               <input
                 type="color"
@@ -951,19 +1032,7 @@ export default function Editor() {
           <Button
             className="inspector-add"
             icon="Plus"
-            onClick={() => {
-              const e = newEvent(
-                "move",
-                o.id,
-                "окно",
-                o.name + " подходит к окну",
-              );
-              mutate((p) => {
-                p.events.push(e);
-                addToBatch(p, beat.id, "ON_START", null, e.id);
-              });
-              openStaging(beat.id, "ON_START");
-            }}
+            onClick={() => openAuthoring('action',{target:o.id})}
           >
             Создать действие с объектом
           </Button>
@@ -1473,6 +1542,7 @@ export default function Editor() {
     return (
       <div className="project-browser">
         <div className="asset-folders">
+            <button onClick={()=>{setDock('create');setMaximized('graph');}}><Icon name="MousePointer2" size={15}/>Действия и группы</button>
           {[
             ["scenes", "PanelsTopLeft", "Сабсцены"],
             ["events", "Layers", "События"],
@@ -1529,9 +1599,7 @@ export default function Editor() {
                       selectBeat(a.entry);
                       setDock("story");
                     } else if (assetCategory === "events") {
-                      setEventContext({ eventId: a.id });
-                      setSelection({ kind: "event", id: a.id });
-                      setDock("event");
+                      openAuthoring('event',{id:a.id});
                     } else if (assetCategory === "audio") setDock("sound");
                     else selectObject(a.id);
                   }}
@@ -1612,15 +1680,15 @@ export default function Editor() {
             <span>
               <Icon
                 name={
-                  key === "music"
+                  TYPES[e.type]?.icon || (key === "music"
                     ? "Music2"
                     : key === "weather"
                       ? "CloudRain"
-                      : "Moon"
+                      : "Moon")
                 }
                 size={17}
               />
-              <strong>{e.name}</strong>
+              <strong>{e.target ? (project.objects.find(o=>o.id===e.target)?.name||e.target)+' · ' : ''}{e.name}</strong>
               <small>{e.origin}</small>
             </span>
             <span className={"effect-status " + e.status}>
@@ -1638,12 +1706,12 @@ export default function Editor() {
               }[e.owner] || e.owner}
             </span>
             <div>
-              {key !== "music" && (
+              {['weather','time'].includes(key) && (
                 <Select
                   value={e.name}
                   options={
                     key === "weather"
-                      ? ["Ясно", "Дождь", "Гроза", "Туман"]
+                      ? ["Ясно", "Дождь", "Гроза", "Туман", "Снег"]
                       : ["Рассвет", "День", "Закат", "Ночь"]
                   }
                   onChange={(value) =>
@@ -1759,6 +1827,7 @@ export default function Editor() {
             {m}
           </button>
         ))}
+        <Button icon="Plus" className="authoring-entry" onClick={()=>{setDock("create");setMaximized("graph");setDetailEditor(false);}}>Действия и события</Button>
         <div className="flex-space" />
         <span className="project-title">
           <Icon name="FolderOpen" size={14} />
@@ -1779,7 +1848,7 @@ export default function Editor() {
           <Select
             value={scene.id}
             onChange={(id) =>
-              selectBeat(project.subscenes.find((s) => s.id === id).entry)
+              openSubscenes('edit',id)
             }
             options={project.subscenes.map((s) => [s.id, s.name])}
           />
@@ -1839,7 +1908,10 @@ export default function Editor() {
           />
         </div>
       </div>
-      <div className="editor-workspace">
+      <div className={'editor-workspace compact-'+compactPanel}>
+        <nav className="compact-panel-tabs" aria-label="Панели редактора">
+          {[['hierarchy','ListTree','Объекты сцены'],['workspace','PanelsTopLeft','Рабочая область'],['inspector','Settings2','Свойства']].map(([id,icon,label])=><button key={id} aria-pressed={compactPanel===id} onClick={()=>setCompactPanel(id)}><Icon name={icon} size={13}/>{label}</button>)}
+        </nav>
         <aside className="hierarchy-panel">
           <div className="panel-tabs">
             <button
@@ -1882,10 +1954,10 @@ export default function Editor() {
                 </div>
                 <button
                   className="tree-row system"
-                  onClick={() => setSelection({ kind: "scene", id: scene.id })}
+                  onClick={openCameras}
                 >
                   <Icon name="Video" />
-                  Главная камера
+                  Камеры сабсцены
                   <Icon name="Eye" />
                 </button>
                 <button
@@ -1904,6 +1976,7 @@ export default function Editor() {
                   Звук и окружение
                   <Icon name="Eye" />
                 </button>
+                {(displayScene.cameras||[]).map(c=><button key={c.id} className={'tree-row system '+(selection.id===c.id?'selected':'')} onClick={()=>selectCamera(c.id)}><Icon name={c.mode==='follow'?'UserRoundCheck':'Video'} size={14}/>{c.name}{c.id===displayScene.defaultCameraId&&<Icon name="Star" size={12}/>}</button>)}
                 <div className="tree-folder">
                   <Icon name="ChevronDown" size={13} />
                   <Icon name="Folder" size={14} />
@@ -2041,45 +2114,14 @@ export default function Editor() {
               <Button
                 icon="Plus"
                 title="Создать сабсцену"
-                onClick={() => {
-                  const id = uid("scene"),
-                    entry = uid("line");
-                  mutate((p) => {
-                    p.subscenes.push({
-                      id,
-                      entry,
-                      name: "Новая сабсцена",
-                      location: "Новая локация",
-                      kind: "living",
-                      sceneId: "chapter1",
-                      weather: "Ясно",
-                      time: "День",
-                    });
-                    p.chapters.push({
-                      id: uid("chapter"),
-                      subsceneId: id,
-                      name: "Первый эпизод",
-                      beats: [
-                        {
-                          id: entry,
-                          kind: "dialogue",
-                          speaker: "Рассказчик",
-                          text: "Новая история.",
-                          next: null,
-                          bindings: [],
-                        },
-                      ],
-                    });
-                  });
-                  selectBeat(entry);
-                }}
+                onClick={() => openSubscenes('create')}
               />
             </div>
             {project.subscenes.map((s) => (
               <button
                 className={scene.id === s.id ? "active" : ""}
                 key={s.id}
-                onClick={() => selectBeat(s.entry)}
+                onClick={() => openSubscenes('edit',s.id)}
               >
                 <Icon
                   name={
@@ -2091,7 +2133,7 @@ export default function Editor() {
                   }
                   size={16}
                 />
-                <span>{s.location}</span>
+                <span title={s.location}>{s.name}</span>
                 <small>
                   {project.chapters
                     .filter((c) => c.subsceneId === s.id)
@@ -2121,10 +2163,10 @@ export default function Editor() {
             <div className="panel-tabs viewport-tabs">
               <button
                 className={mode === "scene" ? "active" : ""}
-                onClick={() => setMode("scene")}
+                onClick={editScene}
               >
                 <Icon name="Box" size={14} />
-                Сцена
+                Редактор сцены
               </button>
               <button
                 className={mode === "game" ? "active" : ""}
@@ -2133,6 +2175,7 @@ export default function Editor() {
                 <Icon name="Gamepad2" size={15} />
                 Игра
               </button>
+              <button className={dock==="cameras"?"active":""} onClick={openCameras}><Icon name="Video" size={14}/>Камеры</button>
               <span className="viewport-location">{displayScene.location}</span>
               <div className="flex-space" />
               <button
@@ -2158,6 +2201,7 @@ export default function Editor() {
               className="scene-viewport"
               tabIndex={0}
               onKeyDown={(e) => {
+                if(mode==='scene'&&!running&&!['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)&&!e.target.isContentEditable){const key=e.key.toLowerCase(),tools={q:'select',w:'translate',e:'rotate',r:'scale'};if(tools[key]){e.preventDefault();setEditTool(tools[key]);}if(key==='f'){e.preventDefault();setFocusRequest(n=>n+1);}}
                 if (
                   mode === "game" &&
                   [" ", "Enter"].includes(e.key) &&
@@ -2169,6 +2213,9 @@ export default function Editor() {
               }}
             >
               <LocationScene
+                sceneId={displayScene.id}
+                editTool={editTool} editSpace={editSpace} snap={snap} focusRequest={cameraPilotId?0:focusRequest} editing={!running&&!cameraPilotId} onTransform={transformObject}
+                cameraScene={displayScene} selectedCameraId={selection.kind==='camera'?selection.id:null} cameraPreviewId={cameraPreviewId} cameraPilotId={cameraPilotId} onCameraChange={changeCamera} onCameraSelect={selectCamera} cameraApi={cameraApi} showCameras={showCameras}
                 kind={displayScene.kind}
                 objects={objects}
                 state={world}
@@ -2178,25 +2225,18 @@ export default function Editor() {
                 onSelect={selectObject}
                 onInteract={interact}
               />
-              <div className="viewport-tools">
-                <Button
-                  icon="Hand"
-                  className={mode === "scene" ? "active" : ""}
-                  title="Вращать сцену мышью"
-                  onClick={() => setMode("scene")}
-                />
-                <Button
-                  icon="Grid3X3"
-                  className={showGrid ? "active" : ""}
-                  title="Сетка сцены"
-                  onClick={() => setShowGrid((v) => !v)}
-                />
-                <Button
-                  icon="Crosshair"
-                  title="Выделить Алису"
-                  onClick={() => selectObject("alice")}
-                />
-              </div>
+              {mode==='scene'&&!cameraPilotId&&<div className="scene-edit-bar">
+                <button className="scene-edit-add" onClick={()=>setPicker({kind:'object'})}><Icon name="Plus" size={14}/>Объект</button>
+                {[['select','MousePointer2','Выбор','Q'],['translate','Move','Сдвиг','W'],['rotate','Rotate3D','Поворот','E'],['scale','Scaling','Масштаб','R']].map(([tool,icon,label,key])=><button key={tool} disabled={running||(selection.kind==='camera'&&(tool==='scale'||(tool==='rotate'&&displayScene.cameras?.find(c=>c.id===selection.id)?.mode==='follow')))} title={label+' · '+key} className={editTool===tool?'active':''} onClick={()=>setEditTool(tool)}><Icon name={icon} size={14}/>{label}</button>)}
+                <button title="Привязка: 0,25 м / 15° / 0,1×" className={snap?'active':''} onClick={()=>setSnap(v=>!v)}><Icon name="Magnet" size={14}/></button>
+                <select aria-label="Оси трансформации" value={editSpace} onChange={e=>setEditSpace(e.target.value)}><option value="world">Мир</option><option value="local">Объект</option></select>
+                <Button icon="Video" title="Показать камеры в 3D" className={showCameras?"active":""} onClick={()=>setShowCameras(v=>!v)}/>
+                <Button icon="Grid3X3" title="Сетка сцены" onClick={()=>setShowGrid(v=>!v)}/>
+                <Button icon="Focus" title="Приблизить выбранный объект · F" disabled={selection.kind!=='object'} onClick={()=>setFocusRequest(n=>n+1)}/>
+              </div>}
+              {mode==='scene'&&!cameraPilotId&&<div className="scene-edit-hint">{running?'Остановите воспроизведение для редактирования':selection.kind==='camera'?'Камера · тяните цветную ось или настройте ракурс мышью':selection.kind==='object'?`${inspectedObject?.name||'Объект'} · тяните цветную ось`:'Выберите объект в сцене или иерархии'}<span>Мышь — обзор · правая кнопка — панорама · колесо — масштаб</span></div>}
+              {cameraPilotId&&mode==='scene'&&<div className="camera-pilot-bar"><Icon name="Video"/><span>Настройка: {displayScene.cameras?.find(c=>c.id===cameraPilotId)?.name}<small>Обзор мышью · правая кнопка — сдвиг · колесо — приближение</small></span><Button icon="Check" onClick={()=>captureCamera(cameraPilotId)}>Сохранить ракурс</Button><Button icon="X" title="Вернуться без сохранения" onClick={()=>setCameraPilotId(null)}/></div>}
+              {mode==='game'&&<div className="camera-view-badge"><Icon name={resolveCamera(displayScene,world,objects,cameraPreviewId).mode==='follow'?'UserRoundCheck':'Video'} size={14}/>{resolveCamera(displayScene,world,objects,cameraPreviewId).name}{cameraPreviewId&&<button onClick={()=>setCameraPreviewId(null)}>По сценарию <Icon name="X" size={12}/></button>}</div>}
               <div className="viewport-state">
                 <span>
                   <Icon
@@ -2205,11 +2245,11 @@ export default function Editor() {
                     }
                     size={13}
                   />
-                  {world.weather}
+                  <select aria-label="Погода в превью" value={world.weather||'Ясно'} onChange={e=>running?rt.controlEffect('weather','set',e.target.value):mutate(p=>p.subscenes.find(s=>s.id===scene.id).weather=e.target.value)}>{['Ясно','Дождь','Гроза','Туман','Снег'].map(w=><option key={w}>{w}</option>)}</select>
                 </span>
                 <span>
                   <Icon name="Moon" size={13} />
-                  {world.time}
+                  <select aria-label="Время суток в превью" value={world.time||'День'} onChange={e=>running?rt.controlEffect('time','set',e.target.value):mutate(p=>p.subscenes.find(s=>s.id===scene.id).time=e.target.value)}>{['Рассвет','День','Закат','Ночь'].map(t=><option key={t}>{t}</option>)}</select>
                 </span>
               </div>
               <GameDialogue
@@ -2223,14 +2263,19 @@ export default function Editor() {
                   playProject.objects.find((o) => o.id === playBeat.signal)
                     ?.name
                 }
-                show={showDialogue}
+                show={mode==="game"&&showDialogue&&!preview?.audition}
               />
-              {running && !preview.textVisible && (
+              {running && !preview.textVisible && !preview.audition && (
                 <div className="scene-preparing">
                   <Icon name="LoaderCircle" size={15} />
                   {preview.error || "Подготовка сцены перед репликой"}
                 </div>
               )}
+              {running&&<div className="scene-activity" aria-live="polite">
+                {preview.audition&&<header><Icon name="Clapperboard" size={13}/><strong>Проба · {preview.auditionName}</strong><button title="Закончить пробу" onClick={()=>rt.stop()}><Icon name="X" size={13}/></button></header>}
+                {(preview.activity||[]).slice(-4).map(a=><div className={'activity-item '+a.status} key={a.id}><Icon name={a.status==='running'?'LoaderCircle':'Check'} size={12}/><span>{TYPES[a.type]?.label} <b>{project.objects.find(o=>o.id===a.target)?.name||''} {String(a.value).slice(0,42)}</b></span>{a.status==='running'&&<progress max="1" value={a.progress||0}/>}</div>)}
+                {preview.error&&<span className="error-box">{preview.error}</span>}
+              </div>}
               <div className="viewport-caption">
                 <Icon name="Video" size={12} />
                 {mode === "game"
@@ -2243,6 +2288,7 @@ export default function Editor() {
               </div>
             </div>
             <div className="live-strip">
+              <output className="audio-output" title="Измеренный уровень на аудиовыходе" aria-label="Уровень звукового выхода"><Icon name="Volume2" size={13}/><meter min="0" max="1" value={[...soundDesk.tracks.values()].some(t=>t.status==='playing')?(soundDesk.output?.level()||0):0}/><span>{soundDesk.output?.context?.state==='running'?'Аудио включено':'Аудио · нажмите Play'}</span></output>
               <button onClick={() => setDock("active")}>
                 <Icon name="Activity" size={13} />
                 {running
@@ -2264,6 +2310,7 @@ export default function Editor() {
               {soundDesk.ducks.size > 0 && (
                 <span className="duck-label">Голос → музыка −12 dB</span>
               )}
+              {[...soundDesk.tracks.values()].some(t=>t.status==='error')&&<button className="audio-error" onClick={()=>setDock('sound')}>Ошибка аудио · открыть</button>}
               <button onClick={() => setDock("active")}>
                 Управление <Icon name="ChevronRight" size={12} />
               </button>
@@ -2281,10 +2328,14 @@ export default function Editor() {
             <div className="panel-tabs dock-tabs">
               {[
                 ["story", "Workflow", "Сценарий"],
+                ["subscenes", "Network", "Сабсцены"],
+                ["cameras", "Video", "Камеры"],
                 ["staging", "Clapperboard", "Постановка"],
                 ["event", "Layers", "Событие"],
+                ["create", "Plus", "Создание"],
                 ["assets", "FolderOpen", "Проект"],
                 ["sound", "Music2", "Звук"],
+                ["samples", "Sparkles", "Эффекты"],
                 ["active", "Activity", "Активные"],
                 ["issues", "TriangleAlert", "Ошибки"],
               ].map(([id, icon, label]) => (
@@ -2294,6 +2345,7 @@ export default function Editor() {
                   disabled={id === "event" && !event}
                   onClick={() => {
                     setDock(id);
+                    if(id==="create")setMaximized("graph");
                     setDetailEditor(false);
                   }}
                 >
@@ -2437,7 +2489,11 @@ export default function Editor() {
                 } catch {}
               }}
             >
-              {detailEditor && event ? (
+              <AuthoringWorkspace hidden={dock!=='create'} project={project} request={authorRequest} mutate={mutate} beat={beat} onNotice={setNotice}
+                onGraph={id=>{setEventContext({eventId:id});setSelection({kind:'event',id});setDock('event');}}
+                onPreview={draft=>{setCameraPreviewId(null);setCameraPilotId(null);const test=structuredClone(project);const i=test.events.findIndex(e=>e.id===draft.id);if(i<0)test.events.push(draft);else test.events[i]=draft;soundDesk.unlock();rt.stop();setMode('game');setMaximized(null);setFollow(false);rt.previewEvent(test,draft.id,beat.id);}}
+                onPlace={(draft,hook)=>{mutate(p=>addToBatch(p,beat.id,hook,null,draft.id));setPhase(hook);setDock('staging');setMaximized(null);setNotice('Добавлено: '+draft.name+' · '+PHASES.find(x=>x.id===hook).label);}}/>
+              {dock==='create'?null:detailEditor && event ? (
                 <EventEditor
                   project={project}
                   event={event}
@@ -2447,7 +2503,7 @@ export default function Editor() {
                   onBack={() => setDetailEditor(false)}
                   onTemplate={() => setEventContext({ eventId: event.id })}
                   onAdd={addEvent}
-                  onPreview={start}
+                  onPreview={()=>audition(event.id)}
                 />
               ) : ["story", "staging", "event"].includes(dock) ? (
                 <EditorGraph
@@ -2486,7 +2542,14 @@ export default function Editor() {
                     })
                   }
                 />
-              ) : dock === "assets" ? (
+              ) : dock === 'cameras' ? <CameraWorkspace scene={displayScene} objects={objects} state={world} selected={selection.kind==='camera'?selection.id:null} onSelect={selectCamera} onCreate={()=>createCamera()} onFollow={followCharacter} onChange={changeCamera} onDefault={id=>mutate(p=>p.subscenes.find(s=>s.id===scene.id).defaultCameraId=id)} onDelete={deleteCamera} onPilot={pilotCamera} onView={viewCamera} onCapture={captureCamera} piloting={cameraPilotId} running={running} onEdit={editScene}/> : dock === 'subscenes' ? <SubsceneWorkspace project={project} scene={displayScene} beat={nodes.find(b=>b.id===subsceneDraft?.fromBeatId)||beat} request={subsceneRequest} draft={subsceneDraft} onDraftChange={setSubsceneDraft} running={running}
+                onStop={()=>rt.stop()} onSelect={id=>openSubscenes('edit',id)} onCreate={draft=>saveNewSubscene(draft)} onDuplicate={id=>saveNewSubscene(null,id)}
+                onPatch={patch=>editSubscene(p=>Object.assign(p.subscenes.find(s=>s.id===scene.id),patch))}
+                onKind={kind=>editSubscene(p=>changeSceneLocation(p,scene.id,kind))} onEntry={(id,reroute)=>editSubscene(p=>setSceneEntry(p,scene.id,id,reroute))}
+                onConnect={(from,choice,to)=>{editSubscene(p=>connectSubscene(p,from,choice,to));setNotice('Переход сохранён. Он виден на карте и работает при запуске.');}}
+                onDisconnect={(from,choice,to)=>{editSubscene(p=>{const b=allBeats(p).find(b=>b.id===from),edge=choice?b?.choices.find(c=>c.id===choice):b;if(edge?.next===to)edge.next=null;});setNotice('Переход убран. Ctrl+Z — вернуть.');}}
+                onOpenBeat={openSubsceneBeat} onScene={editScene} onCameras={openCameras} onCreateRequest={()=>openSubscenes('create')}
+                onCancel={()=>setSubsceneRequest({mode:'edit',token:uid('request')})}/> : dock === 'samples' ? <EventPlayground project={project} preview={preview} scene={displayScene} onPreview={audition} onEdit={editSample} onAdd={id=>{mutate(p=>addToBatch(p,beat.id,'ON_START',null,id));setNotice('Событие добавлено: во время реплики '+beat.id);}}/> : dock === "assets" ? (
                 renderAssets()
               ) : dock === "sound" ? (
                 <SoundWorkspace onAttach={attachSound} />
@@ -2546,7 +2609,7 @@ export default function Editor() {
           <div className="panel-tabs">
             <button className="active">Инспектор</button>
             <button
-              onClick={() => setSelection({ kind: "scene", id: scene.id })}
+              onClick={() => openSubscenes()}
             >
               Сабсцена
             </button>
@@ -2565,78 +2628,12 @@ export default function Editor() {
                   <Icon name="PanelsTopLeft" size={25} />
                   <strong>{scene.name}</strong>
                 </div>
-                <Fold title="Локация" icon="MapPin">
-                  <Field label="Название">
-                    <input
-                      value={scene.name}
-                      onChange={(e) =>
-                        mutate(
-                          (p) =>
-                            (p.subscenes.find((s) => s.id === scene.id).name =
-                              e.target.value),
-                        )
-                      }
-                    />
-                  </Field>
-                  <Field label="Локация">
-                    <input
-                      value={scene.location}
-                      onChange={(e) =>
-                        mutate(
-                          (p) =>
-                            (p.subscenes.find(
-                              (s) => s.id === scene.id,
-                            ).location = e.target.value),
-                        )
-                      }
-                    />
-                  </Field>
-                  <Field label="Сцена из примитивов">
-                    <Select
-                      value={scene.kind}
-                      options={[
-                        ["living", "Гостиная"],
-                        ["garden", "Сад"],
-                        ["station", "Станция"],
-                      ]}
-                      onChange={(kind) =>
-                        mutate(
-                          (p) =>
-                            (p.subscenes.find((s) => s.id === scene.id).kind =
-                              kind),
-                        )
-                      }
-                    />
-                  </Field>
-                </Fold>
-                <Fold title="Начальное окружение" icon="CloudSun">
-                  <Field label="Погода">
-                    <Select
-                      value={scene.weather}
-                      options={["Ясно", "Дождь", "Гроза", "Туман"]}
-                      onChange={(weather) =>
-                        mutate(
-                          (p) =>
-                            (p.subscenes.find(
-                              (s) => s.id === scene.id,
-                            ).weather = weather),
-                        )
-                      }
-                    />
-                  </Field>
-                  <Field label="Время суток">
-                    <Select
-                      value={scene.time}
-                      options={["Рассвет", "День", "Закат", "Ночь"]}
-                      onChange={(time) =>
-                        mutate(
-                          (p) =>
-                            (p.subscenes.find((s) => s.id === scene.id).time =
-                              time),
-                        )
-                      }
-                    />
-                  </Field>
+                <Fold title="Сабсцена" icon="MapPin">
+                  <p>{scene.location} · {scene.weather} · {scene.time}</p>
+                  {scene.description && <p>{scene.description}</p>}
+                  <Button icon="Settings2" onClick={() => openSubscenes()}>Открыть редактор сабсцены</Button>
+                  <Button icon="Box" onClick={editScene}>Редактировать 3D-сцену</Button>
+                  <Button icon="Workflow" onClick={() => openSubsceneBeat(scene.entry)}>Открыть сценарий</Button>
                 </Fold>
               </>
             ) : (
@@ -2740,6 +2737,9 @@ export default function Editor() {
             </button>
           ) : menu === "Создать" ? (
             <>
+              <button onClick={()=>openSubscenes('create')}><Icon name="PanelsTopLeft"/>Сабсцена</button>
+              <button onClick={()=>openAuthoring('action')}><Icon name="MousePointer2"/>Действие</button>
+              <button onClick={()=>openAuthoring('group')}><Icon name="Columns2"/>Группа действий</button>
               <button
                 onClick={() => {
                   setMenu(null);
@@ -2873,24 +2873,7 @@ export default function Editor() {
               </>
             ) : picker.kind === "object" ? (
               <div className="create-options">
-                {["Персонаж", "Активный меш", "Меш"].map((t, i) => (
-                  <button key={t} onClick={() => addObject(t)}>
-                    <Icon
-                      name={["PersonStanding", "MousePointer2", "Box"][i]}
-                      size={23}
-                    />
-                    <span>
-                      <strong>{t}</strong>
-                      <small>
-                        {i === 0
-                          ? "Участвует в диалогах и постановке"
-                          : i === 1
-                            ? "Игрок может взаимодействовать"
-                            : "Декорация в сцене"}
-                      </small>
-                    </span>
-                  </button>
-                ))}
+                {[['Персонаж','box','PersonStanding','Персонаж','Участвует в диалогах и постановке'],['Активный меш','box','MousePointer2','Интерактивный предмет','Клик игрока запускает продолжение'],['Меш','box','Box','Куб','Декорация · размеры меняются мышью'],['Меш','sphere','Circle','Сфера','Простой объёмный объект'],['Меш','cylinder','Cylinder','Цилиндр','Колонна, ваза или временный объект']].map(([type,shape,icon,name,hint])=><button key={name} onClick={()=>addObject(type,shape)}><Icon name={icon} size={23}/><span><strong>{name}</strong><small>{hint}</small></span></button>)}
               </div>
             ) : picker.kind === "event" ? (
               <>
