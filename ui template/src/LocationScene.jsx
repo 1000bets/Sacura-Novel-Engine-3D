@@ -2,7 +2,7 @@ import {updateObjectHighlight} from './sceneEffects.js';
 import React, { useEffect, useRef } from "react";
 import * as THREE from "three";
 import {createCameraRig} from './CameraRig.js';
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import {createSceneNavigation} from './SceneNavigation.js';
 import {createSceneGizmo,groupObjects,meshGeometry,cloneSceneObject} from './SceneGizmo.js';
 import {BUILTIN_TRANSFORMS,resolvedPosition} from './sceneEditing.js';
 import Scene from "./Scene.jsx";
@@ -15,11 +15,11 @@ function Exterior({
   onSelect,
   onInteract,
   mode = "scene",
-  showGrid = true, selected, sceneId, editTool, editSpace, snap, onTransform, focusRequest, editing=true, cameraScene, selectedCameraId, cameraPreviewId, cameraPilotId, onCameraChange, onCameraSelect, cameraApi, showCameras=true,
+  showGrid = true, selected, selectedIds, sceneId, editTool, editSpace, snap, onTransform, onTransforms, focusRequest, editing=true, cameraScene, selectedCameraId, cameraPreviewId, cameraPilotId, onCameraChange, onCameraSelect, cameraApi, showCameras=true,
 }) {
   const host = useRef(),
     live = useRef();
-  live.current = { state, onSelect, onInteract, mode, showGrid,objects,selected,sceneId,kind,editTool,editSpace,snap,onTransform,focusRequest,editing,cameraScene,selectedCameraId,cameraPreviewId,cameraPilotId,onCameraChange,onCameraSelect,showCameras };
+  live.current = { state, onSelect, onInteract, mode, showGrid,objects,selected,selectedIds,sceneId,kind,editTool,editSpace,snap,onTransform,onTransforms,focusRequest,editing,cameraScene,selectedCameraId,cameraPreviewId,cameraPilotId,onCameraChange,onCameraSelect,showCameras };
   useEffect(() => {
     let renderer;
     try {
@@ -34,13 +34,10 @@ function Exterior({
     renderer.setClearColor("#18212a");renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.shadowMap.enabled=true;
     element.appendChild(renderer.domElement);
     const scene = new THREE.Scene(),
-      camera = new THREE.PerspectiveCamera(58, 1, 0.05, 100);
+      camera = new THREE.PerspectiveCamera(58, 1, 0.05, 400);
     camera.position.set(...gameCamera(kind,{})[0]);
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.set(...gameCamera(kind,{})[1]);controls.minDistance=.5;controls.maxDistance=25;
-    controls.enableDamping = true;
-    controls.enablePan = true;
-    controls.maxPolarAngle = 1.45;
+    const controls = createSceneNavigation(camera, renderer.domElement,()=>live.current);
+    controls.target.set(...gameCamera(kind,{})[1]);camera.lookAt(controls.target);
     const hemi=new THREE.HemisphereLight(0xc5d7ea, 0x253831, 2);scene.add(hemi);
     const sun = new THREE.DirectionalLight(0xffd5ac, 2);
     sun.position.set(-4, 9, 3);
@@ -60,15 +57,18 @@ function Exterior({
       }
       return mesh;
     };
+    const prop=(id,build)=>{const start=scene.children.length;build();const group=groupObjects(scene,scene.children.slice(start),id,BUILTIN_TRANSFORMS[id]);picks.push(group);return group;};
     if (kind === "garden") {
-      box(70, 0.2, 70, 0, -0.15, 0, "#3c544b");
-      box(1.6, 0.025, 35, 0, 0, -10, "#899286");
+      prop('garden-ground',()=>box(70, 0.2, 70, 0, -0.15, 0, "#3c544b"));
+      prop('garden-path',()=>box(1.6, 0.025, 35, 0, 0, -10, "#899286"));
+      let treeIndex=0;
       for (const [x, z] of [
         [-3, -2],
         [3, -2],
         [-3, 2],
         [5, 1],[-5,-7],[0,-9],[5,-8],[-6,4],
       ]) {
+        prop(`garden-tree-${++treeIndex}`,()=>{
         box(0.25, 2, 0.25, x, 0.9, z, "#776358");
         const leaves = new THREE.Mesh(
           new THREE.IcosahedronGeometry(1.35, 0),
@@ -76,6 +76,7 @@ function Exterior({
         );
         leaves.position.set(x, 2.7, z);
         scene.add(leaves);
+        });
       }
       const benchStart=scene.children.length;
       box(2, 0.18, 0.6, 2, 0.65, 0.5, "#a49076");
@@ -83,20 +84,24 @@ function Exterior({
       for (const x of [1.25, 2.75]) box(0.12, 0.6, 0.4, x, 0.3, 0.5, "#6c6b68");
       picks.push(groupObjects(scene,scene.children.slice(benchStart),"garden-bench",BUILTIN_TRANSFORMS["garden-bench"]));
       decoratePaper(box(0.4, 0.018, 0.25, 2, 0.77, 0.4, "#efdfb7", "garden-note"),'Записка · осмотреть');
-      box(3, 0.6, 0.2, -2, 0.3, -3, "#6e8272");
+      prop('garden-fence',()=>box(3, 0.6, 0.2, -2, 0.3, -3, "#6e8272"));
     } else {
-      box(70, 0.2, 35, 0, -0.1, 0, "#687575");
+      prop('station-platform',()=>box(70, 0.2, 35, 0, -0.1, 0, "#687575"));
+      prop('station-tracks',()=>{
       for (const z of [-1.6, -2.4]) box(10, 0.07, 0.08, 0, 0.06, z, "#b7b6ab");
       for (let x = -4; x < 5; x += 0.7)
         box(0.12, 0.06, 1, x, 0.02, -2, "#5c534e");
+      });
       const trainStart=scene.children.length;
       box(7, 1.8, 1.5, 0, 1, -2, "#638c8c");
       for (let x = -2.5; x < 3; x += 1.2)
         box(0.8, 0.65, 0.05, x, 1.2, -1.22, "#e3c58d");
       picks.push(groupObjects(scene,scene.children.slice(trainStart),"station-train",BUILTIN_TRANSFORMS["station-train"]));
+      prop('station-canopy',()=>{
       box(5, 0.14, 2, 0, 2.8, 1, "#9aaba3");
       for (const x of [-2, 2]) box(0.12, 2.8, 0.12, x, 1.4, 1.4, "#829a91");
-      box(0.65, 0.8, 0.4, 1.4, 0.4, 1.2, "#aaa39a");
+      });
+      prop('station-luggage',()=>box(0.65, 0.8, 0.4, 1.4, 0.4, 1.2, "#aaa39a"));
       decoratePaper(box(0.4, 0.018, 0.26, 1.4, 0.83, 1.2, "#e6d6b5", "ticket"),'Билет · предъявить');
     }
     const chars = [];
@@ -171,9 +176,9 @@ function Exterior({
     const cameraRig=createCameraRig(scene,camera,controls,renderer.domElement,()=>live.current);if(cameraApi)cameraApi.current=cameraRig;
     let down;
     const ray = new THREE.Raycaster();
-    const press = (e) => {down=[e.clientX,e.clientY];renderer.domElement.closest(".scene-viewport")?.focus({preventScroll:true});};
+    const press = (e) => {down=e.button===0&&!e.altKey?[e.clientX,e.clientY]:null;renderer.domElement.closest(".scene-viewport")?.focus({preventScroll:true});};
     const click = (e) => {
-      if (cameraRig.blocksClick() || gizmo.blocksClick() || !down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5)
+      if (e.button!==0 || e.altKey || controls.blocksClick() || cameraRig.blocksClick() || gizmo.blocksClick() || !down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5)
         return;
       const r = element.getBoundingClientRect();
       ray.setFromCamera(
@@ -192,8 +197,8 @@ function Exterior({
         while (!hit.userData.id && hit.parent) hit = hit.parent;
         if (live.current.mode === "game")
           live.current.onInteract?.(hit.userData.id);
-        else live.current.onSelect?.(hit.userData.id);
-      }else if(live.current.mode==='game')live.current.onInteract?.(null);
+        else live.current.onSelect?.(hit.userData.id,{additive:e.shiftKey||e.ctrlKey||e.metaKey});
+      }else if(live.current.mode==='game')live.current.onInteract?.(null);else live.current.onSelect?.(null,{additive:e.shiftKey||e.ctrlKey||e.metaKey});
     };
     renderer.domElement.addEventListener("pointerdown", press);
     renderer.domElement.addEventListener("pointerup", click);
@@ -225,6 +230,7 @@ function Exterior({
       });
       gizmo.update();
       cameraRig.update(dt,gizmo.dragging);
+      controls.tick(dt);
       renderer.render(scene, camera);
     };
     render();
@@ -235,9 +241,11 @@ function Exterior({
       cameraRig.dispose();
       gizmo.dispose();
       controls.dispose();
+      renderer.domElement.removeEventListener('pointerdown',press);
+      renderer.domElement.removeEventListener('pointerup',click);
       scene.traverse((o) => {
         o.geometry?.dispose();
-        o.material?.dispose();
+        if(Array.isArray(o.material))o.material.forEach(material=>material.dispose());else o.material?.dispose();
       });
       renderer.dispose();
       renderer.domElement.remove();
@@ -248,9 +256,7 @@ function Exterior({
       ref={host}
       className="scene-canvas"
       aria-label={
-        kind === "garden"
-          ? "3D сад с запиской на скамье"
-          : "3D станция с билетом"
+        (kind === "garden" ? "3D сад" : "3D станция") + '. ЛКМ — выбор; Alt + ЛКМ — вращение; средняя кнопка — панорама; ПКМ + WASD/QE — полёт; колесо — приближение; F — фокус.'
       }
     />
   );

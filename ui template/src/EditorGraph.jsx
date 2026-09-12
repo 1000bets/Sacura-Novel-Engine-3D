@@ -487,6 +487,7 @@ const EditorNode = memo(function EditorNode({ id, data, selected }) {
             compact
             action={action}
             project={project}
+            sceneId={data.sceneId}
             onChange={(v) => data.onPatchAction(action.id, v)}
           />
           <div className="node-action-end">
@@ -681,6 +682,8 @@ function GraphCanvas({
     mode === "story"
       ? `${mode}:${scope}:${scope === "chapter" ? project.chapters.find((c) => c.beats.some((b) => b.id === selectedId))?.id : scope === "scene" ? sceneFor(project, selectedId).id : scope === "nearby" ? selectedId : "all"}`
       : `${mode}:${mode === "staging" ? selectedId + phase : eventId}`;
+  const bindingBeat=binding&&allBeats(project).find(beat=>beat.bindings.some(item=>item.id===binding.id));
+  const activeSceneId=sceneFor(project,bindingBeat?.id||selectedId).id;
   useEffect(() => {
     setNodes((previous) =>
       graph.nodes.map((n) => ({
@@ -698,6 +701,7 @@ function GraphCanvas({
         data: {
           ...n.data,
           project,
+          sceneId:activeSceneId,
           onOpen,
           onEdit,
           onPhase,
@@ -741,6 +745,7 @@ function GraphCanvas({
     onPatchAction,
     onBatch,
     project,
+    activeSceneId,
   ]);
   useEffect(() => {
     if (!container.current) return;

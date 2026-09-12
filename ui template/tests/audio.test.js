@@ -2,7 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {SoundDesk} from '../src/audio.js';
 import {BufferPlayer} from '../src/AudioPlayer.js';
-import {SIDECHAIN} from '../src/audioSettings.js';
+import {SIDECHAIN,normalizeSidechain} from '../src/audioSettings.js';
+import {upgradeProject,allBeats,normalizeBatches} from '../src/studioModel.js';
+import {readProject} from '../src/projectFiles.js';
+import {PreviewRuntime} from '../src/runtime.js';
 
 class Audio extends EventTarget {
  constructor(){super();this.volume=1;this.currentTime=0;this.duration=10;}
@@ -78,6 +81,58 @@ test('stopAll cancels pending envelope updates and resets the next playback',asy
  const {desk,advance,play}=setup(t);await play('music-main','music');await play('voice-alice','voice');advance(200);
  desk.stopAll();assert.equal(desk.duckTimer,null);assert.equal(desk.duckTransition,null);assert.equal(desk.ducks.size,0);
  const music=await play('music-main','new',{volume:.8});advance(2000);near(music.audio.volume,.8);
+});
+
+test('project sidechain settings survive export/import and old projects receive defaults',()=>{
+ const project=upgradeProject();assert.deepEqual(project.audioSettings.sidechain,SIDECHAIN);
+ project.audioSettings={output:'keep',sidechain:{attack:1.2,release:2.5,reductionDb:2}};
+ const loaded=readProject(JSON.stringify(project));assert.deepEqual(loaded.audioSettings,project.audioSettings);
+ delete project.audioSettings;assert.deepEqual(readProject(JSON.stringify(project)).audioSettings.sidechain,SIDECHAIN);
+ assert.equal(project.audioSettings,undefined);
+ assert.deepEqual(normalizeSidechain({attack:-5,release:999,reductionDb:0}),{attack:.05,release:10,reductionDb:0});
+ assert.deepEqual(normalizeSidechain({attack:null,release:'invalid',reductionDb:Infinity}),SIDECHAIN);
+ assert.deepEqual(normalizeSidechain({attack:'1.5',release:'2',reductionDb:60}),{attack:1.5,release:2,reductionDb:24});
+});
+
+test('custom attack, release and reduction control actual music without changing voice gain',async t=>{
+ const {desk,advance,play}=setup(t);desk.setSidechain({attack:1.2,release:2,reductionDb:2});
+ const music=await play('music-main','music',{volume:.8}),voice=await play('voice-alice','voice',{volume:.6});
+ advance(620);assert.ok(music.audio.volume>.8*Math.pow(10,-2/20));
+ advance(600);near(music.audio.volume,.8*Math.pow(10,-2/20));near(voice.audio.volume,.6);
+ desk.stop('voice');advance(1000);assert.ok(music.audio.volume<.8&&music.audio.volume>.8*Math.pow(10,-2/20));
+ advance(1020);near(music.audio.volume,.8);
+});
+
+test('editing live sidechain retargets smoothly and zero reduction restores music',async t=>{
+ const {desk,advance,play}=setup(t),music=await play('music-main','music',{volume:1});
+ await play('voice-alice','voice');advance(620);const before=music.audio.volume;
+ desk.setSidechain({attack:.8,release:1.6,reductionDb:2});near(music.audio.volume,before);
+ advance(820);assert.ok(music.audio.volume>before&&music.audio.volume<Math.pow(10,-2/20));
+ advance(800);near(music.audio.volume,Math.pow(10,-2/20));
+ desk.setSidechain({attack:.8,release:1.6,reductionDb:0});advance(1620);near(music.audio.volume,1);
+ assert.ok(desk.ducks.has('voice'));assert.equal(desk.duckTimer,null);
+ desk.setSidechain({attack:.8,release:1.6,reductionDb:6});advance(820);near(music.audio.volume,Math.pow(10,-6/20));
+});
+
+test('editing a running attack retimes from the current gain without restarting for unrelated settings',async t=>{
+ const {desk,advance,play}=setup(t),music=await play('music-main','music',{volume:1});
+ await play('voice-alice','voice');advance(304);const before=music.audio.volume;
+ desk.setSidechain({attack:2,release:.9,reductionDb:4});near(music.audio.volume,before);
+ const transition=desk.duckTransition;
+ desk.setSidechain({attack:2,release:3,reductionDb:4});assert.equal(desk.duckTransition,transition);
+ advance(1000);assert.ok(music.audio.volume>Math.pow(10,-4/20));advance(1020);near(music.audio.volume,Math.pow(10,-4/20));
+});
+
+test('playtest and event preview use project settings and live changes update their snapshot',async t=>{
+ const {desk}=setup(t),rt=new PreviewRuntime(desk),project=upgradeProject(),beat=allBeats(project)[0];
+ beat.bindings=[];beat.batches={};normalizeBatches(beat);
+ project.audioSettings.sidechain={attack:.8,release:1.4,reductionDb:1.5};
+ await rt.start(project,beat.id);assert.deepEqual(desk.sidechain,project.audioSettings.sidechain);
+ const live={attack:1.5,release:2,reductionDb:3};rt.setSidechain(live);
+ assert.deepEqual(desk.sidechain,live);assert.deepEqual(rt.project.audioSettings.sidechain,live);
+ assert.equal(project.audioSettings.sidechain.attack,.8);rt.stop();
+ await rt.previewEvent(project,'studio-music',beat.id);assert.deepEqual(desk.sidechain,project.audioSettings.sidechain);rt.stop();
+ delete project.audioSettings;await rt.start(project,beat.id);assert.deepEqual(desk.sidechain,SIDECHAIN);rt.stop();
 });
 
 test('Web Audio starts at the requested gain and smooths live envelope steps',async()=>{

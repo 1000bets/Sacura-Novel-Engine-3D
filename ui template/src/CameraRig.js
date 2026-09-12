@@ -39,7 +39,8 @@ export function createCameraRig(scene,view,orbit,canvas,getLive){
     const changedScene=lastKey&&lastKey.split('|')[0]!==live.sceneId;
     if(changedScene)editorView=null;
     else if(lastKey?.split('|')[1]==='scene'&&!lastKey?.split('|')[2])editorView=capture();
-    if(changedScene&&live.mode==='scene'&&!pilot)apply(resolveCamera(definition,live.state,live.objects));
+    if(live.mode==='scene'&&!pilot&&!editorView&&!live.objects.length)apply({position:[6,4.5,6],target:[0,0,0],fov:58});
+    else if(changedScene&&live.mode==='scene'&&!pilot)apply(resolveCamera(definition,live.state,live.objects));
     if(live.mode==='scene'&&!pilot&&editorView)apply(editorView);
     if(live.mode==='scene'&&pilot)apply(cameraPose(pilot,live.state,live.objects,live.kind));
     if(live.mode==='game')apply(resolveCamera(definition,live.state,live.objects,live.cameraPreviewId));
@@ -57,8 +58,12 @@ export function createCameraRig(scene,view,orbit,canvas,getLive){
    for(let c of cameras){
     if(!markers.has(c.id))markers.set(c.id,makeMarker(c));const m=markers.get(c.id);
     if(pending?.id===c.id){if(JSON.stringify(c)!==pending.previous)pending=null;else c=pending.value;}
-    const pose=cameraPose(c,live.state,live.objects,live.kind);m.body.visible=live.mode==='scene'&&!pilot&&live.showCameras!==false;
+    const pose=cameraPose(c,live.state,live.objects,live.kind);
     if(!(control.dragging&&control.object===m.body)){m.camera.position.set(...pose.position);m.camera.lookAt(new THREE.Vector3(...pose.target));m.body.position.copy(m.camera.position);m.body.quaternion.copy(m.camera.quaternion);}
+    // Editor navigation may pass through a scene camera. Its solid icon must never fill the viewport.
+    const markerDistance=m.body.position.distanceTo(view.position);
+    m.body.visible=live.mode==='scene'&&!pilot&&live.showCameras!==false&&markerDistance>.6;
+    m.body.scale.setScalar(Math.min(1,Math.max(.2,markerDistance/3)));
     m.camera.position.copy(m.body.position);m.camera.quaternion.copy(m.body.quaternion);m.camera.fov=c.fov;m.camera.aspect=view.aspect;m.camera.updateProjectionMatrix();m.camera.updateMatrixWorld();m.helper.update();m.helper.visible=m.body.visible&&c.id===live.selectedCameraId;
     m.body.children.forEach(x=>x.material.color.set(c.id===live.selectedCameraId?'#ffe1aa':'#c59ab2'));
    }

@@ -1,11 +1,13 @@
 import React from "react";
 import { AUDIO_ASSETS, TYPES } from "./studioModel.js";
+import {sceneStagingPoints,stagingPointOptions,isObjectInScene} from './sceneEditing.js';
 
 export default function ActionFields({
   action: a,
   project,
   onChange,
   compact = false,
+  sceneId,
 }) {
   const field = (label, control) => (
     <label className="action-field">
@@ -15,7 +17,7 @@ export default function ActionFields({
   );
   const select = (key, options) => (
     <select
-      value={a[key] ?? ""}
+      value={Array.isArray(a[key])?a[key].join(', '):a[key] ?? ""}
       onChange={(e) => onChange({ [key]: e.target.value })}
     >
       {options.map((x) => {
@@ -41,6 +43,11 @@ export default function ActionFields({
     duration =
       ["move", "wait", "duck", "stop"].includes(type) ||
       (type === "sound" && !a.assetId);
+  const target=project.objects.find(o=>o.id===a.target),activeScene=project.subscenes.find(scene=>scene.id===(sceneId||target?.subsceneId));
+  const pointOptions=activeScene?stagingPointOptions(activeScene,project.objects,a.value):project.subscenes.flatMap(scene=>sceneStagingPoints(scene,project.objects).map(point=>[point.id,`${scene.name} · ${point.label}`]));
+  if(type==='move'&&!activeScene&&!pointOptions.some(([id])=>id===a.value)){
+    pointOptions.unshift([Array.isArray(a.value)?a.value.join(', '):a.value,Array.isArray(a.value)?`Координаты: ${a.value.join(', ')}`:`Сохранённая точка: ${a.value||'выберите точку'}`]);
+  }
   return (
     <div className={"typed-action-fields " + (compact ? "compact" : "")}>
       {["move", "pose", "visibility", "highlight", "door"].includes(type) &&
@@ -50,11 +57,12 @@ export default function ActionFields({
             "target",
             project.objects
               .filter((o) => type !== "pose" || o.type === "Персонаж")
+              .filter((o) => !sceneId||!activeScene||isObjectInScene(o,activeScene)||o.id===a.target)
               .map((o) => [o.id, o.name]),
           ),
         )}
       {type === "move" &&
-        field("К точке", select("value", ["стол", "камин", "окно", "диван", "вход"]))}
+        field("К точке", select("value", pointOptions))}
       {type === "pose" &&
         field(
           "Поза",

@@ -9,7 +9,8 @@ import {
   TYPES,
   conditionPass,
 } from "./studioModel.js";
-import {ANCHORS,isObjectInScene,objectTransform,resolvedPosition} from './sceneEditing.js';
+import {ANCHORS,isObjectInScene,objectTransform,resolvedPosition,sceneStagingPoints,findStagingPoint} from './sceneEditing.js';
+import {normalizeSidechain} from './audioSettings.js';
 
 export class PreviewRuntime {
   constructor(audio, onChange = () => {}) {
@@ -69,10 +70,16 @@ export class PreviewRuntime {
       throw new Error("INSTANCE_STOPPED");
   }
   ownsAudio(key,runId){return this.audio.get?.(key)?.runId===runId;}
+  setSidechain(settings){
+    const sidechain=normalizeSidechain(settings);
+    if(this.project)this.project.audioSettings={...this.project.audioSettings,sidechain};
+    this.audio.setSidechain?.(sidechain);
+  }
   async start(project, beatId) {
     this.audio.unlock?.().catch(()=>{});
     this.stop();
     this.project = structuredClone(project);
+    this.setSidechain(project.audioSettings?.sidechain);
     this.running = true;
     const token = ++this.generation;
     this.snapshot = {
@@ -100,9 +107,10 @@ export class PreviewRuntime {
     this.audio.unlock?.().catch(()=>{});
     if(!this.running||!this.snapshot.audition||this.snapshot.world.location!==sceneFor(project,beatId).id){
       this.stop();this.running=true;this.project=structuredClone(project);const scene=sceneFor(project,beatId);
-      this.snapshot={...this.snapshot,beatId,phase:'EVENT_PREVIEW',audition:true,paused:false,ready:false,textVisible:false,error:null,activity:[],variables:{...project.variables},world:{location:scene.id,weather:scene.weather,time:scene.time,camera:'Общий план',cameraId:null,positions:{},poses:{},visible:{},motions:{}}};
+      this.snapshot={...this.snapshot,beatId,phase:'EVENT_PREVIEW',audition:true,paused:false,ready:false,textVisible:false,error:null,activity:[],variables:{...project.variables},world:{location:scene.id,weather:scene.weather,time:scene.time,camera:'Общий план',cameraId:null,positions:{},poses:{},visible:{},motions:{},stagingPoints:sceneStagingPoints(scene,project.objects)}};
       for(const type of ['weather','time'])this.snapshot.effects[type]={key:type,type,name:scene[type],status:'held',owner:'SubScene',origin:scene.name};
     }else {this.project.events=structuredClone(project.events);}
+    this.setSidechain(project.audioSettings?.sidechain);
     this.snapshot.auditionName=this.project.events.find(e=>e.id===eventId)?.name;this.snapshot.error=null;this.emit();
     const token=this.generation,b={id:'audition-'+eventId,eventId,hook:'ON_START',join:'FLOW_END',overrides:{},actionOverrides:{}};
     const candidate=structuredClone(this.project),beat=allBeats(candidate).find(x=>x.id===beatId);beat.bindings=[b];beat.batches={ON_START:[{id:'audition',mode:'SEQUENTIAL',bindingIds:[b.id]}]};
@@ -191,6 +199,7 @@ export class PreviewRuntime {
           type: key,
         };
     }
+    this.snapshot.world.stagingPoints=sceneStagingPoints(scene,this.project.objects);
     this.snapshot.beatId = id;
     this.snapshot.hint=null;
     if(id==='a1'&&!this.snapshot.history.length&&!this.project.objects.find(o=>o.id==='alice')?.transforms?.[scene.id])this.snapshot.world.positions.alice='вход';
@@ -363,7 +372,9 @@ export class PreviewRuntime {
     switch (a.type) {
       case "move":
         {const duration=Math.max(.1,Number(a.duration||2))*1000;
-        const previous=world.motions?.[a.target],anchors=ANCHORS[sceneFor(this.project,this.snapshot.beatId).kind||world.location]||ANCHORS.living;
+        const scene=sceneFor(this.project,this.snapshot.beatId),previous=world.motions?.[a.target],anchors=ANCHORS[scene.kind||world.location]||ANCHORS.living;
+        world.stagingPoints=sceneStagingPoints(scene,this.project.objects);
+        if(!findStagingPoint(world.stagingPoints,a.value)&&!anchors[a.value]&&!(Array.isArray(a.value)&&a.value.length===3&&a.value.every(Number.isFinite)))throw new Error('Точка постановки отсутствует в этой сабсцене. Выберите доступную точку в параметрах движения.');
         const movingObject=this.project.objects.find(o=>o.id===a.target);
         let from=world.positions?.[a.target]||(movingObject?objectTransform(movingObject,world.location,sceneFor(this.project,this.snapshot.beatId).kind).position:'стол');
         if(previous&&movingObject)from=resolvedPosition(movingObject,world,sceneFor(this.project,this.snapshot.beatId).kind);

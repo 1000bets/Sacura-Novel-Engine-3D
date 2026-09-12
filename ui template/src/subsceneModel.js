@@ -1,6 +1,6 @@
 import {uid,allBeats} from './model.js';
 import {ensureCameras} from './cameraModel.js';
-import {objectTransform,isObjectInScene,BUILTIN_KINDS} from './sceneEditing.js';
+import {objectTransform,isObjectInScene,BUILTIN_KINDS,addSceneDecorations,createSceneStagingPoints,ensureSceneStagingPoints} from './sceneEditing.js';
 import {gameCamera} from './sceneEffects.js';
 
 export const LOCATION_TEMPLATES=[
@@ -26,6 +26,7 @@ export function addSceneKit(p,scene){
   if(type==='Активный меш')object.interaction='Осмотреть';
   object.transforms={[scene.id]:objectTransform(object,scene.id,scene.kind)};p.objects.push(object);
  }
+ addSceneDecorations(p,scene);ensureSceneStagingPoints(scene,p.objects);
 }
 export function newSceneDraft(p){const t=LOCATION_TEMPLATES[0];return {name:'',location:t.name,kind:t.id,weather:t.weather,time:t.time,description:'',firstText:'Новая история начинается здесь.',characters:p.objects.filter(o=>o.type==='Персонаж'&&!o.subsceneId&&o.active!==false).map(o=>o.id),placement:'separate',choiceId:''};}
 export function createSubscene(p,draft,fromBeatId){
@@ -51,19 +52,22 @@ export function connectSubscene(p,fromId,choiceId,toSceneId){
 }
 export function changeSceneLocation(p,id,kind){
  const scene=p.subscenes.find(s=>s.id===id);if(!scene||!KIT[kind]||scene.kind===kind)return;
- scene.kind=kind;addSceneKit(p,scene);
+ scene.kind=kind;addSceneKit(p,scene);scene.stagingPoints=createSceneStagingPoints(scene,p.objects);
  const main=scene.cameras?.find(c=>c.id===scene.defaultCameraId);if(main){const [position,target]=gameCamera(kind,{camera:'Общий план'});Object.assign(main,{position,target});}
 }
 export function cloneSubscene(p,sourceId){
  const source=p.subscenes.find(s=>s.id===sourceId);if(!source)throw new Error('Сабсцена не найдена.');
+ ensureSceneStagingPoints(source,p.objects);
  const id=uid('scene'),chapters=structuredClone(p.chapters.filter(c=>c.subsceneId===sourceId)),beats=chapters.flatMap(c=>c.beats),beatIds=new Map(beats.map(b=>[b.id,uid('line')])),choiceIds=new Map(beats.flatMap(b=>(b.choices||[]).map(c=>[c.id,uid('choice')]))),objectIds=new Map(),cameraIds=new Map((source.cameras||[]).map(c=>[c.id,uid('camera')]));
  const scene={...structuredClone(source),id,name:source.name+' · копия',entry:beatIds.get(source.entry),excludedObjectIds:[...(source.excludedObjectIds||[])]};
+ const pointIds=new Map(scene.stagingPoints.map((point,index)=>[point.id,`${id}:point:${point.key||index}`]));
  for(const o of [...p.objects]){
   if(o.subsceneId===sourceId||(!o.subsceneId&&o.type!=='Персонаж'&&isObjectInScene(o,source))){
    const copy={...structuredClone(o),id:uid('object'),subsceneId:id,builtin:o.builtin||(BUILTIN_KINDS[o.id]?o.id:undefined),transforms:{[id]:objectTransform(o,sourceId,source.kind)}};objectIds.set(o.id,copy.id);p.objects.push(copy);
   }else if(!o.subsceneId&&o.type==='Персонаж'){o.transforms||={};o.transforms[id]=objectTransform(o,sourceId,source.kind);}
  }
  scene.cameras=(scene.cameras||[]).map(c=>({...c,id:cameraIds.get(c.id),followTargetId:objectIds.get(c.followTargetId)||c.followTargetId}));scene.defaultCameraId=cameraIds.get(source.defaultCameraId)||null;
+ scene.stagingPoints=scene.stagingPoints.map(point=>({...point,id:pointIds.get(point.id),objectId:objectIds.get(point.objectId)||point.objectId}));
  scene.excludedObjectIds=scene.excludedObjectIds.map(id=>objectIds.get(id)||id);
  // Global originals must stay excluded even though their local copies use new IDs.
  scene.excludedObjectIds.push(...[...objectIds.keys()].filter(id=>p.objects.find(o=>o.id===id)&&!p.objects.find(o=>o.id===id).subsceneId));
@@ -71,7 +75,7 @@ export function cloneSubscene(p,sourceId){
   b.id=beatIds.get(b.id);b.next=beatIds.get(b.next)||b.next;if(b.branch)b.branch=choiceIds.get(b.branch);if(b.signal)b.signal=objectIds.get(b.signal)||b.signal;
   for(const c of b.choices||[]){c.id=choiceIds.get(c.id);c.next=beatIds.get(c.next)||c.next;}
   const bindingIds=new Map();for(const binding of b.bindings){const oldId=binding.id;binding.id=uid('binding');bindingIds.set(oldId,binding.id);const event=p.events.find(e=>e.id===binding.eventId);binding.actionOverrides||={};
-   for(const action of event?.groups.flatMap(g=>g.actions)||[]){const effective={...action,...(event.groups[0]?.actions[0]?.id===action.id?binding.overrides:{}),...binding.actionOverrides[action.id]},patch={};if(objectIds.has(effective.target))patch.target=objectIds.get(effective.target);if(cameraIds.has(effective.cameraId))patch.cameraId=cameraIds.get(effective.cameraId);if(Object.keys(patch).length)binding.actionOverrides[action.id]={...binding.actionOverrides[action.id],...patch};}
+   for(const action of event?.groups.flatMap(g=>g.actions)||[]){const effective={...action,...(event.groups[0]?.actions[0]?.id===action.id?binding.overrides:{}),...binding.actionOverrides[action.id]},patch={};if(objectIds.has(effective.target))patch.target=objectIds.get(effective.target);if(cameraIds.has(effective.cameraId))patch.cameraId=cameraIds.get(effective.cameraId);if(effective.type==='move'&&pointIds.has(effective.value))patch.value=pointIds.get(effective.value);if(Object.keys(patch).length)binding.actionOverrides[action.id]={...binding.actionOverrides[action.id],...patch};}
   }
   for(const groups of Object.values(b.batches||{}))for(const g of groups){g.id=uid('batch');g.bindingIds=g.bindingIds.map(id=>bindingIds.get(id)).filter(Boolean);}
  }}

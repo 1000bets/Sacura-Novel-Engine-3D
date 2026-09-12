@@ -1,4 +1,4 @@
-import {SIDECHAIN} from './audioSettings.js';
+import {normalizeSidechain} from './audioSettings.js';
 import React, {
   useCallback,
   useEffect,
@@ -27,6 +27,8 @@ import {
 } from "./studioModel.js";
 import { fixIssue } from "./model.js";
 import {readProject} from './projectFiles.js';
+import {BACKUP_KEY,PROJECT_FILE_TYPES,backupProject,copyProjectAs,createEmptyProject,createProjectTemplate,parseProjectFile,projectFilename,projectFromTemplate,readTemplates,storeTemplate,writeProjectFile} from './projectLifecycle.js';
+import ProjectDialog from './ProjectDialog.jsx';
 import { PreviewRuntime } from "./runtime.js";
 import { soundDesk, clockLabel } from "./audio.js";
 import {
@@ -47,9 +49,14 @@ import {createSubscene,cloneSubscene,setSceneEntry,connectSubscene,changeSceneLo
 import EventPlayground from './EventPlayground.jsx';
 import AuthoringWorkspace from './AuthoringWorkspace.jsx';
 import TransformInspector from './TransformInspector.jsx';
+import MultiTransformInspector from './MultiTransformInspector.jsx';
+import {selectedObjectIds,selectSceneObject,transformSelection} from './sceneSelection.js';
 import CameraWorkspace from './CameraWorkspace.jsx';
 import {newCamera,cleanCamera,cameraFromView,cameraPose,resolveCamera} from './cameraModel.js';
-import {objectTransform,setObjectTransform,isObjectInScene} from './sceneEditing.js';
+import {objectTransform,setObjectTransform,isObjectInScene,sceneStagingPoints} from './sceneEditing.js';
+import HierarchyTree from './HierarchyTree.jsx';
+import EditorSelect from './EditorSelect.jsx';
+import GlobalTimeline from './GlobalTimeline.jsx';
 
 const PROJECT_KEY = "sacura-studio-v2",
   LAYOUT_KEY = "sacura-workspace-v3";
@@ -61,6 +68,9 @@ const initialLayout = {
   height: defaultSceneHeight(),
   scope: "chapter",
   positions: {},
+  treeOpen: {},
+  hiddenHierarchy:false,
+  hiddenInspector:false,
 };
 function loadProject() {
   const raw =
@@ -272,6 +282,10 @@ export default function Editor() {
     [compactPanel,setCompactPanel]=useState('workspace'),
     [picker, setPicker] = useState(null),
     [menu, setMenu] = useState(null),
+    [projectDialog,setProjectDialog]=useState(null),
+    [projectFileError,setProjectFileError]=useState(''),
+    [projectFileBusy,setProjectFileBusy]=useState(false),
+    [projectTemplates,setProjectTemplates]=useState([]),
     [notice, setNotice] = useState(""),
     [assetCategory, setAssetCategory] = useState("events"),
     [audioTick, setAudioTick] = useState(0),
@@ -290,6 +304,8 @@ export default function Editor() {
     [showCameras,setShowCameras]=useState(true);
   const root = useRef(),
     fileInput = useRef(),
+    projectFile = useRef(null),
+    fileOperation = useRef(false),
     graphApi = useRef(),
     cameraApi = useRef(),
     previewRef = useRef(),
@@ -305,13 +321,15 @@ export default function Editor() {
       c.beats.some((b) => b.id === beat.id),
     ),
     running = rt.running && preview?.phase !== "EDIT";
+  const hierarchyVisible=maximized==='hierarchy'||(!['scene','graph','inspector'].includes(maximized)&&!layout.hiddenHierarchy&&(window.innerWidth>1000||compactPanel==='hierarchy'));
+  const inspectorVisible=maximized==='inspector'||(!['scene','graph','hierarchy'].includes(maximized)&&!layout.hiddenInspector&&(window.innerWidth>1000||compactPanel==='inspector'));
   const playProject = running ? rt.project : project,
     playBeat = running
       ? allBeats(playProject).find((b) => b.id === preview.beatId) || beat
       : beat,
     playScene = sceneFor(playProject, playBeat.id),
     displayScene = running ? playScene : scene;
-  useEffect(()=>setCompactPanel('workspace'),[dock,maximized,displayScene.id]);
+  useEffect(()=>setCompactPanel('workspace'),[dock,displayScene.id]);
   const world = useMemo(
     () =>
       running
@@ -341,6 +359,13 @@ export default function Editor() {
       ),
     [playProject, displayScene],
   );
+  const objectSelectionIds=selectedObjectIds(selection,objects),selectedObjects=objectSelectionIds.map(id=>objects.find(object=>object.id===id));
+  useEffect(()=>setSelection(current=>{
+    if(current.kind!=='object')return current;
+    const ids=selectedObjectIds(current,objects),previous=selectedObjectIds(current);
+    if(ids.length===previous.length&&ids.includes(current.id))return current;
+    return ids.length?{kind:'object',id:ids.includes(current.id)?current.id:ids.at(-1),ids}:{kind:'scene',id:displayScene.id};
+  }),[objects,displayScene.id]);
   const issues = useMemo(() => validateStudio(project), [project]),
     variables = running ? preview.variables : project.variables,
     event = project.events.find((e) => e.id === eventContext?.eventId),
@@ -357,7 +382,7 @@ export default function Editor() {
           )?.find((a) => a.id === selection.id)
         : null;
   useEffect(() => {
-    if (!project.actionTemplates || !project.groupTemplates || !project.sceneEditingVersion || project.subscenes.some(s=>!Array.isArray(s.cameras)))
+    if (!project.actionTemplates || !project.groupTemplates || (project.sceneEditingVersion||0)<2 || project.subscenes.some(s=>!Array.isArray(s.cameras)||!Array.isArray(s.stagingPoints)))
       setProject(p => upgradeProject(p));
   }, [project]);
   useEffect(() => {
@@ -373,6 +398,7 @@ export default function Editor() {
     localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout));
   }, [layout]);
   useEffect(() => soundDesk.subscribe(() => setAudioTick((n) => n + 1)), []);
+  useEffect(() => rt.setSidechain(project.audioSettings?.sidechain), [project.audioSettings?.sidechain]);
   useEffect(() => {
     if (running && follow && preview.beatId) {
       setSelectedBeat(preview.beatId);
@@ -570,8 +596,8 @@ export default function Editor() {
   };
   const audition=(eventId)=>{setCameraPreviewId(null);setCameraPilotId(null);soundDesk.unlock().catch(()=>{});setMode('game');setFollow(false);rt.previewEvent(project,eventId,beat.id);};
   const editSample=(eventId)=>{setEventContext({eventId});setSelection({kind:'event',id:eventId});setDock('event');setDetailEditor(false);};
-  const selectObject = (id) => {
-    if (!inspectorPinned) setSelection({ kind: "object", id });
+  const selectObject = (id,options={}) => {
+    if (!inspectorPinned) setSelection(current=>selectSceneObject(current,id,!!options.additive,objects));
   };
   const interact = (id) => {
     if(mode==='game'&&running&&preview.phase==='WAITING_INPUT'){rt.advance();return;}
@@ -585,35 +611,93 @@ export default function Editor() {
     )
       rt.advance(null, id);
   };
-  const exportProject = () => {
+  const downloadFile = (text,filename) => {
     const a = document.createElement("a"),
       url = URL.createObjectURL(
-        new Blob([JSON.stringify(project, null, 2)], {
+        new Blob([text], {
           type: "application/json",
         }),
       );
     a.href = url;
-    a.download = "sacura-project.json";
+    a.download = filename;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  };
+  const exportProject = () => {
+    downloadFile(JSON.stringify(project,null,2),projectFilename(project.title));
     setMenu(null);
+  };
+  const replaceProject = (next,handle=null) => {
+    const entry=next.subscenes[0].entry||allBeats(next)[0].id;
+    backupProject(localStorage,project);
+    rt.stop();setHistory([]);setEventContext(null);setAuthorRequest(null);setSubsceneRequest(null);setSubsceneDraft(null);
+    setCameraPilotId(null);setCameraPreviewId(null);setPicker(null);setDetailEditor(false);setDock('story');setMaximized(null);setMode('scene');
+    setQuery('');setFocusRequest(0);setMenu(null);setPreview(null);setFollow(true);
+    setLayout(l=>({...l,positions:{},treeOpen:{}}));
+    projectFile.current=handle;seed.current.error=null;
+    setProject(next);setSelectedBeat(entry);setSelection({kind:'beat',id:entry});
+  };
+  const runFileOperation = async action => {
+    if(fileOperation.current)return;
+    fileOperation.current=true;setProjectFileBusy(true);setProjectFileError('');
+    try {await action();}
+    catch(err){if(err.name!=='AbortError'){const message=err.message||'Не удалось выполнить операцию с проектом.';setProjectFileError(message);setNotice(message);}}
+    finally{fileOperation.current=false;setProjectFileBusy(false);}
+  };
+  const saveProject = () => {
+    setMenu(null);
+    return runFileOperation(async()=>{
+      const result=await writeProjectFile(project,{handle:projectFile.current,chooseFile:window.showSaveFilePicker?.bind(window),download:downloadFile,filename:projectFilename(project.title)});
+      projectFile.current=result.handle;
+      setNotice(result.downloaded?'Файл проекта передан в загрузки: '+result.filename:'Проект сохранён: '+result.filename);
+    });
+  };
+  const openProjectDialog = mode => {
+    if(fileOperation.current)return;
+    setMenu(null);setProjectFileError('');
+    try{if(mode==='new')setProjectTemplates(readTemplates(localStorage));setProjectDialog(mode);}
+    catch(err){setNotice(err.message);}
+  };
+  const submitProjectDialog = ({name,templateId}) => runFileOperation(async()=>{
+    if(projectDialog==='new'){
+      const template=projectTemplates.find(t=>t.id===templateId);
+      const next=template?projectFromTemplate(template,name):createEmptyProject(name);
+      replaceProject(next);setNotice(template?'Создан проект из шаблона «'+template.name+'».':'Создан пустой проект.');
+    } else if(projectDialog==='template'){
+      storeTemplate(localStorage,createProjectTemplate(project,name));
+      setNotice('Шаблон «'+name.trim()+'» записан. Он доступен при создании нового проекта.');
+    } else {
+      const next=copyProjectAs(project,name);
+      const result=await writeProjectFile(next,{chooseFile:window.showSaveFilePicker?.bind(window),download:downloadFile,filename:projectFilename(next.title)});
+      backupProject(localStorage,project);projectFile.current=result.handle;seed.current.error=null;
+      setProject(next);setHistory([]);
+      setNotice(result.downloaded?'Копия проекта передана в загрузки: '+result.filename:'Копия проекта сохранена: '+result.filename);
+    }
+    setProjectDialog(null);
+  });
+  const openProjectFile = () => {
+    setMenu(null);
+    if(!window.showOpenFilePicker){fileInput.current.click();return;}
+    return runFileOperation(async()=>{
+      const [handle]=await window.showOpenFilePicker({multiple:false,types:PROJECT_FILE_TYPES});
+      const {project:next,template}=parseProjectFile(await (await handle.getFile()).text());
+      replaceProject(next,template?null:handle);setNotice(template?'Создан проект из файла шаблона.':'Проект загружен.');
+    });
   };
   const importProject = async (e) => {
     if(!e.target.files?.length)return;
-    try {
-      const next=readProject(await e.target.files[0].text()),entry=allBeats(next)[0].id;
-      localStorage.setItem(PROJECT_KEY + "-backup-v3", JSON.stringify(project));
-      rt.stop();setHistory([]);setEventContext(null);setAuthorRequest(null);setSubsceneRequest(null);setSubsceneDraft(null);
-      setCameraPilotId(null);setCameraPreviewId(null);setPicker(null);setDetailEditor(false);setDock('story');setMaximized(null);setMode('game');
-      seed.current.error = null;
-      setProject(next);
-      setSelectedBeat(entry);setSelection({kind:'beat',id:entry});
-      setNotice("Проект загружен.");
-    } catch (err) {
-      setNotice(err.message);
-    }
-    e.target.value = "";
+    const file=e.target.files[0];e.target.value='';
+    await runFileOperation(async()=>{
+      const {project:next,template}=parseProjectFile(await file.text());
+      replaceProject(next);setNotice(template?'Создан проект из файла шаблона.':'Проект загружен.');
+    });
   };
+  const restorePreviousProject = () => runFileOperation(async()=>{
+    const raw=localStorage.getItem(BACKUP_KEY);if(!raw)throw new Error('Резервной копии пока нет.');
+    replaceProject(readProject(raw));setNotice('Предыдущий проект восстановлен.');
+  });
   const undo = () => {
     if (!history.length) return;
     rt.stop();setCameraPilotId(null);setCameraPreviewId(null);
@@ -698,7 +782,7 @@ export default function Editor() {
   };
   const openAuthoring=(kind='event',options={})=>{setAuthorRequest({kind,...options,token:uid('request')});setDock('create');setMaximized('graph');setDetailEditor(false);setEventContext(null);setPicker(null);setMenu(null);};
   const createEvent = () => openAuthoring('event');
-  const editScene=()=>{if(rt.running)rt.stop();setCameraPilotId(null);setCameraPreviewId(null);setMode('scene');setMaximized(null);setTreeTab('hierarchy');};
+  const editScene=()=>{if(rt.running){if(rt.snapshot.beatId)setSelectedBeat(rt.snapshot.beatId);rt.stop();}setCameraPilotId(null);setCameraPreviewId(null);setMode('scene');setMaximized(null);setTreeTab('hierarchy');setCompactPanel('workspace');};
   const openSubscenes=(mode='edit',id=displayScene.id)=>{
     if(rt.running)rt.stop();const target=project.subscenes.find(s=>s.id===id);
     if(target&&mode!=='create'){setSelectedBeat(target.entry);setSelection({kind:'scene',id});}
@@ -733,11 +817,17 @@ export default function Editor() {
   const pilotCamera=id=>{editScene();setCameraPilotId(id);setSelection({kind:'camera',id});setDock('cameras');};
   const viewCamera=id=>{setCameraPilotId(null);setCameraPreviewId(id);setMode('game');};
   const deleteCamera=id=>{if(rt.running)return;mutate(p=>{const sc=p.subscenes.find(s=>s.id===scene.id);sc.cameras=sc.cameras.filter(c=>c.id!==id);if(sc.defaultCameraId===id)sc.defaultCameraId=sc.cameras[0]?.id||null;});if(cameraPilotId===id)setCameraPilotId(null);if(cameraPreviewId===id)setCameraPreviewId(null);setSelection({kind:'scene',id:scene.id});setNotice('Камера удалена. Ctrl+Z — отменить.');};
-  useEffect(()=>{setCameraPilotId(null);setCameraPreviewId(null);},[displayScene.id]);
+  useEffect(()=>{setCameraPilotId(null);setCameraPreviewId(null);setFocusRequest(0);},[displayScene.id]);
   const transformObject=(id,value)=>{if(rt.running)return;mutate(p=>setObjectTransform(p,id,scene.id,value));};
+  const transformObjects=changes=>{if(rt.running)return;mutate(p=>{for(const {id,value}of changes)setObjectTransform(p,id,scene.id,value);});};
+  const duplicateObjects=()=>{
+    if(rt.running)return;const copies=selectedObjects.map(object=>{const copy=structuredClone(object);copy.id=uid('object');copy.name=object.name+' · копия';copy.subsceneId=scene.id;copy.builtin=object.builtin||(['letter','door','fireplace','garden-note','ticket'].includes(object.id)?object.id:undefined);const value=objectTransform(object,scene.id,scene.kind);value.position[0]+=.65;copy.transforms={[scene.id]:value};return copy;});
+    mutate(p=>p.objects.push(...copies));setSelection({kind:'object',id:copies.at(-1)?.id,ids:copies.map(object=>object.id)});setFocusRequest({nonce:uid('focus')});
+  };
+  const deleteObjects=()=>{if(rt.running)return;mutate(p=>p.objects=p.objects.filter(object=>!objectSelectionIds.includes(object.id)));setSelection({kind:'scene',id:scene.id});setNotice('Выделенные объекты удалены. Ctrl+Z — вернуть всю группу.');};
   const duplicateObject=(object)=>{
     const copy=structuredClone(object);copy.id=uid('object');copy.name=object.name+' · копия';copy.subsceneId=scene.id;copy.builtin=object.builtin||(['letter','door','fireplace','garden-note','ticket'].includes(object.id)?object.id:undefined);const t=objectTransform(object,scene.id,scene.kind);t.position[0]+=.65;copy.transforms={[scene.id]:t};
-    mutate(p=>p.objects.push(copy));setSelection({kind:'object',id:copy.id});setFocusRequest(n=>n+1);
+    mutate(p=>p.objects.push(copy));setSelection({kind:'object',id:copy.id});setFocusRequest({nonce:uid('focus')});
   };
   const deleteObject=id=>{mutate(p=>p.objects=p.objects.filter(o=>o.id!==id));setSelection({kind:'scene',id:scene.id});setNotice('Объект удалён. Ctrl+Z — вернуть; ссылки в событиях видны во вкладке «Ошибки».');};
   const addObject = (type,primitive="box") => {
@@ -758,7 +848,7 @@ export default function Editor() {
       }),
     );
     setSelection({ kind: "object", id });
-    setFocusRequest(n=>n+1);
+    setFocusRequest({nonce:uid('focus')});
     setPicker(null);
   };
   const attachSound = (asset, cfg) => {
@@ -820,6 +910,7 @@ export default function Editor() {
       left: 224,
       right: 300,
       height: defaultSceneHeight(),
+      hiddenHierarchy:false,hiddenInspector:false,
     }));
     setMaximized(null);
     setMenu(null);
@@ -835,7 +926,7 @@ export default function Editor() {
       }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
-        setNotice("Проект сохранён локально.");
+        if(!projectDialog)e.shiftKey?openProjectDialog('saveAs'):saveProject();
       }
       if (
         (e.ctrlKey || e.metaKey) &&
@@ -852,7 +943,7 @@ export default function Editor() {
     };
     window.addEventListener("keydown", listener);
     return () => window.removeEventListener("keydown", listener);
-  }, [history]);
+  }, [history,project,projectDialog]);
 
   const renderInspector = () => {
     if(selection.kind==='camera'){
@@ -948,6 +1039,11 @@ export default function Editor() {
           </>
         );
     }
+    if(selection.kind==='object'&&selectedObjects.length>1)return <MultiTransformInspector key={objectSelectionIds.join('|')} objects={selectedObjects} disabled={running}
+      onChange={value=>transformObjects(transformSelection(selectedObjects,scene,value))}
+      onFocus={()=>{editScene();setFocusRequest({nonce:uid('focus')});}}
+      onReset={()=>mutate(p=>{for(const id of objectSelectionIds){const object=p.objects.find(o=>o.id===id);if(object?.transforms)delete object.transforms[scene.id];}})}
+      onDuplicate={duplicateObjects} onDelete={deleteObjects}/>;
     if (selection.kind === "object" && inspectedObject) {
       const o = inspectedObject,
         patch = (v) =>
@@ -982,14 +1078,15 @@ export default function Editor() {
           </div>
           <TransformInspector object={o} scene={scene} disabled={running} onChange={value=>transformObject(o.id,value)}
             onReset={()=>mutate(p=>{const x=p.objects.find(x=>x.id===o.id);if(x.transforms)delete x.transforms[scene.id];})}
-            onFocus={()=>{editScene();setFocusRequest(n=>n+1);}} onDuplicate={()=>duplicateObject(o)} onDelete={()=>deleteObject(o.id)}/>
+            onFocus={()=>{editScene();setFocusRequest({nonce:uid('focus')});}} onDuplicate={()=>duplicateObject(o)} onDelete={()=>deleteObject(o.id)}/>
           {running&&<Button icon="Square" onClick={editScene}>Остановить и редактировать сцену</Button>}
           <Fold title="Объект сцены" icon="Box">
             <Field label="Опорная точка">
               <Select
-                value={o.position || "стол"}
-                options={["стол", "камин", "окно", "диван"]}
-                onChange={(position) => {const transforms={...o.transforms};delete transforms[scene.id];patch({position,transforms});}}
+                value=""
+                disabled={running}
+                options={[["","Переместить к точке…"],...sceneStagingPoints(scene,objects).filter(point=>point.objectId!==o.id).map(point=>[point.id,point.label])]}
+                onChange={id=>{const point=sceneStagingPoints(scene,objects).find(point=>point.id===id);if(!point||running)return;const transform=objectTransform(o,scene.id,scene.kind),height=transform.position[1];transform.position=[...point.position];if(o.type!=='Персонаж')transform.position[1]=height;transformObject(o.id,transform);}}
               />
             </Field>
             <Field label="Локация">
@@ -1108,7 +1205,7 @@ export default function Editor() {
                     }
                   />
                 </Field>
-                <ActionFields
+                <ActionFields sceneId={sceneFor(project,contextBeat.id).id}
                   action={inspectedAction}
                   project={project}
                   onChange={(v) => patchAction(inspectedAction.id, v)}
@@ -1835,10 +1932,9 @@ export default function Editor() {
           {project.title}
         </span>
         <button
-          title="Сохранено на этом компьютере"
-          onClick={() =>
-            setNotice("Сохранено локально. Экспорт доступен в меню «Файл».")
-          }
+          title="Сохранить проект · Ctrl+S"
+          disabled={projectFileBusy}
+          onClick={saveProject}
         >
           <Icon name={saveError ? "TriangleAlert" : "CloudCheck"} size={15} />
         </button>
@@ -1846,8 +1942,9 @@ export default function Editor() {
       <div className="editor-toolbar">
         <div className="toolbar-project">
           <Icon name="Box" size={15} />
-          <Select
-            value={scene.id}
+          <EditorSelect
+            label="Текущая сабсцена"
+            value={displayScene.id}
             onChange={(id) =>
               openSubscenes('edit',id)
             }
@@ -1905,19 +2002,22 @@ export default function Editor() {
               ["balanced", "Постановка"],
               ["graph", "Сценарий"],
               ["scene", "Только сцена"],
+              ["hierarchy", "Только иерархия"],
+              ["inspector", "Только инспектор"],
             ]}
           />
         </div>
       </div>
-      <div className={'editor-workspace compact-'+compactPanel}>
+      <div className={'editor-workspace compact-'+compactPanel+(layout.hiddenHierarchy?' hierarchy-hidden':'')+(layout.hiddenInspector?' inspector-hidden':'')+(['scene','graph'].includes(maximized)?' focus-center':maximized==='hierarchy'?' focus-hierarchy':maximized==='inspector'?' focus-inspector':'')}>
         <nav className="compact-panel-tabs" aria-label="Панели редактора">
-          {[['hierarchy','ListTree','Объекты сцены'],['workspace','PanelsTopLeft','Рабочая область'],['inspector','Settings2','Свойства']].map(([id,icon,label])=><button key={id} aria-pressed={compactPanel===id} onClick={()=>setCompactPanel(id)}><Icon name={icon} size={13}/>{label}</button>)}
+          {[['hierarchy','ListTree','Объекты сцены'],['workspace','PanelsTopLeft','Рабочая область'],['inspector','Settings2','Свойства']].map(([id,icon,label])=><button key={id} aria-pressed={compactPanel===id} onClick={()=>{if(['hierarchy','inspector'].includes(maximized))setMaximized(null);setCompactPanel(id);}}><Icon name={icon} size={13}/>{label}</button>)}
         </nav>
         <aside className="hierarchy-panel">
+          <button className="panel-restore" aria-label="Показать иерархию" title="Показать иерархию" onClick={()=>setLayout(l=>({...l,hiddenHierarchy:false}))}><Icon name="PanelLeftOpen" size={18}/><span>Иерархия</span></button>
           <div className="panel-tabs">
             <button
               className={treeTab === "hierarchy" ? "active" : ""}
-              onClick={() => setTreeTab("hierarchy")}
+              onClick={() => {setTreeTab("hierarchy");setCompactPanel("hierarchy");}}
             >
               <Icon name="ListTree" size={14} />
               Иерархия
@@ -1934,6 +2034,8 @@ export default function Editor() {
               title="Создать объект"
               onClick={() => setPicker({ kind: "object" })}
             />
+            <Button icon={maximized==='hierarchy'?'Minimize2':'Maximize2'} title={maximized==='hierarchy'?'Восстановить иерархию':'Развернуть иерархию'} onClick={()=>setMaximized(v=>v==='hierarchy'?null:'hierarchy')}/>
+            <Button icon="PanelLeftClose" title="Свернуть иерархию" onClick={()=>{setMaximized(null);setLayout(l=>({...l,hiddenHierarchy:true}));setCompactPanel('workspace');}}/>
           </div>
           <div className="panel-search">
             <Icon name="Search" size={13} />
@@ -1947,107 +2049,19 @@ export default function Editor() {
           </div>
           <div className="hierarchy-tree">
             {treeTab === "hierarchy" ? (
-              <>
-                <div className="tree-scene">
-                  <Icon name="ChevronDown" size={13} />
-                  <Icon name="Box" size={15} />
-                  <strong>{displayScene.name}</strong>
-                </div>
-                <button
-                  className="tree-row system"
-                  onClick={openCameras}
-                >
-                  <Icon name="Video" />
-                  Камеры сабсцены
-                  <Icon name="Eye" />
-                </button>
-                <button
-                  className="tree-row system"
-                  onClick={() => setShowDialogue((v) => !v)}
-                >
-                  <Icon name="MessagesSquare" />
-                  Система диалогов
-                  <Icon name={showDialogue ? "Eye" : "EyeOff"} />
-                </button>
-                <button
-                  className="tree-row system"
-                  onClick={() => setDock("active")}
-                >
-                  <Icon name="AudioLines" />
-                  Звук и окружение
-                  <Icon name="Eye" />
-                </button>
-                {(displayScene.cameras||[]).map(c=><button key={c.id} className={'tree-row system '+(selection.id===c.id?'selected':'')} onClick={()=>selectCamera(c.id)}><Icon name={c.mode==='follow'?'UserRoundCheck':'Video'} size={14}/>{c.name}{c.id===displayScene.defaultCameraId&&<Icon name="Star" size={12}/>}</button>)}
-                <div className="tree-folder">
-                  <Icon name="ChevronDown" size={13} />
-                  <Icon name="Folder" size={14} />
-                  Объекты сцены
-                </div>
-                {objects
-                  .filter((o) =>
-                    o.name.toLowerCase().includes(query.toLowerCase()),
-                  )
-                  .map((o) => (
-                    <div
-                      className={
-                        "tree-object " +
-                        (selection.id === o.id ? "selected" : "")
-                      }
-                      key={o.id}
-                    >
-                      <button
-                        draggable
-                        onDragStart={(e) =>
-                          e.dataTransfer.setData(
-                            "application/sacura-asset",
-                            JSON.stringify({ id: o.id, kind: "objects" }),
-                          )
-                        }
-                        onClick={() => selectObject(o.id)}
-                      >
-                        <Icon
-                          name={
-                            o.type === "Персонаж"
-                              ? "PersonStanding"
-                              : o.type === "Активный меш"
-                                ? "MousePointer2"
-                                : "Box"
-                          }
-                          size={15}
-                          style={{ color: o.color }}
-                        />
-                        <span>{o.name}</span>
-                      </button>
-                      <button
-                        title={o.active ? "Скрыть объект" : "Показать объект"}
-                        onClick={() =>
-                          mutate(
-                            (p) =>
-                              (p.objects.find((x) => x.id === o.id).active =
-                                !o.active),
-                          )
-                        }
-                      >
-                        <Icon name={o.active ? "Eye" : "EyeOff"} size={13} />
-                      </button>
-                    </div>
-                  ))}
-                <div className="tree-folder">
-                  <Icon name="ChevronDown" size={13} />
-                  <Icon name="MapPin" size={14} />
-                  Точки постановки
-                </div>
-                {["У камина", "У окна", "У стола", "У дивана"].map((t) => (
-                  <div className="tree-anchor" key={t}>
-                    <Icon name="LocateFixed" size={13} />
-                    {t}
-                  </div>
-                ))}
-              </>
+              <HierarchyTree scene={displayScene} objects={objects} points={sceneStagingPoints(displayScene,objects)} query={query} selected={selection.id} selectedIds={objectSelectionIds}
+                expanded={layout.treeOpen||{}} onExpanded={treeOpen=>setLayout(l=>({...l,treeOpen}))}
+                onSelectObject={(id,options)=>{if(!running){setMode('scene');setCameraPilotId(null);setCameraPreviewId(null);}selectObject(id,options);}}
+                onFrameObject={id=>{editScene();setSelection({kind:'object',id});setFocusRequest({nonce:uid('focus')});}}
+                onVisibility={id=>mutate(p=>{const o=p.objects.find(o=>o.id===id);o.active=o.active===false;})}
+                onPoint={point=>{editScene();if(point.objectId)setSelection({kind:'object',id:point.objectId});setFocusRequest({nonce:uid('focus'),position:point.position,objectId:point.objectId});}}
+                onSelectCamera={selectCamera} onCameras={openCameras} showCameras={showCameras} onShowCameras={()=>setShowCameras(v=>!v)}
+                showDialogue={showDialogue} onShowDialogue={()=>setShowDialogue(v=>!v)} onStory={()=>{setDock('story');setDetailEditor(false);setMaximized(null);}}
+                onAudio={()=>{setDock('active');setDetailEditor(false);setMaximized(null);}}/>
             ) : (
               project.subscenes.map((s) => (
-                <details key={s.id} open={!!query || s.id === scene.id}>
-                  <summary>
+                <details key={s.id} open={!!query || (layout.treeOpen?.['history:'+s.id]??s.id===scene.id)}>
+                  <summary onClick={e=>{e.preventDefault();setLayout(l=>({...l,treeOpen:{...l.treeOpen,['history:'+s.id]:!(l.treeOpen?.['history:'+s.id]??s.id===scene.id)}}));}}>
                     <Icon name="ChevronRight" size={12} />
                     <Icon name="PanelsTopLeft" size={14} />
                     {s.name}
@@ -2055,8 +2069,8 @@ export default function Editor() {
                   {project.chapters
                     .filter((c) => c.subsceneId === s.id)
                     .map((c) => (
-                      <details key={c.id} open={!!query || c.id === chapter.id}>
-                        <summary>
+                      <details key={c.id} open={!!query || (layout.treeOpen?.['chapter:'+c.id]??c.id===chapter.id)}>
+                        <summary onClick={e=>{e.preventDefault();setLayout(l=>({...l,treeOpen:{...l.treeOpen,['chapter:'+c.id]:!(l.treeOpen?.['chapter:'+c.id]??c.id===chapter.id)}}));}}>
                           <Icon name="ChevronRight" size={11} />
                           {c.name}
                           <small>{c.beats.length}</small>
@@ -2187,7 +2201,7 @@ export default function Editor() {
                 <Icon name="PanelBottom" size={14} />
               </button>
               <button
-                title="Развернуть сцену"
+                title={maximized==='scene'?'Восстановить сцену':'Развернуть сцену'}
                 onClick={() =>
                   setMaximized(maximized === "scene" ? null : "scene")
                 }
@@ -2202,7 +2216,8 @@ export default function Editor() {
               className="scene-viewport"
               tabIndex={0}
               onKeyDown={(e) => {
-                if(mode==='scene'&&!running&&!['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)&&!e.target.isContentEditable){const key=e.key.toLowerCase(),tools={q:'select',w:'translate',e:'rotate',r:'scale'};if(tools[key]){e.preventDefault();setEditTool(tools[key]);}if(key==='f'){e.preventDefault();setFocusRequest(n=>n+1);}}
+                if(e.currentTarget.dataset.navigating==='true')return;
+                if(mode==='scene'&&!running&&!['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)&&!e.target.isContentEditable){const key=e.key.toLowerCase(),tools={q:'select',w:'translate',e:'rotate',r:'scale'};if(tools[key]){e.preventDefault();setEditTool(tools[key]);}if(key==='f'){e.preventDefault();setFocusRequest({nonce:uid('focus')});}}
                 if (
                   mode === "game" &&
                   [" ", "Enter"].includes(e.key) &&
@@ -2215,12 +2230,13 @@ export default function Editor() {
             >
               <LocationScene
                 sceneId={displayScene.id}
-                editTool={editTool} editSpace={editSpace} snap={snap} focusRequest={cameraPilotId?0:focusRequest} editing={!running&&!cameraPilotId} onTransform={transformObject}
+                editTool={editTool} editSpace={editSpace} snap={snap} focusRequest={cameraPilotId?0:focusRequest} editing={!running&&!cameraPilotId} onTransform={transformObject} onTransforms={transformObjects}
                 cameraScene={displayScene} selectedCameraId={selection.kind==='camera'?selection.id:null} cameraPreviewId={cameraPreviewId} cameraPilotId={cameraPilotId} onCameraChange={changeCamera} onCameraSelect={selectCamera} cameraApi={cameraApi} showCameras={showCameras}
                 kind={displayScene.kind}
                 objects={objects}
                 state={world}
                 selected={selection.kind === "object" ? selection.id : null}
+                selectedIds={objectSelectionIds}
                 mode={mode}
                 showGrid={showGrid}
                 onSelect={selectObject}
@@ -2233,9 +2249,9 @@ export default function Editor() {
                 <select aria-label="Оси трансформации" value={editSpace} onChange={e=>setEditSpace(e.target.value)}><option value="world">Мир</option><option value="local">Объект</option></select>
                 <Button icon="Video" title="Показать камеры в 3D" className={showCameras?"active":""} onClick={()=>setShowCameras(v=>!v)}/>
                 <Button icon="Grid3X3" title="Сетка сцены" onClick={()=>setShowGrid(v=>!v)}/>
-                <Button icon="Focus" title="Приблизить выбранный объект · F" disabled={selection.kind!=='object'} onClick={()=>setFocusRequest(n=>n+1)}/>
+                <Button icon="Focus" title="Приблизить выбранный объект · F" disabled={selection.kind!=='object'} onClick={()=>setFocusRequest({nonce:uid('focus')})}/>
               </div>}
-              {mode==='scene'&&!cameraPilotId&&<div className="scene-edit-hint">{running?'Остановите воспроизведение для редактирования':selection.kind==='camera'?'Камера · тяните цветную ось или настройте ракурс мышью':selection.kind==='object'?`${inspectedObject?.name||'Объект'} · тяните цветную ось`:'Выберите объект в сцене или иерархии'}<span>Мышь — обзор · правая кнопка — панорама · колесо — масштаб</span></div>}
+              {mode==='scene'&&!cameraPilotId&&<div className="scene-edit-hint">{running?'Остановите воспроизведение для редактирования':selection.kind==='camera'?'Камера · тяните цветную ось или настройте ракурс мышью':selectedObjects.length>1?`Выбрано: ${selectedObjects.length} · общая трансформация`:selection.kind==='object'?`${inspectedObject?.name||'Объект'} · тяните цветную ось`:'Выберите объект в сцене или иерархии'}<span>Shift + щелчок — мультивыбор · Alt + ЛКМ — орбита · СКМ — панорама · ПКМ + WASD/QE — полёт · F — всё выделение в кадр</span></div>}
               {cameraPilotId&&mode==='scene'&&<div className="camera-pilot-bar"><Icon name="Video"/><span>Настройка: {displayScene.cameras?.find(c=>c.id===cameraPilotId)?.name}<small>Обзор мышью · правая кнопка — сдвиг · колесо — приближение</small></span><Button icon="Check" onClick={()=>captureCamera(cameraPilotId)}>Сохранить ракурс</Button><Button icon="X" title="Вернуться без сохранения" onClick={()=>setCameraPilotId(null)}/></div>}
               {mode==='game'&&<div className="camera-view-badge"><Icon name={resolveCamera(displayScene,world,objects,cameraPreviewId).mode==='follow'?'UserRoundCheck':'Video'} size={14}/>{resolveCamera(displayScene,world,objects,cameraPreviewId).name}{cameraPreviewId&&<button onClick={()=>setCameraPreviewId(null)}>По сценарию <Icon name="X" size={12}/></button>}</div>}
               <div className="viewport-state">
@@ -2309,7 +2325,7 @@ export default function Editor() {
               </span>
               <div className="flex-space" />
               {soundDesk.ducks.size > 0 && (
-                <span className="duck-label">Голос → музыка −{SIDECHAIN.reductionDb} dB</span>
+                <span className="duck-label">Голос → музыка −{normalizeSidechain(project.audioSettings?.sidechain).reductionDb} dB</span>
               )}
               {[...soundDesk.tracks.values()].some(t=>t.status==='error')&&<button className="audio-error" onClick={()=>setDock('sound')}>Ошибка аудио · открыть</button>}
               <button onClick={() => setDock("active")}>
@@ -2329,6 +2345,7 @@ export default function Editor() {
             <div className="panel-tabs dock-tabs">
               {[
                 ["story", "Workflow", "Сценарий"],
+                ["timeline", "Route", "Таймлайн"],
                 ["subscenes", "Network", "Сабсцены"],
                 ["cameras", "Video", "Камеры"],
                 ["staging", "Clapperboard", "Постановка"],
@@ -2346,7 +2363,7 @@ export default function Editor() {
                   disabled={id === "event" && !event}
                   onClick={() => {
                     setDock(id);
-                    if(id==="create")setMaximized("graph");
+                    if(["create","timeline"].includes(id))setMaximized("graph");
                     setDetailEditor(false);
                   }}
                 >
@@ -2360,7 +2377,7 @@ export default function Editor() {
               <div className="flex-space" />
               <Button
                 icon={maximized === "graph" ? "Minimize2" : "Maximize2"}
-                title="Развернуть граф"
+                title={maximized==='graph'?'Восстановить рабочую область':'Развернуть рабочую область'}
                 onClick={() =>
                   setMaximized(maximized === "graph" ? null : "graph")
                 }
@@ -2543,7 +2560,7 @@ export default function Editor() {
                     })
                   }
                 />
-              ) : dock === 'cameras' ? <CameraWorkspace scene={displayScene} objects={objects} state={world} selected={selection.kind==='camera'?selection.id:null} onSelect={selectCamera} onCreate={()=>createCamera()} onFollow={followCharacter} onChange={changeCamera} onDefault={id=>mutate(p=>p.subscenes.find(s=>s.id===scene.id).defaultCameraId=id)} onDelete={deleteCamera} onPilot={pilotCamera} onView={viewCamera} onCapture={captureCamera} piloting={cameraPilotId} running={running} onEdit={editScene}/> : dock === 'subscenes' ? <SubsceneWorkspace project={project} scene={displayScene} beat={nodes.find(b=>b.id===subsceneDraft?.fromBeatId)||beat} request={subsceneRequest} draft={subsceneDraft} onDraftChange={setSubsceneDraft} running={running}
+              ) : dock === 'timeline' ? <GlobalTimeline project={project} currentSceneId={displayScene.id} currentBeatId={running?preview.beatId:beat.id} running={running} variables={variables} onOpenScene={id=>openSubscenes('edit',id)} onOpenBeat={openSubsceneBeat} onLayoutChange={positions=>mutate(p=>{p.editor={...p.editor,timelinePositions:positions};})}/> : dock === 'cameras' ? <CameraWorkspace scene={displayScene} objects={objects} state={world} selected={selection.kind==='camera'?selection.id:null} onSelect={selectCamera} onCreate={()=>createCamera()} onFollow={followCharacter} onChange={changeCamera} onDefault={id=>mutate(p=>p.subscenes.find(s=>s.id===scene.id).defaultCameraId=id)} onDelete={deleteCamera} onPilot={pilotCamera} onView={viewCamera} onCapture={captureCamera} piloting={cameraPilotId} running={running} onEdit={editScene}/> : dock === 'subscenes' ? <SubsceneWorkspace project={project} scene={displayScene} beat={nodes.find(b=>b.id===subsceneDraft?.fromBeatId)||beat} request={subsceneRequest} draft={subsceneDraft} onDraftChange={setSubsceneDraft} running={running}
                 onStop={()=>rt.stop()} onSelect={id=>openSubscenes('edit',id)} onCreate={draft=>saveNewSubscene(draft)} onDuplicate={id=>saveNewSubscene(null,id)}
                 onPatch={patch=>editSubscene(p=>Object.assign(p.subscenes.find(s=>s.id===scene.id),patch))}
                 onKind={kind=>editSubscene(p=>changeSceneLocation(p,scene.id,kind))} onEntry={(id,reroute)=>editSubscene(p=>setSceneEntry(p,scene.id,id,reroute))}
@@ -2553,7 +2570,7 @@ export default function Editor() {
                 onCancel={()=>setSubsceneRequest({mode:'edit',token:uid('request')})}/> : dock === 'samples' ? <EventPlayground project={project} preview={preview} scene={displayScene} onPreview={audition} onEdit={editSample} onAdd={id=>{mutate(p=>addToBatch(p,beat.id,'ON_START',null,id));setNotice('Событие добавлено: во время реплики '+beat.id);}}/> : dock === "assets" ? (
                 renderAssets()
               ) : dock === "sound" ? (
-                <SoundWorkspace onAttach={attachSound} />
+                <SoundWorkspace project={project} onAttach={attachSound} onSidechainChange={sidechain=>mutate(p=>{p.audioSettings={...p.audioSettings,sidechain};})} />
               ) : dock === "active" ? (
                 renderActive()
               ) : (
@@ -2607,6 +2624,7 @@ export default function Editor() {
           onReset={() => setLayout((l) => ({ ...l, right: 300 }))}
         />
         <aside className="inspector-panel">
+          <button className="panel-restore" aria-label="Показать инспектор" title="Показать инспектор" onClick={()=>setLayout(l=>({...l,hiddenInspector:false}))}><Icon name="PanelRightOpen" size={18}/><span>Инспектор</span></button>
           <div className="panel-tabs">
             <button className="active">Инспектор</button>
             <button
@@ -2621,6 +2639,8 @@ export default function Editor() {
               className={inspectorPinned ? "active" : ""}
               onClick={() => setInspectorPinned((v) => !v)}
             />
+            <Button icon={maximized==='inspector'?'Minimize2':'Maximize2'} title={maximized==='inspector'?'Восстановить инспектор':'Развернуть инспектор'} onClick={()=>setMaximized(v=>v==='inspector'?null:'inspector')}/>
+            <Button icon="PanelRightClose" title="Свернуть инспектор" onClick={()=>{setMaximized(null);setLayout(l=>({...l,hiddenInspector:true}));setCompactPanel('workspace');}}/>
           </div>
           <div className="inspector-scroll">
             {selection.kind === "scene" ? (
@@ -2711,19 +2731,20 @@ export default function Editor() {
         >
           {menu === "Файл" ? (
             <>
-              <button
-                onClick={() => {
-                  setMenu(null);
-                  fileInput.current.click();
-                }}
-              >
+              <button disabled={projectFileBusy} onClick={()=>openProjectDialog('new')}><Icon name="FilePlus2"/>Новый пустой проект…</button>
+              <button disabled={projectFileBusy} onClick={openProjectFile}>
                 <Icon name="FolderOpen" />
                 Открыть проект…
               </button>
+              <button disabled={projectFileBusy} onClick={saveProject}><Icon name="Save"/>Сохранить проект <kbd>Ctrl S</kbd></button>
+              <button disabled={projectFileBusy} onClick={()=>openProjectDialog('saveAs')}><Icon name="SaveAll"/>Сохранить проект как… <kbd>Ctrl Shift S</kbd></button>
+              <button disabled={projectFileBusy} onClick={()=>openProjectDialog('template')}><Icon name="BookCopy"/>Записать проект как шаблон…</button>
+              <button disabled={projectFileBusy} onClick={()=>{downloadFile(JSON.stringify(createProjectTemplate(project,project.title),null,2),projectFilename(project.title,true));setMenu(null);}}><Icon name="FileDown"/>Экспортировать шаблон…</button>
               <button onClick={exportProject}>
                 <Icon name="Download" />
                 Экспортировать JSON
               </button>
+              <button disabled={projectFileBusy} onClick={restorePreviousProject}><Icon name="History"/>Восстановить предыдущий проект</button>
             </>
           ) : menu === "Правка" ? (
             <button
@@ -2771,6 +2792,9 @@ export default function Editor() {
             </>
           ) : (
             <>
+              <button onClick={()=>{setMaximized(null);setLayout(l=>({...l,hiddenHierarchy:hierarchyVisible}));setCompactPanel(hierarchyVisible?'workspace':'hierarchy');setMenu(null);}}><Icon name="PanelLeft"/>{hierarchyVisible?'Свернуть':'Показать'} иерархию</button>
+              <button onClick={()=>{setMaximized(null);setLayout(l=>({...l,hiddenInspector:inspectorVisible}));setCompactPanel(inspectorVisible?'workspace':'inspector');setMenu(null);}}><Icon name="PanelRight"/>{inspectorVisible?'Свернуть':'Показать'} инспектор</button>
+              <button onClick={()=>{setDock('timeline');setDetailEditor(false);setMaximized('graph');setMenu(null);}}><Icon name="Route"/>Общий таймлайн</button>
               <button onClick={resetLayout}>
                 <Icon name="PanelsTopLeft" />
                 Восстановить раскладку
@@ -3001,6 +3025,7 @@ export default function Editor() {
           </div>
         </div>
       )}
+      {projectDialog&&<ProjectDialog key={projectDialog} mode={projectDialog} project={project} templates={projectTemplates} busy={projectFileBusy} error={projectFileError} onSubmit={submitProjectDialog} onClose={()=>setProjectDialog(null)}/>}
       <input
         hidden
         type="file"

@@ -1,8 +1,8 @@
 import {AUDIO_ASSETS} from './studioModel.js';
 import {AudioOutput,BufferPlayer} from './AudioPlayer.js';
-import {SIDECHAIN} from './audioSettings.js';
+import {normalizeSidechain} from './audioSettings.js';
 export class SoundDesk {
- constructor(factory){this.output=factory?null:new AudioOutput();this.factory=factory||(url=>new BufferPlayer(url,this.output));this.tracks=new Map();this.listeners=new Set();this.peaks=new Map();this.ducks=new Set();this.duckGain=1;this.duckTarget=1;this.duckTransition=null;this.duckTimer=null;}
+ constructor(factory){this.output=factory?null:new AudioOutput();this.factory=factory||(url=>new BufferPlayer(url,this.output));this.tracks=new Map();this.listeners=new Set();this.peaks=new Map();this.ducks=new Set();this.sidechain=normalizeSidechain();this.duckGain=1;this.duckTarget=1;this.duckTransition=null;this.duckTimer=null;}
  unlock(){return this.output?.unlock()||Promise.resolve();}
  subscribe(fn){this.listeners.add(fn);return()=>this.listeners.delete(fn);}
  emit(){this.listeners.forEach(fn=>fn());}
@@ -18,12 +18,21 @@ export class SoundDesk {
   const progress=Math.max(0,Math.min(1,(now-transition.start)/transition.duration)),eased=progress*progress*(3-2*progress);
   return transition.from+(this.duckTarget-transition.from)*eased;
  }
- updateDucking(){
-  const target=this.ducks.size?Math.pow(10,-SIDECHAIN.reductionDb/20):1;
-  if(target===this.duckTarget)return;
+ setSidechain(settings){
+  const next=normalizeSidechain(settings),previous=this.sidechain;
+  if(Object.keys(next).every(key=>next[key]===previous[key]))return;
+  this.sidechain=next;
+  const target=this.ducks.size?Math.pow(10,-next.reductionDb/20):1,direction=target<this.duckLevel()?'attack':'release';
+  this.updateDucking(Boolean(this.duckTransition&&next[direction]!==previous[direction]));
+  this.applyVolumes();
+ }
+ updateDucking(retime=false){
+  const target=this.ducks.size?Math.pow(10,-this.sidechain.reductionDb/20):1;
+  if(target===this.duckTarget&&!retime)return;
   const now=Date.now();this.duckGain=this.duckLevel(now);this.duckTarget=target;
   clearInterval(this.duckTimer);this.duckTimer=null;
-  this.duckTransition={from:this.duckGain,start:now,duration:(target< this.duckGain?SIDECHAIN.attack:SIDECHAIN.release)*1000};
+  if(target===this.duckGain){this.duckTransition=null;return;}
+  this.duckTransition={from:this.duckGain,start:now,duration:(target<this.duckGain?this.sidechain.attack:this.sidechain.release)*1000};
   this.duckTimer=setInterval(()=>{
    const now=Date.now();this.duckGain=this.duckLevel(now);
    if(now>=this.duckTransition.start+this.duckTransition.duration){this.duckGain=this.duckTarget;this.duckTransition=null;clearInterval(this.duckTimer);this.duckTimer=null;}

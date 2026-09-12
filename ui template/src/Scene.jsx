@@ -4,23 +4,23 @@ import * as THREE from "three";
 import {createSceneGizmo,groupObjects,meshGeometry,cloneSceneObject} from './SceneGizmo.js';
 import {BUILTIN_TRANSFORMS,resolvedPosition} from './sceneEditing.js';
 import {createCameraRig} from './CameraRig.js';
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import {createSceneNavigation} from './SceneNavigation.js';
 import {atmosphere,gameCamera,decoratePaper,objectPosition,addCharacterDetails,animatePose} from './sceneEffects.js';
 
 export default function Scene({
   objects,
   state,
-  selected,
+  selected, selectedIds,
   onSelect,
   onLetter,
   onInteract,
   mode = "scene",
-  showGrid = true, sceneId="living", editTool, editSpace, snap, onTransform, focusRequest, editing=true, cameraScene, selectedCameraId, cameraPreviewId, cameraPilotId, onCameraChange, onCameraSelect, cameraApi, showCameras=true,
+  showGrid = true, sceneId="living", editTool, editSpace, snap, onTransform, onTransforms, focusRequest, editing=true, cameraScene, selectedCameraId, cameraPreviewId, cameraPilotId, onCameraChange, onCameraSelect, cameraApi, showCameras=true,
 }) {
   const host = useRef(),
     api = useRef();
   const callbacks = useRef();
-  callbacks.current = { onSelect, onLetter, onInteract, mode, state,objects,selected,sceneId,kind:"living",editTool,editSpace,snap,onTransform,focusRequest,editing,cameraScene,selectedCameraId,cameraPreviewId,cameraPilotId,onCameraChange,onCameraSelect,showCameras };
+  callbacks.current = { onSelect, onLetter, onInteract, mode, state,objects,selected,selectedIds,sceneId,kind:"living",editTool,editSpace,snap,onTransform,onTransforms,focusRequest,editing,cameraScene,selectedCameraId,cameraPreviewId,cameraPilotId,onCameraChange,onCameraSelect,showCameras };
   useEffect(() => {
     const element = host.current;
     let renderer;
@@ -41,15 +41,11 @@ export default function Scene({
     element.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
     scene.fog = new THREE.Fog(0x191c22, 20, 40);
-    const camera = new THREE.PerspectiveCamera(58, 1, 0.05, 100);
+    const camera = new THREE.PerspectiveCamera(58, 1, 0.05, 400);
     camera.position.set(-2.8,1.65,2.8);
-    const controls = new OrbitControls(camera, renderer.domElement);
+    const controls = createSceneNavigation(camera, renderer.domElement,()=>callbacks.current);
     controls.target.set(.3,1.02,-1.3);
-    controls.enableDamping = true;
-    controls.maxPolarAngle = Math.PI * 0.47;
-    controls.minDistance = .8;
-    controls.maxDistance = 22;
-    controls.enablePan = true;
+    camera.lookAt(controls.target);
     const hemi=new THREE.HemisphereLight(0xbfcce7, 0x3d292d, 2);scene.add(hemi);
     const sunlight = new THREE.DirectionalLight(0xa5b8e9, 3);
     sunlight.position.set(-3, 9, -4);
@@ -73,22 +69,26 @@ export default function Scene({
       meshes.push(m);
       return m;
     };
+    const prop=(id,build)=>{const start=scene.children.length;build();const group=groupObjects(scene,scene.children.slice(start),id,BUILTIN_TRANSFORMS[id]);pickables.push(group);return group;};
+    prop('room-floor',()=>{
     box(9, 0.22, 6.5, 0, -0.15, 0, 0x49404a);
-    box(9, 3, 0.16, 0, 1.3, -3.2, 0x515c63);
-    box(0.16, 3, 6.5, -4.5, 1.3, 0, 0x515961);
-    box(.16,3.3,6.5,4.5,1.45,0,0x666067);
-    box(9,.12,6.5,0,3.04,0,0x8b8180);
     for (let x = -4; x < 4.5; x += 0.45)
       box(0.014, 0.012, 6.5, x, -0.024, 0, 0x6c6263);
-    box(9, 0.08, 0.13, 0, 0.05, -3.05, 0x777c79);
-    box(0.14, 0.08, 6.4, -4.35, 0.05, 0, 0x777c79);
+    });
+    prop('room-back-wall',()=>{box(9, 3, 0.16, 0, 1.3, -3.2, 0x515c63);box(9, 0.08, 0.13, 0, 0.05, -3.05, 0x777c79);});
+    prop('room-left-wall',()=>{box(0.16, 3, 6.5, -4.5, 1.3, 0, 0x515961);box(0.14, 0.08, 6.4, -4.35, 0.05, 0, 0x777c79);});
+    prop('room-right-wall',()=>box(.16,3.3,6.5,4.5,1.45,0,0x666067));
+    prop('room-ceiling',()=>box(9,.12,6.5,0,3.04,0,0x8b8180));
     // Window, simple mullions and rain; everything in the scene is a primitive.
+    let glass;
+    prop('room-window',()=>{
     box(2.35, 2.2, 0.13, 1.35, 1.53, -3.06, 0x242e3c);
-    const glass = box(2.08, 1.94, 0.04, 1.35, 1.53, -2.97, 0x7b9eac);
+    glass = box(2.08, 1.94, 0.04, 1.35, 1.53, -2.97, 0x7b9eac);
     glass.material.emissive = new THREE.Color(0x34424f);
     box(0.07, 2, 0.09, 1.35, 1.53, -2.9, 0x9ca4a3);
     box(2.15, 0.07, 0.09, 1.35, 1.55, -2.9, 0x9ca4a3);
     box(2.6, 0.14, 0.48, 1.35, 0.48, -2.9, 0x88918d);
+    });
     const fireplaceStart=scene.children.length;
     box(1.45, 1.75, 0.72, -3.1, 0.85, -2.65, 0x8d7c74);
     box(1.68, 0.18, 0.94, -3.1, 1.67, -2.57, 0xa39485);
@@ -106,9 +106,12 @@ export default function Scene({
       scene.add(flame);
     }
     const fireplace=groupObjects(scene,scene.children.slice(fireplaceStart),"fireplace",BUILTIN_TRANSFORMS.fireplace);pickables.push(fireplace);
+    fireplace.attach(lamp);
+    prop('room-rug',()=>{
     box(3, 0.18, 2.2, -0.6, 0.01, 0.8, 0x776370);
     for (let i = 0; i < 4; i++)
       box(3, 0.005, 0.023, -0.6, 0.11, 0.05 + i * 0.45, 0x99858c);
+    });
     const sofaStart=scene.children.length;
     box(2.55, 0.4, 0.9, 2.8, 0.38, 0.6, 0x9e8175);
     box(2.55, 0.67, 0.26, 2.8, 0.74, 0.97, 0xa58c7b);
@@ -132,9 +135,12 @@ export default function Scene({
     door.userData.id = "door";
     pickables.push(door);
     door.attach(box(0.07, 0.07, 0.1, 3.88, 1, -2.99, 0xbda477));
-    table.attach(box(0.23, 0.23, 0.23, 0.2, 0.85, 1.72, 0xadb6b3));
+    prop('room-cup',()=>box(0.23, 0.23, 0.23, 0.2, 0.85, 1.72, 0xadb6b3));
+    prop('room-side-table',()=>{
     box(0.75, 0.12, 0.75, -3.65, 0.78, 0.85, 0x7a6655);
     box(0.15, 0.9, 0.15, -3.65, 0.38, 0.85, 0x605047);
+    });
+    prop('room-lamp',()=>{
     const shade = new THREE.Mesh(
       new THREE.ConeGeometry(0.32, 0.42, 12, 1, true),
       mat(0xd6b886, { side: THREE.DoubleSide }),
@@ -142,6 +148,7 @@ export default function Scene({
     shade.position.set(-3.65, 1.73, 0.85);
     scene.add(shade);
     box(0.05, 0.68, 0.05, -3.65, 1.12, 0.85, 0xb49d7a);
+    });
     const grid = new THREE.GridHelper(36, 36, 0x323842, 0x282d35);
     grid.position.y = -0.28;
     scene.add(grid);
@@ -188,11 +195,11 @@ export default function Scene({
       mouse = new THREE.Vector2();
     let down;
     const pointerDown = (e) => {
-      down = [e.clientX, e.clientY];
+      down = e.button===0&&!e.altKey ? [e.clientX, e.clientY] : null;
       renderer.domElement.closest(".scene-viewport")?.focus({preventScroll:true});
     };
     const click = (e) => {
-      if (cameraRig.blocksClick() || gizmo.blocksClick() || !down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5)
+      if (e.button!==0 || e.altKey || controls.blocksClick() || cameraRig.blocksClick() || gizmo.blocksClick() || !down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5)
         return;
       const r = element.getBoundingClientRect();
       mouse.set(
@@ -213,9 +220,9 @@ export default function Scene({
             if (callbacks.current.onInteract)
               callbacks.current.onInteract(o.userData.id);
             else if (o.userData.id === "letter") callbacks.current.onLetter?.();
-          } else callbacks.current.onSelect?.(o.userData.id);
+          } else callbacks.current.onSelect?.(o.userData.id,{additive:e.shiftKey||e.ctrlKey||e.metaKey});
         }
-      }else if(callbacks.current.mode==='game')callbacks.current.onInteract?.(null);
+      }else if(callbacks.current.mode==='game')callbacks.current.onInteract?.(null);else callbacks.current.onSelect?.(null,{additive:e.shiftKey||e.ctrlKey||e.metaKey});
     };
     renderer.domElement.addEventListener("pointerdown", pointerDown);
     renderer.domElement.addEventListener("pointerup", click);
@@ -253,6 +260,7 @@ export default function Scene({
       });
       gizmo.update();
       cameraRig.update(dt,gizmo.dragging);
+      controls.tick(dt);
       letter.userData.marker.visible=live.interactionTarget==='letter'||live.highlights?.letter;
       ring.scale.setScalar(live.interactionTarget?1+Math.sin(animTime*3)*.06:1);
       lamp.intensity=live.lighting==='Выключить'?0:live.lighting==='Холодный свет'?12:35;
@@ -267,6 +275,8 @@ export default function Scene({
       cameraRig.dispose();
       gizmo.dispose();
       controls.dispose();
+      renderer.domElement.removeEventListener('pointerdown',pointerDown);
+      renderer.domElement.removeEventListener('pointerup',click);
       scene.traverse((o) => {
         o.geometry?.dispose();
         if (o.material)
@@ -366,7 +376,7 @@ export default function Scene({
     <div
       className="scene-canvas"
       ref={host}
-      aria-label="Интерактивная 3D-гостиная. Вращайте мышью; нажмите на персонажа или письмо."
+      aria-label="3D-сцена. ЛКМ — выбор; Alt + ЛКМ — вращение; средняя кнопка — панорама; ПКМ + WASD/QE — полёт; колесо — приближение; F — фокус."
     />
   );
 }

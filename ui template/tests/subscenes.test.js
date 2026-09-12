@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {upgradeProject,allBeats,newEvent,addToBatch,bindingActions,validateStudio} from '../src/studioModel.js';
 import {createSubscene,cloneSubscene,newSceneDraft,beatsInScene,sceneTransitions,setSceneEntry,connectSubscene,changeSceneLocation} from '../src/subsceneModel.js';
-import {isObjectInScene,objectTransform,setObjectTransform} from '../src/sceneEditing.js';
+import {isObjectInScene,objectTransform,setObjectTransform,sceneStagingPoints,stagingPointOptions,resolvedPosition} from '../src/sceneEditing.js';
+import {DECORATION_CATALOG} from '../src/sceneDecorations.js';
 import {PreviewRuntime} from '../src/runtime.js';
 
 test('all location templates create independent props, a camera, a first line and the chosen cast',()=>{
@@ -12,7 +13,7 @@ test('all location templates create independent props, a camera, a first line an
   assert.equal(beatsInScene(p,s.id).length,1);assert.equal(beatsInScene(p,s.id)[0].id,s.entry);
   assert.equal(s.cameras.length,1);assert.equal(s.defaultCameraId,s.cameras[0].id);
   const visible=p.objects.filter(o=>isObjectInScene(o,s));assert.ok(visible.some(o=>o.id==='alice'));assert.ok(!visible.some(o=>o.id==='bob'));
-  const props=visible.filter(o=>o.type!=='Персонаж');assert.equal(props.length,kind==='living'?5:2);
+  const props=visible.filter(o=>o.type!=='Персонаж');assert.equal(props.length,(kind==='living'?5:2)+DECORATION_CATALOG.filter(o=>o.kind===kind).length);
   assert.ok(props.every(o=>o.subsceneId===s.id&&o.transforms[s.id]));
   assert.ok(!validateStudio(p).some(i=>i.beatId===s.entry&&i.level==='error'));
  }
@@ -96,4 +97,60 @@ test('a copied letter satisfies its gate and scene transition restores local vis
  const rt=new PreviewRuntime({stopAll(){},stop(){}});await rt.start(p,b.id);assert.equal(rt.snapshot.phase,'WAITING_OBJECT');
  rt.snapshot.world.visible.alice=false;await rt.advance(null,b.signal);
  assert.equal(rt.snapshot.variables.letter,true);assert.equal(rt.snapshot.world.location,'station');assert.deepEqual(rt.snapshot.world.visible,{});rt.stop();
+});
+
+test('staging points use each location landmarks, follow their own props and survive reload',()=>{
+ const p=upgradeProject(),living=p.subscenes.find(s=>s.id==='living'),garden=p.subscenes.find(s=>s.id==='garden');
+ const points=sceneStagingPoints(garden,p.objects);
+ assert.ok(points.some(point=>point.label==='У скамьи'));assert.ok(!points.some(point=>/камин|окн|диван/.test(point.label)));
+ assert.equal(new Set(p.subscenes.flatMap(scene=>scene.stagingPoints.map(point=>point.id))).size,15);
+ const benchPoint=points.find(point=>point.key==='bench'),beforeLiving=sceneStagingPoints(living,p.objects),bench=p.objects.find(o=>o.id===benchPoint.objectId),transform=objectTransform(bench,garden.id,garden.kind);
+ transform.position[0]+=3;setObjectTransform(p,bench.id,garden.id,transform);
+ const moved=sceneStagingPoints(garden,p.objects).find(point=>point.id===benchPoint.id);
+ assert.deepEqual(moved.position,[benchPoint.position[0]+3,...benchPoint.position.slice(1)]);assert.deepEqual(sceneStagingPoints(living,p.objects),beforeLiving);
+ const reloaded=upgradeProject(JSON.parse(JSON.stringify(p)));assert.deepEqual(sceneStagingPoints(reloaded.subscenes.find(s=>s.id===garden.id),reloaded.objects),sceneStagingPoints(garden,p.objects));
+});
+
+test('copied staging points and movement bindings target the copied local prop',()=>{
+ const p=upgradeProject(),source=p.subscenes.find(s=>s.id==='garden'),point=source.stagingPoints.find(point=>point.key==='bench'),event=newEvent('move','alice',point.id,'К скамье');
+ p.events.push(event);addToBatch(p,source.entry,'BEFORE',null,event.id);
+ const copy=cloneSubscene(p,source.id),copyPoint=copy.stagingPoints.find(point=>point.key==='bench'),copyBeat=beatsInScene(p,copy.id).find(b=>b.id===copy.entry);
+ assert.notEqual(copyPoint.id,point.id);assert.notEqual(copyPoint.objectId,point.objectId);assert.equal(p.objects.find(o=>o.id===copyPoint.objectId).subsceneId,copy.id);
+ assert.equal(bindingActions(p,copyBeat.bindings.find(b=>b.eventId===event.id))[0].value,copyPoint.id);
+ copyPoint.position[0]+=7;assert.notEqual(copyPoint.position[0],point.position[0]);assert.equal(event.groups[0].actions[0].value,point.id);
+ const fresh=createSubscene(p,{...newSceneDraft(p),name:'Другой сад',kind:'garden'});
+ assert.ok(fresh.stagingPoints.every(point=>point.id.startsWith(fresh.id+':')));assert.ok(fresh.stagingPoints.every(point=>!point.objectId||p.objects.find(o=>o.id===point.objectId).subsceneId===fresh.id));
+ changeSceneLocation(p,fresh.id,'station');assert.ok(fresh.stagingPoints.some(point=>point.label==='У вагона'));assert.ok(!fresh.stagingPoints.some(point=>point.label==='У скамьи'));
+});
+
+test('version one projects gain editable decorations and points without overwriting placement',()=>{
+ const p=upgradeProject(),catalogIds=new Set(DECORATION_CATALOG.map(o=>o.id));p.sceneEditingVersion=1;
+ p.objects=p.objects.filter(o=>!catalogIds.has(o.builtin||o.id));p.subscenes.forEach(scene=>delete scene.stagingPoints);
+ setObjectTransform(p,'room-table','living',{position:[2,.3,-1],rotation:[0,25,0],scale:[1.2,1,1]});const oldEvents=structuredClone(p.events),oldTransform=objectTransform(p.objects.find(o=>o.id==='room-table'),'living');
+ const migrated=upgradeProject(p);assert.equal(migrated.sceneEditingVersion,2);assert.deepEqual(migrated.events,oldEvents);
+ assert.deepEqual(objectTransform(migrated.objects.find(o=>o.id==='room-table'),'living'),oldTransform);
+ assert.deepEqual(sceneStagingPoints(migrated.subscenes.find(s=>s.id==='living'),migrated.objects).find(point=>point.key==='table').position,[1.35,.3,-1.7000000000000002]);
+ for(const scene of migrated.subscenes){assert.equal(scene.stagingPoints.length,5);for(const decoration of DECORATION_CATALOG.filter(o=>o.kind===scene.kind))assert.ok(migrated.objects.some(o=>isObjectInScene(o,scene)&&(o.builtin||o.id)===decoration.id));}
+ assert.deepEqual(upgradeProject(migrated),migrated);
+});
+
+test('runtime resolves authored staging point IDs and rejects points from another subscene',async()=>{
+ const p=upgradeProject(),scene=p.subscenes.find(s=>s.id==='garden'),point=scene.stagingPoints.find(point=>point.key==='bench'),entry=allBeats(p).find(b=>b.id===scene.entry),event=newEvent('move','alice',point.id,'Движение к точке');
+ entry.bindings=[];entry.batches={};event.groups[0].actions[0].duration=.1;p.events.push(event);addToBatch(p,entry.id,'BEFORE',null,event.id);
+ setObjectTransform(p,point.objectId,scene.id,{position:[4,0,2],rotation:[0,0,0],scale:[1,1,1]});
+ const rt=new PreviewRuntime({stopAll(){}});await rt.start(p,entry.id);
+ assert.equal(rt.snapshot.error,null);assert.equal(rt.snapshot.world.positions.alice,point.id);
+ assert.deepEqual(resolvedPosition(p.objects.find(o=>o.id==='alice'),rt.snapshot.world,scene.kind),sceneStagingPoints(scene,p.objects).find(p=>p.id===point.id).position);rt.stop();
+ event.groups[0].actions[0].value=p.subscenes[0].stagingPoints[0].id;await rt.start(p,entry.id);assert.match(rt.snapshot.error,/Точка постановки отсутствует/);rt.stop();
+ event.groups[0].actions[0].value=point.id;scene.stagingPoints=scene.stagingPoints.filter(p=>p.id!==point.id);await rt.start(p,entry.id);assert.match(rt.snapshot.error,/Точка постановки отсутствует/);assert.equal(rt.snapshot.world.positions.alice,undefined);rt.stop();
+});
+
+test('movement selectors offer only the current scene points and identify unavailable saved destinations',()=>{
+ const p=upgradeProject(),garden=p.subscenes.find(s=>s.id==='garden'),living=p.subscenes.find(s=>s.id==='living');
+ const options=stagingPointOptions(garden,p.objects,'окно');
+ assert.equal(options[0][0],'окно');assert.equal(options[0][1],'У старого дерева');
+ assert.ok(options.slice(1).every(([id])=>garden.stagingPoints.some(point=>point.id===id)));
+ assert.ok(!options.some(([id])=>living.stagingPoints.some(point=>point.id===id)));
+ const unavailable=stagingPointOptions(garden,p.objects,living.stagingPoints[0].id);assert.match(unavailable[0][1],/недоступна/);
+ const coordinates=stagingPointOptions(garden,p.objects,[2,0,1]);assert.deepEqual(coordinates[0],['2, 0, 1','Координаты: 2, 0, 1']);
 });

@@ -7,6 +7,7 @@ import {cameraPose,cameraFromView,resolveCamera,newCamera} from '../src/cameraMo
 import {setObjectTransform} from '../src/sceneEditing.js';
 import {createCameraRig} from '../src/CameraRig.js';
 import {PreviewRuntime} from '../src/runtime.js';
+import {createEmptyProject} from '../src/projectLifecycle.js';
 
 const state={location:'living',camera:'Общий план',positions:{},visible:{}};
 test('camera migration is idempotent and preserves an intentionally empty camera list',()=>{
@@ -62,6 +63,20 @@ test('piloting preserves an upward-looking camera and restores free limits',()=>
   assert.ok(view.position.distanceTo(new THREE.Vector3(...camera.position))<1e-9);assert.equal(orbit.maxPolarAngle,Math.PI);
   live.cameraPilotId=null;rig.update(.016);assert.ok(view.position.distanceTo(new THREE.Vector3(...free.position))<1e-9);assert.equal(orbit.maxPolarAngle,Math.PI*.47);
  }finally{rig.dispose();orbit.dispose();}
+});
+
+test('empty projects open on the grid and nearby camera icons cannot obscure the editor view',()=>{
+ const project=createEmptyProject(),definition=project.subscenes[0],scene=new THREE.Scene(),view=new THREE.PerspectiveCamera(58,1,.05,100),canvas=new EventTarget();canvas.style={};
+ view.position.set(...definition.cameras[0].position);const orbit={target:new THREE.Vector3(...definition.cameras[0].target),enabled:true,update(){}};
+ const live={sceneId:definition.id,kind:definition.kind,cameraScene:definition,state:{location:definition.id},objects:[],mode:'scene',editing:true,editTool:'select'};
+ const rig=createCameraRig(scene,view,orbit,canvas,()=>live);
+ try{
+  rig.update(.016);assert.ok(view.position.distanceTo(new THREE.Vector3(6,4.5,6))<1e-9);assert.deepEqual(orbit.target.toArray(),[0,0,0]);
+  const marker=scene.children.find(node=>node.userData.cameraId===definition.cameras[0].id);assert.equal(marker.visible,true);
+  view.position.copy(marker.position);rig.update(.016);assert.equal(marker.visible,false);assert.equal(rig.pick(new THREE.Raycaster(view.position,new THREE.Vector3(0,0,-1))),null);
+  view.position.x+=1;rig.update(.016);assert.equal(marker.visible,true);assert.ok(marker.scale.x<.4);
+  const editorPose=rig.capture();live.mode='game';rig.update(.016);live.mode='scene';rig.update(.016);assert.deepEqual(rig.capture(),editorPose);
+ }finally{rig.dispose();}
 });
 
 const dialogueState=(speakerId='alice',index=0)=>({...state,dialogue:{key:'run:'+index,beatId:'line-'+index,kind:'dialogue',speakerId,index}});
