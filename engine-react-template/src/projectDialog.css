@@ -1,5 +1,0 @@
-.project-dialog-backdrop{position:fixed;inset:0;z-index:150;background:#101015b8;display:grid;place-items:center;padding:20px}
-.project-dialog{width:min(490px,100%);max-height:calc(100vh - 40px);overflow:auto;border:1px solid #746270;border-radius:9px;background:#28272f;box-shadow:0 25px 90px #0009;padding:22px;display:flex;flex-direction:column;gap:18px;color:#ddd4df}
-.project-dialog header{display:flex;gap:10px;align-items:center}.project-dialog h2{font-size:18px;margin:0;flex:1}.project-dialog header>svg{color:#c6a4bb}.project-dialog header button{padding:4px;border:0;background:none}
-.project-dialog .field{display:flex;flex-direction:column;gap:7px}.project-dialog input,.project-dialog select{width:100%;padding:9px;border:1px solid #605361;border-radius:5px;background:#212127;color:#e3dce4;font:inherit;color-scheme:dark}
-.project-dialog p{margin:0;font-size:13px;line-height:1.6;color:#b4a9b8}.project-dialog small{font-size:12px;line-height:1.5;color:#a69bad}.project-dialog footer{display:flex;justify-content:flex-end;gap:9px}.project-dialog .project-dialog-error{color:#f1abb2}

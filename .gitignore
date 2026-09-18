@@ -50,6 +50,15 @@ build/
 Build/
 build-*/
 
+# FetchContent sources under Engine/Editor ThirdParty (not committed)
+Root/Engine/ThirdParty/DiligentCore/
+Root/Engine/ThirdParty/DiligentTools/
+Root/Engine/ThirdParty/DiligentFX/
+Root/Engine/ThirdParty/DiligentSamples/
+Root/Engine/ThirdParty/PhysX/
+Root/Engine/ThirdParty/**/_src/
+Root/Editor/ThirdParty/**/_src/
+
 # CMake generated files
 CMakeFiles/
 CMakeCache.txt
