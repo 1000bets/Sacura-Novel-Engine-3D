@@ -62,6 +62,25 @@ Object* MemorySubsystem::FindByID(ObjectID ID) const
     return (It != m_Registry.end()) ? It->second : nullptr;
 }
 
+Object* MemorySubsystem::ResolveHandle(ObjectHandle Handle) const
+{
+    if (!Handle.IsValid())
+    {
+        return nullptr;
+    }
+
+    Object* Found = FindByID(Handle.Id);
+    if (Found == nullptr)
+    {
+        return nullptr;
+    }
+    if (Found->GetGeneration() != Handle.Generation)
+    {
+        return nullptr;
+    }
+    return Found;
+}
+
 // ========================= Creation / Destruction =========================
 
 void MemorySubsystem::DestroyObject(Object* Obj)

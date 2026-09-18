@@ -55,13 +55,10 @@ public:
         assert(Mem && "MemorySubsystem not initialized");
 
         T* Comp = Mem->NewObject<T>(std::forward<Args>(args)...);
-        Comp->m_GameObject = this;
-        Comp->SetOwner(this);
-
-        m_Components.push_back(Comp);
-        Comp->OnCreate();
-        return Comp;
+        return static_cast<T*>(AddExistingComponent(Comp));
     }
+
+    Component* AddExistingComponent(Component* Comp);
 
     template<typename T>
     T* GetComponent() const

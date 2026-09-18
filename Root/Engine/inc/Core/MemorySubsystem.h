@@ -48,6 +48,9 @@ public:
     /// Найти живой объект по ID.  nullptr, если не найден / уже уничтожен.
     Object* FindByID(ObjectID ID) const;
 
+    /// Resolve ObjectHandle; nullptr if destroyed or generation mismatch.
+    Object* ResolveHandle(ObjectHandle Handle) const;
+
     /// Шаблонная версия с кастом.
     template<typename T>
     T* FindByID(ObjectID ID) const
@@ -55,6 +58,14 @@ public:
         static_assert(std::is_base_of_v<Object, T>,
                       "T must derive from Object");
         return dynamic_cast<T*>(FindByID(ID));
+    }
+
+    template<typename T>
+    T* ResolveHandle(ObjectHandle Handle) const
+    {
+        static_assert(std::is_base_of_v<Object, T>,
+                      "T must derive from Object");
+        return dynamic_cast<T*>(ResolveHandle(Handle));
     }
 
     // ========================= Creation / Destruction =========================

@@ -102,6 +102,18 @@ void RenderThread::ResizeRenderer(uint32_t Width, uint32_t Height)
     }
 }
 
+Renderer* RenderThread::GetRenderer()
+{
+    AssertRenderThread();
+    return OwnedRenderer.get();
+}
+
+const Renderer* RenderThread::GetRenderer() const
+{
+    AssertRenderThread();
+    return OwnedRenderer.get();
+}
+
 void RenderThread::ThreadMain()
 {
     SetCurrentThreadRole(ThreadRole::Render);

@@ -31,6 +31,9 @@ public:
     MeshHandle GetDefaultMesh() const { return DefaultMesh; }
     bool IsInitialized() const { return bInitialized; }
 
+    RenderResourceManager& GetResources() { return Resources; }
+    const RenderResourceManager& GetResources() const { return Resources; }
+
 private:
     bool CreateShaders(const std::string& ShaderDirectory);
     bool CreatePipeline();

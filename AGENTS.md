@@ -111,6 +111,62 @@ Pinned version cache vars: `SAKURA_SDL3_GIT_TAG`, `SAKURA_DILIGENT_*_GIT_TAG`, `
 - Executables that need Diligent backend DLLs: `sakura_copy_engine_runtime_dlls(<target>)`.
 - Include usage: `#include <fastgltf/core.hpp>`, `#include "ozz/animation/runtime/skeleton.h"`, `#include "stb_image.h"`, `#include <nlohmann/json.hpp>`, `#include "ufbx.h"`.
 
+## Asset System (Blocks 1–6)
+
+```text
+Content + .meta → AssetRegistry → AssetManager (LoadAsync / PumpCompletions)
+  → CPU resources (Model/StaticMesh/Texture/Material/Skeletal*)
+  → AssetGpuUploader → RenderThread → RenderResourceManager (GPU mesh/texture)
+```
+
+- `AssetRegistry` owns Content scan / GUID↔path / subassets; Game Thread.
+- `AssetManager` dedupes by `AssetKey`+generation; JobSystem workers do I/O; publish only in `PumpCompletions` on Game Thread. No Diligent dependency.
+- Loaders: `ModelLoader` (self-contained GLB only), `TextureLoader` (stb RGBA8), `MaterialLoader` (JSON schemaVersion 1), `SkeletalLoader` (GLB→ozz offline builders; LINEAR only; max 4 influences).
+- Shared GLB parse cache lives in `ModelLoader` for Model/StaticMesh/Skeletal subassets of the same file.
+- `Engine::InitializeHeadless(ContentRoot)` — Game thread + Memory + Jobs + Registry.Scan + AssetManager; no window/render.
+- Full `Initialize` also creates Assets after Jobs; `Tick` calls `Assets.PumpCompletions()`; `Shutdown` calls `Assets.Shutdown()` before `Render.Stop()`.
+- Editor `AssetTools`: `AssetImporter` dispatches by extension; staging outside Content; path conflict → `ImportConflict` (no overwrite). FBX→GLB via ufbx + fastgltf `Exporter` (static geometry only).
+- Headless verification target: `SakuraAssetTest` (`Root/Tests/AssetSystem_Test.cpp`).
+- Content fingerprint: FNV-1a 64-bit (`ContentHash`); mismatch → `AssetChanged`. Not asset identity.
+- Engine defines `NOMINMAX` (required for fastgltf on MSVC).
+
+### Supported profile (v1)
+
+| Operation | Supported | Rejected / out of scope |
+|-----------|-----------|-------------------------|
+| Import GLB | Self-contained buffers/images | External URI, network, path traversal |
+| Import PNG/JPEG | Copy + `.meta` | Files >256MB, images >8192/side |
+| Import FBX | Static meshes, transforms, UV/normals, material slots | Skinning/animation (UnsupportedFeature) |
+| Load Model/StaticMesh | Triangles, owned CPU buffers | Non-triangle primitives without conversion path |
+| Load Texture | RGBA8 CPU, sRGB default | — |
+| Load Material | baseColor/metallic/roughness + optional texture AssetRef | Full PBR |
+| Load Skeletal | GLB→ozz in RAM (no `.ozz` on disk), LINEAR tracks, ≤4 influences | STEP/CUBICSPLINE/morph silent drop |
+| GPU upload | Mesh/texture via Render Thread | Sync load inside Draw |
+
+No disk asset cache / DerivedData / `.meshbin`.
+
+## Reflection System
+
+```text
+ENGINE_CLASS / ENGINE_STRUCT / ENGINE_REFLECT_* (header registrars)
+  → PendingRegistry (static intrusive recipes, early dynamic init)
+  → ReflectionSubsystem::InitializeNative (bind when types are complete)
+  → Class / TypeDescriptor / PropertyDescriptor catalog + CDO
+  → PropertyAccess Get/Set (Inspector / Deserialize / Script / Default)
+```
+
+- **TypeId** / **PropertyId** are stable strings (`"engine.CameraComponent"`, `"field_of_view"`), not RTTI hashes or registration indices.
+- Authoring is in headers next to members via `Reflection/ReflectionMacros.h`. Nested static registrars only store string literals + binder function pointers (`noexcept`, no heap). Binder bodies run in `InitializeNative` when the class is complete.
+- After the class/struct closing brace in the **same header**: `ENGINE_CLASS_END` / `ENGINE_STRUCT_END`, then `ENGINE_IMPLEMENT_FIELD` / `ENGINE_IMPLEMENT_PROPERTY` / `ENGINE_IMPLEMENT_READONLY` (MSVC-safe member-pointer bind).
+- `RF_DISPLAY_NAME`, `RF_UI_RANGE`, `RF_CATEGORY` feed `PropertyAttributes` alongside `PropertyFlags`.
+- `Class` is metadata (`Object` subclass), **not** a scene object. Instances get `Object::AssignClass` / `GetClass` / `GetTypeId` from the factory.
+- `ScriptComponent` (`engine.ScriptComponent`) is a managed property bag (`PropertyId → ReflectedValue`) for a future Python binding path; Reflection core does **not** depend on Python, ImGui, or Diligent.
+- Builtin value types: `engine.bool`, `engine.int64`, `engine.float`, `engine.double`, `engine.string`, `engine.Vector3`, `engine.Quaternion`, `engine.Color` (Color stays a distinct TypeId from Vector4).
+- No on-disk type / schema cache in v1.
+- MSVC static registration can be stripped from static `Engine.lib` if unused: link tests/tools with `/WHOLEARCHIVE:Engine` (see `Root/CMakeLists.txt` for `SakuraReflectionTest`, `SakuraAssetTest`, `SakuraTest`). `ReflectionAnchor.cpp` includes reflected headers and `ForceTouchRegistrars()`.
+- Headless verification: `SakuraReflectionTest` (`Root/Tests/Reflection_Test.cpp` + `Reflection_Test_TU2.cpp` multi-TU include).
+- Engine hooks: `InitializeCommon` calls `InitializeNative` after Jobs; `Shutdown` tears Reflection down after Assets and before Render/Jobs teardown (CDOs still need `MemorySubsystem`).
+
 ## Coding conventions (engine)
 
 - Identifiers: PascalCase, no abbreviations, no type-wrapper suffixes (`Ptr`, `Ref`, `Handle`).

@@ -52,6 +52,16 @@ void GameObject::SetParent(GameObject* NewParent)
 
 // ========================= Components =========================
 
+Component* GameObject::AddExistingComponent(Component* Comp)
+{
+    assert(Comp != nullptr);
+    Comp->m_GameObject = this;
+    Comp->SetOwner(this);
+    m_Components.push_back(Comp);
+    Comp->OnCreate();
+    return Comp;
+}
+
 void GameObject::RemoveComponent(Component* Comp)
 {
     auto It = std::find(m_Components.begin(), m_Components.end(), Comp);

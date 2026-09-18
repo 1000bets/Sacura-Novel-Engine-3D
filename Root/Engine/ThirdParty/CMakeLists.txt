@@ -166,6 +166,33 @@ target_include_directories(SakuraPhysX INTERFACE
 # ---- Asset pipeline (fastgltf, ozz, stb_image, nlohmann/json) ----
 add_subdirectory(asset)
 
+# ---- Python scripting (pybind11 embed) ----
+set(SAKURA_PYBIND11_GIT_TAG "v2.13.6" CACHE STRING "pybind11 git tag")
+option(SAKURA_ENABLE_PYTHON "Enable Python scripting via pybind11" ON)
+
+set(SAKURA_PYTHON_AVAILABLE OFF)
+if(SAKURA_ENABLE_PYTHON)
+    find_package(Python3 COMPONENTS Interpreter Development.Embed QUIET)
+    if(Python3_Development_Embed_FOUND)
+        set(SAKURA_PYTHON_AVAILABLE ON)
+    else()
+        message(WARNING "SAKURA_ENABLE_PYTHON=ON but Python3 Development.Embed was not found; building without Python")
+        set(SAKURA_ENABLE_PYTHON OFF CACHE BOOL "Enable Python scripting via pybind11" FORCE)
+    endif()
+endif()
+
+if(SAKURA_PYTHON_AVAILABLE)
+    FetchContent_Declare(
+        pybind11
+        GIT_REPOSITORY https://github.com/pybind/pybind11.git
+        GIT_TAG        ${SAKURA_PYBIND11_GIT_TAG}
+        GIT_SHALLOW    TRUE
+        SOURCE_DIR     ${CMAKE_CURRENT_SOURCE_DIR}/pybind11/_src
+    )
+    set(PYBIND11_FINDPYTHON ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(pybind11)
+endif()
+
 # ---- Aggregate for Engine ----
 add_library(SakuraEngineThirdParty INTERFACE)
 add_library(Sakura::EngineThirdParty ALIAS SakuraEngineThirdParty)
@@ -177,6 +204,14 @@ target_link_libraries(SakuraEngineThirdParty INTERFACE
     Sakura::PhysX
     Sakura::AssetThirdParty
 )
+
+if(SAKURA_PYTHON_AVAILABLE)
+    target_link_libraries(SakuraEngineThirdParty INTERFACE
+        pybind11::embed
+        Python3::Python
+    )
+    target_compile_definitions(SakuraEngineThirdParty INTERFACE SAKURA_ENABLE_PYTHON=1)
+endif()
 
 if(TARGET Diligent-GraphicsEngineD3D12-shared)
     target_link_libraries(SakuraEngineThirdParty INTERFACE Diligent-GraphicsEngineD3D12-shared)

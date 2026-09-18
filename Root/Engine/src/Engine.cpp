@@ -4,6 +4,7 @@
 #include "Core/Threading/ThreadContext.h"
 #include "Game/Scene.h"
 #include "Platform/WindowSubsystem.h"
+#include "Reflection/ReflectionSubsystem.h"
 
 #include <chrono>
 #include <filesystem>
@@ -25,39 +26,85 @@ WindowSubsystem* Engine::GetWindowSubsystem() const
     return const_cast<Engine*>(this)->GetSubsystem<WindowSubsystem>();
 }
 
-void Engine::Initialize()
+void Engine::SetContentRoot(const std::filesystem::path& InContentRoot)
+{
+    ContentRoot = InContentRoot;
+    Registry.SetContentRoot(ContentRoot);
+}
+
+void Engine::InitializeCommon(bool bCreateWindowAndRender)
 {
     SetCurrentThreadRole(ThreadRole::Game);
     SetCurrentThreadDebugName("Game Thread");
     PrintString("Thread created: Game Thread");
 
     CreateSubsystem<MemorySubsystem>();
-    WindowSubsystem* Window = CreateSubsystem<WindowSubsystem>();
-    Window->CreateMainWindow("Sacura Novel Engine", 1280, 720, true);
 
     Jobs.Initialize();
 
-    if (ShaderDirectory == "shaders")
     {
-        std::filesystem::path Candidate = std::filesystem::current_path() / "shaders";
-        if (!std::filesystem::exists(Candidate))
+        const ReflectionDiagnostic ReflectionInit = ReflectionSubsystem::Get().InitializeNative();
+        if (!ReflectionInit.bOk)
         {
-            Candidate = std::filesystem::current_path() / "Root" / "Engine" / "shaders";
-        }
-        if (std::filesystem::exists(Candidate))
-        {
-            ShaderDirectory = Candidate.string();
+            PrintString(std::string("Reflection InitializeNative failed: ") + ReflectionInit.Message);
         }
     }
 
-    Render.Start(Window->GetNativeWindowInfo(), ShaderDirectory, PreferredBackend);
-    Render.WaitUntilReady();
+    if (!ContentRoot.empty())
+    {
+        Registry.SetContentRoot(ContentRoot);
+        const AssetDiagnostic ScanDiagnostic = Registry.ScanContent();
+        if (ScanDiagnostic.HasError())
+        {
+            PrintString(std::string("AssetRegistry scan failed: ") + ScanDiagnostic.Message);
+        }
+    }
+
+    Assets.Initialize(Registry, Jobs);
+
+    if (bCreateWindowAndRender)
+    {
+        WindowSubsystem* Window = CreateSubsystem<WindowSubsystem>();
+        Window->CreateMainWindow("Sacura Novel Engine", 1280, 720, true);
+
+        if (ShaderDirectory == "shaders")
+        {
+            std::filesystem::path Candidate = std::filesystem::current_path() / "shaders";
+            if (!std::filesystem::exists(Candidate))
+            {
+                Candidate = std::filesystem::current_path() / "Root" / "Engine" / "shaders";
+            }
+            if (std::filesystem::exists(Candidate))
+            {
+                ShaderDirectory = Candidate.string();
+            }
+        }
+
+        Render.Start(Window->GetNativeWindowInfo(), ShaderDirectory, PreferredBackend);
+        Render.WaitUntilReady();
+    }
 
     bRunning = true;
     bInitialized = true;
     NextFrameIndex = 1;
     ActiveScene = nullptr;
+}
+
+void Engine::Initialize()
+{
+    bHeadless = false;
+    InitializeCommon(true);
     PrintString("Engine: initialized");
+}
+
+void Engine::InitializeHeadless(const std::filesystem::path& InContentRoot)
+{
+    bHeadless = true;
+    SetCurrentThreadRole(ThreadRole::Game);
+    SetCurrentThreadDebugName("Game Thread");
+    SetContentRoot(InContentRoot);
+    InitializeCommon(false);
+    PrintString("Engine: initialized headless");
 }
 
 void Engine::SetActiveScene(Scene* Scene)
@@ -71,13 +118,17 @@ void Engine::Tick(float DeltaTime)
     AssertGameThread();
     BeginFrame();
 
+    Assets.PumpCompletions();
     TickSubsystems(DeltaTime);
 
-    if (WindowSubsystem* Window = GetWindowSubsystem())
+    if (!bHeadless)
     {
-        if (Window->IsCloseRequested())
+        if (WindowSubsystem* Window = GetWindowSubsystem())
         {
-            RequestShutdown();
+            if (Window->IsCloseRequested())
+            {
+                RequestShutdown();
+            }
         }
     }
 
@@ -91,6 +142,12 @@ void Engine::BeginFrame()
 
 void Engine::EndFrame()
 {
+    if (bHeadless)
+    {
+        ++NextFrameIndex;
+        return;
+    }
+
     auto Frame = std::make_unique<RenderFrameData>();
     Frame->FrameIndex = NextFrameIndex;
 
@@ -115,11 +172,19 @@ void Engine::Shutdown()
     ActiveScene = nullptr;
 
     PrintString("Engine: shutting down");
-    Render.Stop();
+    Assets.Shutdown();
+    ReflectionSubsystem::Get().Shutdown();
+
+    if (!bHeadless)
+    {
+        Render.Stop();
+    }
+
     Jobs.Shutdown();
     ShutdownSubsystems();
 
     bInitialized = false;
+    bHeadless = false;
     PrintString("Engine: shutdown complete");
 }
 

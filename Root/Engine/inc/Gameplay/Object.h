@@ -1,41 +1,39 @@
 #pragma once
 
 #include "Core/Types.h"
+#include "Gameplay/ObjectHandle.h"
+#include "Reflection/TypeId.h"
+
 #include <string>
 #include <atomic>
 
 class MemorySubsystem;
+class Class;
 
-/// Макрос для каждого наследника Object.
-/// Открывает protected-конструкторы для MemorySubsystem::NewObject<T>().
-///
-/// class MyComponent : public Component {
-///     SAKURA_OBJECT(MyComponent)
-/// public:
-///     void Tick(float DT) override;
-/// };
-///
 #define SAKURA_OBJECT(ClassName)            \
     friend class MemorySubsystem;
 
-/// Корень иерархии типов.
-/// Создание только через MemorySubsystem::NewObject<T>().
-/// Конструкторы protected — прямой new / стек запрещены снаружи.
 class Object
 {
 public:
     virtual ~Object();
 
-    // ------- identity -------
     ObjectID GetID() const { return m_ObjectID; }
+    uint32_t GetGeneration() const { return m_Generation; }
+    ObjectHandle GetObjectHandle() const { return ObjectHandle{m_ObjectID, m_Generation}; }
+
     const std::string& GetName() const { return m_Name; }
     void SetName(const std::string& InName) { m_Name = InName; }
 
-    // ------- ownership -------
     Object* GetOwner() const { return m_Owner; }
     void SetOwner(Object* InOwner) { m_Owner = InOwner; }
 
-    // ------- debug -------
+    Class* GetClass() const { return m_Class; }
+    TypeId GetTypeId() const;
+    void AssignClass(Class* InClass) { m_Class = InClass; }
+
+    static constexpr const char* StaticReflectionTypeId() { return "engine.Object"; }
+
     virtual std::string ToString() const;
 
 protected:
@@ -45,8 +43,10 @@ protected:
     explicit Object(const std::string& InName);
 
     ObjectID m_ObjectID = INVALID_OBJECT_ID;
+    uint32_t m_Generation = 1;
     std::string m_Name;
     Object* m_Owner = nullptr;
+    Class* m_Class = nullptr;
 
 private:
     static std::atomic<ObjectID> s_NextID;

@@ -90,6 +90,7 @@ add_library(Sakura::AssetThirdParty ALIAS SakuraAssetThirdParty)
 target_link_libraries(SakuraAssetThirdParty INTERFACE
     fastgltf::fastgltf
     ozz_animation
+    ozz_animation_offline
     nlohmann_json::nlohmann_json
     Sakura::StbImage
 )

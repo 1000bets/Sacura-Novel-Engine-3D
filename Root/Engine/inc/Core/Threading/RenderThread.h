@@ -41,6 +41,9 @@ public:
 
     MeshHandle GetDefaultMesh() const { return DefaultMesh; }
 
+    Renderer* GetRenderer();
+    const Renderer* GetRenderer() const;
+
     static RenderThread* Get();
 
 private:
