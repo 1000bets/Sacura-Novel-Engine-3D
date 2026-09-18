@@ -4,6 +4,9 @@
 # JetBrains IDE settings
 .idea/
 
+# Visual Studio
+.vs/
+
 # Compiled Object files
 *.slo
 *.lo
