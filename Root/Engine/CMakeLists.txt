@@ -27,3 +27,12 @@ if(NOT WIN32)
 endif()
 
 target_link_libraries(Engine PUBLIC Sakura::EngineThirdParty)
+
+target_compile_definitions(Engine
+PUBLIC
+    PLATFORM_WIN32=1
+    ENGINE_DLL=1
+    D3D12_SUPPORTED=1
+    VULKAN_SUPPORTED=1
+    GL_SUPPORTED=1
+)

@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------
-# Engine third-party: SDL3, Diligent stack, ImGui, PhysX
+# Engine third-party: SDL3, Diligent stack, ImGui, PhysX, asset I/O
 # Fetched at configure time into this tree; pinned tags — bump deliberately.
 # ---------------------------------------------------------------
 
@@ -163,6 +163,9 @@ target_include_directories(SakuraPhysX INTERFACE
     ${PHYSX_ROOT_DIR}/include
 )
 
+# ---- Asset pipeline (fastgltf, ozz, stb_image, nlohmann/json) ----
+add_subdirectory(asset)
+
 # ---- Aggregate for Engine ----
 add_library(SakuraEngineThirdParty INTERFACE)
 add_library(Sakura::EngineThirdParty ALIAS SakuraEngineThirdParty)
@@ -172,6 +175,7 @@ target_link_libraries(SakuraEngineThirdParty INTERFACE
     Diligent-BuildSettings
     Sakura::ImGui
     Sakura::PhysX
+    Sakura::AssetThirdParty
 )
 
 if(TARGET Diligent-GraphicsEngineD3D12-shared)
