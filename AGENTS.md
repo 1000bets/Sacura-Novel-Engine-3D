@@ -1,5 +1,54 @@
 # Sacura Novel Engine 3D — Agent Notes
 
+## Engine vs Project vs Editor
+
+Architecture follows an Unreal-like split: Engine and Editor are built and staged once; user Projects live outside the engine tree and are opened at runtime.
+
+```text
+Installation / Stage/
+├── Bin/
+│   └── SakuraEditor.exe
+└── Engine/
+    ├── Content/     — engine assets (/Engine/…)
+    ├── Shaders/
+    └── Config/
+
+User project (outside engine sources):
+MyGame/
+├── MyGame.project
+├── Content/         — project assets (/Game/…)
+├── Scripts/         — Python gameplay scripts
+└── Config/
+```
+
+Rules:
+
+- **Engine** does not know a concrete Project, does not embed user Content/Scripts, and does not depend on Editor.
+- **Editor** depends on Engine only (`Editor → Engine`). Entry: `SakuraEditor` (`Root/Editor/apps/SakuraEditorMain.cpp`).
+- **Project** is not a CMake target. No `add_subdirectory(Project)`. Descriptor is `*.project` JSON (`name`, `engineVersion`, `startupScene`).
+- Paths: `EnginePaths` (install root from executable / `Bin` parent) and `ProjectPaths` (open project root). Never resolve user assets via `../../../Content` from the exe.
+- Open flow: `ProjectSession::OpenProject` → `ProjectDescriptor` + `ProjectPaths` → `Engine::LoadProjectContent` (Game Content + Scripts + rescan).
+- Create flow: `ProjectGenerator::CreateProject` (folders + `.project`).
+- CLI: `SakuraEditor --project "D:/Games/MyGame/MyGame.project"`; without `--project` → Qt Studio launcher (`ProjectBrowserDialog`: New / Open / Recent / templates).
+- Screenshot helper: `SakuraEditor --screenshot-launcher <path.png>` (for UI iteration).
+- Sample: `Samples/SampleProject/` (not part of Engine Content).
+- CMake staging: `sakura_stage_engine_runtime(<target>)` → `${CMAKE_BINARY_DIR}/Stage/{Bin,Engine/...}`.
+
+### Asset mounts
+
+`AssetRegistry` supports two roots:
+
+| Mount | Virtual prefix | Disk root |
+|-------|----------------|-----------|
+| Engine | `/Engine/...` | `EnginePaths::Content()` |
+| Game | `/Game/...` (default if unprefixed) | `ProjectPaths::Content()` |
+
+Importer writes to the Game mount (`GetContentRoot()` / `GetGameContentRoot()`).
+
+### Python scripts
+
+Scripts live only under `<ProjectRoot>/Scripts/`. After project open, that directory is added to `sys.path`; packages resolve as `import gameplay.player` → `Scripts/gameplay/player.py`. Engine owns the interpreter; it does not hardcode project module names.
+
 ## Rendering architecture
 
 - Graphics abstraction: **Diligent Engine Core** (not raw D3D12/Vulkan/OpenGL, not SDL_GPU).
@@ -86,10 +135,9 @@ Do not duplicate the same library in both. If Editor needs a capability that Eng
 | SimpleMath / DirectXMath | Transforms, math | Vendored under `Root/Engine/ThirdParty/SimpleMath` |
 | SDL3 | Window, input, events | FetchContent (`Root/Engine/ThirdParty/CMakeLists.txt`) |
 | DiligentCore | RHI | FetchContent → `Root/Engine/ThirdParty/DiligentCore/` |
-| DiligentTools | Texture/Asset loaders, Diligent ImGui bridge | FetchContent → `Root/Engine/ThirdParty/DiligentTools/` |
+| DiligentTools | Texture/Asset loaders, Diligent ImGui bridge (Tools-internal only) | FetchContent → `Root/Engine/ThirdParty/DiligentTools/` |
 | DiligentFX | High-level FX framework | FetchContent → `Root/Engine/ThirdParty/DiligentFX/` |
 | DiligentSamples | Official tutorials/samples (sources) | FetchContent → `Root/Engine/ThirdParty/DiligentSamples/`; build with `-DSAKURA_BUILD_DILIGENT_SAMPLES=ON` |
-| Dear ImGui | UI (docking `v*-docking`) | FetchContent → `Root/Engine/ThirdParty/imgui/_src/`; target `Sakura::ImGui` (not named `imgui`, so DiligentTools keeps its bundled ImGui for `Diligent-Imgui`) |
 | PhysX | Physics (NVIDIA PhysX 5.6.1) | FetchContent → `Root/Engine/ThirdParty/PhysX/`; linked as `Sakura::PhysX` |
 | fastgltf | glTF/GLB load + export | FetchContent → `Root/Engine/ThirdParty/asset/fastgltf/_src/`; via `Sakura::AssetThirdParty` |
 | ozz-animation | Skeletal sampling / blending / model-space | FetchContent → `Root/Engine/ThirdParty/asset/ozz-animation/_src/`; target `ozz_animation` |
@@ -102,15 +150,17 @@ Do not duplicate the same library in both. If Editor needs a capability that Eng
 | Dependency | Role | Integration |
 |------------|------|-------------|
 | ufbx | FBX Import source data | FetchContent → `Root/Editor/ThirdParty/ufbx/_src/`; target `Sakura::Ufbx` via `Sakura::EditorThirdParty` |
+| Qt 6 | Editor UI (`Qt6::Core`, `Qt6::Gui`, `Qt6::Widgets`) | `find_package(Qt6)` in `Root/Editor/ThirdParty/CMakeLists.txt`; hint via `SAKURA_QT_ROOT`, `Qt6_DIR`, or `CMAKE_PREFIX_PATH`. Optional local aqt tree: `Root/Editor/ThirdParty/Qt/<ver>/<arch>` (gitignored). |
 
-Fetched Diligent/PhysX/ImGui/asset/`_src` trees are gitignored. Do not copy their `.cpp`/`.h` around the project by hand.
+Fetched Diligent/PhysX/asset/`_src` and local `Editor/ThirdParty/Qt/` trees are gitignored. Do not copy their `.cpp`/`.h` around the project by hand.
 
-Pinned version cache vars: `SAKURA_SDL3_GIT_TAG`, `SAKURA_DILIGENT_*_GIT_TAG`, `SAKURA_IMGUI_GIT_TAG`, `SAKURA_PHYSX_GIT_TAG`, `SAKURA_FASTGLTF_GIT_TAG`, `SAKURA_OZZ_GIT_TAG`, `SAKURA_NLOHMANN_JSON_GIT_TAG`, `SAKURA_STB_GIT_TAG`, `SAKURA_UFBX_GIT_TAG`, `SAKURA_PYBIND11_GIT_TAG`. Bump deliberately (keep Diligent modules on the same version).
+Pinned version cache vars: `SAKURA_SDL3_GIT_TAG`, `SAKURA_DILIGENT_*_GIT_TAG`, `SAKURA_PHYSX_GIT_TAG`, `SAKURA_FASTGLTF_GIT_TAG`, `SAKURA_OZZ_GIT_TAG`, `SAKURA_NLOHMANN_JSON_GIT_TAG`, `SAKURA_STB_GIT_TAG`, `SAKURA_UFBX_GIT_TAG`, `SAKURA_PYBIND11_GIT_TAG`. Bump deliberately (keep Diligent modules on the same version).
 
-- Engine links `Sakura::EngineThirdParty` (SDL3, Diligent backends, ImGui, PhysX, Tools/FX helpers, `Sakura::AssetThirdParty`).
-- Editor links `Sakura::EditorThirdParty` (ufbx) plus Engine.
+- Engine links `Sakura::EngineThirdParty` (SDL3, Diligent backends, PhysX, Tools/FX helpers, `Sakura::AssetThirdParty`). Do **not** add a CMake target named `imgui` — DiligentTools must keep its bundled ImGui for `Diligent-Imgui` only.
+- Editor links `Sakura::EditorThirdParty` (ufbx + Qt6 Core/Gui/Widgets) plus Engine. `CMAKE_AUTOMOC` is ON for the Editor library.
 - Executables that need Diligent backend DLLs: `sakura_copy_engine_runtime_dlls(<target>)`.
-- Include usage: `#include <fastgltf/core.hpp>`, `#include "ozz/animation/runtime/skeleton.h"`, `#include "stb_image.h"`, `#include <nlohmann/json.hpp>`, `#include "ufbx.h"`.
+- Executables that link Editor: `sakura_deploy_qt_runtime(<target>)` (windeployqt on Windows).
+- Include usage: `#include <fastgltf/core.hpp>`, `#include "ozz/animation/runtime/skeleton.h"`, `#include "stb_image.h"`, `#include <nlohmann/json.hpp>`, `#include "ufbx.h"`, `#include <QWidget>` (Editor only).
 
 ## Asset System (Blocks 1–6)
 
@@ -124,7 +174,7 @@ Content + .meta → AssetRegistry → AssetManager (LoadAsync / PumpCompletions)
 - `AssetManager` dedupes by `AssetKey`+generation; JobSystem workers do I/O; publish only in `PumpCompletions` on Game Thread. No Diligent dependency.
 - Loaders: `ModelLoader` (self-contained GLB only), `TextureLoader` (stb RGBA8), `MaterialLoader` (JSON schemaVersion 1), `SkeletalLoader` (GLB→ozz offline builders; LINEAR only; max 4 influences).
 - Shared GLB parse cache lives in `ModelLoader` for Model/StaticMesh/Skeletal subassets of the same file.
-- `Engine::InitializeHeadless(ContentRoot)` — Game thread + Memory + Jobs + Registry.Scan + AssetManager; no window/render.
+- `Engine::InitializeHeadless(GameContentRoot)` — Game thread + Memory + Jobs + Registry.Scan (Engine+Game mounts) + AssetManager; no window/render. Project scripts: sibling `Scripts/` or explicit `SetScriptsRoot`.
 - Full `Initialize` also creates Assets after Jobs; `Tick` calls `Assets.PumpCompletions()`; `Shutdown` calls `Assets.Shutdown()` before `Render.Stop()`.
 - Editor `AssetTools`: `AssetImporter` dispatches by extension; staging outside Content; path conflict → `ImportConflict` (no overwrite). FBX→GLB via ufbx + fastgltf `Exporter` (static geometry only).
 - Headless verification target: `SakuraAssetTest` (`Root/Tests/AssetSystem_Test.cpp`).
@@ -156,7 +206,7 @@ ENGINE_CLASS / ENGINE_STRUCT / ENGINE_REFLECT_* (header registrars)
   → PropertyAccess Get/Set (Inspector / Deserialize / Script / Default)
   → (optional) ScriptingSubsystem + Python Class publish
   → ReflectionJson serialize/deserialize
-  → Editor ReflectionInspector (ImGui drawers via PropertyAccess)
+  → Editor ReflectionInspector (Qt Widgets via PropertyAccess)
 ```
 
 - **TypeId** / **PropertyId** are stable strings (`"engine.CameraComponent"`, `"field_of_view"`), not RTTI hashes or registration indices.
@@ -183,15 +233,15 @@ Python @register_class / field()
 - When ON: Engine links `pybind11::embed` + `Python3::Python`, defines `SAKURA_ENABLE_PYTHON=1`. Reflection core headers stay free of `py::object`.
 - Embedded module name: `engine` (`ScriptComponent` façade, `register_class`, `field`, `Object` handle with generation, Vector3/Transform copy-in/copy-out).
 - Published Python types are kept in an internal TypeId→`py::object` map at register time. `BindScriptComponent` must not scan `sys.modules`. Resolve lifecycle callbacks via `getattr` on the **type**, then bind to the instance — avoid `hasattr`/`attr` on the instance for `on_*` (deadlocks with field descriptors under embed).
-- Project scripts path: `Engine::SetScriptsRoot` or default `ContentRoot/Scripts`. Example: `Content/Scripts/door_controller.py` (`game.DoorController`).
+- Project scripts path: `<ProjectRoot>/Scripts` via `ProjectSession` / `Engine::SetScriptsRoot`. Sample: `Samples/SampleProject/Scripts/door_controller.py` (`game.DoorController`).
 - Exception in `on_update` → mark ScriptFailed, stop further updates; `on_destroy` at most once.
-- **No hot reload** in v1: import once at project open / engine init.
+- **No hot reload** in v1: import at project open / headless init when ScriptsRoot is set.
 - Build without Python: `-DSAKURA_ENABLE_PYTHON=OFF` — native reflection tests still pass; Python cases are skipped in `SakuraReflectionPythonTest`.
 
 ### JSON + Inspector
 
 - `Reflection/Json/ReflectionJson` — `{ "type", "typeVersion", "properties" }`; AssetRef as id string only; ClassRef as TypeId string; unknown fields/types fail with no partial publish; optional per-type migration hooks (e.g. 1→2).
-- Editor `ReflectionInspector` — ImGui drawers for bool/float/string/Vector3/Color via `PropertyAccess`; reset from CDO; range rejection; no hardcoded Camera panel.
+- Editor `ReflectionInspector` — `QWidget` panel (Qt6 Widgets) for bool/float/string/Vector3/Color via `PropertyAccess`; `SetInspectedObject` / `Rebuild`; reset from CDO; range rejection; no hardcoded Camera panel. Requires a `QApplication` before constructing widgets.
 
 ## Coding conventions (engine)
 

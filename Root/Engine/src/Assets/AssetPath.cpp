@@ -28,6 +28,55 @@ std::string AssetPath::NormalizeRelative(const std::string& RelativePath)
     return Normalized;
 }
 
+std::string AssetPath::MakeVirtualPath(AssetMount Mount, const std::string& RelativeInsideContent)
+{
+    const std::string Relative = NormalizeRelative(RelativeInsideContent);
+    const char* MountName = (Mount == AssetMount::Engine) ? EngineMountName : GameMountName;
+    if (Relative.empty())
+    {
+        return std::string("/") + MountName;
+    }
+    return std::string("/") + MountName + "/" + Relative;
+}
+
+bool AssetPath::TryParseVirtualPath(
+    const std::string& VirtualPath,
+    AssetMount& OutMount,
+    std::string& OutRelativeInsideContent)
+{
+    std::string Normalized = VirtualPath;
+    std::replace(Normalized.begin(), Normalized.end(), '\\', '/');
+    while (!Normalized.empty() && Normalized.front() == '/')
+    {
+        Normalized.erase(Normalized.begin());
+    }
+
+    const std::string EnginePrefix = std::string(EngineMountName) + "/";
+    const std::string GamePrefix = std::string(GameMountName) + "/";
+
+    if (Normalized == EngineMountName || Normalized.rfind(EnginePrefix, 0) == 0)
+    {
+        OutMount = AssetMount::Engine;
+        OutRelativeInsideContent = (Normalized == EngineMountName)
+            ? std::string{}
+            : NormalizeRelative(Normalized.substr(EnginePrefix.size()));
+        return true;
+    }
+
+    if (Normalized == GameMountName || Normalized.rfind(GamePrefix, 0) == 0)
+    {
+        OutMount = AssetMount::Game;
+        OutRelativeInsideContent = (Normalized == GameMountName)
+            ? std::string{}
+            : NormalizeRelative(Normalized.substr(GamePrefix.size()));
+        return true;
+    }
+
+    OutMount = AssetMount::Game;
+    OutRelativeInsideContent = NormalizeRelative(Normalized);
+    return true;
+}
+
 bool AssetPath::IsInsideContent(const std::filesystem::path& AbsolutePath, const std::filesystem::path& ContentRoot)
 {
     std::error_code Error;

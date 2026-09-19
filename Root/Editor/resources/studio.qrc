@@ -1,0 +1,8 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/studio">
+        <file alias="template_visual_novel.png">studio/template_visual_novel.png</file>
+        <file alias="template_kinetic_novel.png">studio/template_kinetic_novel.png</file>
+        <file alias="studio_sakura_overlay.png">studio/studio_sakura_overlay.png</file>
+    </qresource>
+</RCC>

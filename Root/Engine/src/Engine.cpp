@@ -1,9 +1,11 @@
 #include "Engine.h"
+#include "Core/EnginePaths.h"
 #include "Core/MemorySubsystem.h"
 #include "Core/Threading/RenderFrameData.h"
 #include "Core/Threading/ThreadContext.h"
 #include "Game/Scene.h"
 #include "Platform/WindowSubsystem.h"
+#include "Project/ProjectPaths.h"
 #include "Reflection/ReflectionSubsystem.h"
 
 #include <chrono>
@@ -32,16 +34,121 @@ WindowSubsystem* Engine::GetWindowSubsystem() const
 void Engine::SetContentRoot(const std::filesystem::path& InContentRoot)
 {
     ContentRoot = InContentRoot;
-    Registry.SetContentRoot(ContentRoot);
-    if (ScriptsRoot.empty() && !ContentRoot.empty())
-    {
-        ScriptsRoot = ContentRoot / "Scripts";
-    }
+    Registry.SetGameContentRoot(ContentRoot);
 }
 
 void Engine::SetScriptsRoot(const std::filesystem::path& InScriptsRoot)
 {
     ScriptsRoot = InScriptsRoot;
+}
+
+void Engine::ResolveShaderDirectory()
+{
+    if (!ShaderDirectory.empty())
+    {
+        return;
+    }
+
+    if (EnginePaths::IsInitialized())
+    {
+        const std::filesystem::path ShadersPath = EnginePaths::Shaders();
+        if (std::filesystem::exists(ShadersPath))
+        {
+            ShaderDirectory = ShadersPath.string();
+            return;
+        }
+    }
+
+    std::filesystem::path Candidate = std::filesystem::current_path() / "shaders";
+    if (!std::filesystem::exists(Candidate))
+    {
+        Candidate = std::filesystem::current_path() / "Engine" / "Shaders";
+    }
+    if (std::filesystem::exists(Candidate))
+    {
+        ShaderDirectory = Candidate.string();
+    }
+}
+
+void Engine::ScanConfiguredContent()
+{
+    if (EnginePaths::IsInitialized())
+    {
+        Registry.SetEngineContentRoot(EnginePaths::Content());
+    }
+
+    if (ContentRoot.empty() && Registry.GetEngineContentRoot().empty())
+    {
+        return;
+    }
+
+    Registry.SetGameContentRoot(ContentRoot);
+    const AssetDiagnostic ScanDiagnostic = Registry.ScanContent();
+    if (ScanDiagnostic.HasError())
+    {
+        PrintString(std::string("AssetRegistry scan failed: ") + ScanDiagnostic.Message);
+    }
+}
+
+void Engine::ImportProjectScripts()
+{
+    Scripting.SetScriptsRoot(ScriptsRoot);
+    if (!Scripting.IsPythonEnabled())
+    {
+        return;
+    }
+
+    const ReflectionDiagnostic Imported = Scripting.ImportConfiguredModules();
+    if (!Imported.bOk)
+    {
+        PrintString(std::string("Scripting import failed: ") + Imported.Message);
+    }
+}
+
+void Engine::LoadProjectContent(const ProjectDescriptor& Descriptor)
+{
+    AssertGameThread();
+
+    ProjectPaths::SetRoot(Descriptor.ProjectRoot);
+    SetContentRoot(ProjectPaths::Content());
+    SetScriptsRoot(ProjectPaths::Scripts());
+
+    if (EnginePaths::IsInitialized())
+    {
+        Registry.SetEngineContentRoot(EnginePaths::Content());
+    }
+
+    Registry.SetGameContentRoot(ContentRoot);
+    const AssetDiagnostic ScanDiagnostic = Registry.ScanContent();
+    if (ScanDiagnostic.HasError())
+    {
+        PrintString(std::string("AssetRegistry project scan failed: ") + ScanDiagnostic.Message);
+    }
+
+    if (bInitialized)
+    {
+        ImportProjectScripts();
+    }
+}
+
+void Engine::UnloadProjectContent()
+{
+    AssertGameThread();
+
+    SetActiveScene(nullptr);
+    ContentRoot.clear();
+    ScriptsRoot.clear();
+    Registry.SetGameContentRoot({});
+    if (EnginePaths::IsInitialized())
+    {
+        Registry.SetEngineContentRoot(EnginePaths::Content());
+        Registry.ScanContent();
+    }
+    else
+    {
+        Registry.Clear();
+    }
+    ProjectPaths::Clear();
 }
 
 void Engine::InitializeCommon(bool bCreateWindowAndRender)
@@ -62,11 +169,6 @@ void Engine::InitializeCommon(bool bCreateWindowAndRender)
         }
     }
 
-    if (ScriptsRoot.empty() && !ContentRoot.empty())
-    {
-        ScriptsRoot = ContentRoot / "Scripts";
-    }
-
     {
         Scripting.SetScriptsRoot(ScriptsRoot);
         const ReflectionDiagnostic ScriptingInit = Scripting.Initialize();
@@ -74,26 +176,13 @@ void Engine::InitializeCommon(bool bCreateWindowAndRender)
         {
             PrintString(std::string("Scripting initialize failed: ") + ScriptingInit.Message);
         }
-        else if (Scripting.IsPythonEnabled())
+        else
         {
-            const ReflectionDiagnostic Imported = Scripting.ImportConfiguredModules();
-            if (!Imported.bOk)
-            {
-                PrintString(std::string("Scripting import failed: ") + Imported.Message);
-            }
+            ImportProjectScripts();
         }
     }
 
-    if (!ContentRoot.empty())
-    {
-        Registry.SetContentRoot(ContentRoot);
-        const AssetDiagnostic ScanDiagnostic = Registry.ScanContent();
-        if (ScanDiagnostic.HasError())
-        {
-            PrintString(std::string("AssetRegistry scan failed: ") + ScanDiagnostic.Message);
-        }
-    }
-
+    ScanConfiguredContent();
     Assets.Initialize(Registry, Jobs);
 
     if (bCreateWindowAndRender)
@@ -101,19 +190,7 @@ void Engine::InitializeCommon(bool bCreateWindowAndRender)
         WindowSubsystem* Window = CreateSubsystem<WindowSubsystem>();
         Window->CreateMainWindow("Sacura Novel Engine", 1280, 720, true);
 
-        if (ShaderDirectory == "shaders")
-        {
-            std::filesystem::path Candidate = std::filesystem::current_path() / "shaders";
-            if (!std::filesystem::exists(Candidate))
-            {
-                Candidate = std::filesystem::current_path() / "Root" / "Engine" / "shaders";
-            }
-            if (std::filesystem::exists(Candidate))
-            {
-                ShaderDirectory = Candidate.string();
-            }
-        }
-
+        ResolveShaderDirectory();
         Render.Start(Window->GetNativeWindowInfo(), ShaderDirectory, PreferredBackend);
         Render.WaitUntilReady();
     }
@@ -137,6 +214,18 @@ void Engine::InitializeHeadless(const std::filesystem::path& InContentRoot)
     SetCurrentThreadRole(ThreadRole::Game);
     SetCurrentThreadDebugName("Game Thread");
     SetContentRoot(InContentRoot);
+    if (ScriptsRoot.empty() && !InContentRoot.empty())
+    {
+        const std::filesystem::path SiblingScripts = InContentRoot.parent_path() / "Scripts";
+        if (std::filesystem::exists(SiblingScripts))
+        {
+            ScriptsRoot = SiblingScripts;
+        }
+        else
+        {
+            ScriptsRoot = InContentRoot / "Scripts";
+        }
+    }
     InitializeCommon(false);
     PrintString("Engine: initialized headless");
 }

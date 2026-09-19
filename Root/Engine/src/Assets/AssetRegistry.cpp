@@ -7,15 +7,36 @@
 
 void AssetRegistry::SetContentRoot(const std::filesystem::path& InContentRoot)
 {
+    SetGameContentRoot(InContentRoot);
+}
+
+void AssetRegistry::SetGameContentRoot(const std::filesystem::path& InContentRoot)
+{
     AssertGameThread();
-    ContentRoot = std::filesystem::absolute(InContentRoot).lexically_normal();
+    if (InContentRoot.empty())
+    {
+        GameContentRoot.clear();
+        return;
+    }
+    GameContentRoot = std::filesystem::absolute(InContentRoot).lexically_normal();
+}
+
+void AssetRegistry::SetEngineContentRoot(const std::filesystem::path& InContentRoot)
+{
+    AssertGameThread();
+    if (InContentRoot.empty())
+    {
+        EngineContentRoot.clear();
+        return;
+    }
+    EngineContentRoot = std::filesystem::absolute(InContentRoot).lexically_normal();
 }
 
 void AssetRegistry::Clear()
 {
     AssertGameThread();
     EntriesById.clear();
-    IdsByRelativePath.clear();
+    IdsByVirtualPath.clear();
     ScanDiagnostics.clear();
 }
 
@@ -43,7 +64,22 @@ AssetType AssetRegistry::InferTypeFromExtension(const std::string& RelativePath)
     return AssetType::Unknown;
 }
 
-AssetDiagnostic AssetRegistry::IngestMetaFile(const std::filesystem::path& AbsoluteMetaPath)
+bool AssetRegistry::ResolvePathRoots(
+    const std::string& RelativeOrVirtualPath,
+    AssetMount& OutMount,
+    std::string& OutRelativeInsideContent,
+    std::filesystem::path& OutContentRoot) const
+{
+    if (!AssetPath::TryParseVirtualPath(RelativeOrVirtualPath, OutMount, OutRelativeInsideContent))
+    {
+        return false;
+    }
+
+    OutContentRoot = (OutMount == AssetMount::Engine) ? EngineContentRoot : GameContentRoot;
+    return !OutContentRoot.empty();
+}
+
+AssetDiagnostic AssetRegistry::IngestMetaFile(AssetMount Mount, const std::filesystem::path& AbsoluteMetaPath)
 {
     AssetMetadata Metadata{};
     AssetDiagnostic Error{};
@@ -52,7 +88,6 @@ AssetDiagnostic AssetRegistry::IngestMetaFile(const std::filesystem::path& Absol
         return Error;
     }
 
-    // AbsoluteMetaPath = Content/x/y.glb.meta → asset = Content/x/y.glb
     std::string AbsoluteMetaString = AbsoluteMetaPath.generic_string();
     std::filesystem::path AbsoluteAssetPath = AbsoluteMetaPath;
     if (AbsoluteMetaString.size() >= 5 && AbsoluteMetaString.compare(AbsoluteMetaString.size() - 5, 5, ".meta") == 0)
@@ -70,11 +105,14 @@ AssetDiagnostic AssetRegistry::IngestMetaFile(const std::filesystem::path& Absol
             AbsoluteAssetPath.string());
     }
 
+    const std::filesystem::path& ContentRoot = (Mount == AssetMount::Engine) ? EngineContentRoot : GameContentRoot;
     std::string RelativePath;
     if (!AssetPath::TryMakeRelative(AbsoluteAssetPath, ContentRoot, RelativePath, Error))
     {
         return Error;
     }
+
+    const std::string VirtualPath = AssetPath::MakeVirtualPath(Mount, RelativePath);
 
     if (EntriesById.find(Metadata.Guid) != EntriesById.end())
     {
@@ -83,39 +121,38 @@ AssetDiagnostic AssetRegistry::IngestMetaFile(const std::filesystem::path& Absol
             "AssetRegistry",
             "Duplicate GUID detected during scan",
             {Metadata.Guid},
-            RelativePath);
+            VirtualPath);
     }
 
-    if (IdsByRelativePath.find(RelativePath) != IdsByRelativePath.end())
+    if (IdsByVirtualPath.find(VirtualPath) != IdsByVirtualPath.end())
     {
         return AssetDiagnostic::Fail(
             AssetErrorCode::DuplicateId,
             "AssetRegistry",
-            "Duplicate relative path during scan",
+            "Duplicate virtual path during scan",
             {Metadata.Guid},
-            RelativePath);
+            VirtualPath);
     }
 
     AssetRegistryEntry Entry{};
     Entry.Metadata = std::move(Metadata);
+    Entry.Mount = Mount;
     Entry.RelativePath = RelativePath;
+    Entry.VirtualPath = VirtualPath;
     Entry.AbsolutePath = AbsoluteAssetPath.string();
     Entry.AbsoluteMetaPath = AbsoluteMetaPath.string();
     Entry.bRegistered = true;
 
-    IdsByRelativePath[RelativePath] = Entry.Metadata.Guid;
+    IdsByVirtualPath[VirtualPath] = Entry.Metadata.Guid;
     EntriesById.emplace(Entry.Metadata.Guid, std::move(Entry));
     return AssetDiagnostic::Ok();
 }
 
-AssetDiagnostic AssetRegistry::ScanContent()
+AssetDiagnostic AssetRegistry::ScanMount(AssetMount Mount, const std::filesystem::path& ContentRoot)
 {
-    AssertGameThread();
-    Clear();
-
     if (ContentRoot.empty())
     {
-        return AssetDiagnostic::Fail(AssetErrorCode::InternalError, "AssetRegistry", "Content root is not set");
+        return AssetDiagnostic::Ok();
     }
 
     std::error_code Error;
@@ -141,7 +178,7 @@ AssetDiagnostic AssetRegistry::ScanContent()
             continue;
         }
 
-        AssetDiagnostic Diagnostic = IngestMetaFile(Entry.path());
+        AssetDiagnostic Diagnostic = IngestMetaFile(Mount, Entry.path());
         if (Diagnostic.HasError())
         {
             ScanDiagnostics.push_back(Diagnostic);
@@ -152,19 +189,43 @@ AssetDiagnostic AssetRegistry::ScanContent()
     return AssetDiagnostic::Ok();
 }
 
-AssetDiagnostic AssetRegistry::RegisterExistingAsset(const std::string& RelativePath, AssetMetadata Metadata)
+AssetDiagnostic AssetRegistry::ScanContent()
+{
+    AssertGameThread();
+    Clear();
+
+    if (GameContentRoot.empty() && EngineContentRoot.empty())
+    {
+        return AssetDiagnostic::Fail(AssetErrorCode::InternalError, "AssetRegistry", "No content roots are set");
+    }
+
+    ScanMount(AssetMount::Engine, EngineContentRoot);
+    ScanMount(AssetMount::Game, GameContentRoot);
+    return AssetDiagnostic::Ok();
+}
+
+AssetDiagnostic AssetRegistry::RegisterExistingAsset(const std::string& RelativeOrVirtualPath, AssetMetadata Metadata)
 {
     AssertGameThread();
 
-    const std::string Normalized = AssetPath::NormalizeRelative(RelativePath);
+    AssetMount Mount = AssetMount::Game;
+    std::string RelativeInsideContent;
+    std::filesystem::path ContentRoot;
+    if (!ResolvePathRoots(RelativeOrVirtualPath, Mount, RelativeInsideContent, ContentRoot))
+    {
+        return AssetDiagnostic::Fail(AssetErrorCode::InternalError, "AssetRegistry", "Content root is not set for mount", {Metadata.Guid}, RelativeOrVirtualPath);
+    }
+
+    const std::string Normalized = AssetPath::NormalizeRelative(RelativeInsideContent);
+    const std::string VirtualPath = AssetPath::MakeVirtualPath(Mount, Normalized);
     const std::filesystem::path AbsolutePath = AssetPath::CombineContent(ContentRoot, Normalized);
     if (!AssetPath::IsInsideContent(AbsolutePath, ContentRoot))
     {
-        return AssetDiagnostic::Fail(AssetErrorCode::InvalidData, "AssetRegistry", "Path outside Content", {Metadata.Guid}, Normalized);
+        return AssetDiagnostic::Fail(AssetErrorCode::InvalidData, "AssetRegistry", "Path outside Content", {Metadata.Guid}, VirtualPath);
     }
     if (!std::filesystem::exists(AbsolutePath))
     {
-        return AssetDiagnostic::Fail(AssetErrorCode::NotFound, "AssetRegistry", "Asset file not found", {Metadata.Guid}, Normalized);
+        return AssetDiagnostic::Fail(AssetErrorCode::NotFound, "AssetRegistry", "Asset file not found", {Metadata.Guid}, VirtualPath);
     }
     if (!Metadata.Guid.IsValid())
     {
@@ -176,11 +237,11 @@ AssetDiagnostic AssetRegistry::RegisterExistingAsset(const std::string& Relative
     }
     if (EntriesById.find(Metadata.Guid) != EntriesById.end())
     {
-        return AssetDiagnostic::Fail(AssetErrorCode::DuplicateId, "AssetRegistry", "GUID already registered", {Metadata.Guid}, Normalized);
+        return AssetDiagnostic::Fail(AssetErrorCode::DuplicateId, "AssetRegistry", "GUID already registered", {Metadata.Guid}, VirtualPath);
     }
-    if (IdsByRelativePath.find(Normalized) != IdsByRelativePath.end())
+    if (IdsByVirtualPath.find(VirtualPath) != IdsByVirtualPath.end())
     {
-        return AssetDiagnostic::Fail(AssetErrorCode::ImportConflict, "AssetRegistry", "Path already registered", {Metadata.Guid}, Normalized);
+        return AssetDiagnostic::Fail(AssetErrorCode::ImportConflict, "AssetRegistry", "Path already registered", {Metadata.Guid}, VirtualPath);
     }
 
     const std::string MetaRelative = AssetPath::MetaPathForAsset(Normalized);
@@ -194,12 +255,14 @@ AssetDiagnostic AssetRegistry::RegisterExistingAsset(const std::string& Relative
 
     AssetRegistryEntry Entry{};
     Entry.Metadata = std::move(Metadata);
+    Entry.Mount = Mount;
     Entry.RelativePath = Normalized;
+    Entry.VirtualPath = VirtualPath;
     Entry.AbsolutePath = AbsolutePath.string();
     Entry.AbsoluteMetaPath = AbsoluteMeta.string();
     Entry.bRegistered = true;
 
-    IdsByRelativePath[Normalized] = Entry.Metadata.Guid;
+    IdsByVirtualPath[VirtualPath] = Entry.Metadata.Guid;
     EntriesById.emplace(Entry.Metadata.Guid, std::move(Entry));
     return AssetDiagnostic::Ok();
 }
@@ -212,7 +275,7 @@ AssetDiagnostic AssetRegistry::Unregister(const AssetId& Id)
     {
         return AssetDiagnostic::Fail(AssetErrorCode::NotFound, "AssetRegistry", "Asset not registered", {Id});
     }
-    IdsByRelativePath.erase(Found->second.RelativePath);
+    IdsByVirtualPath.erase(Found->second.VirtualPath);
     EntriesById.erase(Found);
     return AssetDiagnostic::Ok();
 }
@@ -228,11 +291,15 @@ bool AssetRegistry::TryGetById(const AssetId& Id, AssetRegistryEntry& OutEntry) 
     return true;
 }
 
-bool AssetRegistry::TryGetByPath(const std::string& RelativePath, AssetRegistryEntry& OutEntry) const
+bool AssetRegistry::TryGetByPath(const std::string& RelativeOrVirtualPath, AssetRegistryEntry& OutEntry) const
 {
-    const std::string Normalized = AssetPath::NormalizeRelative(RelativePath);
-    auto FoundPath = IdsByRelativePath.find(Normalized);
-    if (FoundPath == IdsByRelativePath.end())
+    AssetMount Mount = AssetMount::Game;
+    std::string RelativeInsideContent;
+    AssetPath::TryParseVirtualPath(RelativeOrVirtualPath, Mount, RelativeInsideContent);
+    const std::string VirtualPath = AssetPath::MakeVirtualPath(Mount, RelativeInsideContent);
+
+    auto FoundPath = IdsByVirtualPath.find(VirtualPath);
+    if (FoundPath == IdsByVirtualPath.end())
     {
         return false;
     }
@@ -272,9 +339,13 @@ bool AssetRegistry::Exists(const AssetId& Id) const
     return EntriesById.find(Id) != EntriesById.end();
 }
 
-bool AssetRegistry::PathExists(const std::string& RelativePath) const
+bool AssetRegistry::PathExists(const std::string& RelativeOrVirtualPath) const
 {
-    return IdsByRelativePath.find(AssetPath::NormalizeRelative(RelativePath)) != IdsByRelativePath.end();
+    AssetMount Mount = AssetMount::Game;
+    std::string RelativeInsideContent;
+    AssetPath::TryParseVirtualPath(RelativeOrVirtualPath, Mount, RelativeInsideContent);
+    const std::string VirtualPath = AssetPath::MakeVirtualPath(Mount, RelativeInsideContent);
+    return IdsByVirtualPath.find(VirtualPath) != IdsByVirtualPath.end();
 }
 
 std::vector<AssetRegistryEntry> AssetRegistry::FindByType(AssetType Type) const
@@ -290,13 +361,17 @@ std::vector<AssetRegistryEntry> AssetRegistry::FindByType(AssetType Type) const
     return Result;
 }
 
-std::vector<AssetRegistryEntry> AssetRegistry::FindByDirectory(const std::string& RelativeDirectory) const
+std::vector<AssetRegistryEntry> AssetRegistry::FindByDirectory(const std::string& RelativeOrVirtualDirectory) const
 {
-    const std::string Prefix = AssetPath::NormalizeRelative(RelativeDirectory);
+    AssetMount Mount = AssetMount::Game;
+    std::string RelativeInsideContent;
+    AssetPath::TryParseVirtualPath(RelativeOrVirtualDirectory, Mount, RelativeInsideContent);
+    const std::string Prefix = AssetPath::MakeVirtualPath(Mount, RelativeInsideContent);
+
     std::vector<AssetRegistryEntry> Result;
     for (const auto& Pair : EntriesById)
     {
-        if (Prefix.empty() || Pair.second.RelativePath.rfind(Prefix, 0) == 0)
+        if (Prefix.empty() || Pair.second.VirtualPath.rfind(Prefix, 0) == 0)
         {
             Result.push_back(Pair.second);
         }
@@ -304,27 +379,40 @@ std::vector<AssetRegistryEntry> AssetRegistry::FindByDirectory(const std::string
     return Result;
 }
 
-AssetDiagnostic AssetRegistry::RenamePair(const std::string& OldRelativePath, const std::string& NewRelativePath)
+AssetDiagnostic AssetRegistry::RenamePair(const std::string& OldRelativeOrVirtualPath, const std::string& NewRelativeOrVirtualPath)
 {
     AssertGameThread();
 
     AssetRegistryEntry Entry{};
-    if (!TryGetByPath(OldRelativePath, Entry))
+    if (!TryGetByPath(OldRelativeOrVirtualPath, Entry))
     {
-        return AssetDiagnostic::Fail(AssetErrorCode::NotFound, "AssetRegistry", "Source asset not found", {}, OldRelativePath);
+        return AssetDiagnostic::Fail(AssetErrorCode::NotFound, "AssetRegistry", "Source asset not found", {}, OldRelativeOrVirtualPath);
     }
 
-    const std::string NewNormalized = AssetPath::NormalizeRelative(NewRelativePath);
-    if (PathExists(NewNormalized))
+    AssetMount NewMount = AssetMount::Game;
+    std::string NewRelativeInsideContent;
+    std::filesystem::path NewContentRoot;
+    if (!ResolvePathRoots(NewRelativeOrVirtualPath, NewMount, NewRelativeInsideContent, NewContentRoot))
     {
-        return AssetDiagnostic::Fail(AssetErrorCode::ImportConflict, "AssetRegistry", "Destination path already registered", {Entry.Metadata.Guid}, NewNormalized);
+        return AssetDiagnostic::Fail(AssetErrorCode::InternalError, "AssetRegistry", "Destination content root is not set", {Entry.Metadata.Guid}, NewRelativeOrVirtualPath);
+    }
+    if (NewMount != Entry.Mount)
+    {
+        return AssetDiagnostic::Fail(AssetErrorCode::InvalidData, "AssetRegistry", "Cannot rename across mounts", {Entry.Metadata.Guid}, NewRelativeOrVirtualPath);
     }
 
-    const std::filesystem::path NewAbsolute = AssetPath::CombineContent(ContentRoot, NewNormalized);
-    const std::filesystem::path NewMetaAbsolute = AssetPath::CombineContent(ContentRoot, AssetPath::MetaPathForAsset(NewNormalized));
-    if (!AssetPath::IsInsideContent(NewAbsolute, ContentRoot))
+    const std::string NewNormalized = AssetPath::NormalizeRelative(NewRelativeInsideContent);
+    const std::string NewVirtualPath = AssetPath::MakeVirtualPath(NewMount, NewNormalized);
+    if (PathExists(NewVirtualPath))
     {
-        return AssetDiagnostic::Fail(AssetErrorCode::InvalidData, "AssetRegistry", "Destination outside Content", {Entry.Metadata.Guid}, NewNormalized);
+        return AssetDiagnostic::Fail(AssetErrorCode::ImportConflict, "AssetRegistry", "Destination path already registered", {Entry.Metadata.Guid}, NewVirtualPath);
+    }
+
+    const std::filesystem::path NewAbsolute = AssetPath::CombineContent(NewContentRoot, NewNormalized);
+    const std::filesystem::path NewMetaAbsolute = AssetPath::CombineContent(NewContentRoot, AssetPath::MetaPathForAsset(NewNormalized));
+    if (!AssetPath::IsInsideContent(NewAbsolute, NewContentRoot))
+    {
+        return AssetDiagnostic::Fail(AssetErrorCode::InvalidData, "AssetRegistry", "Destination outside Content", {Entry.Metadata.Guid}, NewVirtualPath);
     }
 
     std::error_code Error;
@@ -332,20 +420,21 @@ AssetDiagnostic AssetRegistry::RenamePair(const std::string& OldRelativePath, co
     std::filesystem::rename(Entry.AbsolutePath, NewAbsolute, Error);
     if (Error)
     {
-        return AssetDiagnostic::Fail(AssetErrorCode::InternalError, "AssetRegistry", Error.message(), {Entry.Metadata.Guid}, NewNormalized);
+        return AssetDiagnostic::Fail(AssetErrorCode::InternalError, "AssetRegistry", Error.message(), {Entry.Metadata.Guid}, NewVirtualPath);
     }
     std::filesystem::rename(Entry.AbsoluteMetaPath, NewMetaAbsolute, Error);
     if (Error)
     {
         std::filesystem::rename(NewAbsolute, Entry.AbsolutePath);
-        return AssetDiagnostic::Fail(AssetErrorCode::InternalError, "AssetRegistry", "Failed to rename .meta; data file rolled back", {Entry.Metadata.Guid}, NewNormalized);
+        return AssetDiagnostic::Fail(AssetErrorCode::InternalError, "AssetRegistry", "Failed to rename .meta; data file rolled back", {Entry.Metadata.Guid}, NewVirtualPath);
     }
 
-    IdsByRelativePath.erase(Entry.RelativePath);
+    IdsByVirtualPath.erase(Entry.VirtualPath);
     Entry.RelativePath = NewNormalized;
+    Entry.VirtualPath = NewVirtualPath;
     Entry.AbsolutePath = NewAbsolute.string();
     Entry.AbsoluteMetaPath = NewMetaAbsolute.string();
-    IdsByRelativePath[NewNormalized] = Entry.Metadata.Guid;
+    IdsByVirtualPath[NewVirtualPath] = Entry.Metadata.Guid;
     EntriesById[Entry.Metadata.Guid] = Entry;
     return AssetDiagnostic::Ok();
 }

@@ -1,5 +1,6 @@
 #include "Engine.h"
 #include "Editor.h"
+#include "Core/EnginePaths.h"
 #include "Game/Scene.h"
 #include "Gameplay/GameObject.h"
 #include "Gameplay/CameraComponent.h"
@@ -89,17 +90,28 @@ static void TestRendering(Engine& Eng)
     std::cout << "  Rendered 30 frames with default quad\n";
 }
 
-int main()
+int main(int ArgumentCount, char** Arguments)
 {
     std::cout << "=== Engine ===\n";
     Engine Eng;
 
-    std::filesystem::path ShaderPath = std::filesystem::current_path() / "shaders";
-    if (!std::filesystem::exists(ShaderPath))
+    if (ArgumentCount > 0)
     {
-        ShaderPath = std::filesystem::path("M:/Sacura-Novel-Engine-3D/Root/Engine/shaders");
+        EnginePaths::InitializeFromExecutable(std::filesystem::absolute(Arguments[0]));
     }
-    Eng.SetShaderDirectory(ShaderPath.string());
+
+    if (EnginePaths::IsInitialized() && std::filesystem::exists(EnginePaths::Shaders()))
+    {
+        Eng.SetShaderDirectory(EnginePaths::Shaders().string());
+    }
+    else
+    {
+        const std::filesystem::path LocalShaders = std::filesystem::current_path() / "shaders";
+        if (std::filesystem::exists(LocalShaders))
+        {
+            Eng.SetShaderDirectory(LocalShaders.string());
+        }
+    }
     Eng.SetGraphicsBackend(GraphicsBackend::Auto);
     Eng.Initialize();
 

@@ -39,13 +39,20 @@ void Expect(bool Condition, const char* Message)
     }
 }
 
-std::filesystem::path FindContentRoot()
+std::filesystem::path FindSampleProjectRoot()
 {
+#if defined(SAKURA_SAMPLE_PROJECT_DIR)
+    const std::filesystem::path Configured = std::filesystem::path(SAKURA_SAMPLE_PROJECT_DIR);
+    if (std::filesystem::exists(Configured / "Scripts" / "door_controller.py"))
+    {
+        return std::filesystem::weakly_canonical(Configured);
+    }
+#endif
+
     const std::filesystem::path Candidates[] = {
-        std::filesystem::current_path() / "Content",
-        std::filesystem::current_path() / ".." / "Content",
-        std::filesystem::current_path() / ".." / ".." / "Content",
-        std::filesystem::path("M:/Sacura-Novel-Engine-3D/Content"),
+        std::filesystem::current_path() / "Samples" / "SampleProject",
+        std::filesystem::current_path() / ".." / "Samples" / "SampleProject",
+        std::filesystem::current_path() / ".." / ".." / "Samples" / "SampleProject",
     };
     for (const std::filesystem::path& Candidate : Candidates)
     {
@@ -60,13 +67,13 @@ std::filesystem::path FindContentRoot()
 
 int main()
 {
-    const std::filesystem::path ContentRoot = FindContentRoot();
+    const std::filesystem::path SampleProjectRoot = FindSampleProjectRoot();
     Engine Application;
-    if (!ContentRoot.empty())
+    if (!SampleProjectRoot.empty())
     {
-        Application.SetScriptsRoot(ContentRoot / "Scripts");
+        Application.SetScriptsRoot(SampleProjectRoot / "Scripts");
     }
-    Application.InitializeHeadless(ContentRoot.empty() ? std::filesystem::path{} : ContentRoot);
+    Application.InitializeHeadless(SampleProjectRoot.empty() ? std::filesystem::path{} : SampleProjectRoot / "Content");
 
     ReflectionSubsystem& Reflection = ReflectionSubsystem::Get();
     Expect(Reflection.IsInitialized(), "Reflection initialized");
@@ -151,9 +158,9 @@ int main()
 
 #if defined(SAKURA_ENABLE_PYTHON)
     Expect(Application.GetScripting().IsPythonEnabled(), "Python enabled");
-    Expect(!ContentRoot.empty(), "Content root with Scripts found");
+    Expect(!SampleProjectRoot.empty(), "Sample project with Scripts found");
 
-    if (!ContentRoot.empty())
+    if (!SampleProjectRoot.empty())
     {
         Class* DoorClass = Reflection.FindClass("game.DoorController");
         Expect(DoorClass != nullptr, "FindClass game.DoorController");

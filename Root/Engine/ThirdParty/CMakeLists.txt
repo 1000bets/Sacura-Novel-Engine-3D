@@ -1,6 +1,7 @@
 # ---------------------------------------------------------------
-# Engine third-party: SDL3, Diligent stack, ImGui, PhysX, asset I/O
+# Engine third-party: SDL3, Diligent stack, PhysX, asset I/O
 # Fetched at configure time into this tree; pinned tags — bump deliberately.
+# Editor UI is Qt (Editor/ThirdParty), not Dear ImGui.
 # ---------------------------------------------------------------
 
 include(FetchContent)
@@ -83,9 +84,8 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(SDL3 DiligentCore)
 
 # DiligentTools embeds its own ImGui into Diligent-Imgui when target "imgui" is absent.
+# Do not add a top-level target named "imgui" — leave Tools' bundled ImGui alone.
 FetchContent_MakeAvailable(DiligentTools DiligentFX)
-
-add_subdirectory(imgui)
 
 if(SAKURA_BUILD_DILIGENT_SAMPLES)
     FetchContent_MakeAvailable(DiligentSamples)
@@ -212,7 +212,6 @@ add_library(Sakura::EngineThirdParty ALIAS SakuraEngineThirdParty)
 target_link_libraries(SakuraEngineThirdParty INTERFACE
     SDL3::SDL3
     Diligent-BuildSettings
-    Sakura::ImGui
     Sakura::PhysX
     Sakura::AssetThirdParty
 )
@@ -252,7 +251,7 @@ endif()
 if(TARGET Diligent-Imgui)
     target_link_libraries(SakuraEngineThirdParty INTERFACE Diligent-Imgui)
 endif()
-# Diligent-Imgui uses Tools' bundled ImGui (~1.89). Sakura::ImGui is docking 1.92+ for our UI.
+# Diligent-Imgui uses Tools' bundled ImGui only. Editor UI is Qt (Qt6::Core/Gui/Widgets).
 
 target_include_directories(SakuraEngineThirdParty INTERFACE
     ${diligentcore_SOURCE_DIR}

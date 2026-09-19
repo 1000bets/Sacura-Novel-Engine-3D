@@ -6,22 +6,35 @@
 
 ## Сборка
 
-Нужны CMake 3.20+, C++17 компилятор, Python 3 (для Diligent) и Git. Из корня:
+Нужны CMake 3.20+, C++17 компилятор, Python 3 (для Diligent), Git и **Qt 6** (модули Core, Gui, Widgets) для Editor. Из корня:
 
 ```sh
+# Пример: локальный Qt (aqt) в Root/Editor/ThirdParty/Qt/<ver>/<arch>
 cmake -S . -B build
-cmake --build build --config Debug --target SakuraTest
+cmake --build build --config Debug --target SakuraEditor
 ```
 
-Зависимости подтягиваются из `Root/Engine/ThirdParty` или `Root/Editor/ThirdParty` (у владельца модуля), не из общей Root-папки.
+После сборки staged layout: `build/Stage/Bin/SakuraEditor.exe` + `build/Stage/Engine/{Content,Shaders,Config}`.
+
+Открытие проекта:
+
+```sh
+build/Stage/Bin/SakuraEditor.exe --project "M:/path/to/MyGame/MyGame.project"
+```
+
+Без `--project` открывается Project Browser (New / Open / Recent).
+
+Зависимости подтягиваются из `Root/Engine/ThirdParty` или `Root/Editor/ThirdParty` (у владельца модуля), не из общей Root-папки. Qt ищется через `find_package(Qt6)`; можно задать `Qt6_DIR`, `CMAKE_PREFIX_PATH` или `SAKURA_QT_ROOT`.
 
 ## Структура
 
-- `Root/Engine` — ядро движка
-- `Root/Engine/ThirdParty` — SimpleMath, SDL3, Diligent (Core/Tools/FX/Samples), Dear ImGui, PhysX
-- `Root/Editor` — C++-редактор (каркас)
-- `Root/Editor/ThirdParty` — только editor-only зависимости
-- `AGENTS.md` — архитектурные правила (рендер, third-party, стиль кода)
+- `Root/Engine` — runtime движка (без пользовательских проектов)
+- `Root/Engine/Content` — engine content (`/Engine/...`)
+- `Root/Engine/ThirdParty` — SimpleMath, SDL3, Diligent, PhysX, asset libs
+- `Root/Editor` — Editor library + `apps/SakuraEditorMain.cpp`
+- `Root/Editor/ThirdParty` — editor-only (ufbx, Qt6)
+- `Samples/SampleProject` — пример внешнего проекта (`.project` + Content/Scripts/Config)
+- `AGENTS.md` — архитектурные правила
 
 ## Текущее состояние
 

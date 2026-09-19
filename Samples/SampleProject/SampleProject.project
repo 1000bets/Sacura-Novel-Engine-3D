@@ -1,0 +1,5 @@
+{
+  "name": "SampleProject",
+  "engineVersion": "0.1",
+  "startupScene": "Content/Scenes/Main.scene"
+}

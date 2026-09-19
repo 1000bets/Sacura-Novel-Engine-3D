@@ -6,6 +6,7 @@
 #include "Core/Threading/JobSystem.h"
 #include "Core/Threading/RenderThread.h"
 #include "Platform/GraphicsBackend.h"
+#include "Project/ProjectDescriptor.h"
 #include "Rendering/SceneExtractor.h"
 #include "Scripting/ScriptingSubsystem.h"
 
@@ -47,6 +48,9 @@ public:
     void SetScriptsRoot(const std::filesystem::path& InScriptsRoot);
     const std::filesystem::path& GetScriptsRoot() const { return ScriptsRoot; }
 
+    void LoadProjectContent(const ProjectDescriptor& Descriptor);
+    void UnloadProjectContent();
+
     void SetActiveScene(Scene* Scene);
     Scene* GetActiveScene() const { return ActiveScene; }
 
@@ -57,13 +61,16 @@ private:
     void BeginFrame();
     void EndFrame();
     void InitializeCommon(bool bCreateWindowAndRender);
+    void ResolveShaderDirectory();
+    void ScanConfiguredContent();
+    void ImportProjectScripts();
 
     bool bRunning = false;
     bool bInitialized = false;
     bool bHeadless = false;
     uint64_t NextFrameIndex = 1;
     GraphicsBackend PreferredBackend = GraphicsBackend::Auto;
-    std::string ShaderDirectory = "shaders";
+    std::string ShaderDirectory;
     std::filesystem::path ContentRoot;
     std::filesystem::path ScriptsRoot;
 

@@ -738,7 +738,7 @@ ReflectionDiagnostic ScriptingSubsystem::ImportConfiguredModules()
         return ReflectionDiagnostic::Ok();
     }
 
-    for (const fs::directory_entry& Entry : fs::directory_iterator(ScriptsRoot, ErrorCode))
+    for (const fs::directory_entry& Entry : fs::recursive_directory_iterator(ScriptsRoot, ErrorCode))
     {
         if (!Entry.is_regular_file(ErrorCode))
         {
@@ -748,11 +748,28 @@ ReflectionDiagnostic ScriptingSubsystem::ImportConfiguredModules()
         {
             continue;
         }
-        const std::string ModuleName = Entry.path().stem().string();
-        if (ModuleName == "__init__")
+
+        const std::string Stem = Entry.path().stem().string();
+        if (Stem == "__init__")
         {
             continue;
         }
+
+        fs::path Relative = fs::relative(Entry.path(), ScriptsRoot, ErrorCode);
+        if (ErrorCode)
+        {
+            continue;
+        }
+        Relative.replace_extension();
+        std::string ModuleName = Relative.generic_string();
+        for (char& Character : ModuleName)
+        {
+            if (Character == '/')
+            {
+                Character = '.';
+            }
+        }
+
         ReflectionDiagnostic Imported = ImportModule(ModuleName);
         if (!Imported.bOk)
         {

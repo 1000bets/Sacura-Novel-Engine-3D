@@ -5,9 +5,78 @@
 #include "Reflection/PropertyAccess.h"
 #include "Reflection/ReflectedValue.h"
 
-#include <imgui.h>
+#include <QCheckBox>
+#include <QColorDialog>
+#include <QDoubleSpinBox>
+#include <QFormLayout>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QLineEdit>
+#include <QPushButton>
+#include <QSlider>
+#include <QVBoxLayout>
 #include <cstring>
-#include <string>
+
+ReflectionInspector::ReflectionInspector(QWidget* Parent)
+    : QWidget(Parent)
+{
+    RootLayout = new QVBoxLayout(this);
+    TypeLabel = new QLabel(this);
+    TypeLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    ResetAllButton = new QPushButton(tr("Reset All"), this);
+    PropertiesLayout = new QFormLayout();
+    PropertiesLayout->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
+
+    RootLayout->addWidget(TypeLabel);
+    RootLayout->addWidget(ResetAllButton);
+    RootLayout->addLayout(PropertiesLayout);
+    RootLayout->addStretch(1);
+
+    connect(ResetAllButton, &QPushButton::clicked, this, &ReflectionInspector::OnResetAllClicked);
+    ResetAllButton->setEnabled(false);
+}
+
+void ReflectionInspector::SetInspectedObject(Object* Instance)
+{
+    InspectedObject = Instance;
+    Rebuild();
+}
+
+Object* ReflectionInspector::GetInspectedObject() const
+{
+    return InspectedObject;
+}
+
+void ReflectionInspector::Rebuild()
+{
+    ClearPropertyEditors();
+
+    if (InspectedObject == nullptr || InspectedObject->GetClass() == nullptr)
+    {
+        TypeLabel->setText(tr("(no object)"));
+        ResetAllButton->setEnabled(false);
+        return;
+    }
+
+    TypeLabel->setText(QString::fromStdString(InspectedObject->GetClass()->GetTypeId().Value));
+    ResetAllButton->setEnabled(true);
+
+    for (const PropertyDescriptor* Descriptor : ListEditableProperties(InspectedObject))
+    {
+        if (Descriptor != nullptr)
+        {
+            AddPropertyEditor(*Descriptor);
+        }
+    }
+}
+
+void ReflectionInspector::ClearPropertyEditors()
+{
+    while (PropertiesLayout->rowCount() > 0)
+    {
+        PropertiesLayout->removeRow(0);
+    }
+}
 
 std::vector<const PropertyDescriptor*> ReflectionInspector::ListEditableProperties(Object* Instance)
 {
@@ -77,122 +146,252 @@ ReflectionDiagnostic ReflectionInspector::ResetAllToDefault(Object* Instance)
     return ReflectionDiagnostic::Ok();
 }
 
-ReflectionInspectorDrawResult ReflectionInspector::DrawProperty(Object* Instance, const PropertyDescriptor& Descriptor)
+void ReflectionInspector::ApplyBoolValue(const PropertyId& Property, bool Value)
 {
-    ReflectionInspectorDrawResult Result;
-    if (Instance == nullptr)
+    if (InspectedObject == nullptr)
     {
-        Result.Diagnostic = ReflectionDiagnostic::Fail("Instance is null");
-        return Result;
+        return;
     }
+    ReflectionDiagnostic SetResult = PropertyAccess::SetProperty(
+        InspectedObject,
+        Property,
+        ReflectedValue::MakeBool(Value),
+        PropertyAccessContext::Inspector);
+    if (SetResult.bOk)
+    {
+        emit PropertyChanged();
+    }
+    else
+    {
+        Rebuild();
+    }
+}
 
+void ReflectionInspector::ApplyFloatValue(const PropertyId& Property, double Value)
+{
+    if (InspectedObject == nullptr)
+    {
+        return;
+    }
+    ReflectionDiagnostic SetResult = PropertyAccess::SetProperty(
+        InspectedObject,
+        Property,
+        ReflectedValue::MakeFloat(static_cast<float>(Value)),
+        PropertyAccessContext::Inspector);
+    if (SetResult.bOk)
+    {
+        emit PropertyChanged();
+    }
+    else
+    {
+        Rebuild();
+    }
+}
+
+void ReflectionInspector::ApplyStringValue(const PropertyId& Property, const QString& Value)
+{
+    if (InspectedObject == nullptr)
+    {
+        return;
+    }
+    ReflectionDiagnostic SetResult = PropertyAccess::SetProperty(
+        InspectedObject,
+        Property,
+        ReflectedValue::MakeString(Value.toStdString()),
+        PropertyAccessContext::Inspector);
+    if (SetResult.bOk)
+    {
+        emit PropertyChanged();
+    }
+    else
+    {
+        Rebuild();
+    }
+}
+
+void ReflectionInspector::ApplyVector3Value(const PropertyId& Property, float X, float Y, float Z)
+{
+    if (InspectedObject == nullptr)
+    {
+        return;
+    }
+    float Values[3] = {X, Y, Z};
+    ReflectedValue Updated = ReflectedValue::MakeEmpty();
+    Updated.ValueKind = ReflectedValue::Kind::Bytes;
+    Updated.BytesValue.resize(sizeof(Values));
+    std::memcpy(Updated.BytesValue.data(), Values, sizeof(Values));
+    ReflectionDiagnostic SetResult = PropertyAccess::SetProperty(
+        InspectedObject,
+        Property,
+        Updated,
+        PropertyAccessContext::Inspector);
+    if (SetResult.bOk)
+    {
+        emit PropertyChanged();
+    }
+    else
+    {
+        Rebuild();
+    }
+}
+
+void ReflectionInspector::ApplyColorValue(const PropertyId& Property, float R, float G, float B, float A)
+{
+    if (InspectedObject == nullptr)
+    {
+        return;
+    }
+    float Values[4] = {R, G, B, A};
+    ReflectedValue Updated = ReflectedValue::MakeEmpty();
+    Updated.ValueKind = ReflectedValue::Kind::Bytes;
+    Updated.BytesValue.resize(sizeof(Values));
+    std::memcpy(Updated.BytesValue.data(), Values, sizeof(Values));
+    ReflectionDiagnostic SetResult = PropertyAccess::SetProperty(
+        InspectedObject,
+        Property,
+        Updated,
+        PropertyAccessContext::Inspector);
+    if (SetResult.bOk)
+    {
+        emit PropertyChanged();
+    }
+    else
+    {
+        Rebuild();
+    }
+}
+
+void ReflectionInspector::OnResetPropertyClicked(const PropertyId Property)
+{
+    ReflectionDiagnostic Reset = ResetPropertyToDefault(InspectedObject, Property);
+    if (Reset.bOk)
+    {
+        Rebuild();
+        emit PropertyChanged();
+    }
+}
+
+void ReflectionInspector::OnResetAllClicked()
+{
+    ReflectionDiagnostic Reset = ResetAllToDefault(InspectedObject);
+    if (Reset.bOk)
+    {
+        Rebuild();
+        emit PropertyChanged();
+    }
+}
+
+void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor)
+{
     ReflectedValue CurrentValue;
     ReflectionDiagnostic Got = PropertyAccess::GetProperty(
-        Instance,
+        InspectedObject,
         Descriptor,
         CurrentValue,
         PropertyAccessContext::Inspector);
     if (!Got.bOk)
     {
-        Result.Diagnostic = Got;
-        return Result;
+        return;
     }
 
-    const char* Label = Descriptor.Attributes.DisplayName != nullptr
-        ? Descriptor.Attributes.DisplayName
-        : Descriptor.Id.Value.c_str();
+    const QString Label = Descriptor.Attributes.DisplayName != nullptr
+        ? QString::fromUtf8(Descriptor.Attributes.DisplayName)
+        : QString::fromStdString(Descriptor.Id.Value);
     const bool bEditable = HasPropertyFlag(Descriptor.Attributes.Flags, PropertyFlags::EditorEditable)
         && !Descriptor.bReadOnly;
+    const PropertyId Property = Descriptor.Id;
 
-    ImGui::PushID(Descriptor.Id.Value.c_str());
+    QWidget* FieldWidget = new QWidget(this);
+    QHBoxLayout* FieldLayout = new QHBoxLayout(FieldWidget);
+    FieldLayout->setContentsMargins(0, 0, 0, 0);
 
     if (Descriptor.ValueTypeId.Value == "engine.bool")
     {
-        bool Value = CurrentValue.BoolValue;
-        if (!bEditable)
+        QCheckBox* CheckBox = new QCheckBox(FieldWidget);
+        CheckBox->setChecked(CurrentValue.BoolValue);
+        CheckBox->setEnabled(bEditable);
+        FieldLayout->addWidget(CheckBox);
+        if (bEditable)
         {
-            ImGui::BeginDisabled();
+            connect(CheckBox, &QCheckBox::toggled, this, [this, Property](bool Value)
+            {
+                ApplyBoolValue(Property, Value);
+            });
         }
-        if (ImGui::Checkbox(Label, &Value))
-        {
-            ReflectionDiagnostic SetResult = PropertyAccess::SetProperty(
-                Instance,
-                Descriptor,
-                ReflectedValue::MakeBool(Value),
-                PropertyAccessContext::Inspector);
-            Result.bChanged = SetResult.bOk;
-            Result.bRejected = !SetResult.bOk;
-            Result.Diagnostic = SetResult;
-        }
-        if (!bEditable)
-        {
-            ImGui::EndDisabled();
-        }
-        Result.bDrawn = true;
     }
     else if (Descriptor.ValueTypeId.Value == "engine.float" || Descriptor.ValueTypeId.Value == "engine.double")
     {
-        float Value = static_cast<float>(CurrentValue.Float64Value);
-        if (!bEditable)
-        {
-            ImGui::BeginDisabled();
-        }
-        bool bEdited = false;
+        QDoubleSpinBox* SpinBox = new QDoubleSpinBox(FieldWidget);
+        SpinBox->setDecimals(4);
+        SpinBox->setSingleStep(0.1);
         if (Descriptor.Attributes.bHasRange)
         {
-            bEdited = ImGui::SliderFloat(
-                Label,
-                &Value,
-                static_cast<float>(Descriptor.Attributes.RangeMinimum),
-                static_cast<float>(Descriptor.Attributes.RangeMaximum));
+            SpinBox->setRange(Descriptor.Attributes.RangeMinimum, Descriptor.Attributes.RangeMaximum);
         }
         else
         {
-            bEdited = ImGui::DragFloat(Label, &Value, 0.1f);
+            SpinBox->setRange(-1.0e9, 1.0e9);
         }
-        if (bEdited)
+        SpinBox->setValue(CurrentValue.Float64Value);
+        SpinBox->setEnabled(bEditable);
+        FieldLayout->addWidget(SpinBox, 1);
+
+        if (Descriptor.Attributes.bHasRange)
         {
-            ReflectionDiagnostic SetResult = PropertyAccess::SetProperty(
-                Instance,
-                Descriptor,
-                ReflectedValue::MakeFloat(Value),
-                PropertyAccessContext::Inspector);
-            Result.bChanged = SetResult.bOk;
-            Result.bRejected = !SetResult.bOk;
-            Result.Diagnostic = SetResult;
+            QSlider* Slider = new QSlider(Qt::Horizontal, FieldWidget);
+            const double Minimum = Descriptor.Attributes.RangeMinimum;
+            const double Maximum = Descriptor.Attributes.RangeMaximum;
+            const int SliderSteps = 1000;
+            Slider->setRange(0, SliderSteps);
+            const double Normalized = (CurrentValue.Float64Value - Minimum)
+                / (Maximum - Minimum);
+            Slider->setValue(static_cast<int>(Normalized * SliderSteps));
+            Slider->setEnabled(bEditable);
+            FieldLayout->addWidget(Slider, 1);
+
+            if (bEditable)
+            {
+                connect(Slider, &QSlider::valueChanged, this, [this, Property, SpinBox, Minimum, Maximum, SliderSteps](int SliderValue)
+                {
+                    const double Value = Minimum
+                        + (static_cast<double>(SliderValue) / static_cast<double>(SliderSteps))
+                            * (Maximum - Minimum);
+                    SpinBox->blockSignals(true);
+                    SpinBox->setValue(Value);
+                    SpinBox->blockSignals(false);
+                    ApplyFloatValue(Property, Value);
+                });
+                connect(SpinBox, qOverload<double>(&QDoubleSpinBox::valueChanged), this, [this, Property, Slider, Minimum, Maximum, SliderSteps](double Value)
+                {
+                    const double NormalizedValue = (Value - Minimum) / (Maximum - Minimum);
+                    Slider->blockSignals(true);
+                    Slider->setValue(static_cast<int>(NormalizedValue * SliderSteps));
+                    Slider->blockSignals(false);
+                    ApplyFloatValue(Property, Value);
+                });
+            }
         }
-        if (!bEditable)
+        else if (bEditable)
         {
-            ImGui::EndDisabled();
+            connect(SpinBox, qOverload<double>(&QDoubleSpinBox::valueChanged), this, [this, Property](double Value)
+            {
+                ApplyFloatValue(Property, Value);
+            });
         }
-        Result.bDrawn = true;
     }
     else if (Descriptor.ValueTypeId.Value == "engine.string")
     {
-        std::string Value = CurrentValue.StringValue;
-        char Buffer[512] = {};
-        const size_t CopyCount = Value.size() < sizeof(Buffer) - 1 ? Value.size() : sizeof(Buffer) - 1;
-        std::memcpy(Buffer, Value.data(), CopyCount);
-        if (!bEditable)
+        QLineEdit* LineEdit = new QLineEdit(FieldWidget);
+        LineEdit->setText(QString::fromStdString(CurrentValue.StringValue));
+        LineEdit->setEnabled(bEditable);
+        FieldLayout->addWidget(LineEdit, 1);
+        if (bEditable)
         {
-            ImGui::BeginDisabled();
+            connect(LineEdit, &QLineEdit::editingFinished, this, [this, Property, LineEdit]()
+            {
+                ApplyStringValue(Property, LineEdit->text());
+            });
         }
-        if (ImGui::InputText(Label, Buffer, sizeof(Buffer)))
-        {
-            ReflectionDiagnostic SetResult = PropertyAccess::SetProperty(
-                Instance,
-                Descriptor,
-                ReflectedValue::MakeString(Buffer),
-                PropertyAccessContext::Inspector);
-            Result.bChanged = SetResult.bOk;
-            Result.bRejected = !SetResult.bOk;
-            Result.Diagnostic = SetResult;
-        }
-        if (!bEditable)
-        {
-            ImGui::EndDisabled();
-        }
-        Result.bDrawn = true;
     }
     else if (Descriptor.ValueTypeId.Value == "engine.Vector3")
     {
@@ -201,30 +400,36 @@ ReflectionInspectorDrawResult ReflectionInspector::DrawProperty(Object* Instance
         {
             std::memcpy(Values, CurrentValue.BytesValue.data(), sizeof(Values));
         }
-        if (!bEditable)
+
+        QDoubleSpinBox* SpinX = new QDoubleSpinBox(FieldWidget);
+        QDoubleSpinBox* SpinY = new QDoubleSpinBox(FieldWidget);
+        QDoubleSpinBox* SpinZ = new QDoubleSpinBox(FieldWidget);
+        for (QDoubleSpinBox* SpinBox : {SpinX, SpinY, SpinZ})
         {
-            ImGui::BeginDisabled();
+            SpinBox->setDecimals(4);
+            SpinBox->setSingleStep(0.1);
+            SpinBox->setRange(-1.0e9, 1.0e9);
+            SpinBox->setEnabled(bEditable);
+            FieldLayout->addWidget(SpinBox, 1);
         }
-        if (ImGui::DragFloat3(Label, Values, 0.1f))
+        SpinX->setValue(Values[0]);
+        SpinY->setValue(Values[1]);
+        SpinZ->setValue(Values[2]);
+
+        if (bEditable)
         {
-            ReflectedValue Updated = ReflectedValue::MakeEmpty();
-            Updated.ValueKind = ReflectedValue::Kind::Bytes;
-            Updated.BytesValue.resize(sizeof(Values));
-            std::memcpy(Updated.BytesValue.data(), Values, sizeof(Values));
-            ReflectionDiagnostic SetResult = PropertyAccess::SetProperty(
-                Instance,
-                Descriptor,
-                Updated,
-                PropertyAccessContext::Inspector);
-            Result.bChanged = SetResult.bOk;
-            Result.bRejected = !SetResult.bOk;
-            Result.Diagnostic = SetResult;
+            auto CommitVector = [this, Property, SpinX, SpinY, SpinZ]()
+            {
+                ApplyVector3Value(
+                    Property,
+                    static_cast<float>(SpinX->value()),
+                    static_cast<float>(SpinY->value()),
+                    static_cast<float>(SpinZ->value()));
+            };
+            connect(SpinX, qOverload<double>(&QDoubleSpinBox::valueChanged), this, CommitVector);
+            connect(SpinY, qOverload<double>(&QDoubleSpinBox::valueChanged), this, CommitVector);
+            connect(SpinZ, qOverload<double>(&QDoubleSpinBox::valueChanged), this, CommitVector);
         }
-        if (!bEditable)
-        {
-            ImGui::EndDisabled();
-        }
-        Result.bDrawn = true;
     }
     else if (Descriptor.ValueTypeId.Value == "engine.Color")
     {
@@ -233,74 +438,51 @@ ReflectionInspectorDrawResult ReflectionInspector::DrawProperty(Object* Instance
         {
             std::memcpy(Values, CurrentValue.BytesValue.data(), sizeof(Values));
         }
-        if (!bEditable)
-        {
-            ImGui::BeginDisabled();
-        }
-        if (ImGui::ColorEdit4(Label, Values))
-        {
-            ReflectedValue Updated = ReflectedValue::MakeEmpty();
-            Updated.ValueKind = ReflectedValue::Kind::Bytes;
-            Updated.BytesValue.resize(sizeof(Values));
-            std::memcpy(Updated.BytesValue.data(), Values, sizeof(Values));
-            ReflectionDiagnostic SetResult = PropertyAccess::SetProperty(
-                Instance,
-                Descriptor,
-                Updated,
-                PropertyAccessContext::Inspector);
-            Result.bChanged = SetResult.bOk;
-            Result.bRejected = !SetResult.bOk;
-            Result.Diagnostic = SetResult;
-        }
-        if (!bEditable)
-        {
-            ImGui::EndDisabled();
-        }
-        Result.bDrawn = true;
-    }
 
-    if (bEditable && Result.bDrawn)
-    {
-        ImGui::SameLine();
-        if (ImGui::SmallButton("Reset"))
+        QPushButton* ColorButton = new QPushButton(FieldWidget);
+        const QColor CurrentColor = QColor::fromRgbF(Values[0], Values[1], Values[2], Values[3]);
+        ColorButton->setText(CurrentColor.name(QColor::HexArgb));
+        ColorButton->setEnabled(bEditable);
+        FieldLayout->addWidget(ColorButton, 1);
+
+        if (bEditable)
         {
-            ReflectionDiagnostic Reset = ResetPropertyToDefault(Instance, Descriptor.Id);
-            Result.bChanged = Reset.bOk;
-            Result.bRejected = !Reset.bOk;
-            Result.Diagnostic = Reset;
+            connect(ColorButton, &QPushButton::clicked, this, [this, Property, ColorButton, CurrentColor]()
+            {
+                const QColor Picked = QColorDialog::getColor(
+                    CurrentColor,
+                    this,
+                    tr("Pick Color"),
+                    QColorDialog::ShowAlphaChannel);
+                if (!Picked.isValid())
+                {
+                    return;
+                }
+                ColorButton->setText(Picked.name(QColor::HexArgb));
+                ApplyColorValue(
+                    Property,
+                    static_cast<float>(Picked.redF()),
+                    static_cast<float>(Picked.greenF()),
+                    static_cast<float>(Picked.blueF()),
+                    static_cast<float>(Picked.alphaF()));
+            });
         }
     }
-
-    ImGui::PopID();
-    return Result;
-}
-
-void ReflectionInspector::DrawObject(Object* Instance, const char* PanelTitle)
-{
-    if (Instance == nullptr || Instance->GetClass() == nullptr)
+    else
     {
-        return;
+        QLabel* Unsupported = new QLabel(tr("unsupported"), FieldWidget);
+        FieldLayout->addWidget(Unsupported);
     }
 
-    if (!ImGui::Begin(PanelTitle))
+    if (bEditable)
     {
-        ImGui::End();
-        return;
-    }
-
-    ImGui::TextUnformatted(Instance->GetClass()->GetTypeId().Value.c_str());
-    if (ImGui::Button("Reset All"))
-    {
-        ResetAllToDefault(Instance);
-    }
-
-    for (const PropertyDescriptor* Descriptor : ListEditableProperties(Instance))
-    {
-        if (Descriptor != nullptr)
+        QPushButton* ResetButton = new QPushButton(tr("Reset"), FieldWidget);
+        FieldLayout->addWidget(ResetButton);
+        connect(ResetButton, &QPushButton::clicked, this, [this, Property]()
         {
-            DrawProperty(Instance, *Descriptor);
-        }
+            OnResetPropertyClicked(Property);
+        });
     }
 
-    ImGui::End();
+    PropertiesLayout->addRow(Label, FieldWidget);
 }
