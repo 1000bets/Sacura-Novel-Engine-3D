@@ -95,6 +95,7 @@ Do not duplicate the same library in both. If Editor needs a capability that Eng
 | ozz-animation | Skeletal sampling / blending / model-space | FetchContent → `Root/Engine/ThirdParty/asset/ozz-animation/_src/`; target `ozz_animation` |
 | stb_image | PNG/JPEG decode to RAM | FetchContent → `Root/Engine/ThirdParty/asset/stb/_src/`; target `Sakura::StbImage` |
 | nlohmann/json | `.meta` and JSON documents | FetchContent → `Root/Engine/ThirdParty/asset/nlohmann_json/_src/`; `nlohmann_json::nlohmann_json` |
+| pybind11 | Python embed scripting | FetchContent → `Root/Engine/ThirdParty/pybind11/_src/`; optional via `SAKURA_ENABLE_PYTHON` |
 
 ### Current Editor deps
 
@@ -104,7 +105,7 @@ Do not duplicate the same library in both. If Editor needs a capability that Eng
 
 Fetched Diligent/PhysX/ImGui/asset/`_src` trees are gitignored. Do not copy their `.cpp`/`.h` around the project by hand.
 
-Pinned version cache vars: `SAKURA_SDL3_GIT_TAG`, `SAKURA_DILIGENT_*_GIT_TAG`, `SAKURA_IMGUI_GIT_TAG`, `SAKURA_PHYSX_GIT_TAG`, `SAKURA_FASTGLTF_GIT_TAG`, `SAKURA_OZZ_GIT_TAG`, `SAKURA_NLOHMANN_JSON_GIT_TAG`, `SAKURA_STB_GIT_TAG`, `SAKURA_UFBX_GIT_TAG`. Bump deliberately (keep Diligent modules on the same version).
+Pinned version cache vars: `SAKURA_SDL3_GIT_TAG`, `SAKURA_DILIGENT_*_GIT_TAG`, `SAKURA_IMGUI_GIT_TAG`, `SAKURA_PHYSX_GIT_TAG`, `SAKURA_FASTGLTF_GIT_TAG`, `SAKURA_OZZ_GIT_TAG`, `SAKURA_NLOHMANN_JSON_GIT_TAG`, `SAKURA_STB_GIT_TAG`, `SAKURA_UFBX_GIT_TAG`, `SAKURA_PYBIND11_GIT_TAG`. Bump deliberately (keep Diligent modules on the same version).
 
 - Engine links `Sakura::EngineThirdParty` (SDL3, Diligent backends, ImGui, PhysX, Tools/FX helpers, `Sakura::AssetThirdParty`).
 - Editor links `Sakura::EditorThirdParty` (ufbx) plus Engine.
@@ -153,6 +154,9 @@ ENGINE_CLASS / ENGINE_STRUCT / ENGINE_REFLECT_* (header registrars)
   → ReflectionSubsystem::InitializeNative (bind when types are complete)
   → Class / TypeDescriptor / PropertyDescriptor catalog + CDO
   → PropertyAccess Get/Set (Inspector / Deserialize / Script / Default)
+  → (optional) ScriptingSubsystem + Python Class publish
+  → ReflectionJson serialize/deserialize
+  → Editor ReflectionInspector (ImGui drawers via PropertyAccess)
 ```
 
 - **TypeId** / **PropertyId** are stable strings (`"engine.CameraComponent"`, `"field_of_view"`), not RTTI hashes or registration indices.
@@ -160,12 +164,34 @@ ENGINE_CLASS / ENGINE_STRUCT / ENGINE_REFLECT_* (header registrars)
 - After the class/struct closing brace in the **same header**: `ENGINE_CLASS_END` / `ENGINE_STRUCT_END`, then `ENGINE_IMPLEMENT_FIELD` / `ENGINE_IMPLEMENT_PROPERTY` / `ENGINE_IMPLEMENT_READONLY` (MSVC-safe member-pointer bind).
 - `RF_DISPLAY_NAME`, `RF_UI_RANGE`, `RF_CATEGORY` feed `PropertyAttributes` alongside `PropertyFlags`.
 - `Class` is metadata (`Object` subclass), **not** a scene object. Instances get `Object::AssignClass` / `GetClass` / `GetTypeId` from the factory.
-- `ScriptComponent` (`engine.ScriptComponent`) is a managed property bag (`PropertyId → ReflectedValue`) for a future Python binding path; Reflection core does **not** depend on Python, ImGui, or Diligent.
 - Builtin value types: `engine.bool`, `engine.int64`, `engine.float`, `engine.double`, `engine.string`, `engine.Vector3`, `engine.Quaternion`, `engine.Color` (Color stays a distinct TypeId from Vector4).
 - No on-disk type / schema cache in v1.
-- MSVC static registration can be stripped from static `Engine.lib` if unused: link tests/tools with `/WHOLEARCHIVE:Engine` (see `Root/CMakeLists.txt` for `SakuraReflectionTest`, `SakuraAssetTest`, `SakuraTest`). `ReflectionAnchor.cpp` includes reflected headers and `ForceTouchRegistrars()`.
-- Headless verification: `SakuraReflectionTest` (`Root/Tests/Reflection_Test.cpp` + `Reflection_Test_TU2.cpp` multi-TU include).
-- Engine hooks: `InitializeCommon` calls `InitializeNative` after Jobs; `Shutdown` tears Reflection down after Assets and before Render/Jobs teardown (CDOs still need `MemorySubsystem`).
+- MSVC static registration can be stripped from static `Engine.lib` if unused: link tests/tools with `/WHOLEARCHIVE:Engine` (see `Root/CMakeLists.txt` for `SakuraReflectionTest`, `SakuraReflectionPythonTest`, `SakuraAssetTest`, `SakuraTest`). `ReflectionAnchor.cpp` includes reflected headers and `ForceTouchRegistrars()`.
+- Headless verification: `SakuraReflectionTest` (native) and `SakuraReflectionPythonTest` (JSON + Python carrier + inspector list API).
+- Engine hooks: `InitializeCommon` calls `InitializeNative` after Jobs, then `ScriptingSubsystem::Initialize` + import `ScriptsRoot` modules; `Shutdown` destroys script instances → finalize interpreter → Reflection shutdown (after Assets, before Render/Jobs). CDOs still need `MemorySubsystem`.
+
+### Python carrier model (`SAKURA_ENABLE_PYTHON`)
+
+```text
+Python @register_class / field()
+  → ScriptingSubsystem publishes Class (Origin=Python, NativeBackingType=engine.ScriptComponent)
+  → native ScriptComponent carrier holds managed PropertyId→ReflectedValue + ScriptInstanceHandle
+  → OnCreate/Tick/OnDestroy → Python on_create/on_update/on_destroy (no user __init__)
+```
+
+- CMake option `SAKURA_ENABLE_PYTHON` (default ON). If Python3 `Development.Embed` is missing, configure falls back to OFF with a warning. pybind11 (pinned `SAKURA_PYBIND11_GIT_TAG`, default `v2.13.6`) lives in `Root/Engine/ThirdParty/pybind11/_src` (gitignored). Hint install root with `SAKURA_PYTHON_ROOT` / `-DSAKURA_PYTHON_ROOT=...`. Runtime needs `python310.dll` on `PATH` (or next to the exe) and a valid `PYTHONHOME`.
+- When ON: Engine links `pybind11::embed` + `Python3::Python`, defines `SAKURA_ENABLE_PYTHON=1`. Reflection core headers stay free of `py::object`.
+- Embedded module name: `engine` (`ScriptComponent` façade, `register_class`, `field`, `Object` handle with generation, Vector3/Transform copy-in/copy-out).
+- Published Python types are kept in an internal TypeId→`py::object` map at register time. `BindScriptComponent` must not scan `sys.modules`. Resolve lifecycle callbacks via `getattr` on the **type**, then bind to the instance — avoid `hasattr`/`attr` on the instance for `on_*` (deadlocks with field descriptors under embed).
+- Project scripts path: `Engine::SetScriptsRoot` or default `ContentRoot/Scripts`. Example: `Content/Scripts/door_controller.py` (`game.DoorController`).
+- Exception in `on_update` → mark ScriptFailed, stop further updates; `on_destroy` at most once.
+- **No hot reload** in v1: import once at project open / engine init.
+- Build without Python: `-DSAKURA_ENABLE_PYTHON=OFF` — native reflection tests still pass; Python cases are skipped in `SakuraReflectionPythonTest`.
+
+### JSON + Inspector
+
+- `Reflection/Json/ReflectionJson` — `{ "type", "typeVersion", "properties" }`; AssetRef as id string only; ClassRef as TypeId string; unknown fields/types fail with no partial publish; optional per-type migration hooks (e.g. 1→2).
+- Editor `ReflectionInspector` — ImGui drawers for bool/float/string/Vector3/Color via `PropertyAccess`; reset from CDO; range rejection; no hardcoded Camera panel.
 
 ## Coding conventions (engine)
 

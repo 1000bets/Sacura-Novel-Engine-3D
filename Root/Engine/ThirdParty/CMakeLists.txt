@@ -169,14 +169,26 @@ add_subdirectory(asset)
 # ---- Python scripting (pybind11 embed) ----
 set(SAKURA_PYBIND11_GIT_TAG "v2.13.6" CACHE STRING "pybind11 git tag")
 option(SAKURA_ENABLE_PYTHON "Enable Python scripting via pybind11" ON)
+set(SAKURA_PYTHON_ROOT "" CACHE PATH "Optional Python root hint for Development/Embed")
 
-set(SAKURA_PYTHON_AVAILABLE OFF)
+set(SAKURA_PYTHON_AVAILABLE OFF CACHE INTERNAL "Python embed available for Sakura")
 if(SAKURA_ENABLE_PYTHON)
+    if(SAKURA_PYTHON_ROOT)
+        set(Python3_ROOT_DIR "${SAKURA_PYTHON_ROOT}")
+    elseif(DEFINED ENV{SAKURA_PYTHON_ROOT})
+        set(Python3_ROOT_DIR "$ENV{SAKURA_PYTHON_ROOT}")
+    endif()
+
     find_package(Python3 COMPONENTS Interpreter Development.Embed QUIET)
-    if(Python3_Development_Embed_FOUND)
-        set(SAKURA_PYTHON_AVAILABLE ON)
+    if(NOT Python3_Development_Embed_FOUND)
+        find_package(Python3 COMPONENTS Interpreter Development QUIET)
+    endif()
+
+    if(Python3_Development_Embed_FOUND OR Python3_Development_FOUND)
+        set(SAKURA_PYTHON_AVAILABLE ON CACHE INTERNAL "Python embed available for Sakura" FORCE)
+        message(STATUS "Sakura Python: ${Python3_EXECUTABLE} (${Python3_VERSION})")
     else()
-        message(WARNING "SAKURA_ENABLE_PYTHON=ON but Python3 Development.Embed was not found; building without Python")
+        message(WARNING "SAKURA_ENABLE_PYTHON=ON but Python3 Development/Embed was not found; building without Python")
         set(SAKURA_ENABLE_PYTHON OFF CACHE BOOL "Enable Python scripting via pybind11" FORCE)
     endif()
 endif()
@@ -206,10 +218,16 @@ target_link_libraries(SakuraEngineThirdParty INTERFACE
 )
 
 if(SAKURA_PYTHON_AVAILABLE)
-    target_link_libraries(SakuraEngineThirdParty INTERFACE
-        pybind11::embed
-        Python3::Python
-    )
+    if(TARGET Python3::Python)
+        target_link_libraries(SakuraEngineThirdParty INTERFACE
+            pybind11::embed
+            Python3::Python
+        )
+    else()
+        target_link_libraries(SakuraEngineThirdParty INTERFACE
+            pybind11::embed
+        )
+    endif()
     target_compile_definitions(SakuraEngineThirdParty INTERFACE SAKURA_ENABLE_PYTHON=1)
 endif()
 

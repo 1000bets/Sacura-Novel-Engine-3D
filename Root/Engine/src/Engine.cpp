@@ -11,7 +11,10 @@
 #include <memory>
 #include <thread>
 
-Engine::Engine() = default;
+Engine::Engine()
+    : Scripting(ScriptingSubsystem::Get())
+{
+}
 
 Engine::~Engine()
 {
@@ -30,6 +33,15 @@ void Engine::SetContentRoot(const std::filesystem::path& InContentRoot)
 {
     ContentRoot = InContentRoot;
     Registry.SetContentRoot(ContentRoot);
+    if (ScriptsRoot.empty() && !ContentRoot.empty())
+    {
+        ScriptsRoot = ContentRoot / "Scripts";
+    }
+}
+
+void Engine::SetScriptsRoot(const std::filesystem::path& InScriptsRoot)
+{
+    ScriptsRoot = InScriptsRoot;
 }
 
 void Engine::InitializeCommon(bool bCreateWindowAndRender)
@@ -47,6 +59,28 @@ void Engine::InitializeCommon(bool bCreateWindowAndRender)
         if (!ReflectionInit.bOk)
         {
             PrintString(std::string("Reflection InitializeNative failed: ") + ReflectionInit.Message);
+        }
+    }
+
+    if (ScriptsRoot.empty() && !ContentRoot.empty())
+    {
+        ScriptsRoot = ContentRoot / "Scripts";
+    }
+
+    {
+        Scripting.SetScriptsRoot(ScriptsRoot);
+        const ReflectionDiagnostic ScriptingInit = Scripting.Initialize();
+        if (!ScriptingInit.bOk)
+        {
+            PrintString(std::string("Scripting initialize failed: ") + ScriptingInit.Message);
+        }
+        else if (Scripting.IsPythonEnabled())
+        {
+            const ReflectionDiagnostic Imported = Scripting.ImportConfiguredModules();
+            if (!Imported.bOk)
+            {
+                PrintString(std::string("Scripting import failed: ") + Imported.Message);
+            }
         }
     }
 
@@ -173,6 +207,7 @@ void Engine::Shutdown()
 
     PrintString("Engine: shutting down");
     Assets.Shutdown();
+    Scripting.Shutdown();
     ReflectionSubsystem::Get().Shutdown();
 
     if (!bHeadless)

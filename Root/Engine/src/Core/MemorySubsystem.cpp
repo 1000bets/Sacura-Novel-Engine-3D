@@ -1,5 +1,7 @@
 #include "Core/MemorySubsystem.h"
 
+#include "Gameplay/ObjectHandle.h"
+
 #include <iostream>
 
 // ------------------------------------------------------------------

@@ -7,6 +7,7 @@
 #include "Core/Threading/RenderThread.h"
 #include "Platform/GraphicsBackend.h"
 #include "Rendering/SceneExtractor.h"
+#include "Scripting/ScriptingSubsystem.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -37,10 +38,14 @@ public:
     SceneExtractor& GetSceneExtractor() { return Extractor; }
     AssetRegistry& GetAssetRegistry() { return Registry; }
     AssetManager& GetAssetManager() { return Assets; }
+    ScriptingSubsystem& GetScripting() { return Scripting; }
     WindowSubsystem* GetWindowSubsystem() const;
 
     void SetContentRoot(const std::filesystem::path& ContentRoot);
     const std::filesystem::path& GetContentRoot() const { return ContentRoot; }
+
+    void SetScriptsRoot(const std::filesystem::path& InScriptsRoot);
+    const std::filesystem::path& GetScriptsRoot() const { return ScriptsRoot; }
 
     void SetActiveScene(Scene* Scene);
     Scene* GetActiveScene() const { return ActiveScene; }
@@ -60,11 +65,13 @@ private:
     GraphicsBackend PreferredBackend = GraphicsBackend::Auto;
     std::string ShaderDirectory = "shaders";
     std::filesystem::path ContentRoot;
+    std::filesystem::path ScriptsRoot;
 
     JobSystem Jobs;
     RenderThread Render;
     SceneExtractor Extractor;
     AssetRegistry Registry;
     AssetManager Assets;
+    ScriptingSubsystem& Scripting;
     Scene* ActiveScene = nullptr;
 };

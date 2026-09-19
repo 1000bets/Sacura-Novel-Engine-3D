@@ -26,8 +26,14 @@ add_executable(SakuraReflectionTest
 )
 target_link_libraries(SakuraReflectionTest PRIVATE Engine)
 
+add_executable(SakuraReflectionPythonTest
+    Tests/ReflectionPython_Test.cpp
+)
+target_link_libraries(SakuraReflectionPythonTest PRIVATE Engine Editor)
+
 if(MSVC)
     target_link_options(SakuraReflectionTest PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:Engine>")
+    target_link_options(SakuraReflectionPythonTest PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:Engine>")
     target_link_options(SakuraAssetTest PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:Engine>")
     target_link_options(SakuraTest PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:Engine>")
 endif()

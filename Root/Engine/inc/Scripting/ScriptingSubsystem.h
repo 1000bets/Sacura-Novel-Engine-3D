@@ -6,6 +6,7 @@
 #include "Reflection/TypeId.h"
 
 #include <filesystem>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -34,6 +35,9 @@ class ScriptingSubsystem
 public:
     static ScriptingSubsystem& Get();
 
+    ScriptingSubsystem(const ScriptingSubsystem&) = delete;
+    ScriptingSubsystem& operator=(const ScriptingSubsystem&) = delete;
+
     ReflectionDiagnostic Initialize();
     void Shutdown();
 
@@ -54,7 +58,8 @@ public:
     void DestroyAllScriptInstances();
 
 private:
-    ScriptingSubsystem() = default;
+    ScriptingSubsystem();
+    ~ScriptingSubsystem();
 
     bool bInitialized = false;
     std::filesystem::path ScriptsRoot;
@@ -62,7 +67,7 @@ private:
 
 #if defined(SAKURA_ENABLE_PYTHON)
     struct ScriptInstanceRecord;
-    std::unordered_map<uint64_t, ScriptInstanceRecord> Instances;
+    std::unordered_map<uint64_t, std::unique_ptr<ScriptInstanceRecord>> Instances;
 #endif
 };
 
