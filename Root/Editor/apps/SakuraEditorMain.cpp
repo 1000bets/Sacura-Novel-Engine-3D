@@ -6,41 +6,27 @@
 #include "ProjectBrowserDialog.h"
 
 #include <QApplication>
+#include <QTimer>
 
 #include <filesystem>
 #include <string>
 
 namespace
 {
-std::filesystem::path ParseProjectArgument(int ArgumentCount, char** Arguments)
+std::filesystem::path ParseFlagPath(int ArgumentCount, char** Arguments, const char* Flag, const char* FlagEquals)
 {
+    const std::string FlagName = Flag;
+    const std::string FlagPrefix = FlagEquals;
     for (int Index = 1; Index < ArgumentCount; ++Index)
     {
         const std::string Argument = Arguments[Index];
-        if (Argument == "--project" && Index + 1 < ArgumentCount)
+        if (Argument == FlagName && Index + 1 < ArgumentCount)
         {
             return Arguments[Index + 1];
         }
-        if (Argument.rfind("--project=", 0) == 0)
+        if (Argument.rfind(FlagPrefix, 0) == 0)
         {
-            return Argument.substr(std::string("--project=").size());
-        }
-    }
-    return {};
-}
-
-std::filesystem::path ParseScreenshotArgument(int ArgumentCount, char** Arguments)
-{
-    for (int Index = 1; Index < ArgumentCount; ++Index)
-    {
-        const std::string Argument = Arguments[Index];
-        if (Argument == "--screenshot-launcher" && Index + 1 < ArgumentCount)
-        {
-            return Arguments[Index + 1];
-        }
-        if (Argument.rfind("--screenshot-launcher=", 0) == 0)
-        {
-            return Argument.substr(std::string("--screenshot-launcher=").size());
+            return Argument.substr(FlagPrefix.size());
         }
     }
     return {};
@@ -57,16 +43,16 @@ int main(int ArgumentCount, char** Arguments)
     const std::filesystem::path ExecutablePath = std::filesystem::absolute(Arguments[0]);
     EnginePaths::InitializeFromExecutable(ExecutablePath);
 
-    const std::filesystem::path ScreenshotPath = ParseScreenshotArgument(ArgumentCount, Arguments);
-    if (!ScreenshotPath.empty())
+    const std::filesystem::path LauncherShot = ParseFlagPath(ArgumentCount, Arguments, "--screenshot-launcher", "--screenshot-launcher=");
+    if (!LauncherShot.empty())
     {
         ProjectBrowserDialog Browser;
-        if (!Browser.CaptureScreenshot(ScreenshotPath))
+        if (!Browser.CaptureScreenshot(LauncherShot))
         {
             PrintString("SakuraEditor: failed to capture launcher screenshot");
             return 1;
         }
-        PrintString(std::string("SakuraEditor: launcher screenshot saved to ") + ScreenshotPath.generic_string());
+        PrintString(std::string("SakuraEditor: launcher screenshot saved to ") + LauncherShot.generic_string());
         return 0;
     }
 
@@ -76,7 +62,7 @@ int main(int ArgumentCount, char** Arguments)
     ProjectSession Session;
     Session.BindEngine(&BoundEngine);
 
-    std::filesystem::path ProjectFile = ParseProjectArgument(ArgumentCount, Arguments);
+    std::filesystem::path ProjectFile = ParseFlagPath(ArgumentCount, Arguments, "--project", "--project=");
     if (ProjectFile.empty())
     {
         ProjectBrowserDialog Browser;
@@ -97,6 +83,23 @@ int main(int ArgumentCount, char** Arguments)
 
     EditorMainWindow MainWindow(BoundEngine, Session);
     MainWindow.show();
+
+    const std::filesystem::path EditorShot = ParseFlagPath(ArgumentCount, Arguments, "--screenshot-editor", "--screenshot-editor=");
+    if (!EditorShot.empty())
+    {
+        QTimer::singleShot(200, [&]()
+        {
+            if (!MainWindow.CaptureScreenshot(QString::fromStdString(EditorShot.string())))
+            {
+                PrintString("SakuraEditor: failed to capture editor screenshot");
+                Application.exit(1);
+                return;
+            }
+            PrintString(std::string("SakuraEditor: editor screenshot saved to ") + EditorShot.generic_string());
+            Application.exit(0);
+        });
+        return Application.exec();
+    }
 
     const int ExitCode = Application.exec();
 

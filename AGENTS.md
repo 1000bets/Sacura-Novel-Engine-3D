@@ -30,8 +30,10 @@ Rules:
 - Open flow: `ProjectSession::OpenProject` → `ProjectDescriptor` + `ProjectPaths` → `Engine::LoadProjectContent` (Game Content + Scripts + rescan).
 - Create flow: `ProjectGenerator::CreateProject` (folders + `.project`).
 - CLI: `SakuraEditor --project "D:/Games/MyGame/MyGame.project"`; without `--project` → Qt Studio launcher (`ProjectBrowserDialog`: New / Open / Recent / templates).
-- Screenshot helper: `SakuraEditor --screenshot-launcher <path.png>` (for UI iteration).
+- Screenshot helper: `SakuraEditor --screenshot-launcher <path.png>` / `--screenshot-editor <path.png>` (for UI iteration).
+- Editor shell UI mirrors React prototype (`Sacura-Novel-Engine-3D_ReactEngine` / `Editor.jsx`): menubar, play toolbar, hierarchy, viewport, bottom dock tabs, inspector, status — graphite + muted rose.
 - Sample: `Samples/SampleProject/` (not part of Engine Content).
+- Source packer (no build / Diligent / PhysX / Qt): `Scripts/PackEngineSourceApp/PackEngineSourceApp.py` or `PackEngineSourceApp.exe` → RAR under `Scripts/PackEngineSourceApp/Output/` (needs WinRAR `Rar.exe`). Rebuild exe: `python -m PyInstaller --onefile --console --name PackEngineSourceApp Scripts/PackEngineSourceApp/PackEngineSourceApp.py`.
 - CMake staging: `sakura_stage_engine_runtime(<target>)` → `${CMAKE_BINARY_DIR}/Stage/{Bin,Engine/...}`.
 
 ### Asset mounts

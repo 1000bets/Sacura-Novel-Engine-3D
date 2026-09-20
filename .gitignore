@@ -84,3 +84,10 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# Source packer output
+Scripts/PackEngineSourceApp/Output/
+Scripts/PackEngineSourceApp/build/
+Scripts/PackEngineSourceApp/dist/
+Scripts/PackEngineSourceApp/*.spec
+Scripts/PackEngineSourceApp/PackEngineSourceApp.exe

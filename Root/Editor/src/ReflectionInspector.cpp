@@ -20,6 +20,7 @@
 ReflectionInspector::ReflectionInspector(QWidget* Parent)
     : QWidget(Parent)
 {
+    setObjectName("ReflectionInspector");
     RootLayout = new QVBoxLayout(this);
     TypeLabel = new QLabel(this);
     TypeLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
@@ -34,6 +35,7 @@ ReflectionInspector::ReflectionInspector(QWidget* Parent)
 
     connect(ResetAllButton, &QPushButton::clicked, this, &ReflectionInspector::OnResetAllClicked);
     ResetAllButton->setEnabled(false);
+    ResetAllButton->setVisible(false);
 }
 
 void ReflectionInspector::SetInspectedObject(Object* Instance)
@@ -53,13 +55,15 @@ void ReflectionInspector::Rebuild()
 
     if (InspectedObject == nullptr || InspectedObject->GetClass() == nullptr)
     {
-        TypeLabel->setText(tr("(no object)"));
+        TypeLabel->setText(tr("Select an object in Hierarchy"));
         ResetAllButton->setEnabled(false);
+        ResetAllButton->setVisible(false);
         return;
     }
 
     TypeLabel->setText(QString::fromStdString(InspectedObject->GetClass()->GetTypeId().Value));
     ResetAllButton->setEnabled(true);
+    ResetAllButton->setVisible(true);
 
     for (const PropertyDescriptor* Descriptor : ListEditableProperties(InspectedObject))
     {
