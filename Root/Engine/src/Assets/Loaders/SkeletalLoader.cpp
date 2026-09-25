@@ -521,7 +521,7 @@ std::shared_ptr<const void> SkeletalLoader::Load(const AssetLoadContext& Context
 
     AssetType RequestedType = Context.Entry.Metadata.Type;
     int32_t SelectorIndex = 0;
-    if (Context.SubAsset != nullptr)
+    if (Context.SubAsset.has_value())
     {
         RequestedType = Context.SubAsset->Type;
         SelectorIndex = Context.SubAsset->Selector.Index;

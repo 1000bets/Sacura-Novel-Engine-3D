@@ -272,3 +272,76 @@ ReflectionDiagnostic PropertyAccess::SetProperty(
 
     return Descriptor.WriteObject(Instance, Descriptor, InValue);
 }
+
+ReflectionDiagnostic PropertyAccess::CopyPropertiesFrom(
+    Object* Source,
+    Object* Destination,
+    PropertyAccessContext Context)
+{
+    if (Source == nullptr || Destination == nullptr)
+    {
+        return ReflectionDiagnostic::Fail("Source or Destination is null");
+    }
+
+    Class* SourceClass = Source->GetClass();
+    Class* DestinationClass = Destination->GetClass();
+    if (SourceClass == nullptr || DestinationClass == nullptr)
+    {
+        return ReflectionDiagnostic::Fail("Source or Destination has no Class");
+    }
+
+    if (!DestinationClass->IsA(SourceClass) && !SourceClass->IsA(DestinationClass) && SourceClass != DestinationClass)
+    {
+        return ReflectionDiagnostic::Fail("Incompatible Class hierarchy for property copy");
+    }
+
+    for (Class* Current = SourceClass; Current != nullptr; Current = Current->GetBaseClass())
+    {
+        for (const PropertyDescriptor& Descriptor : Current->GetProperties())
+        {
+            ReflectedValue Value;
+            ReflectionDiagnostic GetResult = GetProperty(Source, Descriptor, Value, Context);
+            if (!GetResult.bOk)
+            {
+                continue;
+            }
+
+            ReflectionDiagnostic SetResult = SetProperty(Destination, Descriptor, Value, Context);
+            if (!SetResult.bOk)
+            {
+                return SetResult;
+            }
+        }
+    }
+
+    return ReflectionDiagnostic::Ok();
+}
+
+ReflectionDiagnostic PropertyAccess::ResetToClassDefaults(
+    Object* Instance,
+    PropertyAccessContext Context)
+{
+    if (Instance == nullptr)
+    {
+        return ReflectionDiagnostic::Fail("Instance is null");
+    }
+
+    Class* ObjectClass = Instance->GetClass();
+    if (ObjectClass == nullptr)
+    {
+        return ReflectionDiagnostic::Fail("Object has no Class");
+    }
+
+    Object* Defaults = ObjectClass->GetClassDefaultObject();
+    if (Defaults == nullptr)
+    {
+        return ReflectionDiagnostic::Fail("Class has no CDO", ObjectClass->GetTypeId());
+    }
+
+    if (Defaults == Instance)
+    {
+        return ReflectionDiagnostic::Fail("Cannot reset CDO onto itself", ObjectClass->GetTypeId());
+    }
+
+    return CopyPropertiesFrom(Defaults, Instance, Context);
+}

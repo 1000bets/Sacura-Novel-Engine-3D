@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "baseColor": [
+    0.1,
+    0.8,
+    0.3,
+    1
+  ],
+  "alphaMode": "MASK",
+  "alphaCutoff": 0.5,
+  "doubleSided": true,
+  "baseColorTexture": {
+    "assetId": "ca82fd11-a1a4-5dc3-a2cd-aa924788c157",
+    "subAssetId": null
+  }
+}

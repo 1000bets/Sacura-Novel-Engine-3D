@@ -44,6 +44,9 @@ struct PropertyAttributes
     const char* DisplayName = nullptr;
     const char* Category = nullptr;
     const char* Description = nullptr;
+    const char* AssetTypeFilter = nullptr;
+    const char* CompanionProperty = nullptr;
+    bool bEditorHidden = false;
     bool bHasRange = false;
     double RangeMinimum = 0.0;
     double RangeMaximum = 0.0;

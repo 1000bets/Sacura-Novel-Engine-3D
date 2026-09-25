@@ -12,3 +12,7 @@ endforeach()
 if(EXISTS "${SOURCE_DIR}/platforms")
     file(COPY "${SOURCE_DIR}/platforms" DESTINATION "${DEST_DIR}")
 endif()
+
+if(EXISTS "${SOURCE_DIR}/imageformats")
+    file(COPY "${SOURCE_DIR}/imageformats" DESTINATION "${DEST_DIR}")
+endif()

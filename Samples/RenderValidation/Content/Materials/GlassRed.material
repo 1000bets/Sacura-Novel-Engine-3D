@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "baseColor": [
+    1,
+    0.1,
+    0.08,
+    0.35
+  ],
+  "alphaMode": "BLEND",
+  "roughness": 0.2,
+  "doubleSided": true
+}

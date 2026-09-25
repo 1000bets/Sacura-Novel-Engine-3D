@@ -1,5 +1,6 @@
 {
   "name": "SampleProject",
   "engineVersion": "0.1",
-  "startupScene": "Content/Scenes/Main.scene"
+  "startupScene": "Content/Scenes/Main.scene",
+  "startupStory": "Content/Stories/Demo.story"
 }

@@ -1,6 +1,8 @@
 #include "ReflectionInspector.h"
 
 #include "Gameplay/Object.h"
+#include "Assets/AssetRegistry.h"
+#include "Assets/Guid.h"
 #include "Reflection/Class.h"
 #include "Reflection/PropertyAccess.h"
 #include "Reflection/ReflectedValue.h"
@@ -12,10 +14,13 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMenu>
 #include <QPushButton>
 #include <QSlider>
+#include <QSpinBox>
 #include <QVBoxLayout>
 #include <cstring>
+#include <algorithm>
 
 ReflectionInspector::ReflectionInspector(QWidget* Parent)
     : QWidget(Parent)
@@ -47,6 +52,59 @@ void ReflectionInspector::SetInspectedObject(Object* Instance)
 Object* ReflectionInspector::GetInspectedObject() const
 {
     return InspectedObject;
+}
+
+void ReflectionInspector::SetPropertyCommitCallback(PropertyCommitCallback Callback)
+{
+    CommitCallback = std::move(Callback);
+}
+
+void ReflectionInspector::SetPropertyResetCallback(PropertyResetCallback Callback)
+{
+    ResetCallback = std::move(Callback);
+}
+
+void ReflectionInspector::SetAssetRegistry(AssetRegistry* InRegistry)
+{
+    Registry = InRegistry;
+    Rebuild();
+}
+
+void ReflectionInspector::SetAssetCommitCallback(AssetCommitCallback Callback)
+{
+    AssetCallback = std::move(Callback);
+}
+
+bool ReflectionInspector::CommitProperty(const PropertyId& Property, const ReflectedValue& NewValue)
+{
+    if (InspectedObject == nullptr)
+    {
+        return false;
+    }
+    if (CommitCallback)
+    {
+        return CommitCallback(InspectedObject, Property, NewValue);
+    }
+    ReflectionDiagnostic SetResult = PropertyAccess::SetProperty(
+        InspectedObject,
+        Property,
+        NewValue,
+        PropertyAccessContext::Inspector);
+    return SetResult.bOk;
+}
+
+bool ReflectionInspector::CommitReset(const PropertyId& Property)
+{
+    if (InspectedObject == nullptr)
+    {
+        return false;
+    }
+    if (ResetCallback)
+    {
+        return ResetCallback(InspectedObject, Property);
+    }
+    ReflectionDiagnostic Reset = ResetPropertyToDefault(InspectedObject, Property);
+    return Reset.bOk;
 }
 
 void ReflectionInspector::Rebuild()
@@ -92,6 +150,10 @@ std::vector<const PropertyDescriptor*> ReflectionInspector::ListEditableProperti
 
     for (const PropertyDescriptor& Descriptor : Instance->GetClass()->GetProperties())
     {
+        if (Descriptor.Attributes.bEditorHidden)
+        {
+            continue;
+        }
         if (HasPropertyFlag(Descriptor.Attributes.Flags, PropertyFlags::EditorVisible)
             || HasPropertyFlag(Descriptor.Attributes.Flags, PropertyFlags::EditorEditable)
             || HasPropertyFlag(Descriptor.Attributes.Flags, PropertyFlags::EditorReadOnly))
@@ -152,16 +214,7 @@ ReflectionDiagnostic ReflectionInspector::ResetAllToDefault(Object* Instance)
 
 void ReflectionInspector::ApplyBoolValue(const PropertyId& Property, bool Value)
 {
-    if (InspectedObject == nullptr)
-    {
-        return;
-    }
-    ReflectionDiagnostic SetResult = PropertyAccess::SetProperty(
-        InspectedObject,
-        Property,
-        ReflectedValue::MakeBool(Value),
-        PropertyAccessContext::Inspector);
-    if (SetResult.bOk)
+    if (CommitProperty(Property, ReflectedValue::MakeBool(Value)))
     {
         emit PropertyChanged();
     }
@@ -173,16 +226,7 @@ void ReflectionInspector::ApplyBoolValue(const PropertyId& Property, bool Value)
 
 void ReflectionInspector::ApplyFloatValue(const PropertyId& Property, double Value)
 {
-    if (InspectedObject == nullptr)
-    {
-        return;
-    }
-    ReflectionDiagnostic SetResult = PropertyAccess::SetProperty(
-        InspectedObject,
-        Property,
-        ReflectedValue::MakeFloat(static_cast<float>(Value)),
-        PropertyAccessContext::Inspector);
-    if (SetResult.bOk)
+    if (CommitProperty(Property, ReflectedValue::MakeFloat(static_cast<float>(Value))))
     {
         emit PropertyChanged();
     }
@@ -194,16 +238,7 @@ void ReflectionInspector::ApplyFloatValue(const PropertyId& Property, double Val
 
 void ReflectionInspector::ApplyStringValue(const PropertyId& Property, const QString& Value)
 {
-    if (InspectedObject == nullptr)
-    {
-        return;
-    }
-    ReflectionDiagnostic SetResult = PropertyAccess::SetProperty(
-        InspectedObject,
-        Property,
-        ReflectedValue::MakeString(Value.toStdString()),
-        PropertyAccessContext::Inspector);
-    if (SetResult.bOk)
+    if (CommitProperty(Property, ReflectedValue::MakeString(Value.toStdString())))
     {
         emit PropertyChanged();
     }
@@ -215,21 +250,12 @@ void ReflectionInspector::ApplyStringValue(const PropertyId& Property, const QSt
 
 void ReflectionInspector::ApplyVector3Value(const PropertyId& Property, float X, float Y, float Z)
 {
-    if (InspectedObject == nullptr)
-    {
-        return;
-    }
     float Values[3] = {X, Y, Z};
     ReflectedValue Updated = ReflectedValue::MakeEmpty();
     Updated.ValueKind = ReflectedValue::Kind::Bytes;
     Updated.BytesValue.resize(sizeof(Values));
     std::memcpy(Updated.BytesValue.data(), Values, sizeof(Values));
-    ReflectionDiagnostic SetResult = PropertyAccess::SetProperty(
-        InspectedObject,
-        Property,
-        Updated,
-        PropertyAccessContext::Inspector);
-    if (SetResult.bOk)
+    if (CommitProperty(Property, Updated))
     {
         emit PropertyChanged();
     }
@@ -241,21 +267,12 @@ void ReflectionInspector::ApplyVector3Value(const PropertyId& Property, float X,
 
 void ReflectionInspector::ApplyColorValue(const PropertyId& Property, float R, float G, float B, float A)
 {
-    if (InspectedObject == nullptr)
-    {
-        return;
-    }
     float Values[4] = {R, G, B, A};
     ReflectedValue Updated = ReflectedValue::MakeEmpty();
     Updated.ValueKind = ReflectedValue::Kind::Bytes;
     Updated.BytesValue.resize(sizeof(Values));
     std::memcpy(Updated.BytesValue.data(), Values, sizeof(Values));
-    ReflectionDiagnostic SetResult = PropertyAccess::SetProperty(
-        InspectedObject,
-        Property,
-        Updated,
-        PropertyAccessContext::Inspector);
-    if (SetResult.bOk)
+    if (CommitProperty(Property, Updated))
     {
         emit PropertyChanged();
     }
@@ -265,10 +282,36 @@ void ReflectionInspector::ApplyColorValue(const PropertyId& Property, float R, f
     }
 }
 
+void ReflectionInspector::ApplyAssetValue(const PropertyDescriptor& Descriptor, const AssetKey& Key)
+{
+    const PropertyId Companion = Descriptor.Attributes.CompanionProperty != nullptr
+        ? PropertyId{Descriptor.Attributes.CompanionProperty}
+        : PropertyId{};
+    bool bCommitted = false;
+    if (AssetCallback)
+    {
+        bCommitted = AssetCallback(InspectedObject, Descriptor.Id, Companion, Key);
+    }
+    else
+    {
+        const std::string AssetValue = Key.Asset.IsValid() ? Key.Asset.ToString() : std::string{};
+        bCommitted = CommitProperty(Descriptor.Id, ReflectedValue::MakeString(AssetValue));
+        if (bCommitted && !Companion.Value.empty())
+        {
+            const std::string SubAssetValue = Key.HasSubAsset() ? Key.SubAsset->ToString() : std::string{};
+            bCommitted = CommitProperty(Companion, ReflectedValue::MakeString(SubAssetValue));
+        }
+    }
+    if (bCommitted)
+    {
+        Rebuild();
+        emit PropertyChanged();
+    }
+}
+
 void ReflectionInspector::OnResetPropertyClicked(const PropertyId Property)
 {
-    ReflectionDiagnostic Reset = ResetPropertyToDefault(InspectedObject, Property);
-    if (Reset.bOk)
+    if (CommitReset(Property))
     {
         Rebuild();
         emit PropertyChanged();
@@ -277,8 +320,29 @@ void ReflectionInspector::OnResetPropertyClicked(const PropertyId Property)
 
 void ReflectionInspector::OnResetAllClicked()
 {
-    ReflectionDiagnostic Reset = ResetAllToDefault(InspectedObject);
-    if (Reset.bOk)
+    if (InspectedObject == nullptr)
+    {
+        return;
+    }
+
+    bool bAny = false;
+    for (const PropertyDescriptor* Descriptor : ListEditableProperties(InspectedObject))
+    {
+        if (Descriptor == nullptr || Descriptor->bReadOnly)
+        {
+            continue;
+        }
+        if (!HasPropertyFlag(Descriptor->Attributes.Flags, PropertyFlags::EditorEditable))
+        {
+            continue;
+        }
+        if (CommitReset(Descriptor->Id))
+        {
+            bAny = true;
+        }
+    }
+
+    if (bAny)
     {
         Rebuild();
         emit PropertyChanged();
@@ -309,7 +373,92 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
     QHBoxLayout* FieldLayout = new QHBoxLayout(FieldWidget);
     FieldLayout->setContentsMargins(0, 0, 0, 0);
 
-    if (Descriptor.ValueTypeId.Value == "engine.bool")
+    if (Descriptor.Attributes.AssetTypeFilter != nullptr)
+    {
+        AssetKey CurrentKey{};
+        Guid::TryParse(CurrentValue.StringValue, CurrentKey.Asset);
+        if (Descriptor.Attributes.CompanionProperty != nullptr && InspectedObject->GetClass() != nullptr)
+        {
+            ReflectedValue CompanionValue;
+            const PropertyDescriptor* Companion = InspectedObject->GetClass()->FindProperty(
+                PropertyId{Descriptor.Attributes.CompanionProperty});
+            if (Companion != nullptr
+                && PropertyAccess::GetProperty(InspectedObject, *Companion, CompanionValue, PropertyAccessContext::Inspector).bOk)
+            {
+                SubAssetId SubAsset{};
+                if (Guid::TryParse(CompanionValue.StringValue, SubAsset) && SubAsset.IsValid())
+                {
+                    CurrentKey.SubAsset = SubAsset;
+                }
+            }
+        }
+
+        QString Display = tr("None");
+        AssetRegistryEntry CurrentEntry{};
+        const SubAssetRecord* CurrentSubAsset = nullptr;
+        if (Registry != nullptr && Registry->TryResolveKey(CurrentKey, CurrentEntry, &CurrentSubAsset))
+        {
+            Display = QString::fromStdString(CurrentEntry.VirtualPath);
+            if (CurrentSubAsset != nullptr)
+            {
+                Display += QString::fromUtf8(" :: ") + QString::fromStdString(CurrentSubAsset->Name);
+            }
+        }
+
+        QPushButton* Picker = new QPushButton(Display, FieldWidget);
+        Picker->setEnabled(bEditable && Registry != nullptr);
+        Picker->setToolTip(Display);
+        QMenu* Menu = new QMenu(Picker);
+        QAction* ClearAction = Menu->addAction(tr("None"));
+        connect(ClearAction, &QAction::triggered, this, [this, Descriptor]()
+        {
+            ApplyAssetValue(Descriptor, AssetKey{});
+        });
+        Menu->addSeparator();
+
+        AssetType Filter = AssetType::Unknown;
+        TryParseAssetType(Descriptor.Attributes.AssetTypeFilter, Filter);
+        std::vector<AssetRegistryEntry> Entries;
+        if (Registry != nullptr)
+        {
+            Entries = Registry->FindByDirectory("/Game");
+            std::vector<AssetRegistryEntry> EngineEntries = Registry->FindByDirectory("/Engine");
+            Entries.insert(Entries.end(), EngineEntries.begin(), EngineEntries.end());
+        }
+        std::sort(Entries.begin(), Entries.end(), [](const AssetRegistryEntry& First, const AssetRegistryEntry& Second)
+        {
+            return First.VirtualPath < Second.VirtualPath;
+        });
+        for (const AssetRegistryEntry& Entry : Entries)
+        {
+            if (Entry.Metadata.Type == Filter)
+            {
+                const AssetKey Key{Entry.Metadata.Guid, std::nullopt};
+                QAction* Action = Menu->addAction(QString::fromStdString(Entry.VirtualPath));
+                connect(Action, &QAction::triggered, this, [this, Descriptor, Key]()
+                {
+                    ApplyAssetValue(Descriptor, Key);
+                });
+            }
+            for (const SubAssetRecord& SubAsset : Entry.Metadata.SubAssets)
+            {
+                if (SubAsset.Type != Filter)
+                {
+                    continue;
+                }
+                AssetKey Key{Entry.Metadata.Guid, SubAsset.Id};
+                QAction* Action = Menu->addAction(
+                    QString::fromStdString(Entry.VirtualPath + " :: " + SubAsset.Name));
+                connect(Action, &QAction::triggered, this, [this, Descriptor, Key]()
+                {
+                    ApplyAssetValue(Descriptor, Key);
+                });
+            }
+        }
+        Picker->setMenu(Menu);
+        FieldLayout->addWidget(Picker, 1);
+    }
+    else if (Descriptor.ValueTypeId.Value == "engine.bool")
     {
         QCheckBox* CheckBox = new QCheckBox(FieldWidget);
         CheckBox->setChecked(CurrentValue.BoolValue);
@@ -320,6 +469,37 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
             connect(CheckBox, &QCheckBox::toggled, this, [this, Property](bool Value)
             {
                 ApplyBoolValue(Property, Value);
+            });
+        }
+    }
+    else if (Descriptor.ValueTypeId.Value == "engine.int64")
+    {
+        QSpinBox* SpinBox = new QSpinBox(FieldWidget);
+        if (Descriptor.Attributes.bHasRange)
+        {
+            SpinBox->setRange(
+                static_cast<int>(Descriptor.Attributes.RangeMinimum),
+                static_cast<int>(Descriptor.Attributes.RangeMaximum));
+        }
+        else
+        {
+            SpinBox->setRange(-1000000, 1000000);
+        }
+        SpinBox->setValue(static_cast<int>(CurrentValue.Int64Value));
+        SpinBox->setEnabled(bEditable);
+        FieldLayout->addWidget(SpinBox, 1);
+        if (bEditable)
+        {
+            connect(SpinBox, qOverload<int>(&QSpinBox::valueChanged), this, [this, Property](int Value)
+            {
+                if (CommitProperty(Property, ReflectedValue::MakeInt64(Value)))
+                {
+                    emit PropertyChanged();
+                }
+                else
+                {
+                    Rebuild();
+                }
             });
         }
     }

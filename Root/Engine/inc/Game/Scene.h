@@ -7,9 +7,6 @@
 
 class GameObject;
 
-/// Контейнер объектов на сцене.
-/// Владеет временем жизни ВСЕХ GameObject (плоский список raw-указателей).
-/// Создание/удаление через MemorySubsystem.
 class Scene : public Object
 {
     SAKURA_OBJECT(Scene)
@@ -17,27 +14,37 @@ class Scene : public Object
 public:
     ~Scene() override;
 
-    // ----- GameObject management -----
-
     GameObject* CreateGameObject(const std::string& Name = "GameObject");
-    void DestroyGameObject(GameObject* GO);
+    bool DestroyGameObject(GameObject* GO);
+    void QueueDestroyGameObject(GameObject* GO);
+    void FlushPendingDestroys();
+
+    GameObject* FindByPersistentId(const std::string& PersistentId) const;
     GameObject* FindByName(const std::string& Name) const;
+    GameObject* FindByHandle(ObjectHandle Handle) const;
 
     std::vector<GameObject*> GetRootObjects() const;
     const std::vector<GameObject*>& GetAllObjects() const { return m_Objects; }
 
     size_t GetObjectCount() const { return m_Objects.size(); }
 
-    // ----- state -----
+    void Tick(float DeltaTime);
 
     bool IsLoaded() const { return m_bLoaded; }
-    void SetLoaded(bool b) { m_bLoaded = b; }
+    void SetLoaded(bool bLoaded) { m_bLoaded = bLoaded; }
 
 protected:
     Scene();
     explicit Scene(const std::string& InName);
 
 private:
-    std::vector<GameObject*> m_Objects;// Scene владеет, delete в деструкторе
+    friend class GameObject;
+
+    bool DestroyGameObjectInternal(GameObject* GO);
+    void DetachHierarchy(GameObject* GO);
+
+    std::vector<GameObject*> m_Objects;
+    std::vector<GameObject*> m_PendingDestroy;
     bool m_bLoaded = false;
+    bool m_bFlushingPendingDestroy = false;
 };

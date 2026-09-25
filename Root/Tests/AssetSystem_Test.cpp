@@ -6,7 +6,9 @@
 #include "Assets/Guid.h"
 #include "Assets/Resources/MaterialResource.h"
 #include "Assets/Resources/ModelResource.h"
+#include "Assets/Resources/StaticMeshResource.h"
 #include "Assets/Resources/TextureResource.h"
+#include "Assets/Loaders/IAssetLoader.h"
 #include "AssetTools/AssetImporter.h"
 #include "AssetTools/ImportRequest.h"
 #include "Core/Threading/JobSystem.h"
@@ -16,12 +18,15 @@
 #include <fastgltf/core.hpp>
 #include <fastgltf/types.hpp>
 
+#include <atomic>
 #include <chrono>
 #include <cstring>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <memory>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -224,7 +229,7 @@ void TestImportAndLoad(const std::filesystem::path& Root)
     if (!PumpUntil(Eng, TextureKey, AssetLoadState::Ready))
     {
         const AssetDiagnostic Diagnostic = Eng.GetAssetManager().GetLastDiagnostic(TextureKey);
-        std::cout << "  Texture diagnostic: " << AssetErrorCodeToString(Diagnostic.Code) << " — " << Diagnostic.Message
+        std::cout << "  Texture diagnostic: " << AssetErrorCodeToString(Diagnostic.Code) << " РІР‚вЂќ " << Diagnostic.Message
                   << " path=" << Diagnostic.Path << '\n';
         Expect(false, "Texture LoadAsync Ready");
     }
@@ -259,7 +264,7 @@ void TestImportAndLoad(const std::filesystem::path& Root)
     AssetHandle<MaterialResource> Material;
     Expect(Eng.GetAssetManager().TryGetLoaded(MaterialKey, Material) && Material->BaseColorTexture.Key.Asset == TextureKey.Asset, "Material holds texture AssetRef");
 
-    // Missing dependency → Failed
+    // Missing dependency РІвЂ вЂ™ Failed
     AssetKey MissingTexture{};
     MissingTexture.Asset = Guid::Generate();
     const auto BrokenMaterialPath = Root / "Content" / "Materials" / "Broken.material";
@@ -406,6 +411,294 @@ void TestGlbCreateImportAndLoad(const std::filesystem::path& Root)
     Eng.Shutdown();
 }
 
+void TestAssetLoadContextOwnsSubAssetByValue()
+{
+    std::cout << "\n=== AssetLoadContext owns SubAsset by value ===\n";
+
+    std::optional<AssetLoadContext> WorkerContext;
+    SubAssetId ExpectedId = Guid::Generate();
+    {
+        AssetRegistryEntry Entry{};
+        Entry.RelativePath = "Models/Owned.glb";
+        Entry.Metadata.Guid = Guid::Generate();
+        Entry.Metadata.Type = AssetType::Model;
+
+        SubAssetRecord Record{};
+        Record.Id = ExpectedId;
+        Record.Type = AssetType::StaticMesh;
+        Record.Name = "Mesh0";
+        Record.Selector.Kind = "mesh";
+        Record.Selector.Index = 2;
+        Entry.Metadata.SubAssets.push_back(Record);
+
+        AssetLoadContext Local{};
+        Local.Entry = Entry;
+        BindLoadContextSubAsset(Local, &Entry.Metadata.SubAssets.front());
+        Local.Key.Asset = Entry.Metadata.Guid;
+        Local.Key.SubAsset = ExpectedId;
+
+        WorkerContext = Local;
+        Entry.Metadata.SubAssets.clear();
+        Entry = AssetRegistryEntry{};
+    }
+
+    Expect(WorkerContext.has_value(), "Worker context survived producer scope");
+    Expect(WorkerContext->SubAsset.has_value(), "SubAsset optional present after producer destroy");
+    if (WorkerContext->SubAsset.has_value())
+    {
+        Expect(WorkerContext->SubAsset->Id == ExpectedId, "SubAssetId preserved");
+        Expect(WorkerContext->SubAsset->Type == AssetType::StaticMesh, "SubAsset Type preserved");
+        Expect(WorkerContext->SubAsset->Selector.Index == 2, "Selector.Index preserved");
+        Expect(WorkerContext->SubAsset->Name == "Mesh0", "SubAsset Name preserved");
+    }
+
+    AssetLoadContext Moved = std::move(*WorkerContext);
+    WorkerContext.reset();
+    Expect(Moved.SubAsset.has_value() && Moved.SubAsset->Selector.Index == 2, "Move preserves SubAsset");
+}
+
+void TestSubAssetLoadAfterProducerReturns(const std::filesystem::path& Root)
+{
+    std::cout << "\n=== SubAsset load after producer returns (gated worker) ===\n";
+
+    const auto ExternalGlb = Root / "External" / "GateTriangle.glb";
+    {
+        std::vector<float> Positions = {
+            -0.5f, -0.5f, 0.f,
+             0.5f, -0.5f, 0.f,
+             0.0f,  0.5f, 0.f
+        };
+        std::vector<uint32_t> Indices = {0, 1, 2};
+        std::vector<std::byte> BufferBytes(Positions.size() * sizeof(float) + Indices.size() * sizeof(uint32_t));
+        std::memcpy(BufferBytes.data(), Positions.data(), Positions.size() * sizeof(float));
+        std::memcpy(BufferBytes.data() + Positions.size() * sizeof(float), Indices.data(), Indices.size() * sizeof(uint32_t));
+
+        fastgltf::Asset Asset{};
+        {
+            fastgltf::AssetInfo Info{};
+            Info.gltfVersion = "2.0";
+            Info.generator = "SakuraAssetTest";
+            Asset.assetInfo = std::move(Info);
+        }
+
+        fastgltf::Buffer Buffer{};
+        fastgltf::sources::Vector BufferSource{};
+        BufferSource.bytes = BufferBytes;
+        Buffer.byteLength = BufferSource.bytes.size();
+        Buffer.data = std::move(BufferSource);
+        Asset.buffers.push_back(std::move(Buffer));
+
+        fastgltf::BufferView PositionView{};
+        PositionView.bufferIndex = 0;
+        PositionView.byteOffset = 0;
+        PositionView.byteLength = Positions.size() * sizeof(float);
+        PositionView.target = fastgltf::BufferTarget::ArrayBuffer;
+        Asset.bufferViews.push_back(std::move(PositionView));
+
+        fastgltf::BufferView IndexView{};
+        IndexView.bufferIndex = 0;
+        IndexView.byteOffset = Positions.size() * sizeof(float);
+        IndexView.byteLength = Indices.size() * sizeof(uint32_t);
+        IndexView.target = fastgltf::BufferTarget::ElementArrayBuffer;
+        Asset.bufferViews.push_back(std::move(IndexView));
+
+        fastgltf::Accessor PositionAccessor{};
+        PositionAccessor.bufferViewIndex = 0;
+        PositionAccessor.componentType = fastgltf::ComponentType::Float;
+        PositionAccessor.count = 3;
+        PositionAccessor.type = fastgltf::AccessorType::Vec3;
+        Asset.accessors.push_back(std::move(PositionAccessor));
+
+        fastgltf::Accessor IndexAccessor{};
+        IndexAccessor.bufferViewIndex = 1;
+        IndexAccessor.componentType = fastgltf::ComponentType::UnsignedInt;
+        IndexAccessor.count = 3;
+        IndexAccessor.type = fastgltf::AccessorType::Scalar;
+        Asset.accessors.push_back(std::move(IndexAccessor));
+
+        fastgltf::Primitive Primitive{};
+        Primitive.type = fastgltf::PrimitiveType::Triangles;
+        Primitive.indicesAccessor = 1;
+        Primitive.attributes.emplace_back(fastgltf::Attribute{std::pmr::string("POSITION"), 0});
+
+        fastgltf::Mesh Mesh{};
+        Mesh.primitives.push_back(std::move(Primitive));
+        Asset.meshes.push_back(std::move(Mesh));
+
+        fastgltf::Node Node{};
+        Node.meshIndex = 0;
+        Asset.nodes.push_back(std::move(Node));
+
+        fastgltf::Scene Scene{};
+        Scene.nodeIndices.push_back(0);
+        Asset.scenes.push_back(std::move(Scene));
+        Asset.defaultScene = 0;
+
+        fastgltf::Exporter Exporter;
+        auto ExportResult = Exporter.writeGltfBinary(Asset, fastgltf::ExportOptions::None);
+        Expect(static_cast<bool>(ExportResult), "Export gated triangle GLB");
+        if (!ExportResult)
+        {
+            return;
+        }
+
+        std::filesystem::create_directories(ExternalGlb.parent_path());
+        std::ofstream Output(ExternalGlb, std::ios::binary);
+        Output.write(
+            reinterpret_cast<const char*>(ExportResult->output.data()),
+            static_cast<std::streamsize>(ExportResult->output.size()));
+        Expect(static_cast<bool>(Output), "Write gated triangle GLB file");
+    }
+
+    Engine Eng;
+    Eng.InitializeHeadless(Root / "Content");
+
+    AssetMetadata Metadata{};
+    Metadata.Guid = Guid::Generate();
+    Metadata.Type = AssetType::Model;
+    SubAssetRecord MeshSub{};
+    MeshSub.Id = Guid::Generate();
+    MeshSub.Type = AssetType::StaticMesh;
+    MeshSub.Name = "Triangle";
+    MeshSub.Selector.Kind = "mesh";
+    MeshSub.Selector.Index = 0;
+    Metadata.SubAssets.push_back(MeshSub);
+
+    std::filesystem::create_directories(Root / "Content" / "Models");
+    std::filesystem::copy_file(
+        ExternalGlb,
+        Root / "Content" / "Models" / "GateTriangle.glb",
+        std::filesystem::copy_options::overwrite_existing);
+    AssetDiagnostic RegisterError = Eng.GetAssetRegistry().RegisterExistingAsset("Models/GateTriangle.glb", Metadata);
+    Expect(!RegisterError.HasError(), "Register gated model with StaticMesh subasset");
+
+    auto ReleaseFlag = std::make_shared<std::atomic<bool>>(false);
+    Eng.GetAssetManager().SetWorkerLoadReleaseFlag(ReleaseFlag);
+
+    AssetKey MeshKey{};
+    MeshKey.Asset = Metadata.Guid;
+    MeshKey.SubAsset = MeshSub.Id;
+    Eng.GetAssetManager().LoadAsync<StaticMeshResource>(MeshKey);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    Expect(Eng.GetAssetManager().GetLoadState(MeshKey) != AssetLoadState::Ready, "Load still gated before release");
+
+    ReleaseFlag->store(true, std::memory_order_release);
+    Eng.GetAssetManager().ClearWorkerLoadReleaseFlag();
+
+    Expect(PumpUntil(Eng, MeshKey, AssetLoadState::Ready), "StaticMesh subasset Ready after gate release");
+    AssetHandle<StaticMeshResource> Mesh;
+    Expect(Eng.GetAssetManager().TryGetLoaded(MeshKey, Mesh) && Mesh.IsValid(), "TryGetLoaded StaticMesh subasset");
+
+    AssetKey WholeKey{};
+    WholeKey.Asset = Metadata.Guid;
+    Eng.GetAssetManager().LoadAsync<ModelResource>(WholeKey);
+    Expect(PumpUntil(Eng, WholeKey, AssetLoadState::Ready), "Whole Model load Ready");
+    Eng.GetAssetManager().LoadAsync<StaticMeshResource>(MeshKey);
+    Expect(PumpUntil(Eng, MeshKey, AssetLoadState::Ready), "Repeated StaticMesh subasset request Ready");
+
+    Eng.Shutdown();
+}
+
+void TestAssetManagerLifetimeAndCancel(const std::filesystem::path& Root)
+{
+    std::cout << "\n=== AssetManager lifetime / cancel / fault ===\n";
+
+    WriteMinimalPng(Root / "Content" / "Textures" / "Life.png");
+
+    {
+        Engine Eng;
+        Eng.InitializeHeadless(Root / "Content");
+
+        AssetMetadata Metadata{};
+        Metadata.Guid = Guid::Generate();
+        Metadata.Type = AssetType::Texture;
+        Eng.GetAssetRegistry().RegisterExistingAsset("Textures/Life.png", Metadata);
+
+        auto ReleaseFlag = std::make_shared<std::atomic<bool>>(false);
+        Eng.GetAssetManager().SetWorkerLoadReleaseFlag(ReleaseFlag);
+
+        AssetKey Key{};
+        Key.Asset = Metadata.Guid;
+        Eng.GetAssetManager().LoadAsync<TextureResource>(Key);
+        Expect(Eng.GetAssetManager().GetLoadState(Key) != AssetLoadState::Ready, "Gated load not ready before release");
+
+        Eng.GetAssetManager().CancelLoad(Key);
+        ReleaseFlag->store(true, std::memory_order_release);
+        Expect(PumpUntil(Eng, Key, AssetLoadState::Cancelled), "CancelLoad observed as Cancelled");
+        Eng.GetAssetManager().ClearWorkerLoadReleaseFlag();
+
+        Eng.GetAssetManager().SetWorkerLoadFault([]()
+        {
+            throw std::runtime_error("injected loader fault");
+        });
+        Eng.GetAssetManager().LoadAsync<TextureResource>(Key);
+        Expect(PumpUntil(Eng, Key, AssetLoadState::Failed), "Loader exception becomes Failed");
+        const AssetDiagnostic FaultDiagnostic = Eng.GetAssetManager().GetLastDiagnostic(Key);
+        Expect(FaultDiagnostic.Code == AssetErrorCode::InternalError, "Fault diagnostic InternalError");
+        Eng.GetAssetManager().ClearWorkerLoadFault();
+
+        const uint64_t SessionBefore = Eng.GetAssetManager().GetSessionId();
+        Eng.GetAssetManager().Shutdown();
+        Eng.GetAssetManager().Initialize(Eng.GetAssetRegistry(), Eng.GetJobSystem());
+        Expect(Eng.GetAssetManager().GetSessionId() != SessionBefore, "Re-Initialize bumps session");
+
+        Eng.GetAssetManager().LoadAsync<TextureResource>(Key);
+        Expect(PumpUntil(Eng, Key, AssetLoadState::Ready), "Load after re-Initialize Ready");
+        Eng.Shutdown();
+    }
+
+    {
+        SetCurrentThreadRole(ThreadRole::Game);
+        JobSystem Jobs;
+        Jobs.Initialize(2);
+        AssetRegistry Registry;
+        Registry.SetGameContentRoot(Root / "Content");
+
+        AssetMetadata Metadata{};
+        Metadata.Guid = Guid::Generate();
+        Metadata.Type = AssetType::Texture;
+        Registry.RegisterExistingAsset("Textures/Life.png", Metadata);
+
+        auto ReleaseFlag = std::make_shared<std::atomic<bool>>(false);
+        {
+            AssetManager Manager;
+            Manager.Initialize(Registry, Jobs);
+            Manager.SetWorkerLoadReleaseFlag(ReleaseFlag);
+
+            AssetKey Key{};
+            Key.Asset = Metadata.Guid;
+            Manager.LoadAsync<TextureResource>(Key);
+
+            // Destructor/Shutdown must wait for outstanding workers while JobSystem stays alive.
+            ReleaseFlag->store(true, std::memory_order_release);
+        }
+        Expect(true, "AssetManager destructor with live JobSystem completed");
+        Jobs.Shutdown();
+    }
+
+    {
+        Engine Eng;
+        Eng.InitializeHeadless(Root / "Content");
+
+        AssetKey MissingTexture{};
+        MissingTexture.Asset = Guid::Generate();
+        const auto BrokenMaterialPath = Root / "Content" / "Materials" / "LifeBroken.material";
+        WriteMinimalMaterial(BrokenMaterialPath, MissingTexture);
+
+        AssetMetadata MaterialMeta{};
+        MaterialMeta.Guid = Guid::Generate();
+        MaterialMeta.Type = AssetType::Material;
+        Eng.GetAssetRegistry().RegisterExistingAsset("Materials/LifeBroken.material", MaterialMeta);
+
+        AssetKey MaterialKey{};
+        MaterialKey.Asset = MaterialMeta.Guid;
+        Eng.GetAssetManager().LoadAsync<MaterialResource>(MaterialKey);
+        Expect(PumpUntil(Eng, MaterialKey, AssetLoadState::Failed), "Dependency failure ends Material load");
+        Eng.Shutdown();
+    }
+}
+
 void TestHeadlessShutdown(const std::filesystem::path& Root)
 {
     std::cout << "\n=== Shutdown during load ===\n";
@@ -426,18 +719,61 @@ void TestHeadlessShutdown(const std::filesystem::path& Root)
 }
 }
 
+void TestForwardMaterial(const std::filesystem::path& Root)
+{
+    const auto Path = Root / "Forward.material";
+    MaterialLoader Loader;
+    AssetLoadContext Context;
+    Context.Entry.AbsolutePath = Path.string();
+    auto Load = [&](const nlohmann::json& Document)
+    {
+        {
+            std::ofstream Output(Path);
+            Output << Document.dump();
+        }
+        AssetDiagnostic Diagnostic;
+        return std::static_pointer_cast<const MaterialResource>(Loader.Load(Context, Diagnostic));
+    };
+    nlohmann::json Document = {{"schemaVersion", 1}, {"metallic", 0.7}, {"roughness", 0.2},
+        {"alphaMode", "BLEND"}, {"baseColor", {0.2, 0.4, 0.8, 0.3}}, {"doubleSided", true},
+        {"emissive", {4.0, 1.0, 0.0}}, {"castShadows", false}};
+    const auto Material = Load(Document);
+    Expect(Material && Material->AlphaMode == MaterialAlphaMode::Blend
+        && Material->bDoubleSided && !Material->bCastShadows
+        && Material->Emissive.x == 4.f, "Forward material fields survive loading");
+    Document["alphaMode"] = "MASK";
+    Document["alphaCutoff"] = 0.6;
+    const auto Mask = Load(Document);
+    Expect(Mask && Mask->AlphaMode == MaterialAlphaMode::Mask
+        && Mask->AlphaCutoff == 0.6f, "Alpha mask contract");
+    Document["roughness"] = -1.0;
+    Expect(!Load(Document), "Negative roughness rejected");
+    Document["roughness"] = "invalid";
+    Expect(!Load(Document), "Invalid factor type rejected");
+    Document["roughness"] = 0.5;
+    Document["alphaMode"] = "unknown";
+    Expect(!Load(Document), "Unknown alpha mode rejected");
+    const auto Default = Load({{"schemaVersion", 1}});
+    Expect(Default && Default->AlphaMode == MaterialAlphaMode::Opaque,
+        "Existing material schema keeps opaque defaults");
+}
+
 int main()
 {
     SetCurrentThreadRole(ThreadRole::Game);
     SetCurrentThreadDebugName("Game Thread");
 
     const std::filesystem::path Root = MakeTempRoot();
+    TestForwardMaterial(Root);
     std::cout << "AssetSystem test root: " << Root.string() << '\n';
 
     TestGuidAndMeta(Root);
     TestRegistry(Root);
+    TestAssetLoadContextOwnsSubAssetByValue();
     TestImportAndLoad(Root);
     TestGlbCreateImportAndLoad(Root);
+    TestSubAssetLoadAfterProducerReturns(Root);
+    TestAssetManagerLifetimeAndCancel(Root);
     TestHeadlessShutdown(Root);
 
     std::cout << "\nFailures: " << FailureCount << '\n';

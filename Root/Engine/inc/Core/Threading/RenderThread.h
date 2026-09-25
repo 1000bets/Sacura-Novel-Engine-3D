@@ -9,13 +9,24 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
+#include <unordered_map>
 
 class Renderer;
+
+enum class RenderThreadState : uint8_t
+{
+    Stopped = 0,
+    Starting,
+    Ready,
+    Failed,
+    Stopping
+};
 
 class RenderThread
 {
@@ -32,12 +43,20 @@ public:
         GraphicsBackend BackendPreference = GraphicsBackend::Auto);
     void Stop();
 
+    RenderThreadState GetState() const;
     bool IsReady() const;
-    void WaitUntilReady() const;
+    bool HasFailed() const;
+    const std::string& GetLastError() const;
+    bool WaitUntilReady() const;
 
-    void Enqueue(RenderCommandQueue::Command Work);
+    RenderCommandEnqueueResult Enqueue(RenderCommandQueue::Command Work);
     bool SubmitFrame(std::unique_ptr<RenderFrameData> Frame);
+    uint64_t GetRetirementValue() const { return LastSubmittedFrame.load(std::memory_order_acquire) + 1; }
+    RenderStatistics GetStatistics(RenderSurfaceId Surface) const;
     void ResizeRenderer(uint32_t Width, uint32_t Height);
+    bool AttachSurface(RenderSurfaceId Surface, const NativeWindowInfo& WindowInfo);
+    void DetachSurface(RenderSurfaceId Surface);
+    void ResizeSurface(RenderSurfaceId Surface, uint32_t Width, uint32_t Height);
 
     MeshHandle GetDefaultMesh() const { return DefaultMesh; }
 
@@ -50,6 +69,7 @@ private:
     void ThreadMain();
     void ProcessPendingCommands();
     void RenderFrame(const RenderFrameData& Frame);
+    void SetState(RenderThreadState NewState);
 
     static RenderThread* Instance;
 
@@ -57,16 +77,19 @@ private:
     RenderFrameQueue FrameQueue;
 
     std::thread Thread;
-    std::atomic<bool> bRunning{false};
-    std::atomic<bool> bReady{false};
+    std::atomic<RenderThreadState> State{RenderThreadState::Stopped};
     std::atomic<bool> bStopRequested{false};
 
     mutable std::mutex ReadyMutex;
     mutable std::condition_variable ReadyCondition;
+    std::string LastError;
 
     NativeWindowInfo WindowInfo{};
     std::string ShaderDirectory;
     GraphicsBackend BackendPreference = GraphicsBackend::Auto;
     std::unique_ptr<Renderer> OwnedRenderer;
     MeshHandle DefaultMesh{};
+    std::atomic<uint64_t> LastSubmittedFrame{0};
+    mutable std::mutex StatisticsMutex;
+    std::unordered_map<uint32_t, RenderStatistics> PublishedStatistics;
 };

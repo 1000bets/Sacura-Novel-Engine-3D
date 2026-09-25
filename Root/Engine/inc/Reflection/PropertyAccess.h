@@ -56,4 +56,13 @@ struct PropertyAccess
         const PropertyDescriptor& Descriptor,
         const ReflectedValue& InValue,
         PropertyAccessContext Context = PropertyAccessContext::Default);
+
+    static ReflectionDiagnostic CopyPropertiesFrom(
+        Object* Source,
+        Object* Destination,
+        PropertyAccessContext Context = PropertyAccessContext::Deserialize);
+
+    static ReflectionDiagnostic ResetToClassDefaults(
+        Object* Instance,
+        PropertyAccessContext Context = PropertyAccessContext::Deserialize);
 };

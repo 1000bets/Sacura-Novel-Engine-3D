@@ -7,25 +7,9 @@
 #include "Gameplay/LightComponent.h"
 #include "Gameplay/MeshRendererComponent.h"
 
-#include <vector>
-
 Matrix SceneExtractor::ComputeWorldMatrix(const GameObject& Object) const
 {
-    std::vector<const GameObject*> Chain;
-    const GameObject* Current = &Object;
-    while (Current != nullptr)
-    {
-        Chain.push_back(Current);
-        Current = Current->GetParent();
-    }
-
-    Matrix World = Matrix::Identity;
-    for (auto Iterator = Chain.rbegin(); Iterator != Chain.rend(); ++Iterator)
-    {
-        World = (*Iterator)->GetTransform().GetMatrix() * World;
-    }
-
-    return World;
+    return Object.GetWorldMatrix();
 }
 
 void SceneExtractor::Extract(const Scene& SourceScene, RenderScene& Output) const
@@ -42,7 +26,7 @@ void SceneExtractor::ExtractRenderableObjects(const Scene& SourceScene, RenderSc
 {
     for (GameObject* Object : SourceScene.GetAllObjects())
     {
-        if (Object == nullptr || !Object->IsActive() || !Object->IsVisual())
+        if (Object == nullptr || !Object->IsActiveInHierarchy() || !Object->IsVisual())
         {
             continue;
         }
@@ -57,8 +41,17 @@ void SceneExtractor::ExtractRenderableObjects(const Scene& SourceScene, RenderSc
         Extracted.WorldMatrix = ComputeWorldMatrix(*Object);
         Extracted.Mesh = MeshRenderer->Mesh;
         Extracted.Material = MeshRenderer->Material;
+        Extracted.SurfaceMaterial = MeshRenderer->SurfaceMaterial;
+        Extracted.BaseColorTexture = MeshRenderer->BaseColorTexture;
+        Extracted.BaseColor = MeshRenderer->BaseColorFactor;
         Extracted.Bounds = MeshRenderer->LocalBounds.TransformedBy(Extracted.WorldMatrix);
         Extracted.bVisible = true;
+        Extracted.bMissingAsset = MeshRenderer->bMissingAsset;
+        Extracted.bUsePlaceholder = MeshRenderer->bMissingAsset || (MeshRenderer->bPendingAsset && !MeshRenderer->Mesh.IsValid());
+        if (MeshRenderer->bMissingAsset)
+        {
+            Extracted.DiagnosticMessage = "Missing or failed mesh asset on '" + Object->GetName() + "'";
+        }
         Output.Objects.push_back(Extracted);
     }
 }
@@ -70,7 +63,7 @@ void SceneExtractor::ExtractCamera(const Scene& SourceScene, RenderScene& Output
 
     for (GameObject* Object : SourceScene.GetAllObjects())
     {
-        if (Object == nullptr || !Object->IsActive())
+        if (Object == nullptr || !Object->IsActiveInHierarchy())
         {
             continue;
         }
@@ -98,10 +91,10 @@ void SceneExtractor::ExtractCamera(const Scene& SourceScene, RenderScene& Output
         return;
     }
 
-    const Transform& CameraTransform = PrimaryOwner->GetTransform();
-    const Vector3 Position = CameraTransform.Position;
-    const Vector3 Forward = CameraTransform.GetForward();
-    const Vector3 Up = CameraTransform.GetUp();
+    // Cameras use world position/orientation; non-uniform parent scale is dropped via rotation extract.
+    const Vector3 Position = PrimaryOwner->GetWorldPosition();
+    const Vector3 Forward = PrimaryOwner->GetWorldForward();
+    const Vector3 Up = PrimaryOwner->GetWorldUp();
 
     RenderCamera& Camera = Output.Camera;
     Camera.Position = Position;
@@ -123,7 +116,7 @@ void SceneExtractor::ExtractLights(const Scene& SourceScene, RenderScene& Output
 {
     for (GameObject* Object : SourceScene.GetAllObjects())
     {
-        if (Object == nullptr || !Object->IsActive())
+        if (Object == nullptr || !Object->IsActiveInHierarchy())
         {
             continue;
         }
@@ -134,12 +127,10 @@ void SceneExtractor::ExtractLights(const Scene& SourceScene, RenderScene& Output
             continue;
         }
 
-        const Transform& LightTransform = Object->GetTransform();
-
         RenderLight Extracted;
         Extracted.Type = Light->Type;
-        Extracted.Position = LightTransform.Position;
-        Extracted.Direction = LightTransform.GetForward();
+        Extracted.Position = Object->GetWorldPosition();
+        Extracted.Direction = Object->GetWorldForward();
         Extracted.LightColor = Light->LightColor;
         Extracted.Intensity = Light->Intensity;
         Extracted.Range = Light->Range;

@@ -3,6 +3,7 @@
 #include "Gameplay/CameraComponent.h"
 #include "Gameplay/GameObject.h"
 #include "Gameplay/LightSettings.h"
+#include "Gameplay/MeshRendererComponent.h"
 #include "Reflection/PendingRegistry.h"
 #include "Reflection/PropertyAccess.h"
 #include "Reflection/ReflectionSubsystem.h"
@@ -65,6 +66,30 @@ int main()
         Expect(HasProperty(CameraClass, "aspect_ratio"), "Camera aspect_ratio field");
         Expect(HasProperty(CameraClass, "primary"), "Camera primary field");
         Expect(CameraClass->GetProperties().size() == 5, "Camera property count");
+    }
+
+    Class* MeshRendererClass = Reflection.FindClass("engine.MeshRendererComponent");
+    Expect(MeshRendererClass != nullptr, "FindClass MeshRendererComponent");
+    if (MeshRendererClass != nullptr)
+    {
+        const PropertyDescriptor* MeshAssetProperty = MeshRendererClass->FindProperty(PropertyId{"mesh_asset_id"});
+        const PropertyDescriptor* MeshSubAssetProperty = MeshRendererClass->FindProperty(PropertyId{"mesh_sub_asset_id"});
+        const PropertyDescriptor* MaterialAssetProperty = MeshRendererClass->FindProperty(PropertyId{"material_asset_id"});
+        Expect(
+            MeshAssetProperty != nullptr
+                && std::string(MeshAssetProperty->Attributes.AssetTypeFilter) == "StaticMesh",
+            "Mesh asset property filters StaticMesh assets");
+        Expect(
+            MeshAssetProperty != nullptr
+                && std::string(MeshAssetProperty->Attributes.CompanionProperty) == "mesh_sub_asset_id",
+            "Mesh asset property identifies its subasset companion");
+        Expect(
+            MeshSubAssetProperty != nullptr && MeshSubAssetProperty->Attributes.bEditorHidden,
+            "Mesh subasset implementation property is hidden in editor");
+        Expect(
+            MaterialAssetProperty != nullptr
+                && std::string(MaterialAssetProperty->Attributes.AssetTypeFilter) == "Material",
+            "Material asset property filters Material assets");
     }
 
     TypeDescriptor* LightType = Reflection.FindType("engine.LightSettings");
@@ -138,6 +163,18 @@ int main()
         Component* Attached = Reflection.CreateComponent(*Owner, TypeId{"engine.CameraComponent"});
         Expect(Attached != nullptr, "CreateComponent attaches");
         Expect(Owner->GetComponent<CameraComponent>() == Attached, "Component owned by GameObject");
+        Expect(Attached->GetClass() == CameraClass, "CreateComponent Class assigned");
+
+        GameObject* TypedOwner = Memory->NewObject<GameObject>("AddComponentOwner");
+        CameraComponent* Added = TypedOwner->AddComponent<CameraComponent>();
+        Expect(Added != nullptr, "AddComponent CameraComponent");
+        Expect(Added->GetClass() == CameraClass, "AddComponent assigns Class");
+        ReflectedValue AddedFov;
+        ReflectionDiagnostic GetAddedFov = PropertyAccess::GetProperty(Added, PropertyId{"field_of_view"}, AddedFov);
+        Expect(GetAddedFov.bOk && AddedFov.Float64Value == 60.0, "AddComponent uses CDO defaults");
+        ReflectionDiagnostic ResetAdded = PropertyAccess::ResetToClassDefaults(Added);
+        Expect(ResetAdded.bOk, "ResetToClassDefaults");
+        Memory->DestroyObject(TypedOwner);
         Memory->DestroyObject(Owner);
     }
 

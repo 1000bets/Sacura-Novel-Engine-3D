@@ -6,6 +6,8 @@
 #include "Assets/Resources/TextureResource.h"
 #include "Rendering/RenderResourceHandles.h"
 
+#include <atomic>
+#include <cstdint>
 #include <mutex>
 #include <unordered_map>
 
@@ -14,7 +16,8 @@ enum class AssetGpuState
     Absent = 0,
     UploadQueued,
     Resident,
-    Failed
+    Failed,
+    Cancelled
 };
 
 struct AssetGpuMeshEntry
@@ -22,6 +25,7 @@ struct AssetGpuMeshEntry
     AssetGpuState State = AssetGpuState::Absent;
     MeshHandle Mesh{};
     AssetDiagnostic Diagnostic = AssetDiagnostic::Ok();
+    uint64_t SessionId = 0;
 };
 
 struct AssetGpuTextureEntry
@@ -29,6 +33,7 @@ struct AssetGpuTextureEntry
     AssetGpuState State = AssetGpuState::Absent;
     TextureHandle Texture{};
     AssetDiagnostic Diagnostic = AssetDiagnostic::Ok();
+    uint64_t SessionId = 0;
 };
 
 class AssetGpuUploader
@@ -43,9 +48,11 @@ public:
     bool TryGetTexture(const AssetKey& Key, TextureHandle& OutTexture) const;
 
     void Clear();
+    uint64_t GetSessionId() const { return SessionId.load(std::memory_order_acquire); }
 
 private:
     mutable std::mutex Mutex;
     std::unordered_map<AssetKey, AssetGpuMeshEntry, AssetKeyHash> Meshes;
     std::unordered_map<AssetKey, AssetGpuTextureEntry, AssetKeyHash> Textures;
+    std::atomic<uint64_t> SessionId{1};
 };

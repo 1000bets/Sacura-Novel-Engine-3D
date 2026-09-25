@@ -5,15 +5,28 @@
 #include "Assets/AssetTypes.h"
 
 #include <memory>
+#include <optional>
 #include <vector>
 
 struct AssetLoadContext
 {
     const AssetRegistry* Registry = nullptr;
     AssetRegistryEntry Entry{};
-    const SubAssetRecord* SubAsset = nullptr;
+    std::optional<SubAssetRecord> SubAsset{};
     AssetKey Key{};
 };
+
+inline void BindLoadContextSubAsset(AssetLoadContext& Context, const SubAssetRecord* ResolvedSubAsset)
+{
+    if (ResolvedSubAsset != nullptr)
+    {
+        Context.SubAsset = *ResolvedSubAsset;
+    }
+    else
+    {
+        Context.SubAsset.reset();
+    }
+}
 
 class IAssetLoader
 {

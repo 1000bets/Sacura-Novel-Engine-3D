@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "guid": "a8b01056-31d8-5832-832b-bef841650a0d",
+  "assetType": "Model",
+  "sourceFingerprint": "b1236d7f021f4839",
+  "loadSettings": {},
+  "importInfo": {},
+  "subAssets": [
+    {
+      "id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+      "type": "StaticMesh",
+      "name": "Sphere",
+      "selector": {
+        "kind": "mesh",
+        "index": 0
+      }
+    }
+  ]
+}

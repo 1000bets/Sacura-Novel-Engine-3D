@@ -78,6 +78,9 @@ compile_commands.json
 # vcpkg
 vcpkg_installed/
 
+# Local CMake user presets (machine-specific Qt/Python paths)
+CMakeUserPresets.json
+
 # debug information files
 *.dwo
 
@@ -91,3 +94,5 @@ Scripts/PackEngineSourceApp/build/
 Scripts/PackEngineSourceApp/dist/
 Scripts/PackEngineSourceApp/*.spec
 Scripts/PackEngineSourceApp/PackEngineSourceApp.exe
+
+/Root/Engine/ThirdParty/Qt/

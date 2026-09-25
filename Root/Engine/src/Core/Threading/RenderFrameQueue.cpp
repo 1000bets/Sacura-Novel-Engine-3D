@@ -76,6 +76,21 @@ void RenderFrameQueue::RequestShutdown()
     ConsumerCondition.notify_all();
 }
 
+void RenderFrameQueue::ResetForReuse()
+{
+    {
+        std::lock_guard<std::mutex> Lock(Mutex);
+        bShutdownRequested = false;
+        while (!Frames.empty())
+        {
+            Frames.pop();
+        }
+    }
+
+    ProducerCondition.notify_all();
+    ConsumerCondition.notify_all();
+}
+
 void RenderFrameQueue::NotifyWake()
 {
     ConsumerCondition.notify_one();

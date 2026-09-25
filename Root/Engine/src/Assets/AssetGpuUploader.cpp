@@ -1,8 +1,8 @@
 #include "Assets/AssetGpuUploader.h"
 #include "Core/Threading/RenderThread.h"
 #include "Core/Threading/ThreadContext.h"
-#include "Rendering/Renderer.h"
-#include "Rendering/Resources/RenderResourceManager.h"
+#include "Rendering/RHI/Renderer.h"
+#include "Rendering/RHI/RenderResourceManager.h"
 
 void AssetGpuUploader::RequestUploadMesh(AssetHandle<StaticMeshResource> Mesh, const AssetKey& Key)
 {
@@ -11,6 +11,8 @@ void AssetGpuUploader::RequestUploadMesh(AssetHandle<StaticMeshResource> Mesh, c
     {
         return;
     }
+
+    const uint64_t CapturedSession = SessionId.load(std::memory_order_acquire);
 
     {
         std::lock_guard<std::mutex> Lock(Mutex);
@@ -22,24 +24,33 @@ void AssetGpuUploader::RequestUploadMesh(AssetHandle<StaticMeshResource> Mesh, c
         Entry.State = AssetGpuState::UploadQueued;
         Entry.Diagnostic = AssetDiagnostic::Ok();
         Entry.Mesh = MeshHandle{};
+        Entry.SessionId = CapturedSession;
     }
 
     RenderThread* Thread = RenderThread::Get();
-    if (Thread == nullptr)
+    if (Thread == nullptr || !Thread->IsReady())
     {
         std::lock_guard<std::mutex> Lock(Mutex);
         AssetGpuMeshEntry& Entry = Meshes[Key];
-        Entry.State = AssetGpuState::Failed;
-        Entry.Diagnostic = AssetDiagnostic::Fail(
-            AssetErrorCode::GpuUploadFailed,
-            "AssetGpuUploader",
-            "RenderThread is not available",
-            Key);
+        if (Entry.SessionId == CapturedSession)
+        {
+            Entry.State = AssetGpuState::Failed;
+            Entry.Diagnostic = AssetDiagnostic::Fail(
+                AssetErrorCode::GpuUploadFailed,
+                "AssetGpuUploader",
+                "RenderThread is not available",
+                Key);
+        }
         return;
     }
 
-    Thread->Enqueue([this, Mesh, Key]()
+    const RenderCommandEnqueueResult EnqueueResult = Thread->Enqueue([this, Mesh, Key, CapturedSession]()
     {
+        if (CapturedSession != SessionId.load(std::memory_order_acquire))
+        {
+            return;
+        }
+
         Renderer* OwnedRenderer = RenderThread::Get() != nullptr ? RenderThread::Get()->GetRenderer() : nullptr;
         MeshHandle Created{};
         AssetDiagnostic Diagnostic = AssetDiagnostic::Ok();
@@ -65,19 +76,43 @@ void AssetGpuUploader::RequestUploadMesh(AssetHandle<StaticMeshResource> Mesh, c
         }
 
         std::lock_guard<std::mutex> Lock(Mutex);
-        AssetGpuMeshEntry& Entry = Meshes[Key];
+        auto Iterator = Meshes.find(Key);
+        if (Iterator == Meshes.end() || Iterator->second.SessionId != CapturedSession)
+        {
+            if (Created.IsValid() && OwnedRenderer != nullptr)
+            {
+                OwnedRenderer->GetResources().ReleaseMesh(Created, RenderThread::Get()->GetRetirementValue());
+            }
+            return;
+        }
+
         if (Created.IsValid())
         {
-            Entry.State = AssetGpuState::Resident;
-            Entry.Mesh = Created;
-            Entry.Diagnostic = AssetDiagnostic::Ok();
+            Iterator->second.State = AssetGpuState::Resident;
+            Iterator->second.Mesh = Created;
+            Iterator->second.Diagnostic = AssetDiagnostic::Ok();
         }
         else
         {
-            Entry.State = AssetGpuState::Failed;
-            Entry.Diagnostic = Diagnostic;
+            Iterator->second.State = AssetGpuState::Failed;
+            Iterator->second.Diagnostic = Diagnostic;
         }
     });
+
+    if (EnqueueResult != RenderCommandEnqueueResult::Accepted)
+    {
+        std::lock_guard<std::mutex> Lock(Mutex);
+        AssetGpuMeshEntry& Entry = Meshes[Key];
+        if (Entry.SessionId == CapturedSession)
+        {
+            Entry.State = AssetGpuState::Failed;
+            Entry.Diagnostic = AssetDiagnostic::Fail(
+                AssetErrorCode::GpuUploadFailed,
+                "AssetGpuUploader",
+                "Render command enqueue rejected",
+                Key);
+        }
+    }
 }
 
 void AssetGpuUploader::RequestUploadTexture(AssetHandle<TextureResource> Texture, const AssetKey& Key)
@@ -87,6 +122,8 @@ void AssetGpuUploader::RequestUploadTexture(AssetHandle<TextureResource> Texture
     {
         return;
     }
+
+    const uint64_t CapturedSession = SessionId.load(std::memory_order_acquire);
 
     {
         std::lock_guard<std::mutex> Lock(Mutex);
@@ -98,24 +135,33 @@ void AssetGpuUploader::RequestUploadTexture(AssetHandle<TextureResource> Texture
         Entry.State = AssetGpuState::UploadQueued;
         Entry.Diagnostic = AssetDiagnostic::Ok();
         Entry.Texture = TextureHandle{};
+        Entry.SessionId = CapturedSession;
     }
 
     RenderThread* Thread = RenderThread::Get();
-    if (Thread == nullptr)
+    if (Thread == nullptr || !Thread->IsReady())
     {
         std::lock_guard<std::mutex> Lock(Mutex);
         AssetGpuTextureEntry& Entry = Textures[Key];
-        Entry.State = AssetGpuState::Failed;
-        Entry.Diagnostic = AssetDiagnostic::Fail(
-            AssetErrorCode::GpuUploadFailed,
-            "AssetGpuUploader",
-            "RenderThread is not available",
-            Key);
+        if (Entry.SessionId == CapturedSession)
+        {
+            Entry.State = AssetGpuState::Failed;
+            Entry.Diagnostic = AssetDiagnostic::Fail(
+                AssetErrorCode::GpuUploadFailed,
+                "AssetGpuUploader",
+                "RenderThread is not available",
+                Key);
+        }
         return;
     }
 
-    Thread->Enqueue([this, Texture, Key]()
+    const RenderCommandEnqueueResult EnqueueResult = Thread->Enqueue([this, Texture, Key, CapturedSession]()
     {
+        if (CapturedSession != SessionId.load(std::memory_order_acquire))
+        {
+            return;
+        }
+
         Renderer* OwnedRenderer = RenderThread::Get() != nullptr ? RenderThread::Get()->GetRenderer() : nullptr;
         TextureHandle Created{};
         AssetDiagnostic Diagnostic = AssetDiagnostic::Ok();
@@ -141,19 +187,43 @@ void AssetGpuUploader::RequestUploadTexture(AssetHandle<TextureResource> Texture
         }
 
         std::lock_guard<std::mutex> Lock(Mutex);
-        AssetGpuTextureEntry& Entry = Textures[Key];
+        auto Iterator = Textures.find(Key);
+        if (Iterator == Textures.end() || Iterator->second.SessionId != CapturedSession)
+        {
+            if (Created.IsValid() && OwnedRenderer != nullptr)
+            {
+                OwnedRenderer->GetResources().ReleaseTexture(Created, RenderThread::Get()->GetRetirementValue());
+            }
+            return;
+        }
+
         if (Created.IsValid())
         {
-            Entry.State = AssetGpuState::Resident;
-            Entry.Texture = Created;
-            Entry.Diagnostic = AssetDiagnostic::Ok();
+            Iterator->second.State = AssetGpuState::Resident;
+            Iterator->second.Texture = Created;
+            Iterator->second.Diagnostic = AssetDiagnostic::Ok();
         }
         else
         {
-            Entry.State = AssetGpuState::Failed;
-            Entry.Diagnostic = Diagnostic;
+            Iterator->second.State = AssetGpuState::Failed;
+            Iterator->second.Diagnostic = Diagnostic;
         }
     });
+
+    if (EnqueueResult != RenderCommandEnqueueResult::Accepted)
+    {
+        std::lock_guard<std::mutex> Lock(Mutex);
+        AssetGpuTextureEntry& Entry = Textures[Key];
+        if (Entry.SessionId == CapturedSession)
+        {
+            Entry.State = AssetGpuState::Failed;
+            Entry.Diagnostic = AssetDiagnostic::Fail(
+                AssetErrorCode::GpuUploadFailed,
+                "AssetGpuUploader",
+                "Render command enqueue rejected",
+                Key);
+        }
+    }
 }
 
 AssetGpuState AssetGpuUploader::GetMeshState(const AssetKey& Key) const
@@ -204,7 +274,43 @@ bool AssetGpuUploader::TryGetTexture(const AssetKey& Key, TextureHandle& OutText
 
 void AssetGpuUploader::Clear()
 {
-    std::lock_guard<std::mutex> Lock(Mutex);
-    Meshes.clear();
-    Textures.clear();
+    std::vector<MeshHandle> ReleasedMeshes;
+    std::vector<TextureHandle> ReleasedTextures;
+    {
+        std::lock_guard<std::mutex> Lock(Mutex);
+        SessionId.fetch_add(1, std::memory_order_acq_rel);
+        for (const auto& Entry : Meshes)
+        {
+            if (Entry.second.Mesh.IsValid())
+            {
+                ReleasedMeshes.push_back(Entry.second.Mesh);
+            }
+        }
+        for (const auto& Entry : Textures)
+        {
+            if (Entry.second.Texture.IsValid())
+            {
+                ReleasedTextures.push_back(Entry.second.Texture);
+            }
+        }
+        Meshes.clear();
+        Textures.clear();
+    }
+    RenderThread* Thread = RenderThread::Get();
+    if (Thread != nullptr && Thread->IsReady())
+    {
+        const uint64_t CompletionValue = Thread->GetRetirementValue();
+        Thread->Enqueue([Thread, CompletionValue, ReleasedMeshes = std::move(ReleasedMeshes), ReleasedTextures = std::move(ReleasedTextures)]()
+        {
+            auto& Resources = Thread->GetRenderer()->GetResources();
+            for (MeshHandle Mesh : ReleasedMeshes)
+            {
+                Resources.ReleaseMesh(Mesh, CompletionValue);
+            }
+            for (TextureHandle Texture : ReleasedTextures)
+            {
+                Resources.ReleaseTexture(Texture, CompletionValue);
+            }
+        });
+    }
 }

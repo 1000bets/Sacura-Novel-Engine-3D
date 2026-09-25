@@ -499,7 +499,7 @@ std::shared_ptr<const void> ModelLoader::Load(const AssetLoadContext& Context, A
         return nullptr;
     }
 
-    if (Context.SubAsset != nullptr)
+    if (Context.SubAsset.has_value())
     {
         if (Context.SubAsset->Type == AssetType::StaticMesh)
         {

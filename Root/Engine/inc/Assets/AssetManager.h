@@ -17,7 +17,10 @@
 #include "Assets/Resources/TextureResource.h"
 #include "Core/Threading/JobSystem.h"
 
+#include <atomic>
 #include <cstdint>
+#include <functional>
+#include <memory>
 #include <mutex>
 #include <queue>
 #include <type_traits>
@@ -38,6 +41,11 @@ class AssetManager
 {
 public:
     AssetManager();
+    ~AssetManager();
+
+    AssetManager(const AssetManager&) = delete;
+    AssetManager& operator=(const AssetManager&) = delete;
+
     void Initialize(AssetRegistry& Registry, JobSystem& Jobs);
     void Shutdown();
 
@@ -50,30 +58,21 @@ public:
     AssetLoadState GetLoadState(const AssetKey& Key) const;
     AssetDiagnostic GetLastDiagnostic(const AssetKey& Key) const;
 
+    void CancelLoad(const AssetKey& Key);
     void PumpCompletions();
     void UnloadUnused();
 
+    uint64_t GetSessionId() const { return SessionId.load(std::memory_order_acquire); }
+
+    // Test seam: when set, worker jobs spin until the flag becomes true before calling Load.
+    void SetWorkerLoadReleaseFlag(std::shared_ptr<std::atomic<bool>> ReleaseFlag);
+    void ClearWorkerLoadReleaseFlag();
+
+    // Test seam: invoked on the worker before Load; may throw to simulate loader faults.
+    void SetWorkerLoadFault(std::function<void()> Fault);
+    void ClearWorkerLoadFault();
+
 private:
-    struct SlotKey
-    {
-        AssetKey Key{};
-        uint64_t Generation = 0;
-
-        bool operator==(const SlotKey& Other) const
-        {
-            return Key == Other.Key && Generation == Other.Generation;
-        }
-    };
-
-    struct SlotKeyHash
-    {
-        size_t operator()(const SlotKey& Value) const
-        {
-            AssetKeyHash HashKey;
-            return HashKey(Value.Key) ^ (static_cast<size_t>(Value.Generation) * 0x9e3779b97f4a7c15ull);
-        }
-    };
-
     struct AssetSlot
     {
         AssetKey Key{};
@@ -85,12 +84,14 @@ private:
         std::vector<AssetKey> PendingDependencies;
         std::vector<AssetKey> WaitingParents;
         bool bCancelRequested = false;
+        std::shared_ptr<std::atomic<bool>> CancelFlag = std::make_shared<std::atomic<bool>>(false);
     };
 
     struct CompletionEvent
     {
         AssetKey Key{};
         uint64_t Generation = 0;
+        uint64_t SessionId = 0;
         AssetLoadState State = AssetLoadState::Failed;
         std::shared_ptr<const void> Resource;
         AssetDiagnostic Diagnostic = AssetDiagnostic::Ok();
@@ -107,6 +108,7 @@ private:
     AssetType ResolveExpectedType(const AssetKey& Key) const;
     AssetSlot* FindSlot(const AssetKey& Key);
     const AssetSlot* FindSlot(const AssetKey& Key) const;
+    void ResetOutstandingLoadsGroup();
 
     template <typename ResourceType>
     static AssetType ResourceAssetType();
@@ -114,6 +116,8 @@ private:
     AssetRegistry* Registry = nullptr;
     JobSystem* Jobs = nullptr;
     bool bInitialized = false;
+    std::atomic<bool> bAcceptingLoads{false};
+    std::atomic<uint64_t> SessionId{0};
 
     ModelLoader ModelLoaderInstance;
     TextureLoader TextureLoaderInstance;
@@ -126,6 +130,13 @@ private:
 
     std::mutex CompletionMutex;
     std::queue<CompletionEvent> Completions;
+
+    JobGroup OutstandingLoads;
+    std::shared_ptr<std::atomic<bool>> SessionCancelFlag;
+
+    std::shared_ptr<std::atomic<bool>> WorkerLoadReleaseFlag;
+    std::function<void()> WorkerLoadFault;
+    std::mutex WorkerLoadFaultMutex;
 };
 
 template <typename ResourceType>

@@ -2,18 +2,67 @@
 #include "Core/Threading/ThreadContext.h"
 
 #include <algorithm>
+#include <chrono>
+#include <exception>
 #include <functional>
+#include <string>
+#include <thread>
+#include <utility>
 
 AssetManager::AssetManager()
     : SkeletalLoaderInstance(ModelLoaderInstance)
 {
 }
 
+AssetManager::~AssetManager()
+{
+    if (bInitialized)
+    {
+        Shutdown();
+    }
+}
+
+void AssetManager::SetWorkerLoadReleaseFlag(std::shared_ptr<std::atomic<bool>> ReleaseFlag)
+{
+    WorkerLoadReleaseFlag = std::move(ReleaseFlag);
+}
+
+void AssetManager::ClearWorkerLoadReleaseFlag()
+{
+    WorkerLoadReleaseFlag.reset();
+}
+
+void AssetManager::SetWorkerLoadFault(std::function<void()> Fault)
+{
+    std::lock_guard<std::mutex> Lock(WorkerLoadFaultMutex);
+    WorkerLoadFault = std::move(Fault);
+}
+
+void AssetManager::ClearWorkerLoadFault()
+{
+    std::lock_guard<std::mutex> Lock(WorkerLoadFaultMutex);
+    WorkerLoadFault = nullptr;
+}
+
+void AssetManager::ResetOutstandingLoadsGroup()
+{
+    OutstandingLoads = JobGroup{};
+}
+
 void AssetManager::Initialize(AssetRegistry& InRegistry, JobSystem& InJobs)
 {
     AssertGameThread();
+    if (bInitialized)
+    {
+        Shutdown();
+    }
+
     Registry = &InRegistry;
     Jobs = &InJobs;
+    SessionCancelFlag = std::make_shared<std::atomic<bool>>(false);
+    ResetOutstandingLoadsGroup();
+    SessionId.fetch_add(1, std::memory_order_acq_rel);
+    bAcceptingLoads.store(true, std::memory_order_release);
     bInitialized = true;
     PrintString("AssetManager: initialized");
 }
@@ -26,17 +75,35 @@ void AssetManager::Shutdown()
         return;
     }
 
+    bAcceptingLoads.store(false, std::memory_order_release);
+    if (SessionCancelFlag)
+    {
+        SessionCancelFlag->store(true, std::memory_order_release);
+    }
+
     {
         std::lock_guard<std::mutex> Lock(SlotsMutex);
         for (auto& Pair : Slots)
         {
             Pair.second.bCancelRequested = true;
+            if (Pair.second.CancelFlag)
+            {
+                Pair.second.CancelFlag->store(true, std::memory_order_release);
+            }
             if (Pair.second.State == AssetLoadState::Queued || Pair.second.State == AssetLoadState::Loading)
             {
                 Pair.second.State = AssetLoadState::Cancelled;
+                Pair.second.Diagnostic = AssetDiagnostic::Fail(
+                    AssetErrorCode::Cancelled,
+                    "AssetManager",
+                    "Load cancelled by shutdown",
+                    Pair.second.Key);
             }
         }
     }
+
+    OutstandingLoads.Wait();
+    ResetOutstandingLoadsGroup();
 
     PumpCompletions();
 
@@ -55,10 +122,39 @@ void AssetManager::Shutdown()
     }
 
     ModelLoaderInstance.ClearSharedDocuments();
+    ClearWorkerLoadReleaseFlag();
+    ClearWorkerLoadFault();
+    SessionCancelFlag.reset();
+    SessionId.fetch_add(1, std::memory_order_acq_rel);
     Registry = nullptr;
     Jobs = nullptr;
     bInitialized = false;
     PrintString("AssetManager: shutdown");
+}
+
+void AssetManager::CancelLoad(const AssetKey& Key)
+{
+    AssertGameThread();
+    std::lock_guard<std::mutex> Lock(SlotsMutex);
+    AssetSlot* Slot = FindSlot(Key);
+    if (Slot == nullptr)
+    {
+        return;
+    }
+
+    Slot->bCancelRequested = true;
+    if (Slot->CancelFlag)
+    {
+        Slot->CancelFlag->store(true, std::memory_order_release);
+    }
+
+    if (Slot->State == AssetLoadState::Queued)
+    {
+        Slot->State = AssetLoadState::Cancelled;
+        Slot->Diagnostic = AssetDiagnostic::Fail(AssetErrorCode::Cancelled, "AssetManager", "Load cancelled", Key);
+        Slot->Resource.reset();
+        NotifyParents(Key);
+    }
 }
 
 AssetManager::AssetSlot* AssetManager::FindSlot(const AssetKey& Key)
@@ -183,10 +279,10 @@ bool AssetManager::HasDependencyCycle(const AssetKey& RootKey, const std::vector
                 AssetLoadContext Context{};
                 Context.Registry = Registry;
                 Context.Entry = Entry;
-                Context.SubAsset = SubAsset;
+                BindLoadContextSubAsset(Context, SubAsset);
                 Context.Key = Current;
                 IAssetLoader* Loader = const_cast<AssetManager*>(this)->ResolveLoader(
-                    SubAsset != nullptr ? SubAsset->Type : Entry.Metadata.Type);
+                    Context.SubAsset.has_value() ? Context.SubAsset->Type : Entry.Metadata.Type);
                 if (Loader != nullptr)
                 {
                     Loader->CollectDependencies(Context, Collected);
@@ -268,27 +364,85 @@ void AssetManager::ScheduleWorkerLoad(AssetSlot& Slot, const AssetLoadContext& C
         return;
     }
 
+    if (!bAcceptingLoads.load(std::memory_order_acquire))
+    {
+        FailSlot(
+            Slot,
+            AssetDiagnostic::Fail(AssetErrorCode::Cancelled, "AssetManager", "Loads are no longer accepted", Slot.Key));
+        return;
+    }
+
+    if (!Slot.CancelFlag)
+    {
+        Slot.CancelFlag = std::make_shared<std::atomic<bool>>(false);
+    }
+    Slot.CancelFlag->store(Slot.bCancelRequested, std::memory_order_release);
+
     Slot.State = AssetLoadState::Loading;
     const AssetKey Key = Slot.Key;
     const uint64_t Generation = Slot.Generation;
-    const bool bCancelRequested = Slot.bCancelRequested;
-
-    Jobs->Schedule([this, Key, Generation, Context, Loader, bCancelRequested]()
+    const uint64_t CapturedSession = SessionId.load(std::memory_order_acquire);
+    std::shared_ptr<std::atomic<bool>> CancelFlag = Slot.CancelFlag;
+    std::shared_ptr<std::atomic<bool>> ReleaseFlag = WorkerLoadReleaseFlag;
+    std::function<void()> Fault;
     {
+        std::lock_guard<std::mutex> Lock(WorkerLoadFaultMutex);
+        Fault = WorkerLoadFault;
+    }
+
+    Jobs->Schedule(OutstandingLoads, [this, Key, Generation, CapturedSession, Context, Loader, CancelFlag, ReleaseFlag, Fault]()
+    {
+        auto PushEvent = [this](CompletionEvent Event)
+        {
+            std::lock_guard<std::mutex> Lock(CompletionMutex);
+            Completions.push(std::move(Event));
+        };
+
         CompletionEvent Event{};
         Event.Key = Key;
         Event.Generation = Generation;
+        Event.SessionId = CapturedSession;
 
-        if (bCancelRequested)
+        if (ReleaseFlag)
+        {
+            while (!ReleaseFlag->load(std::memory_order_acquire))
+            {
+                if (CancelFlag && CancelFlag->load(std::memory_order_acquire))
+                {
+                    Event.State = AssetLoadState::Cancelled;
+                    Event.Diagnostic = AssetDiagnostic::Fail(AssetErrorCode::Cancelled, "AssetManager", "Load cancelled", Key);
+                    PushEvent(std::move(Event));
+                    return;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+        }
+
+        if ((CancelFlag && CancelFlag->load(std::memory_order_acquire))
+            || CapturedSession != SessionId.load(std::memory_order_acquire))
         {
             Event.State = AssetLoadState::Cancelled;
             Event.Diagnostic = AssetDiagnostic::Fail(AssetErrorCode::Cancelled, "AssetManager", "Load cancelled", Key);
+            PushEvent(std::move(Event));
+            return;
         }
-        else
+
+        try
         {
+            if (Fault)
+            {
+                Fault();
+            }
+
             AssetDiagnostic Diagnostic = AssetDiagnostic::Ok();
             std::shared_ptr<const void> Resource = Loader->Load(Context, Diagnostic);
-            if (!Resource || Diagnostic.HasError())
+            if ((CancelFlag && CancelFlag->load(std::memory_order_acquire))
+                || CapturedSession != SessionId.load(std::memory_order_acquire))
+            {
+                Event.State = AssetLoadState::Cancelled;
+                Event.Diagnostic = AssetDiagnostic::Fail(AssetErrorCode::Cancelled, "AssetManager", "Load cancelled", Key);
+            }
+            else if (!Resource || Diagnostic.HasError())
             {
                 Event.State = AssetLoadState::Failed;
                 Event.Diagnostic = Diagnostic.HasError()
@@ -302,9 +456,26 @@ void AssetManager::ScheduleWorkerLoad(AssetSlot& Slot, const AssetLoadContext& C
                 Event.Diagnostic = AssetDiagnostic::Ok();
             }
         }
+        catch (const std::exception& Exception)
+        {
+            Event.State = AssetLoadState::Failed;
+            Event.Diagnostic = AssetDiagnostic::Fail(
+                AssetErrorCode::InternalError,
+                "AssetManager",
+                std::string("Loader exception: ") + Exception.what(),
+                Key);
+        }
+        catch (...)
+        {
+            Event.State = AssetLoadState::Failed;
+            Event.Diagnostic = AssetDiagnostic::Fail(
+                AssetErrorCode::InternalError,
+                "AssetManager",
+                "Loader unknown exception",
+                Key);
+        }
 
-        std::lock_guard<std::mutex> Lock(CompletionMutex);
-        Completions.push(std::move(Event));
+        PushEvent(std::move(Event));
     });
 }
 
@@ -399,7 +570,7 @@ void AssetManager::BeginLoadWhenReady(AssetSlot& Slot)
     AssetLoadContext Context{};
     Context.Registry = Registry;
     Context.Entry = Entry;
-    Context.SubAsset = SubAsset;
+    BindLoadContextSubAsset(Context, SubAsset);
     Context.Key = Slot.Key;
     ScheduleWorkerLoad(Slot, Context, Loader);
 }
@@ -407,7 +578,7 @@ void AssetManager::BeginLoadWhenReady(AssetSlot& Slot)
 void AssetManager::RequestLoad(const AssetKey& Key, AssetType ExpectedType)
 {
     AssertGameThread();
-    if (!bInitialized || !Key.IsValid())
+    if (!bInitialized || !bAcceptingLoads.load(std::memory_order_acquire) || !Key.IsValid())
     {
         return;
     }
@@ -470,7 +641,7 @@ void AssetManager::RequestLoad(const AssetKey& Key, AssetType ExpectedType)
         AssetLoadContext Context{};
         Context.Registry = Registry;
         Context.Entry = Entry;
-        Context.SubAsset = SubAsset;
+        BindLoadContextSubAsset(Context, SubAsset);
         Context.Key = Key;
 
         IAssetLoader* Loader = ResolveLoader(Slot.Type);
@@ -526,13 +697,18 @@ void AssetManager::RequestLoad(const AssetKey& Key, AssetType ExpectedType)
 void AssetManager::PublishCompletion(const CompletionEvent& Event)
 {
     AssertGameThread();
+    if (Event.SessionId != SessionId.load(std::memory_order_acquire))
+    {
+        return;
+    }
+
     AssetSlot* Slot = FindSlot(Event.Key);
     if (Slot == nullptr || Slot->Generation != Event.Generation)
     {
         return;
     }
 
-    if (Slot->bCancelRequested)
+    if (Slot->bCancelRequested || (Slot->CancelFlag && Slot->CancelFlag->load(std::memory_order_acquire)))
     {
         Slot->State = AssetLoadState::Cancelled;
         Slot->Diagnostic = AssetDiagnostic::Fail(AssetErrorCode::Cancelled, "AssetManager", "Load cancelled", Event.Key);

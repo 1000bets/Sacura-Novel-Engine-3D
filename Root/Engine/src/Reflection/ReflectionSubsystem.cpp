@@ -6,6 +6,7 @@
 #include "Gameplay/GameObject.h"
 #include "Gameplay/ScriptComponent.h"
 #include "Reflection/PendingRegistry.h"
+#include "Reflection/PropertyAccess.h"
 #include "Reflection/ReflectionValueCodec.h"
 
 #include <SimpleMath.h>
@@ -559,10 +560,19 @@ Object* ReflectionSubsystem::CreateInstance(const TypeId& Id)
     }
 
     Object* Instance = Target->Factory(Target);
-    if (Instance != nullptr)
+    if (Instance == nullptr)
     {
-        Instance->AssignClass(Target);
+        return nullptr;
     }
+
+    Instance->AssignClass(Target);
+
+    Object* Defaults = Target->GetClassDefaultObject();
+    if (Defaults != nullptr && Defaults != Instance)
+    {
+        PropertyAccess::CopyPropertiesFrom(Defaults, Instance, PropertyAccessContext::Deserialize);
+    }
+
     return Instance;
 }
 

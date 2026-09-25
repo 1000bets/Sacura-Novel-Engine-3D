@@ -1,0 +1,13 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "local-windows-msvc-debug",
+      "inherits": "windows-msvc-debug",
+      "cacheVariables": {
+        "SAKURA_QT_ROOT": "SET_ME_TO_QT_INSTALL_OR_aqt_TREE",
+        "SAKURA_PYTHON_ROOT": "SET_ME_TO_PYTHON_ROOT_OPTIONAL"
+      }
+    }
+  ]
+}

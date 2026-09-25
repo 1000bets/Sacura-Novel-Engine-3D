@@ -159,13 +159,28 @@ AssetDiagnostic AssetRegistry::ScanMount(AssetMount Mount, const std::filesystem
     if (!std::filesystem::exists(ContentRoot, Error))
     {
         std::filesystem::create_directories(ContentRoot, Error);
+        if (Error)
+        {
+            return AssetDiagnostic::Fail(
+                AssetErrorCode::InternalError,
+                "AssetRegistry",
+                "Failed to create content root: " + Error.message(),
+                {},
+                ContentRoot.generic_string());
+        }
     }
 
+    Error.clear();
     for (const std::filesystem::directory_entry& Entry : std::filesystem::recursive_directory_iterator(ContentRoot, Error))
     {
         if (Error)
         {
-            break;
+            return AssetDiagnostic::Fail(
+                AssetErrorCode::InternalError,
+                "AssetRegistry",
+                "Failed while iterating content root: " + Error.message(),
+                {},
+                ContentRoot.generic_string());
         }
         if (!Entry.is_regular_file())
         {
@@ -186,6 +201,16 @@ AssetDiagnostic AssetRegistry::ScanMount(AssetMount Mount, const std::filesystem
         }
     }
 
+    if (Error)
+    {
+        return AssetDiagnostic::Fail(
+            AssetErrorCode::InternalError,
+            "AssetRegistry",
+            "Failed while iterating content root: " + Error.message(),
+            {},
+            ContentRoot.generic_string());
+    }
+
     return AssetDiagnostic::Ok();
 }
 
@@ -199,8 +224,28 @@ AssetDiagnostic AssetRegistry::ScanContent()
         return AssetDiagnostic::Fail(AssetErrorCode::InternalError, "AssetRegistry", "No content roots are set");
     }
 
-    ScanMount(AssetMount::Engine, EngineContentRoot);
-    ScanMount(AssetMount::Game, GameContentRoot);
+    const AssetDiagnostic EngineScan = ScanMount(AssetMount::Engine, EngineContentRoot);
+    if (EngineScan.HasError())
+    {
+        ScanDiagnostics.push_back(EngineScan);
+        return EngineScan;
+    }
+
+    const AssetDiagnostic GameScan = ScanMount(AssetMount::Game, GameContentRoot);
+    if (GameScan.HasError())
+    {
+        ScanDiagnostics.push_back(GameScan);
+        return GameScan;
+    }
+
+    if (!ScanDiagnostics.empty())
+    {
+        return AssetDiagnostic::Fail(
+            AssetErrorCode::InvalidData,
+            "AssetRegistry",
+            std::to_string(ScanDiagnostics.size()) + " asset(s) failed during content scan");
+    }
+
     return AssetDiagnostic::Ok();
 }
 

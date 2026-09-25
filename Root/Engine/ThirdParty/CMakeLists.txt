@@ -205,11 +205,14 @@ if(SAKURA_PYTHON_AVAILABLE)
     FetchContent_MakeAvailable(pybind11)
 endif()
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/Qt.cmake)
+
 # ---- Aggregate for Engine ----
 add_library(SakuraEngineThirdParty INTERFACE)
 add_library(Sakura::EngineThirdParty ALIAS SakuraEngineThirdParty)
 
 target_link_libraries(SakuraEngineThirdParty INTERFACE
+    Sakura::EngineQtThirdParty
     SDL3::SDL3
     Diligent-BuildSettings
     Sakura::PhysX
@@ -260,6 +263,7 @@ target_include_directories(SakuraEngineThirdParty INTERFACE
 )
 
 function(sakura_copy_engine_runtime_dlls TargetName)
+    sakura_deploy_qt_runtime(${TargetName})
     if(COMMAND copy_required_dlls)
         copy_required_dlls(${TargetName})
     endif()

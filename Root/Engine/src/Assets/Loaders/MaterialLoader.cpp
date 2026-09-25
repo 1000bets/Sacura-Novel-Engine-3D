@@ -5,6 +5,8 @@
 #include <nlohmann/json.hpp>
 
 #include <fstream>
+#include <cmath>
+#include <stdexcept>
 
 namespace
 {
@@ -108,24 +110,84 @@ std::shared_ptr<const void> MaterialLoader::Load(const AssetLoadContext& Context
     }
 
     auto Resource = std::make_shared<MaterialResource>();
-
-    if (Document.contains("baseColor") && Document["baseColor"].is_array() && Document["baseColor"].size() == 4)
+    try
     {
-        Resource->BaseColor = DirectX::SimpleMath::Vector4(
-            Document["baseColor"][0].get<float>(),
-            Document["baseColor"][1].get<float>(),
-            Document["baseColor"][2].get<float>(),
-            Document["baseColor"][3].get<float>());
+        if (Document.contains("baseColor") && (!Document["baseColor"].is_array() || Document["baseColor"].size() != 4))
+        {
+            throw std::runtime_error("baseColor must contain four numbers");
+        }
+        for (const char* Property : {"metallic", "roughness", "alphaCutoff"})
+        {
+            if (Document.contains(Property) && !Document[Property].is_number())
+            {
+                throw std::runtime_error(std::string(Property) + " must be a number");
+            }
+        }
+
+        if (Document.contains("baseColor") && Document["baseColor"].is_array() && Document["baseColor"].size() == 4)
+        {
+            Resource->BaseColor = DirectX::SimpleMath::Vector4(
+                Document["baseColor"][0].get<float>(),
+                Document["baseColor"][1].get<float>(),
+                Document["baseColor"][2].get<float>(),
+                Document["baseColor"][3].get<float>());
+        }
+
+        if (Document.contains("metallic") && Document["metallic"].is_number())
+        {
+            Resource->Metallic = Document["metallic"].get<float>();
+        }
+
+        if (Document.contains("roughness") && Document["roughness"].is_number())
+        {
+            Resource->Roughness = Document["roughness"].get<float>();
+        }
+
+        const std::string AlphaMode = Document.value("alphaMode", std::string("OPAQUE"));
+        if (AlphaMode == "MASK")
+        {
+            Resource->AlphaMode = MaterialAlphaMode::Mask;
+        }
+        else if (AlphaMode == "BLEND")
+        {
+            Resource->AlphaMode = MaterialAlphaMode::Blend;
+        }
+        else if (AlphaMode != "OPAQUE")
+        {
+            throw std::runtime_error("Unknown material alphaMode");
+        }
+        Resource->AlphaCutoff = Document.value("alphaCutoff", 0.5f);
+        Resource->bDoubleSided = Document.value("doubleSided", false);
+        Resource->bCastShadows = Document.value("castShadows", true);
+        if (Document.contains("emissive"))
+        {
+            const auto& Emissive = Document.at("emissive");
+            if (!Emissive.is_array() || Emissive.size() != 3)
+            {
+                throw std::runtime_error("emissive must contain three numbers");
+            }
+            Resource->Emissive = DirectX::SimpleMath::Vector3(
+                Emissive.at(0).get<float>(), Emissive.at(1).get<float>(), Emissive.at(2).get<float>());
+        }
+        for (float Value : {Resource->Metallic, Resource->Roughness, Resource->AlphaCutoff,
+                           Resource->BaseColor.x, Resource->BaseColor.y, Resource->BaseColor.z, Resource->BaseColor.w})
+        {
+            if (!std::isfinite(Value) || Value < 0.f || Value > 1.f)
+            {
+                throw std::runtime_error("Material factors must be finite and within [0, 1]");
+            }
+        }
+        const auto& Emissive = Resource->Emissive;
+        if (!std::isfinite(Emissive.x) || !std::isfinite(Emissive.y) || !std::isfinite(Emissive.z)
+            || Emissive.x < 0.f || Emissive.y < 0.f || Emissive.z < 0.f)
+        {
+            throw std::runtime_error("Emissive must be finite and nonnegative");
+        }
     }
-
-    if (Document.contains("metallic") && Document["metallic"].is_number())
+    catch (const std::exception& Exception)
     {
-        Resource->Metallic = Document["metallic"].get<float>();
-    }
-
-    if (Document.contains("roughness") && Document["roughness"].is_number())
-    {
-        Resource->Roughness = Document["roughness"].get<float>();
+        OutDiagnostic = AssetDiagnostic::Fail(AssetErrorCode::InvalidData, "MaterialLoader", Exception.what(), Context.Key);
+        return nullptr;
     }
 
     AssetKey TextureKey{};

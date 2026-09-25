@@ -29,6 +29,20 @@ struct ReflectionCategoryTag
     const char* Text = nullptr;
 };
 
+struct ReflectionAssetTypeTag
+{
+    const char* Text = nullptr;
+};
+
+struct ReflectionCompanionPropertyTag
+{
+    const char* Text = nullptr;
+};
+
+struct ReflectionEditorHiddenTag
+{
+};
+
 inline void ApplyReflectArgument(PropertyAttributes& Attributes, PropertyFlags Flags)
 {
     Attributes.Flags = Attributes.Flags | Flags;
@@ -49,6 +63,21 @@ inline void ApplyReflectArgument(PropertyAttributes& Attributes, ReflectionUiRan
 inline void ApplyReflectArgument(PropertyAttributes& Attributes, ReflectionCategoryTag Tag)
 {
     Attributes.Category = Tag.Text;
+}
+
+inline void ApplyReflectArgument(PropertyAttributes& Attributes, ReflectionAssetTypeTag Tag)
+{
+    Attributes.AssetTypeFilter = Tag.Text;
+}
+
+inline void ApplyReflectArgument(PropertyAttributes& Attributes, ReflectionCompanionPropertyTag Tag)
+{
+    Attributes.CompanionProperty = Tag.Text;
+}
+
+inline void ApplyReflectArgument(PropertyAttributes& Attributes, ReflectionEditorHiddenTag)
+{
+    Attributes.bEditorHidden = true;
 }
 
 inline void BuildPropertyAttributes(PropertyAttributes&)
@@ -76,6 +105,9 @@ inline PropertyAttributes MakePropertyAttributes(Arguments&&... Values)
 #define RF_DISPLAY_NAME(TextLiteral) ReflectionDisplayNameTag{TextLiteral}
 #define RF_UI_RANGE(MinimumValue, MaximumValue) ReflectionUiRangeTag{static_cast<double>(MinimumValue), static_cast<double>(MaximumValue)}
 #define RF_CATEGORY(TextLiteral) ReflectionCategoryTag{TextLiteral}
+#define RF_ASSET_TYPE(TextLiteral) ReflectionAssetTypeTag{TextLiteral}
+#define RF_COMPANION_PROPERTY(TextLiteral) ReflectionCompanionPropertyTag{TextLiteral}
+#define RF_EDITOR_HIDDEN ReflectionEditorHiddenTag{}
 
 template <typename ClassType, typename MemberType>
 MemberType ReflectionMemberTypeProbe(MemberType ClassType::*);

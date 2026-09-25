@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "guid": "f79c4239-0125-5d59-af97-43896e4308c5",
+  "assetType": "Model",
+  "sourceFingerprint": "a9482ed01c68b52c",
+  "loadSettings": {},
+  "importInfo": {},
+  "subAssets": [
+    {
+      "id": "200faafb-1aaa-5d75-8b60-3cc12d9a6742",
+      "type": "StaticMesh",
+      "name": "Plane",
+      "selector": {
+        "kind": "mesh",
+        "index": 0
+      }
+    }
+  ]
+}

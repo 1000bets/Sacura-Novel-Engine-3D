@@ -1,5 +1,9 @@
 # Sacura Novel Engine 3D — Agent Notes
 
+## Tool restrictions
+
+- Computer Use is prohibited for this project. Do not use UI automation to inspect, operate or test applications. Use builds, automated tests, logs and project-provided command-line or screenshot helpers instead.
+
 ## Engine vs Project vs Editor
 
 Architecture follows an Unreal-like split: Engine and Editor are built and staged once; user Projects live outside the engine tree and are opened at runtime.
@@ -23,18 +27,38 @@ MyGame/
 
 Rules:
 
-- **Engine** does not know a concrete Project, does not embed user Content/Scripts, and does not depend on Editor.
-- **Editor** depends on Engine only (`Editor → Engine`). Entry: `SakuraEditor` (`Root/Editor/apps/SakuraEditorMain.cpp`).
-- **Project** is not a CMake target. No `add_subdirectory(Project)`. Descriptor is `*.project` JSON (`name`, `engineVersion`, `startupScene`).
+- **Engine** (logical EngineRuntime, CMake target `Engine`) does not know a concrete Project, does not embed user Content/Scripts, and does not depend on Editor. Qt6 Core/Gui/Widgets is a public Engine dependency for runtime UI.
+- **EditorCore** (CMake `EditorCore`) depends on Engine + ufbx — import tools, `SceneDocument`, `EditorCommandStack` / scene edit commands. Its operations require no QApplication; Qt linkage is inherited from Engine. It is built independently of SAKURA_BUILD_EDITOR.
+- **Editor** (logical QtEditorFramework, CMake `Editor`) depends on EditorCore + Qt6 Widgets — shell UI, adapters, native viewport host. Entry: `SakuraEditor` (`Root/Editor/apps/SakuraEditorMain.cpp`).
+- **Project** is not a CMake target. No `add_subdirectory(Project)`. Descriptor is `*.project` JSON (`name`, `engineVersion`, `startupScene`, optional `startupStory`).
 - Paths: `EnginePaths` (install root from executable / `Bin` parent) and `ProjectPaths` (open project root). Never resolve user assets via `../../../Content` from the exe.
-- Open flow: `ProjectSession::OpenProject` → `ProjectDescriptor` + `ProjectPaths` → `Engine::LoadProjectContent` (Game Content + Scripts + rescan).
-- Create flow: `ProjectGenerator::CreateProject` (folders + `.project`).
+- Open flow: `ProjectSession::OpenProject` → `ProjectDescriptor` + `ProjectPaths` → `Engine::LoadProjectContent` (returns `AssetDiagnostic`; Game Content + Scripts + rescan) → load `startupScene` via `SceneSerializer` into `Engine::AdoptScene`. Health: `Ready` / `Degraded` (scan or startupScene issues) / `Failed`.
+- Scene document format `sakura.scene` v1 (`SceneSerializer`): stable object/component string IDs, parent refs, transform/flags, reflected component `type`/`typeVersion`/`properties`. Runtime `ObjectHandle` and GPU handles are not persisted. Atomic write: temp file + verify + rename. Subtree helpers: `SerializeSubtreeToJson` / `DeserializeSubtreeFromJson` (delete undo), `SerializeComponentToJson` / `DeserializeComponentFromJson`.
+- Story document format `sakura.story` v1 (`StoryDocumentIO` under `Root/Engine/inc/Story/`): nodes with kinds `Line`, `Choice`, `Action`, `End`; action kinds `Wait`, `MoveTo`, `CameraCut`. **`StoryRuntime`** (Engine, UI-independent): `LoadFromFile` / `Reset` / `AdvanceDialogue` / `SelectChoice` / `Tick` for timed blocking actions; `Stop` cancels running actions. `MoveTo` resolves a persistent object ID and lerps its local transform; `CameraCut` blends the primary `CameraComponent` owner transform (optional copy from an object resolved by persistent ID). Sample: `Samples/SampleProject/Content/Stories/Demo.story`. Headless test: `SakuraStoryRuntimeTest` (`Engine.Story.Runtime`). Editor playtest: `PlaySession` PlayWorld + dock tab «Сценарий» and viewport strip overlay driven by `StoryRuntime`.
+- EditorCore `SceneDocument`: path, dirty flag, `AdoptScene` / Open/Save/SaveAs/Close; failed Open keeps the previous document. Saving a scene does not rewrite `.project`. Engine owns the main scene via unique_ptr; SceneDocument stores a generation-checked non-owning identity. Project close stops play and releases the Engine-owned scene; document/session close order is safe.
+- EditorCore commands (`EditorCommandStack` + `Make*Command`): rename, transform, create/delete (subtree JSON undo), reparent (cycle reject), add/remove component, set/reset property. All Hierarchy/Inspector mutations go through the stack; stack marks the document dirty. Selection uses `ObjectHandle`, never Qt ownership of `GameObject`.
+- `LightComponent` is reflected (`engine.LightComponent`) so factory / inspector / scene IO work; `light_type` is int64 (0=Directional, 1=Point, 2=Spot).
+- Create flow: `ProjectGenerator::CreateProject` (folders + `.project` + real empty `startupScene` file). `ProjectName` must be a single path segment inside the parent directory; `startupScene` must stay inside the project root.
+- **One project per process (v1):** File → Open / New while a project is already open launches a new `SakuraEditor --project …` process. Do not treat `ScriptsRoot` / `sys.path` swap as Python isolation. Type registration is for the trusted open project only; UI must not promise a sandbox.
 - CLI: `SakuraEditor --project "D:/Games/MyGame/MyGame.project"`; without `--project` → Qt Studio launcher (`ProjectBrowserDialog`: New / Open / Recent / templates).
+- **SakuraPlayer** (`Root/Engine/apps/SakuraPlayerMain.cpp`): Qt runtime host with Engine-owned `RenderViewportWidget` and `StoryWidget`. Uses QApplication + QTimer, `InitializeHeadless` + `StartPresenting`, `StartGame`, and `.project` startupStory. No automatic dialogue advancement or implicit first-choice selection. Links Engine and deploys Qt through the Engine runtime helper.
 - Screenshot helper: `SakuraEditor --screenshot-launcher <path.png>` / `--screenshot-editor <path.png>` (for UI iteration).
 - Editor shell UI mirrors React prototype (`Sacura-Novel-Engine-3D_ReactEngine` / `Editor.jsx`): menubar, play toolbar, hierarchy, viewport, bottom dock tabs, inspector, status — graphite + muted rose.
 - Sample: `Samples/SampleProject/` (not part of Engine Content).
 - Source packer (no build / Diligent / PhysX / Qt): `Scripts/PackEngineSourceApp/PackEngineSourceApp.py` or `PackEngineSourceApp.exe` → RAR under `Scripts/PackEngineSourceApp/Output/` (needs WinRAR `Rar.exe`). Rebuild exe: `python -m PyInstaller --onefile --console --name PackEngineSourceApp Scripts/PackEngineSourceApp/PackEngineSourceApp.py`.
 - CMake staging: `sakura_stage_engine_runtime(<target>)` → `${CMAKE_BINARY_DIR}/Stage/{Bin,Engine/...}`.
+
+### Runtime hosting and scene ownership
+
+- Qt owns the application loop and native viewport for both Editor and Player. Shared game UI lives in `Root/Engine/inc/src/UI`; Editor-specific panels stay in Editor. SDL remains available for existing low-level host tests.
+- `Engine::AdoptScene(unique_ptr<Scene>)` transfers main-world ownership and stops any current simulation. `PlaySession` exclusively owns its cloned PlayWorld; the main world remains in Engine. `GetActiveScene` selects the simulated world without transferring ownership.
+- `Engine::StartGame` runs the main world in Player; `PlaySession::StartPlay` runs a copy in Editor. Both use `Engine::TickWorld` for scene components and StoryRuntime. Pausing freezes both; Step advances both once.
+- Engine is the only frame producer. EndFrame submits one immutable RenderFrameData containing all active RenderViewFrame snapshots. Editor Scene and Game are simultaneous native surfaces with separate cameras, dimensions, HDR/depth/OIT attachments and shadow atlases; Scene extracts EditWorld, Game extracts the active world. Frame indices increase monotonically.
+- Register/configure/resize/unregister surfaces through Engine. Surface 1 initializes the shared device; additional native swapchains require D3D12 or Vulkan (OpenGL remains a single-surface fallback). Native-surface destruction synchronously detaches and waits for GPU idle before returning to Qt; resize is enqueued. Zero-sized/hidden surfaces suspend. StopPresenting joins Render Thread before host destruction.
+- `Object::PersistentId` survives serialization, deletion undo, reorder and rename. Runtime ObjectHandle is never persisted. New IDs use GUIDs; loaded scene IDs are preserved.
+- Story actions persist `targetObjectId` and retain generation-checked identities while running. Legacy `targetObjectName` is resolved once on load and must be unique. A destroyed target fails the action without dereferencing stale memory.
+- Startup story is an optional project-relative `startupStory` path restricted to the project root. Engine owns StoryRuntime; UI hosts do not hardcode sample content.
+- Diligent implementation and backend headers are private under `Root/Engine/src/Rendering/RHI`; only that directory invokes the Diligent API. Public gameplay/editor headers expose scene data and resource identities.
 
 ### Asset mounts
 
@@ -54,7 +78,7 @@ Scripts live only under `<ProjectRoot>/Scripts/`. After project open, that direc
 ## Rendering architecture
 
 - Graphics abstraction: **Diligent Engine Core** (not raw D3D12/Vulkan/OpenGL, not SDL_GPU).
-- Window / input / events: **SDL3**.
+- Application windows / runtime UI: **Qt6**. SDL3 remains for legacy host tests.
 - Our code owns `Rendering` (Renderer, RenderScene, SceneExtractor, passes, materials). Gameplay never includes Diligent headers or native GPU API types (`VkInstance`, `ID3D12Device`, etc.).
 - Only `Rendering/RHI` may talk to Diligent.
 - Shaders: **HLSL** as the primary language.
@@ -66,21 +90,22 @@ Scripts live only under `<ProjectRoot>/Scripts/`. After project open, that direc
 Module layout under `Root/Engine`:
 
 ```text
-inc/src/Rendering/
+src/Rendering/RHI/
   Renderer.*          — lifecycle, clear, draw from RenderFrameData
   RenderDevice.*      — Diligent device / context / swapchain ownership
   RenderContext.h     — per-frame execution state only
-  Resources/
-    GpuBuffer.*       — Vertex / Index / Constant buffers
-    RenderMesh.*      — GPU mesh (VB + IB + counts)
-    RenderResourceManager.* — MeshHandle → RenderMesh
-shaders/TestMesh.hlsl — VSMain + PSMain (HLSL only; Diligent compiles/translates)
+  GpuBuffer.*        — Vertex / Index / Constant buffers
+  RenderMesh.*       — GPU mesh (VB + IB + counts)
+  RenderResourceManager.* — resource identities, residency and retirement
+  EnvironmentLighting.* — irradiance, prefiltered environment and BRDF LUT
+shaders/Forward.hlsl — PBR, shadow and weighted transparency entry points
+shaders/Postprocess.hlsl — composite, tone mapping/bloom and FXAA
 ```
 
 - `Renderer` is created and used **only** on Render Thread (`AssertRenderThread` on public methods).
-- SDL3 window stays in `WindowSubsystem`; Rendering receives `NativeWindowInfo` only.
-- Resize path: SDL event → Game Thread → Render Command → `Renderer::Resize` → SwapChain.
-- First milestone draw: indexed colored quad + `FrameConstants` / `ObjectConstants` (World × ViewProjection).
+- Qt runtime windows are owned by UI widgets; the legacy SDL host uses `WindowSubsystem`. Rendering receives `NativeWindowInfo` only.
+- Resize path: Qt resize (or legacy SDL event) → Game Thread → Render Command → `Renderer::Resize` → SwapChain.
+- Forward rendering: GGX metallic/roughness PBR, directional/point/spot lights; inverse-transpose normal transforms. Material v1 supports alphaMode OPAQUE/MASK/BLEND, alphaCutoff, emissive, doubleSided and castShadows in addition to existing factors/baseColorTexture. No GPU skinning.
 - Debug builds use Diligent validation; startup logs Backend / GPU / Resolution / formats via `PrintString`.
 - Executables need Diligent backend DLLs **and** `SDL3.dll` next to the binary (POST_BUILD on `SakuraTest`).
 
@@ -112,7 +137,7 @@ Cross-thread work:
 - Game → Render work → `RenderThread::Enqueue` / `RenderCommandQueue` (not JobSystem).
 - Frame handoff → immutable `RenderFrameData` via `RenderFrameQueue` (max 1–2 frames ahead, backpressure).
 - **Diligent** is owned by `RenderDevice` / `Renderer` on the **Render Thread** only (`ImmediateContext`, Present, Draw).
-- `WindowSubsystem` (SDL3) owns the OS window on the Game Thread; resize is forwarded as a Render Command.
+- Qt runtime widgets (or the legacy SDL `WindowSubsystem`) own native windows on Game Thread; resize is forwarded as a Render Command.
 - GPU resources (`GpuBuffer`, `RenderMesh`, pipelines, shaders) live only in Rendering; Game code uses `MeshHandle` / `MaterialHandle`.
 
 Lifecycle: Game Thread initializes JobSystem → starts Render Thread → waits READY → loop. Shutdown: stop frames → join Render Thread → JobSystem shutdown → subsystems → (later) destroy SDL after GPU teardown.
@@ -134,6 +159,7 @@ Do not duplicate the same library in both. If Editor needs a capability that Eng
 
 | Dependency | Role | Integration |
 |------------|------|-------------|
+| Qt 6 | Engine runtime UI and application windows | `Root/Engine/ThirdParty/Qt.cmake`; public via `Sakura::EngineQtThirdParty`. Local SDK: `Root/Engine/ThirdParty/Qt/`; hints: SAKURA_QT_ROOT / Qt6_DIR. |
 | SimpleMath / DirectXMath | Transforms, math | Vendored under `Root/Engine/ThirdParty/SimpleMath` |
 | SDL3 | Window, input, events | FetchContent (`Root/Engine/ThirdParty/CMakeLists.txt`) |
 | DiligentCore | RHI | FetchContent → `Root/Engine/ThirdParty/DiligentCore/` |
@@ -151,18 +177,18 @@ Do not duplicate the same library in both. If Editor needs a capability that Eng
 
 | Dependency | Role | Integration |
 |------------|------|-------------|
-| ufbx | FBX Import source data | FetchContent → `Root/Editor/ThirdParty/ufbx/_src/`; target `Sakura::Ufbx` via `Sakura::EditorThirdParty` |
-| Qt 6 | Editor UI (`Qt6::Core`, `Qt6::Gui`, `Qt6::Widgets`) | `find_package(Qt6)` in `Root/Editor/ThirdParty/CMakeLists.txt`; hint via `SAKURA_QT_ROOT`, `Qt6_DIR`, or `CMAKE_PREFIX_PATH`. Optional local aqt tree: `Root/Editor/ThirdParty/Qt/<ver>/<arch>` (gitignored). |
+| ufbx | FBX Import source data | FetchContent → `Root/Editor/ThirdParty/ufbx/_src/`; target `Sakura::Ufbx` via `Sakura::EditorCoreThirdParty` |
 
-Fetched Diligent/PhysX/asset/`_src` and local `Editor/ThirdParty/Qt/` trees are gitignored. Do not copy their `.cpp`/`.h` around the project by hand.
+Fetched Diligent/PhysX/asset/`_src` and local `Engine/ThirdParty/Qt/` trees are gitignored. Do not copy their `.cpp`/`.h` around the project by hand.
 
 Pinned version cache vars: `SAKURA_SDL3_GIT_TAG`, `SAKURA_DILIGENT_*_GIT_TAG`, `SAKURA_PHYSX_GIT_TAG`, `SAKURA_FASTGLTF_GIT_TAG`, `SAKURA_OZZ_GIT_TAG`, `SAKURA_NLOHMANN_JSON_GIT_TAG`, `SAKURA_STB_GIT_TAG`, `SAKURA_UFBX_GIT_TAG`, `SAKURA_PYBIND11_GIT_TAG`. Bump deliberately (keep Diligent modules on the same version).
 
 - Engine links `Sakura::EngineThirdParty` (SDL3, Diligent backends, PhysX, Tools/FX helpers, `Sakura::AssetThirdParty`). Do **not** add a CMake target named `imgui` — DiligentTools must keep its bundled ImGui for `Diligent-Imgui` only.
-- Editor links `Sakura::EditorThirdParty` (ufbx + Qt6 Core/Gui/Widgets) plus Engine. `CMAKE_AUTOMOC` is ON for the Editor library.
+- EditorCore links `Sakura::EditorCoreThirdParty` (ufbx) plus Engine; no QWidget operations or QApplication requirement.
+- Editor links EditorCore and inherits Qt from Engine. AUTOMOC is enabled for Engine runtime widgets and Editor widgets.
 - Executables that need Diligent backend DLLs: `sakura_copy_engine_runtime_dlls(<target>)`.
-- Executables that link Editor: `sakura_deploy_qt_runtime(<target>)` (windeployqt on Windows).
-- Include usage: `#include <fastgltf/core.hpp>`, `#include "ozz/animation/runtime/skeleton.h"`, `#include "stb_image.h"`, `#include <nlohmann/json.hpp>`, `#include "ufbx.h"`, `#include <QWidget>` (Editor only).
+- `sakura_copy_engine_runtime_dlls(<target>)` also deploys Qt runtime libraries and Windows platform/image plugins for Engine consumers.
+- Include usage: `#include <fastgltf/core.hpp>`, `#include "ozz/animation/runtime/skeleton.h"`, `#include "stb_image.h"`, `#include <nlohmann/json.hpp>`, `#include "ufbx.h"`, `#include <QWidget>` (Engine UI and Editor UI).
 
 ## Asset System (Blocks 1–6)
 
@@ -178,10 +204,11 @@ Content + .meta → AssetRegistry → AssetManager (LoadAsync / PumpCompletions)
 - Shared GLB parse cache lives in `ModelLoader` for Model/StaticMesh/Skeletal subassets of the same file.
 - `Engine::InitializeHeadless(GameContentRoot)` — Game thread + Memory + Jobs + Registry.Scan (Engine+Game mounts) + AssetManager; no window/render. Project scripts: sibling `Scripts/` or explicit `SetScriptsRoot`.
 - Full `Initialize` also creates Assets after Jobs; `Tick` calls `Assets.PumpCompletions()`; `Shutdown` calls `Assets.Shutdown()` before `Render.Stop()`.
-- Editor `AssetTools`: `AssetImporter` dispatches by extension; staging outside Content; path conflict → `ImportConflict` (no overwrite). FBX→GLB via ufbx + fastgltf `Exporter` (static geometry only).
-- Headless verification target: `SakuraAssetTest` (`Root/Tests/AssetSystem_Test.cpp`).
+- Editor `AssetTools` (EditorCore): `AssetImporter` dispatches by extension; staging outside Content; path conflict → `ImportConflict` (no overwrite). FBX→GLB via ufbx + fastgltf `Exporter` (static geometry only).
+- Headless verification target: `SakuraAssetTest` (`Root/Tests/AssetSystem_Test.cpp`) links Engine + EditorCore (no QApplication needed).
 - Content fingerprint: FNV-1a 64-bit (`ContentHash`); mismatch → `AssetChanged`. Not asset identity.
 - Engine defines `NOMINMAX` (required for fastgltf on MSVC).
+- `AssetRegistry::ScanContent` returns failure when mount iteration fails or any `.meta` ingest error was recorded (diagnostics remain in `GetScanDiagnostics()`).
 
 ### Supported profile (v1)
 
@@ -192,7 +219,7 @@ Content + .meta → AssetRegistry → AssetManager (LoadAsync / PumpCompletions)
 | Import FBX | Static meshes, transforms, UV/normals, material slots | Skinning/animation (UnsupportedFeature) |
 | Load Model/StaticMesh | Triangles, owned CPU buffers | Non-triangle primitives without conversion path |
 | Load Texture | RGBA8 CPU, sRGB default | — |
-| Load Material | baseColor/metallic/roughness + optional texture AssetRef | Full PBR |
+| Load Material | baseColor/metallic/roughness, baseColorTexture, emissive, OPAQUE/MASK/BLEND, cutoff and sidedness | Normal/metallic-roughness texture maps |
 | Load Skeletal | GLB→ozz in RAM (no `.ozz` on disk), LINEAR tracks, ≤4 influences | STEP/CUBICSPLINE/morph silent drop |
 | GPU upload | Mesh/texture via Render Thread | Sync load inside Draw |
 
@@ -244,6 +271,9 @@ Python @register_class / field()
 
 - `Reflection/Json/ReflectionJson` — `{ "type", "typeVersion", "properties" }`; AssetRef as id string only; ClassRef as TypeId string; unknown fields/types fail with no partial publish; optional per-type migration hooks (e.g. 1→2).
 - Editor `ReflectionInspector` — `QWidget` panel (Qt6 Widgets) for bool/float/string/Vector3/Color via `PropertyAccess`; `SetInspectedObject` / `Rebuild`; reset from CDO; range rejection; no hardcoded Camera panel. Requires a `QApplication` before constructing widgets.
+- Asset properties keep stable GUID and subasset IDs in serialized scene data, while editor UI resolves them through `AssetRegistry` and displays virtual paths. Reflected asset fields use `RF_ASSET_TYPE`; `RF_COMPANION_PROPERTY` groups a subasset ID with its owning asset; `RF_EDITOR_HIDDEN` keeps implementation fields out of the Inspector. Users must never type asset GUIDs in the Inspector.
+- `ContentBrowserWidget` lists Engine and Game mounts and exports `application/x-sakura-asset` drag payloads. Dropping a StaticMesh or Model subasset into the Scene viewport creates a `GameObject` with `MeshRendererComponent`; dropping a Material assigns it to the selected mesh object.
+- Scene gizmo operations are available only in the Scene viewport. During a drag the selected object receives preview transforms directly; release restores the old value and commits one `MakeSetTransformCommand`, preserving a single undo step.
 
 ## Coding conventions (engine)
 
@@ -253,3 +283,23 @@ Python @register_class / field()
 - Prefer complete names over short ones.
 - Debug logging messages in English via `PrintString`.
 - Dominant build configuration: **Debug**.
+- CMake presets (Windows/MSVC): `CMakePresets.json` (`windows-msvc-debug` / `windows-msvc-release` / `windows-msvc-debug-engine-only`). Machine paths via `CMakeUserPresets.json` (see `.example`) using `SAKURA_QT_ROOT` / `SAKURA_PYTHON_ROOT`. Editor optional: `-DSAKURA_BUILD_EDITOR=OFF`. Tests: `ctest --preset windows-msvc-debug` (excludes label `probe`).
+
+## Architecture follow-up and rendering roadmap
+
+- The architecture cleanup preserves PhysX, DiligentFX, ozz, Python and the current backend choices; dependency scope is unchanged.
+- Minimal Forward implementation and remaining validation are documented in `Docs/ForwardRenderer.md`; `Docs/RenderingRoadmap.md` remains the longer-term roadmap. Do not describe newly written GPU code as runtime-verified until the current sources have been built and exercised.
+- Continue using forward rendering. Deferred and ray tracing require a separate explicit decision.
+- Regression coverage includes standalone component ticking, safe close during Play, persistent scene IDs, story target deletion, ambiguous legacy names and actual Qt dialogue/choice button interactions.
+
+### Minimal Forward renderer contracts
+
+- All swapchains use IsPrimary=false. Renderer explicitly calls FinishFrame and ReleaseStaleResources once after every surface has presented; individual Present calls must not invalidate another surface’s dynamic buffers.
+- One device/context and Render Thread serve every surface. Each surface owns RGBA16F HDR, D32 depth, weighted OIT accumulation/revealage, tone-mapped intermediate, a 4096-square shadow atlas and a four-frame duration-query ring. No GPU state is accessed from Qt/Game Thread.
+- Lighting budget: 32 visible lights and 16 shadow tiles of 1024 pixels per view. Directional/spot use one tile; point uses six. Overflow is counted in RenderStatistics. Directional shadows use a camera-relative finite volume, not cascades.
+- IBL uses a built-in sky baked into irradiance and GGX-prefiltered reflection cubemaps plus an integrated BRDF LUT. This is global environment lighting; custom HDR import and local probes are outside this minimal implementation.
+- OPAQUE/MASK render with depth writes; MASK uses the same alpha test for shadow casting. BLEND uses weighted blended OIT with depth testing and no depth writes, then composites in linear HDR. Weighted OIT is approximate, does not model refraction, and translucent surfaces do not cast transmission shadows.
+- Post: linear HDR composition → exposure, threshold bloom and ACES approximation → FXAA → sRGB swapchain. Qt UI is composed separately. No TAA/motion vectors, deferred renderer, animation or GPU skinning in this change.
+- CPU visibility uses conservative world AABB/frustum tests separately for every camera and shadow view; local lights are range-culled. Opaque draws are front-to-back. GPU timings measure shadow, opaque, transparency and post passes without blocking; delayed samples carry their GPU frame index. CPU submission time, draw/triangle counts, light-budget overflow and asset GPU memory estimates are exposed through Engine::GetRenderStatistics.
+- Asset retirement retains identities until the fence has completed the last potentially referencing submitted frame (signal value FrameIndex + 1). Cancellation after upload also retires the created object. IDs are never recycled across renderer sessions. Project close clears upload caches, cancels CPU loads and schedules GPU retirement. Resize/detach/shutdown deliberately wait for GPU idle; ordinary frames do not.
+- `Samples/RenderValidation/RenderValidation.project` is the reproducible technical scene; `GenerateScene.py` regenerates its GLBs, materials, alpha texture and metadata. `SakuraForwardRendererTest` / `Engine.Render.Forward` exercises two surfaces, culling, shadow allocation, suspend/resize/reattach and retirement. `--vulkan` selects Vulkan for an additional run.

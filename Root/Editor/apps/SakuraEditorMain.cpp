@@ -76,9 +76,13 @@ int main(int ArgumentCount, char** Arguments)
 
     if (!Session.OpenProject(ProjectFile))
     {
-        PrintString("SakuraEditor: failed to open project");
+        PrintString(std::string("SakuraEditor: failed to open project: ") + Session.GetLastError());
         BoundEngine.Shutdown();
         return 1;
+    }
+    if (Session.GetHealth() == ProjectSessionHealth::Degraded)
+    {
+        PrintString(std::string("SakuraEditor: project opened in degraded state: ") + Session.GetLastError());
     }
 
     EditorMainWindow MainWindow(BoundEngine, Session);
@@ -104,6 +108,7 @@ int main(int ArgumentCount, char** Arguments)
     const int ExitCode = Application.exec();
 
     Session.CloseProject();
+    BoundEngine.StopPresenting();
     BoundEngine.Shutdown();
     return ExitCode;
 }

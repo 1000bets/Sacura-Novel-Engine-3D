@@ -22,6 +22,8 @@ public:
     uint32_t GetGeneration() const { return m_Generation; }
     ObjectHandle GetObjectHandle() const { return ObjectHandle{m_ObjectID, m_Generation}; }
 
+    const std::string& GetPersistentId() const { return PersistentId; }
+
     const std::string& GetName() const { return m_Name; }
     void SetName(const std::string& InName) { m_Name = InName; }
 
@@ -49,6 +51,8 @@ protected:
     Class* m_Class = nullptr;
 
 private:
+    friend class SceneSerializer;
+    std::string PersistentId;
     static std::atomic<ObjectID> s_NextID;
     static ObjectID GenerateID();
 };

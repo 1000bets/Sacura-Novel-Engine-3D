@@ -19,6 +19,7 @@ public:
     std::unique_ptr<RenderFrameData> WaitForFrameFor(std::chrono::milliseconds Timeout);
     void ReleaseConsumedFrame();
     void RequestShutdown();
+    void ResetForReuse();
     void NotifyWake();
     void WaitUntilEmpty();
 

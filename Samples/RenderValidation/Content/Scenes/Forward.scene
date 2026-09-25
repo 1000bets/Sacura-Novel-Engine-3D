@@ -1,0 +1,3264 @@
+{
+  "format": "sakura.scene",
+  "formatVersion": 1,
+  "name": "Forward validation",
+  "objects": [
+    {
+      "id": "72042b2c-422c-5955-a82d-00e9d511178d",
+      "name": "PBR-0-0",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          -2.1,
+          0.55,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "217a9299-74db-5c4e-b9a8-6493c85ab8ef",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "8a147e9f-278b-5b95-bfe3-61c620ce8442",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "d2d5024d-834a-5e9a-a646-8b38d0aafbf5",
+      "name": "PBR-0-1",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          -1.05,
+          0.55,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "e3e70693-8455-57e9-be84-b4ba7584716c",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ee81d475-ef73-55e0-b1bd-31db942eb24c",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "a1cf4399-7673-5687-8960-442dcc2d82f6",
+      "name": "PBR-0-2",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0.0,
+          0.55,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "67a7ba39-c7b9-5f2a-849e-a5b2c66452c1",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "9d1fed71-8e7d-5b68-86f8-a20c942f2f3e",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "38f9c75d-3cf3-5cd2-b929-7d7e2ef17c87",
+      "name": "PBR-0-3",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          1.05,
+          0.55,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "d5d7f24c-d6cf-55da-b62e-60d84b1a92c1",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "c57fb539-50b5-5bfc-83d3-0342f63cc6a7",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "b6917985-47bf-55dc-bc37-12f5aacf8a91",
+      "name": "PBR-0-4",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          2.1,
+          0.55,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "b872a14e-1fb3-5b20-bd2f-dc287620956c",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "441d64ca-20ad-55a7-9f8c-eefc99eddc51",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "54114dc5-3e2d-5427-a000-e089b15f40cf",
+      "name": "PBR-1-0",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          -2.1,
+          1.6,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "98a721e8-7250-5a94-a8a7-a7cb32078d91",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "7bb6d7db-5be0-51c1-a9da-65f69ae86128",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "c997273d-d0c6-5ac9-9849-a5d05884a620",
+      "name": "PBR-1-1",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          -1.05,
+          1.6,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "81cccaef-564f-579c-9285-1bc09b2037f8",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "6cd6afe3-75f4-5d00-8361-36efdd1fa9ad",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "144b408b-a38c-5488-9d10-eae984fc9c3c",
+      "name": "PBR-1-2",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0.0,
+          1.6,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "92b4194d-65a4-552b-9f1e-1f03868d4df6",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "9c850191-df8b-557d-b639-8ecc0747b2e1",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "d667f6f3-27f9-566f-a575-302bf76d52a2",
+      "name": "PBR-1-3",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          1.05,
+          1.6,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "9afd3ded-77b2-59a7-9694-43c52202567b",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "e6b21144-e5c0-5f10-aba6-cc306a0d10f3",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "9d8fc9dd-8023-53ef-9981-e86b8e54168f",
+      "name": "PBR-1-4",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          2.1,
+          1.6,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "6ed20af9-9dc4-59c7-bd44-1b670acf67ff",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "89f3ed0a-e25c-5b4d-8079-f06ad56c0118",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "6e24f466-f3dd-5c32-9e12-7ff85acec698",
+      "name": "Floor",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          -0.1,
+          0
+        ],
+        "rotation": [
+          -0.70710678,
+          0,
+          0,
+          0.70710678
+        ],
+        "scale": [
+          12,
+          12,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "b1a50509-aa1f-5b89-8443-ab19bddc4f78",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f79c4239-0125-5d59-af97-43896e4308c5",
+            "mesh_sub_asset_id": "200faafb-1aaa-5d75-8b60-3cc12d9a6742",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "54a5a4d5-4e81-5ce5-a0cb-b6ba4876f47b",
+      "name": "IntersectingRed",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          -0.6,
+          0.7,
+          1.1
+        ],
+        "rotation": [
+          0,
+          0.38268343,
+          0,
+          0.92387953
+        ],
+        "scale": [
+          2.4,
+          1.3,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "dfc1190c-b745-557d-a730-09cc78bfa715",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f79c4239-0125-5d59-af97-43896e4308c5",
+            "mesh_sub_asset_id": "200faafb-1aaa-5d75-8b60-3cc12d9a6742",
+            "material_asset_id": "60d97d0b-5569-5b3a-9fa9-39ffb098dbef",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "10f9eebe-85af-5880-9d27-6afe898d27a4",
+      "name": "IntersectingBlue",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0.6,
+          0.7,
+          1.1
+        ],
+        "rotation": [
+          0,
+          -0.38268343,
+          0,
+          0.92387953
+        ],
+        "scale": [
+          2.4,
+          1.3,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "5b63e197-37e6-5bf7-bcce-a2845adc55bc",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f79c4239-0125-5d59-af97-43896e4308c5",
+            "mesh_sub_asset_id": "200faafb-1aaa-5d75-8b60-3cc12d9a6742",
+            "material_asset_id": "1dd18ab6-01f6-51a7-aebf-34a1a8f30fde",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "5c1b450f-e9ad-50cb-9ae0-9fdbc7554067",
+      "name": "Cutout",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          2.8,
+          1.1,
+          -0.5
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1.2,
+          1.8,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "0dd6869e-2b55-530a-b48e-bb3ecdba6b52",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f79c4239-0125-5d59-af97-43896e4308c5",
+            "mesh_sub_asset_id": "200faafb-1aaa-5d75-8b60-3cc12d9a6742",
+            "material_asset_id": "31c3441a-52c0-56e1-980c-11b1747207ef",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "4152a941-af47-5beb-981e-817005c9e830",
+      "name": "Emission",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          -2.8,
+          1.1,
+          -0.5
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          0.6,
+          0.6,
+          0.6
+        ]
+      },
+      "components": [
+        {
+          "id": "d1c99491-4f21-57df-8c56-9bf601049d57",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ef8b1398-4871-5714-8632-58d6e71e5da8",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "9528ca7a-f8f7-5f2b-9378-f2e8f00b1cf8",
+      "name": "Offscreen-0",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          100,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "35864de5-f51d-54e1-8113-63c223c8adbd",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "e788e390-c086-52af-b1b6-4b711f625b92",
+      "name": "Offscreen-1",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          101,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "08a6e33f-bf51-5de1-9943-fb21554114c1",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "a7dc1341-de44-5ec8-a6fd-9ac52a169a4e",
+      "name": "Offscreen-2",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          102,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "fbb05759-a013-5cd9-8bc0-0d43ebfe0b50",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "d8f42d84-26bb-504f-81c4-9e1dbf0324c6",
+      "name": "Offscreen-3",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          103,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "0465fc42-a692-5c46-bcd2-0fc041f5e613",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "a1effb0d-1fb8-5eeb-bad3-6ea4875756d3",
+      "name": "Offscreen-4",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          104,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "58a96df9-fc47-5b38-acd1-76bc14ae465a",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "87327e97-35b3-59e5-88ac-8b603567dddd",
+      "name": "Offscreen-5",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          105,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "cbcbf752-6929-51e7-9aa1-7c4a9f67361e",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "81132e21-fa5e-507a-b584-031e6378adf2",
+      "name": "Offscreen-6",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          106,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "d96b359f-3e32-5d3b-b107-0a5dd687df60",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "06eb61c0-8052-52c0-b2c8-4c2470238128",
+      "name": "Offscreen-7",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          107,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "c0e3f078-c679-55ad-a7ef-0c2418af62de",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "c07255e6-0305-5b47-bfe3-9a116c75ab16",
+      "name": "Offscreen-8",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          108,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "b30a65ce-7b8e-526e-b21b-3a3fc5e0c231",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "814ed41c-87e8-5430-8fb7-4d885a747dc7",
+      "name": "Offscreen-9",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          109,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "a3bf040f-4641-5af0-bba2-9064fbc7e45b",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "44220b05-f621-546d-b13d-68b46ca722bf",
+      "name": "Offscreen-10",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          110,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "eff70b99-15d3-530b-ab77-ea8429408399",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "e6cc4ab6-0d4e-53eb-9e39-377df3b838be",
+      "name": "Offscreen-11",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          111,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "67df47bc-b295-596b-b372-3807e7e4874d",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "029f5b7b-27e2-5d8f-8424-a3f098c55225",
+      "name": "Offscreen-12",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          112,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "88370fa7-17c6-5c9e-b078-6d69a20fcbdd",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "fb15c46b-bb9d-59de-9509-3fec8e1acb81",
+      "name": "Offscreen-13",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          113,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "21528fea-1dec-572a-8ed5-464a1e544576",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "6299410f-05db-58e0-a0d5-7966cd9fcdd8",
+      "name": "Offscreen-14",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          114,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "ecd4ce5e-9e08-5819-b99b-b2550e4c74b8",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "b3a99735-e951-5073-954a-5b3cb02f0065",
+      "name": "Offscreen-15",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          115,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "01931be1-903c-5ce0-9987-fbaca254a6b5",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "594be27a-fd8f-50ee-ad53-e18c40430401",
+      "name": "Offscreen-16",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          116,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "d10d0774-543b-5570-bf49-07a484250d15",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "369e7417-6b4b-556c-be54-b47b283c9bd2",
+      "name": "Offscreen-17",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          117,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "f09c4229-4108-5f7a-bcbb-029e4fad1ae2",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "6354eeaa-202d-5f6b-8ca1-663549c59f6e",
+      "name": "Offscreen-18",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          118,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "42c5b0ca-a9d2-5aad-8814-f3af25036c27",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "4ec99bc6-e4f0-5400-a7e0-11b83cab04c2",
+      "name": "Offscreen-19",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          119,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "33a45da1-8db3-5bb6-8f9f-4cb03f21a369",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "18e36523-a4f4-58fc-bc96-61006c939941",
+      "name": "Offscreen-20",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          120,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "4dcce3ee-5a68-50a0-8241-2008f0577595",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "96f6c30e-0e64-538f-95e2-405c432206fb",
+      "name": "Offscreen-21",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          121,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "511d4836-72e7-58f1-a322-3ceab015a0e2",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "e612faa9-af41-515e-a0d0-1478b0d55199",
+      "name": "Offscreen-22",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          122,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "266c905e-528e-5f62-a786-b5293c3dde3b",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "06816da8-26a4-52f4-b370-9d7be9ddde69",
+      "name": "Offscreen-23",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          123,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "bcc9cdeb-826a-5799-9523-86143c339991",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "3954f8b2-280e-50cb-b792-ce082cddabc0",
+      "name": "Offscreen-24",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          124,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "7b120537-0b3e-5f1c-9cfc-62fb4daa0fd8",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "5858cf0f-b7a7-5703-8962-86315af1b3a7",
+      "name": "Offscreen-25",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          125,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "48ba1995-e163-5e3f-aa38-85fa2bee1b53",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "b8aa00fe-ff63-5d34-95ba-3f5709f42ef9",
+      "name": "Offscreen-26",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          126,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "53efa7fc-4c42-54f9-8911-08adbc6bfa0e",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "3730323e-7806-5430-81d0-17045e38f75a",
+      "name": "Offscreen-27",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          127,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "6b34aaec-e75d-5df4-87c1-af6e6e8e0318",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "cd11d427-5726-5580-9ed6-f9f3366a60f3",
+      "name": "Offscreen-28",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          128,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "10f60fee-e725-5f03-aabf-6d849bc24783",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "262074f4-b5a8-5453-94b0-e4f7b9adfa31",
+      "name": "Offscreen-29",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          129,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "97647b24-3ccb-5b9a-960d-ce610c146ea6",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "8a9b1baf-6bae-558c-86d8-c483dbbf8349",
+      "name": "Offscreen-30",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          130,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "ae9a6477-140d-5dc1-b88c-d8bd53bbcbb7",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbedf0d4-ec44-580f-b60e-e607a0b3590a",
+      "name": "Offscreen-31",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          131,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "19396bfb-8db4-5fed-b174-4eb74e925b9c",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "fc060878-ff1a-5335-8b53-c8823eac7f50",
+      "name": "Offscreen-32",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          132,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "0ade412d-fa7d-5207-b8a5-e4401c0cb7a4",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "fadfc774-e27d-5cef-b15d-20802f72806e",
+      "name": "Offscreen-33",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          133,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "9c6dd60a-cdd9-5e8e-90ab-19ad1a0c2b7b",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "80570203-13cc-54b6-b57a-4acc25ffa470",
+      "name": "Offscreen-34",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          134,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "76decbb6-96dc-5a3d-b7ee-b9f72eb280a9",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "14aa51a4-9834-5851-93ed-ea5a8b39ddb4",
+      "name": "Offscreen-35",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          135,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "2819b4f7-2762-5569-8fa8-1e02d3882e8e",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "12629fec-aa31-5a16-a16a-bdc77cbe92a7",
+      "name": "Offscreen-36",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          136,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "84526eed-308c-56ec-8b70-5b3439443ed9",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "d8b45adb-ea82-5370-8fbf-3a25464a69de",
+      "name": "Offscreen-37",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          137,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "9faa2008-37e1-54cc-ac25-06661a181e83",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "f85a48b0-8d11-5a1b-a589-7ac8f133eba3",
+      "name": "Offscreen-38",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          138,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "9913c44b-04db-5115-a14c-ee0b894fa06e",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "49675c17-f620-50ee-8819-befd3a0016f3",
+      "name": "Offscreen-39",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          139,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "414f8279-84b0-581e-9d69-70bc140eb6b1",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "847efe09-a12e-5101-8133-d41a96e06b30",
+      "name": "Offscreen-40",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          140,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "cf28bb6d-0d8a-5168-abe8-c13c82ca000d",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "fceb13ed-950c-5408-8468-2fe41ec6ef0b",
+      "name": "Offscreen-41",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          141,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "2ac65662-e9bb-5a6e-a2a1-2c54417703b8",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "2dbbcb05-9bed-54eb-87a5-bb28d7d8f766",
+      "name": "Offscreen-42",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          142,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "84731c87-8f32-5c38-ae57-aa8bfac928ce",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "b4d09f56-7f72-5a71-a83e-85ff4c1bf82f",
+      "name": "Offscreen-43",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          143,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "2eae864b-aae6-5fcd-b848-834aa5e230ba",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "88058da1-7e7e-5ff2-b4c9-9af92c7935cf",
+      "name": "Offscreen-44",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          144,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "3d4c0cd2-4443-5ddb-9573-200b0a288527",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "ce4ccc9c-0ae8-5364-8dc0-1aa80ccd0172",
+      "name": "Offscreen-45",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          145,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "1f3b37d7-d013-55e1-a0dc-30c98ffc64ce",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "5a422532-fdc1-5b55-bd35-dc414e8080a6",
+      "name": "Offscreen-46",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          146,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "a47ed955-105d-55a9-b232-46566529a6ab",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "a1160133-2cc8-5d3e-85ca-9a0c573223f6",
+      "name": "Offscreen-47",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          147,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "a3abc928-9a54-5c04-9c38-06a91dc3d4ae",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "d6c06eda-e705-5dae-a76b-8ac7c86bfa75",
+      "name": "Offscreen-48",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          148,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "23a8b98c-f6f5-5484-989e-81ee136c5485",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "d80764ee-300b-5c0d-9c92-39f2d2f373cd",
+      "name": "Offscreen-49",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          149,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "384968d3-7fcc-544d-9a76-1e15ee497ecd",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "dfdcf562-47dd-562c-bbd9-e6951b981eb4",
+      "name": "Offscreen-50",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          150,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "514e0fe8-374f-571b-bd3a-bd9128885144",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "582784c5-745e-534c-aaf2-da126436828e",
+      "name": "Offscreen-51",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          151,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "bf20fc58-a0b8-5b16-9e01-d1b34b859643",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "23bd4228-f9d8-5836-a7f1-8a038f2b5dd6",
+      "name": "Offscreen-52",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          152,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "47325335-c86c-547c-983f-22db24836080",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "770acafb-aed0-55b6-8da5-6156d531ccb5",
+      "name": "Offscreen-53",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          153,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "1d981c83-ae8c-5e5c-a072-adce415e5f17",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "7326f390-c7cd-5040-bd02-814d64833fff",
+      "name": "Offscreen-54",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          154,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "17eb43f2-72fb-5b36-92be-7afd334843ff",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "9443b5e5-3999-5583-abd9-0fde2c31518f",
+      "name": "Offscreen-55",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          155,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "77ba4d7d-1a4e-5a6d-9a26-41d465aa6a96",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "0b7de45c-a423-5a66-aa41-e9ba415ca4dd",
+      "name": "Offscreen-56",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          156,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "0b7e8378-7e64-5448-943b-c23a58d18209",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "2e11b20e-95a9-547b-bd3a-a7050f8fad3c",
+      "name": "Offscreen-57",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          157,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "03de2667-ee68-5ea9-a0df-93aee0dec891",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "b787ab45-2c39-5776-b41d-87f78809c8ff",
+      "name": "Offscreen-58",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          158,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "dafbbff2-5f3a-59d0-a92c-264aba13889a",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "453a82b5-7b6e-5847-95d9-4bcbdec76f7e",
+      "name": "Offscreen-59",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          159,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "8f88bcfb-0201-5c86-8a11-edada1f20d18",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "60edb04c-c2a0-592a-9bd6-c7801c2e6092",
+      "name": "Offscreen-60",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          160,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "b3e87539-2164-52ee-9c8d-978658a5a636",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "b75238b0-4332-5a6a-9637-c9253dbfdf69",
+      "name": "Offscreen-61",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          161,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "8038dd73-e63b-54f5-9e24-15e0c102f7e4",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "f0b7ff67-74ea-5eb2-a998-ce560f68820e",
+      "name": "Offscreen-62",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          162,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "f318cab2-1bc5-5b41-9225-5712f2fec023",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "e60f8e32-928e-5f6c-82b7-a4076b15efed",
+      "name": "Offscreen-63",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          163,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "06829b67-0c2f-5cd5-a05f-6882aeaf6f84",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "a8b01056-31d8-5832-832b-bef841650a0d",
+            "mesh_sub_asset_id": "e6ace5b3-77fc-51a0-8831-0b840860b89b",
+            "material_asset_id": "ad66e9e4-9a6a-5ca0-b1f8-416eac04fbac",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "07d685a1-1879-58c0-be67-9b3930d04a1a",
+      "name": "Camera",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          2,
+          7
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "ac66077c-a415-590c-8233-8623227b36f5",
+          "type": "engine.CameraComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "field_of_view": 60,
+            "near_plane": 0.1,
+            "far_plane": 200,
+            "aspect_ratio": 1.7777778,
+            "primary": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "30789544-451c-5c39-b7b6-0682ccc35480",
+      "name": "Sun",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          5,
+          3
+        ],
+        "rotation": [
+          -0.38268343,
+          0,
+          0,
+          0.92387953
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "94229740-4996-5314-84aa-0936f82c1610",
+          "type": "engine.LightComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "light_type": 0,
+            "light_color": [
+              1,
+              0.95,
+              0.85,
+              1
+            ],
+            "intensity": 3,
+            "cast_shadows": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "4806628d-3a9e-5f18-b9f2-8f4cb935c9dc",
+      "name": "Point",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          -2,
+          2.5,
+          2
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "3b65ab4e-51c7-5023-b5b8-2b90f51920aa",
+          "type": "engine.LightComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "light_type": 1,
+            "light_color": [
+              0.3,
+              0.5,
+              1,
+              1
+            ],
+            "intensity": 12,
+            "range": 8,
+            "cast_shadows": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "e4af4579-ff5d-539d-b618-b237996d7a61",
+      "name": "Spot",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          2,
+          3,
+          2
+        ],
+        "rotation": [
+          -0.258819,
+          0,
+          0,
+          0.9659258
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "35b3e949-0987-5fcb-9495-828cd2038c4b",
+          "type": "engine.LightComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "light_type": 2,
+            "light_color": [
+              1,
+              0.3,
+              0.1,
+              1
+            ],
+            "intensity": 15,
+            "range": 8,
+            "inner_cone_angle": 15,
+            "outer_cone_angle": 35,
+            "cast_shadows": true
+          }
+        }
+      ]
+    }
+  ]
+}

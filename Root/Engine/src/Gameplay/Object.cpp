@@ -1,4 +1,5 @@
 #include "Gameplay/Object.h"
+#include "Assets/Guid.h"
 #include "Core/MemorySubsystem.h"
 #include "Reflection/Class.h"
 
@@ -13,6 +14,7 @@ ObjectID Object::GenerateID()
 
 Object::Object()
     : m_ObjectID(GenerateID())
+    , PersistentId(Guid::Generate().ToString())
 {
     if (auto* Mem = MemorySubsystem::Get())
     {
@@ -23,6 +25,7 @@ Object::Object()
 Object::Object(const std::string& InName)
     : m_ObjectID(GenerateID())
     , m_Name(InName)
+    , PersistentId(Guid::Generate().ToString())
 {
     if (auto* Mem = MemorySubsystem::Get())
     {

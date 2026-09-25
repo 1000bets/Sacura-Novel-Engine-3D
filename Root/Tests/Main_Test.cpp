@@ -77,7 +77,7 @@ static void TestRendering(Engine& Eng)
     MeshRendererComponent* MeshRenderer = QuadObject->AddComponent<MeshRendererComponent>();
     MeshRenderer->Mesh = Eng.GetRenderThread().GetDefaultMesh();
 
-    Eng.SetActiveScene(SceneObject);
+    Eng.AdoptScene(std::unique_ptr<Scene>(SceneObject));
 
     for (int Frame = 0; Frame < 30; ++Frame)
     {
@@ -85,8 +85,7 @@ static void TestRendering(Engine& Eng)
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
 
-    Eng.SetActiveScene(nullptr);
-    Mem->DestroyObject(SceneObject);
+    Eng.AdoptScene({});
     std::cout << "  Rendered 30 frames with default quad\n";
 }
 
