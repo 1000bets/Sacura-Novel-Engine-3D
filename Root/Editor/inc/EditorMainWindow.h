@@ -167,7 +167,6 @@ private:
     QWidget* StoryDockPage = nullptr;
     StoryWidget* StoryPanel = nullptr;
     StoryWidget* GameDialogue = nullptr;
-    QLabel* StoryOverlayLabel = nullptr;
     StoryRuntime& StoryPlayback;
     QTabWidget* InspectorTabs = nullptr;
     QLineEdit* ObjectNameEdit = nullptr;

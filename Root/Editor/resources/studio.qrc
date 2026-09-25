@@ -4,5 +4,6 @@
         <file alias="template_visual_novel.png">studio/template_visual_novel.png</file>
         <file alias="template_kinetic_novel.png">studio/template_kinetic_novel.png</file>
         <file alias="studio_sakura_overlay.png">studio/studio_sakura_overlay.png</file>
+        <file alias="checkbox_check.png">studio/checkbox_check.png</file>
     </qresource>
 </RCC>

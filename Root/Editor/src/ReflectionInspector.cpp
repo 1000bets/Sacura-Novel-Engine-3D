@@ -465,10 +465,10 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
     }
     else if (Descriptor.ValueTypeId.Value == "engine.bool")
     {
-        QCheckBox* CheckBox = new QCheckBox(FieldWidget);
+        QCheckBox* CheckBox = new QCheckBox(Label, FieldWidget);
         CheckBox->setChecked(CurrentValue.BoolValue);
         CheckBox->setEnabled(bEditable);
-        FieldLayout->addWidget(CheckBox);
+        FieldLayout->addWidget(CheckBox, 1);
         if (bEditable)
         {
             connect(CheckBox, &QCheckBox::toggled, this, [this, Property](bool Value)
@@ -673,5 +673,12 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
         });
     }
 
-    PropertiesLayout->addRow(Label, FieldWidget);
+    if (Descriptor.ValueTypeId.Value == "engine.bool")
+    {
+        PropertiesLayout->addRow(QString(), FieldWidget);
+    }
+    else
+    {
+        PropertiesLayout->addRow(Label, FieldWidget);
+    }
 }

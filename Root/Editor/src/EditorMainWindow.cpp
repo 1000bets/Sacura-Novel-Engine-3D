@@ -590,17 +590,6 @@ void EditorMainWindow::BuildUi()
         CameraSpeedSpin->setValue(Speed);
     });
     ViewportLayout->addWidget(ViewportHeader);
-
-    auto* LiveStrip = new QFrame(ViewportPanel);
-    LiveStrip->setObjectName("LiveStrip");
-    auto* LiveLayout = new QHBoxLayout(LiveStrip);
-    LiveLayout->setContentsMargins(10, 4, 10, 4);
-    LiveLayout->addWidget(new QLabel(QString::fromUtf8("\xF0\x9F\x94\x8A  \xD0\x90\xD1\x83\xD0\xB4\xD0\xB8\xD0\xBE · \xD0\xBD\xD0\xB0\xD0\xB6\xD0\xBC\xD0\xB8\xD1\x82\xD0\xB5 Play"), LiveStrip));
-    StoryOverlayLabel = new QLabel(QString::fromUtf8(""), LiveStrip);
-    StoryOverlayLabel->setWordWrap(true);
-    LiveLayout->addWidget(StoryOverlayLabel, 1);
-    LiveLayout->addWidget(new QLabel(QString::fromUtf8("Active: 0"), LiveStrip));
-    ViewportLayout->addWidget(LiveStrip);
     ViewportLayout->addWidget(PrimaryViewport, 1);
     GameDialogue = new StoryWidget(StoryPlayback, ViewportPanel);
     ViewportLayout->addWidget(GameDialogue);
@@ -1575,26 +1564,38 @@ void EditorMainWindow::ConfigureComponentInspector(ReflectionInspector* Componen
         const PropertyId& Property,
         const ReflectedValue& NewValue)
     {
-        if (Instance == nullptr || GetEditScene() == nullptr)
+        if (Instance == nullptr || GetEditScene() == nullptr || BoundEngine.GetPlaySession().IsSimulating())
         {
             return false;
         }
-        return ExecuteCommand(MakeSetPropertyCommand(
+        if (!CommandStack.Execute(MakeSetPropertyCommand(
             GetEditScene(),
             Instance->GetObjectHandle(),
             Property,
-            NewValue));
-    });
-    ComponentInspector->SetPropertyResetCallback([this](Object* Instance, const PropertyId& Property)
-    {
-        if (Instance == nullptr || GetEditScene() == nullptr)
+            NewValue)))
         {
             return false;
         }
-        return ExecuteCommand(MakeResetPropertyCommand(
+        UpdateWindowTitleDirty();
+        UpdateStatus();
+        return true;
+    });
+    ComponentInspector->SetPropertyResetCallback([this](Object* Instance, const PropertyId& Property)
+    {
+        if (Instance == nullptr || GetEditScene() == nullptr || BoundEngine.GetPlaySession().IsSimulating())
+        {
+            return false;
+        }
+        if (!CommandStack.Execute(MakeResetPropertyCommand(
             GetEditScene(),
             Instance->GetObjectHandle(),
-            Property));
+            Property)))
+        {
+            return false;
+        }
+        UpdateWindowTitleDirty();
+        UpdateStatus();
+        return true;
     });
     ComponentInspector->SetAssetCommitCallback([this](
         Object* Instance,
@@ -2562,7 +2563,6 @@ void EditorMainWindow::RefreshStoryPlaybackUi()
     const bool bAllowInput = bPlaying && !bPaused;
     StoryPanel->Refresh(bAllowInput);
     GameDialogue->Refresh(bAllowInput);
-    StoryOverlayLabel->setText(QString::fromStdString(StoryPlayback.GetDisplayedLine()));
 }
 
 void EditorMainWindow::closeEvent(QCloseEvent* Event)

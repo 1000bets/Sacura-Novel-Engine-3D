@@ -4,6 +4,8 @@
 #include "AssetTools/AssetImporter.h"
 #include "AssetTools/ImportRequest.h"
 #include "Assets/AssetMetadata.h"
+#include "Assets/AssetPath.h"
+#include "Core/Threading/ThreadContext.h"
 #include "EditorAssetMime.h"
 #include "Engine.h"
 
@@ -342,6 +344,7 @@ ContentBrowserWidget::ContentBrowserWidget(QWidget* Parent)
     {
         MoveAsset(Payload.VirtualPath, DestinationFolder);
     };
+    SourcesTree->setContextMenuPolicy(Qt::CustomContextMenu);
     SourcesTree->installEventFilter(this);
     AssetView->installEventFilter(this);
     BrowserSplitter->addWidget(SourcesTree);
@@ -384,18 +387,27 @@ ContentBrowserWidget::ContentBrowserWidget(QWidget* Parent)
     });
     connect(ImportButton, &QToolButton::clicked, this, &ContentBrowserWidget::SelectImportFiles);
     connect(AssetView, &QListWidget::customContextMenuRequested, this, &ContentBrowserWidget::ShowAssetContextMenu);
+    connect(SourcesTree, &QTreeWidget::customContextMenuRequested, this, &ContentBrowserWidget::ShowSourcesContextMenu);
 
-    auto* RenameAction = new QAction(tr("Rename Asset"), AssetView);
+    auto* RenameAction = new QAction(tr("Rename"), AssetView);
     RenameAction->setShortcut(QKeySequence(Qt::Key_F2));
-    RenameAction->setShortcutContext(Qt::WidgetShortcut);
+    RenameAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
     AssetView->addAction(RenameAction);
-    connect(RenameAction, &QAction::triggered, this, &ContentBrowserWidget::RenameSelectedAsset);
+    SourcesTree->addAction(RenameAction);
+    connect(RenameAction, &QAction::triggered, this, &ContentBrowserWidget::RenameSelection);
 
-    auto* DeleteAction = new QAction(tr("Delete Asset"), AssetView);
+    auto* DeleteAction = new QAction(tr("Delete"), AssetView);
     DeleteAction->setShortcut(QKeySequence::Delete);
-    DeleteAction->setShortcutContext(Qt::WidgetShortcut);
+    DeleteAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
     AssetView->addAction(DeleteAction);
-    connect(DeleteAction, &QAction::triggered, this, &ContentBrowserWidget::DeleteSelectedAsset);
+    SourcesTree->addAction(DeleteAction);
+    connect(DeleteAction, &QAction::triggered, this, &ContentBrowserWidget::DeleteSelection);
+
+    auto* NewFolderAction = new QAction(tr("New Folder"), this);
+    NewFolderAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_N));
+    NewFolderAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+    addAction(NewFolderAction);
+    connect(NewFolderAction, &QAction::triggered, this, &ContentBrowserWidget::CreateFolder);
 
 }
 
@@ -450,11 +462,16 @@ void ContentBrowserWidget::BuildSourcesTree(const std::vector<AssetRegistryEntry
             Folder = Folder.section('/', 0, -2);
         }
     }
+    CollectGameFoldersOnDisk(Folders);
     for (const QString& Folder : Folders)
     {
         const QString ParentPath = Folder.section('/', 0, -2);
         auto Parent = ItemsByPath.find(ParentPath);
         if (Parent == ItemsByPath.end())
+        {
+            continue;
+        }
+        if (ItemsByPath.find(Folder) != ItemsByPath.end())
         {
             continue;
         }
@@ -604,7 +621,16 @@ void ContentBrowserWidget::RefreshAssetView()
     }
     if (!bTypeFilterActive && SearchText.isEmpty())
     {
-        for (auto FolderIterator = ChildFolders.rbegin(); FolderIterator != ChildFolders.rend(); ++FolderIterator)
+        CollectGameFoldersOnDisk(ChildFolders);
+        std::set<QString> DirectChildFolders;
+        for (const QString& Folder : ChildFolders)
+        {
+            if (Folder.section('/', 0, -2) == CurrentFolder)
+            {
+                DirectChildFolders.insert(Folder);
+            }
+        }
+        for (auto FolderIterator = DirectChildFolders.rbegin(); FolderIterator != DirectChildFolders.rend(); ++FolderIterator)
         {
             const QString& Folder = *FolderIterator;
             auto* Item = new QListWidgetItem(MakeFolderIcon(), Folder.section('/', -1));
@@ -900,22 +926,70 @@ void ContentBrowserWidget::ShowAssetContextMenu(const QPoint& Position)
 {
     QListWidgetItem* Item = AssetView->itemAt(Position);
     QMenu Menu(this);
-    if (Item != nullptr && Item->data(ItemKindRole).toInt() == AssetItemKind)
+    if (Item != nullptr)
     {
         AssetView->setCurrentItem(Item);
-        Menu.addAction(tr("Copy"), this, &ContentBrowserWidget::CopySelectionToClipboard);
-        if (Item->data(VirtualPathRole).toString().startsWith("/Game/"))
+        if (Item->data(ItemKindRole).toInt() == FolderItemKind)
         {
-            Menu.addAction(tr("Rename"), this, &ContentBrowserWidget::RenameSelectedAsset);
-            Menu.addAction(tr("Delete"), this, &ContentBrowserWidget::DeleteSelectedAsset);
+            const QString Folder = Item->data(FolderPathRole).toString();
+            if (IsWritableGameFolder(Folder))
+            {
+                Menu.addAction(tr("New Folder"), this, &ContentBrowserWidget::CreateFolder);
+                if (Folder != "/Game")
+                {
+                    Menu.addAction(tr("Rename"), this, &ContentBrowserWidget::RenameSelectedFolder);
+                    Menu.addAction(tr("Delete"), this, &ContentBrowserWidget::DeleteSelectedFolder);
+                }
+            }
         }
+        else if (Item->data(ItemKindRole).toInt() == AssetItemKind)
+        {
+            Menu.addAction(tr("Copy"), this, &ContentBrowserWidget::CopySelectionToClipboard);
+            if (Item->data(VirtualPathRole).toString().startsWith("/Game/"))
+            {
+                Menu.addAction(tr("Rename"), this, &ContentBrowserWidget::RenameSelectedAsset);
+                Menu.addAction(tr("Delete"), this, &ContentBrowserWidget::DeleteSelectedAsset);
+            }
+        }
+        Menu.addSeparator();
+    }
+    else if (IsWritableGameFolder(CurrentFolder))
+    {
+        Menu.addAction(tr("New Folder"), this, &ContentBrowserWidget::CreateFolder);
         Menu.addSeparator();
     }
     QAction* PasteAction = Menu.addAction(tr("Paste"), this, &ContentBrowserWidget::PasteFromClipboard);
     PasteAction->setEnabled(
-        (CurrentFolder == "/Game" || CurrentFolder.startsWith("/Game/"))
+        IsWritableGameFolder(CurrentFolder)
         && QGuiApplication::clipboard()->mimeData()->hasFormat(SakuraAssetMimeType));
     Menu.exec(AssetView->viewport()->mapToGlobal(Position));
+}
+
+void ContentBrowserWidget::ShowSourcesContextMenu(const QPoint& Position)
+{
+    QTreeWidgetItem* Item = SourcesTree->itemAt(Position);
+    if (Item != nullptr)
+    {
+        SourcesTree->setCurrentItem(Item);
+        SetCurrentFolder(Item->data(0, FolderPathRole).toString());
+    }
+
+    const QString Folder = SelectedFolderPath();
+    QMenu Menu(this);
+    if (IsWritableGameFolder(Folder))
+    {
+        Menu.addAction(tr("New Folder"), this, &ContentBrowserWidget::CreateFolder);
+        if (Folder != "/Game" && Folder.startsWith("/Game/"))
+        {
+            Menu.addAction(tr("Rename"), this, &ContentBrowserWidget::RenameSelectedFolder);
+            Menu.addAction(tr("Delete"), this, &ContentBrowserWidget::DeleteSelectedFolder);
+        }
+    }
+    if (Menu.actions().isEmpty())
+    {
+        return;
+    }
+    Menu.exec(SourcesTree->viewport()->mapToGlobal(Position));
 }
 
 void ContentBrowserWidget::RenameSelectedAsset()
@@ -1075,7 +1149,7 @@ void ContentBrowserWidget::MoveAsset(
     {
         return;
     }
-    if (!SourceVirtualPath.startsWith("/Game/") || (DestinationFolder != "/Game" && !DestinationFolder.startsWith("/Game/")))
+    if (!SourceVirtualPath.startsWith("/Game/") || !IsWritableGameFolder(DestinationFolder))
     {
         QMessageBox::warning(this, tr("Move Failed"), tr("Assets can only be moved within Game Content."));
         return;
@@ -1095,6 +1169,344 @@ void ContentBrowserWidget::MoveAsset(
         return;
     }
     Refresh();
+}
+
+void ContentBrowserWidget::RenameSelection()
+{
+    QListWidgetItem* AssetItem = AssetView != nullptr ? AssetView->currentItem() : nullptr;
+    if (AssetItem != nullptr && AssetView->hasFocus())
+    {
+        if (AssetItem->data(ItemKindRole).toInt() == FolderItemKind)
+        {
+            RenameSelectedFolder();
+            return;
+        }
+        if (AssetItem->data(ItemKindRole).toInt() == AssetItemKind)
+        {
+            RenameSelectedAsset();
+            return;
+        }
+    }
+    RenameSelectedFolder();
+}
+
+void ContentBrowserWidget::DeleteSelection()
+{
+    QListWidgetItem* AssetItem = AssetView != nullptr ? AssetView->currentItem() : nullptr;
+    if (AssetItem != nullptr && AssetView->hasFocus())
+    {
+        if (AssetItem->data(ItemKindRole).toInt() == FolderItemKind)
+        {
+            DeleteSelectedFolder();
+            return;
+        }
+        if (AssetItem->data(ItemKindRole).toInt() == AssetItemKind)
+        {
+            DeleteSelectedAsset();
+            return;
+        }
+    }
+    DeleteSelectedFolder();
+}
+
+QString ContentBrowserWidget::SelectedFolderPath() const
+{
+    if (AssetView != nullptr && AssetView->hasFocus())
+    {
+        QListWidgetItem* Item = AssetView->currentItem();
+        if (Item != nullptr && Item->data(ItemKindRole).toInt() == FolderItemKind)
+        {
+            return Item->data(FolderPathRole).toString();
+        }
+    }
+    if (SourcesTree != nullptr)
+    {
+        QTreeWidgetItem* Item = SourcesTree->currentItem();
+        if (Item != nullptr)
+        {
+            return Item->data(0, FolderPathRole).toString();
+        }
+    }
+    return CurrentFolder;
+}
+
+bool ContentBrowserWidget::IsWritableGameFolder(const QString& Folder) const
+{
+    return Folder == "/Game" || Folder.startsWith("/Game/");
+}
+
+bool ContentBrowserWidget::ResolveGameFolderPath(const QString& VirtualFolder, std::filesystem::path& OutAbsolute) const
+{
+    if (Registry == nullptr || !IsWritableGameFolder(VirtualFolder))
+    {
+        return false;
+    }
+    AssetMount Mount = AssetMount::Game;
+    std::string RelativeInsideContent;
+    if (!AssetPath::TryParseVirtualPath(VirtualFolder.toStdString(), Mount, RelativeInsideContent)
+        || Mount != AssetMount::Game)
+    {
+        return false;
+    }
+    const std::filesystem::path ContentRoot = Registry->GetGameContentRoot().lexically_normal();
+    OutAbsolute = AssetPath::CombineContent(ContentRoot, RelativeInsideContent).lexically_normal();
+    if (OutAbsolute == ContentRoot)
+    {
+        return true;
+    }
+    std::filesystem::path Probe = OutAbsolute;
+    std::error_code Error;
+    while (!std::filesystem::exists(Probe, Error) && Probe.has_parent_path() && Probe != Probe.parent_path())
+    {
+        Probe = Probe.parent_path();
+    }
+    return AssetPath::IsInsideContent(Probe, ContentRoot);
+}
+
+void ContentBrowserWidget::CollectGameFoldersOnDisk(std::set<QString>& OutFolders) const
+{
+    if (Registry == nullptr || Registry->GetGameContentRoot().empty())
+    {
+        return;
+    }
+    const std::filesystem::path ContentRoot = Registry->GetGameContentRoot();
+    std::error_code Error;
+    if (!std::filesystem::exists(ContentRoot, Error))
+    {
+        return;
+    }
+    for (const std::filesystem::directory_entry& Entry
+        : std::filesystem::recursive_directory_iterator(ContentRoot, Error))
+    {
+        if (Error || !Entry.is_directory())
+        {
+            continue;
+        }
+        std::string Relative;
+        AssetDiagnostic Diagnostic{};
+        if (!AssetPath::TryMakeRelative(Entry.path(), ContentRoot, Relative, Diagnostic) || Relative.empty())
+        {
+            continue;
+        }
+        QString Folder = QString::fromStdString(AssetPath::MakeVirtualPath(AssetMount::Game, Relative));
+        while (Folder.count('/') > 1)
+        {
+            OutFolders.insert(Folder);
+            Folder = Folder.section('/', 0, -2);
+        }
+    }
+}
+
+void ContentBrowserWidget::RescanAndRefresh()
+{
+    if (Registry == nullptr)
+    {
+        return;
+    }
+    const AssetDiagnostic Result = Registry->ScanContent();
+    if (Result.HasError())
+    {
+        QMessageBox::warning(this, tr("Content Scan Failed"), QString::fromStdString(Result.Message));
+    }
+    Refresh();
+}
+
+void ContentBrowserWidget::CreateFolder()
+{
+    QString ParentFolder = CurrentFolder;
+    if (AssetView != nullptr)
+    {
+        QListWidgetItem* Item = AssetView->currentItem();
+        if (Item != nullptr && Item->data(ItemKindRole).toInt() == FolderItemKind)
+        {
+            ParentFolder = Item->data(FolderPathRole).toString();
+        }
+    }
+    if (Registry == nullptr || !IsWritableGameFolder(ParentFolder))
+    {
+        QMessageBox::warning(this, tr("New Folder Failed"), tr("Engine Content is read-only. Select a Game Content folder."));
+        return;
+    }
+
+    bool bAccepted = false;
+    const QString FolderName = QInputDialog::getText(
+        this,
+        tr("New Folder"),
+        tr("Folder name"),
+        QLineEdit::Normal,
+        tr("NewFolder"),
+        &bAccepted).trimmed();
+    if (!bAccepted)
+    {
+        return;
+    }
+    if (FolderName.isEmpty() || FolderName == "." || FolderName == ".."
+        || FolderName.contains('/') || FolderName.contains('\\'))
+    {
+        QMessageBox::warning(this, tr("New Folder Failed"), tr("Folder name must be a single non-empty name."));
+        return;
+    }
+
+    const QString NewFolder = ParentFolder + "/" + FolderName;
+    std::filesystem::path AbsoluteFolder;
+    if (!ResolveGameFolderPath(NewFolder, AbsoluteFolder))
+    {
+        QMessageBox::warning(this, tr("New Folder Failed"), tr("Destination is outside Game Content."));
+        return;
+    }
+    if (std::filesystem::exists(AbsoluteFolder))
+    {
+        QMessageBox::warning(this, tr("New Folder Failed"), tr("A folder with that name already exists."));
+        return;
+    }
+
+    std::error_code Error;
+    if (!std::filesystem::create_directories(AbsoluteFolder, Error) || Error)
+    {
+        QMessageBox::warning(
+            this,
+            tr("New Folder Failed"),
+            Error ? QString::fromStdString(Error.message()) : tr("Failed to create folder."));
+        return;
+    }
+
+    PrintString(std::string("ContentBrowser: created folder ") + NewFolder.toStdString());
+    Refresh();
+    SetCurrentFolder(NewFolder);
+}
+
+void ContentBrowserWidget::RenameSelectedFolder()
+{
+    const QString SourceFolder = SelectedFolderPath();
+    if (Registry == nullptr || !IsWritableGameFolder(SourceFolder) || SourceFolder == "/Game")
+    {
+        QMessageBox::warning(this, tr("Rename Failed"), tr("Only nested Game Content folders can be renamed."));
+        return;
+    }
+
+    bool bAccepted = false;
+    const QString NewName = QInputDialog::getText(
+        this,
+        tr("Rename Folder"),
+        tr("Folder name"),
+        QLineEdit::Normal,
+        SourceFolder.section('/', -1),
+        &bAccepted).trimmed();
+    if (!bAccepted)
+    {
+        return;
+    }
+    if (NewName.isEmpty() || NewName == "." || NewName == ".."
+        || NewName.contains('/') || NewName.contains('\\'))
+    {
+        QMessageBox::warning(this, tr("Rename Failed"), tr("Folder name must be a single non-empty name."));
+        return;
+    }
+
+    const QString DestinationFolder = SourceFolder.section('/', 0, -2) + "/" + NewName;
+    if (DestinationFolder == SourceFolder)
+    {
+        return;
+    }
+
+    std::filesystem::path SourceAbsolute;
+    std::filesystem::path DestinationAbsolute;
+    if (!ResolveGameFolderPath(SourceFolder, SourceAbsolute)
+        || !ResolveGameFolderPath(DestinationFolder, DestinationAbsolute))
+    {
+        QMessageBox::warning(this, tr("Rename Failed"), tr("Folder path is outside Game Content."));
+        return;
+    }
+    if (!std::filesystem::exists(SourceAbsolute))
+    {
+        QMessageBox::warning(this, tr("Rename Failed"), tr("Folder does not exist on disk."));
+        return;
+    }
+    if (std::filesystem::exists(DestinationAbsolute))
+    {
+        QMessageBox::warning(this, tr("Rename Failed"), tr("A folder with that name already exists."));
+        return;
+    }
+
+    std::error_code Error;
+    std::filesystem::rename(SourceAbsolute, DestinationAbsolute, Error);
+    if (Error)
+    {
+        QMessageBox::warning(this, tr("Rename Failed"), QString::fromStdString(Error.message()));
+        return;
+    }
+
+    PrintString(std::string("ContentBrowser: renamed folder ")
+        + SourceFolder.toStdString()
+        + " -> "
+        + DestinationFolder.toStdString());
+    if (CurrentFolder == SourceFolder || CurrentFolder.startsWith(SourceFolder + "/"))
+    {
+        CurrentFolder = DestinationFolder + CurrentFolder.mid(SourceFolder.size());
+    }
+    RescanAndRefresh();
+}
+
+void ContentBrowserWidget::DeleteSelectedFolder()
+{
+    const QString Folder = SelectedFolderPath();
+    if (Registry == nullptr || BoundEngine == nullptr || !IsWritableGameFolder(Folder) || Folder == "/Game")
+    {
+        QMessageBox::warning(this, tr("Delete Failed"), tr("Only nested Game Content folders can be deleted."));
+        return;
+    }
+
+    const auto Answer = QMessageBox::question(
+        this,
+        tr("Delete Folder"),
+        tr("Delete folder %1 and all assets inside it?\nExisting scene references will become missing.")
+            .arg(Folder),
+        QMessageBox::Yes | QMessageBox::No,
+        QMessageBox::No);
+    if (Answer != QMessageBox::Yes)
+    {
+        return;
+    }
+
+    std::filesystem::path AbsoluteFolder;
+    if (!ResolveGameFolderPath(Folder, AbsoluteFolder))
+    {
+        QMessageBox::warning(this, tr("Delete Failed"), tr("Folder path is outside Game Content."));
+        return;
+    }
+
+    for (const AssetRegistryEntry& Entry : CachedEntries)
+    {
+        const QString VirtualPath = QString::fromStdString(Entry.VirtualPath);
+        if (VirtualPath == Folder || VirtualPath.startsWith(Folder + "/"))
+        {
+            BoundEngine->GetAssetManager().InvalidateAsset(Entry.Metadata.Guid);
+            BoundEngine->GetAssetGpuUploader().InvalidateAsset(Entry.Metadata.Guid);
+        }
+    }
+
+    std::error_code Error;
+    if (std::filesystem::exists(AbsoluteFolder, Error))
+    {
+        std::filesystem::remove_all(AbsoluteFolder, Error);
+        if (Error)
+        {
+            QMessageBox::warning(this, tr("Delete Failed"), QString::fromStdString(Error.message()));
+            RescanAndRefresh();
+            return;
+        }
+    }
+
+    PrintString(std::string("ContentBrowser: deleted folder ") + Folder.toStdString());
+    if (CurrentFolder == Folder || CurrentFolder.startsWith(Folder + "/"))
+    {
+        CurrentFolder = Folder.section('/', 0, -2);
+        if (CurrentFolder.isEmpty())
+        {
+            CurrentFolder = "/Game";
+        }
+    }
+    RescanAndRefresh();
 }
 
 void ContentBrowserWidget::AddAssetItem(const AssetRegistryEntry& Entry)

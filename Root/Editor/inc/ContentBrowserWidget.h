@@ -6,6 +6,8 @@
 #include <QStringList>
 #include <QWidget>
 
+#include <filesystem>
+#include <set>
 #include <vector>
 
 class Engine;
@@ -48,10 +50,21 @@ private:
     void SelectImportFiles();
     void ImportFiles(const QStringList& SourceFiles);
     void ShowAssetContextMenu(const QPoint& Position);
+    void ShowSourcesContextMenu(const QPoint& Position);
     void RenameSelectedAsset();
     void DeleteSelectedAsset();
+    void CreateFolder();
+    void RenameSelectedFolder();
+    void DeleteSelectedFolder();
+    void RenameSelection();
+    void DeleteSelection();
     bool DuplicateClipboardAsset();
     void MoveAsset(const QString& SourceVirtualPath, const QString& DestinationFolder);
+    QString SelectedFolderPath() const;
+    bool IsWritableGameFolder(const QString& Folder) const;
+    bool ResolveGameFolderPath(const QString& VirtualFolder, std::filesystem::path& OutAbsolute) const;
+    void CollectGameFoldersOnDisk(std::set<QString>& OutFolders) const;
+    void RescanAndRefresh();
 
     Engine* BoundEngine = nullptr;
     AssetRegistry* Registry = nullptr;
