@@ -283,6 +283,8 @@ Python @register_class / field()
 
 ## Coding conventions (engine)
 
+- Editor gizmo overlay is a non-activating, input-transparent tool window. The native viewport owns mouse/keyboard input and forwards mouse events in viewport coordinates to the gizmo. Pass SimpleMath matrices directly to ImGuizmo without transposing; both store translation in the last four-float row. Windows fly navigation uses physical WASD/QE scan codes so the keyboard layout does not change camera controls.
+
 - Identifiers: PascalCase, no abbreviations, no type-wrapper suffixes (`Ptr`, `Ref`, `Handle`).
 - Booleans may use a `b` prefix (`bActive`, `bRunning`).
 - Always use braces for `if` / loops; no single-line conditionals.

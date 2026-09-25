@@ -37,6 +37,23 @@ constexpr float WheelDollyFactor = 0.12f;
 constexpr float MinMoveSpeed = 0.25f;
 constexpr float MaxMoveSpeed = 250.0f;
 
+int GetCameraNavigationKey(const QKeyEvent& Event)
+{
+#ifdef Q_OS_WIN
+    switch (Event.nativeScanCode())
+    {
+    case 0x11: return Qt::Key_W;
+    case 0x1f: return Qt::Key_S;
+    case 0x1e: return Qt::Key_A;
+    case 0x20: return Qt::Key_D;
+    case 0x10: return Qt::Key_Q;
+    case 0x12: return Qt::Key_E;
+    default: break;
+    }
+#endif
+    return Event.key();
+}
+
 float ClampPitch(float PitchDegrees)
 {
     return std::clamp(PitchDegrees, -MaxPitchDegrees, MaxPitchDegrees);
@@ -62,9 +79,12 @@ Vector3 DirectionFromYawPitch(float YawDegrees, float PitchDegrees)
 
 class EditorGizmoOverlay : public QWidget
 {
+    friend class EditorViewportWidget;
+
 public:
     explicit EditorGizmoOverlay(EditorViewportWidget* InOwner)
-        : QWidget(InOwner->window(), Qt::Tool | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint)
+        : QWidget(InOwner->window(), Qt::Tool | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint
+            | Qt::WindowTransparentForInput | Qt::WindowDoesNotAcceptFocus)
         , Owner(InOwner)
     {
         setAttribute(Qt::WA_TranslucentBackground, true);
@@ -146,25 +166,22 @@ protected:
                 Owner->GetViewCamera().NearPlane,
                 Owner->GetViewCamera().FarPlane);
             Matrix WorldMatrix = SelectedWorld.GetMatrix();
-            Matrix ImGuizmoView = ViewMatrix.Transpose();
-            Matrix ImGuizmoProjection = ProjectionMatrix.Transpose();
-            Matrix ImGuizmoWorld = WorldMatrix.Transpose();
             const ImGuizmo::OPERATION OperationMask =
                 ImGuizmo::TRANSLATE | ImGuizmo::ROTATE | ImGuizmo::SCALE;
             const bool bChanged = ImGuizmo::Manipulate(
-                &ImGuizmoView._11,
-                &ImGuizmoProjection._11,
+                &ViewMatrix._11,
+                &ProjectionMatrix._11,
                 OperationMask,
                 ImGuizmo::LOCAL,
-                &ImGuizmoWorld._11);
-            if (bChanged)
-            {
-                ApplyManipulatedWorld(ImGuizmoWorld.Transpose());
-            }
+                &WorldMatrix._11);
             if (ImGuizmo::IsUsing() && !bManipulating)
             {
                 DragStartLocal = SelectedLocal;
                 bManipulating = true;
+            }
+            if (bChanged)
+            {
+                ApplyManipulatedWorld(WorldMatrix);
             }
         }
 
@@ -182,7 +199,7 @@ protected:
         {
             ImGui::SetCurrentContext(ImGuiContextInstance);
             bLeftMouseDown = true;
-            bPressedOverGizmo = ImGuizmo::IsOver();
+            bPressedOverGizmo = bHasSelection && ImGuizmo::IsOver();
             bSelectionClickCandidate =
                 !bPressedOverGizmo
                 && Owner->bEditorToolsEnabled
@@ -485,21 +502,20 @@ void EditorViewportWidget::dropEvent(QDropEvent* Event)
 
 void EditorViewportWidget::mousePressEvent(QMouseEvent* Event)
 {
-    setFocus();
-    HandleCameraMousePress(Event);
-    RenderViewportWidget::mousePressEvent(Event);
+    Gizmo->mousePressEvent(Event);
+    Event->accept();
 }
 
 void EditorViewportWidget::mouseMoveEvent(QMouseEvent* Event)
 {
-    HandleCameraMouseMove(Event);
-    RenderViewportWidget::mouseMoveEvent(Event);
+    Gizmo->mouseMoveEvent(Event);
+    Event->accept();
 }
 
 void EditorViewportWidget::mouseReleaseEvent(QMouseEvent* Event)
 {
-    HandleCameraMouseRelease(Event);
-    RenderViewportWidget::mouseReleaseEvent(Event);
+    Gizmo->mouseReleaseEvent(Event);
+    Event->accept();
 }
 
 void EditorViewportWidget::wheelEvent(QWheelEvent* Event)
@@ -519,7 +535,7 @@ void EditorViewportWidget::keyReleaseEvent(QKeyEvent* Event)
 
 void EditorViewportWidget::focusOutEvent(QFocusEvent* Event)
 {
-    ResetCameraNavigation();
+    Gizmo->focusOutEvent(Event);
     RenderViewportWidget::focusOutEvent(Event);
 }
 
@@ -668,7 +684,7 @@ void EditorViewportWidget::HandleCameraKeyPress(QKeyEvent* Event)
     {
         return;
     }
-    HeldKeys.insert(Event->key());
+    HeldKeys.insert(GetCameraNavigationKey(*Event));
     if (ActiveCameraMode == CameraMode::FlyLook)
     {
         Event->accept();
@@ -681,7 +697,7 @@ void EditorViewportWidget::HandleCameraKeyRelease(QKeyEvent* Event)
     {
         return;
     }
-    HeldKeys.remove(Event->key());
+    HeldKeys.remove(GetCameraNavigationKey(*Event));
     if (ActiveCameraMode == CameraMode::FlyLook)
     {
         Event->accept();
