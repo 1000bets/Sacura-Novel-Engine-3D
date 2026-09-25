@@ -501,7 +501,7 @@ std::shared_ptr<const void> ModelLoader::Load(const AssetLoadContext& Context, A
 
     if (Context.SubAsset.has_value())
     {
-        if (Context.SubAsset->Type == AssetType::StaticMesh)
+        if (Context.SubAsset->Type == StaticMeshAssetType)
         {
             const int32_t MeshIndex = Context.SubAsset->Selector.Index;
             if (MeshIndex < 0 || MeshIndex >= static_cast<int32_t>(Document->Meshes.size()) || !Document->Meshes[static_cast<size_t>(MeshIndex)].Mesh)

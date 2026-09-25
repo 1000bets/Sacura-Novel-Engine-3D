@@ -12,7 +12,7 @@
 class ModelLoader : public IAssetLoader
 {
 public:
-    AssetType GetAssetType() const override { return AssetType::Model; }
+    AssetType GetAssetType() const override { return ModelAssetType; }
     const char* GetLoaderName() const override { return "ModelLoader"; }
 
     std::shared_ptr<const void> Load(const AssetLoadContext& Context, AssetDiagnostic& OutDiagnostic) override;

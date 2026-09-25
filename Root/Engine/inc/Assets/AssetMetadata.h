@@ -17,7 +17,7 @@ struct SubAssetSelector
 struct SubAssetRecord
 {
     SubAssetId Id{};
-    AssetType Type = AssetType::Unknown;
+    AssetType Type = UnknownAssetType;
     std::string Name;
     SubAssetSelector Selector{};
 };
@@ -26,13 +26,13 @@ struct AssetMetadata
 {
     int32_t SchemaVersion = 1;
     AssetId Guid{};
-    AssetType Type = AssetType::Unknown;
+    AssetType Type = UnknownAssetType;
     nlohmann::json LoadSettings = nlohmann::json::object();
     std::vector<SubAssetRecord> SubAssets;
     ContentHash SourceFingerprint{};
     nlohmann::json ImportInfo = nlohmann::json::object();
 
-    bool IsValid() const { return Guid.IsValid() && Type != AssetType::Unknown; }
+    bool IsValid() const { return Guid.IsValid() && Type.IsValid(); }
 };
 
 namespace AssetMetadataIO

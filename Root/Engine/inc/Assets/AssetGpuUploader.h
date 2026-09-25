@@ -47,6 +47,7 @@ public:
     bool TryGetMesh(const AssetKey& Key, MeshHandle& OutMesh) const;
     bool TryGetTexture(const AssetKey& Key, TextureHandle& OutTexture) const;
 
+    void InvalidateAsset(const AssetId& Id);
     void Clear();
     uint64_t GetSessionId() const { return SessionId.load(std::memory_order_acquire); }
 

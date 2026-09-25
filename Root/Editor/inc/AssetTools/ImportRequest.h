@@ -9,4 +9,5 @@ struct ImportRequest
     std::string DestinationRelativePath;
     std::filesystem::path StagingDirectory;
     bool bOverwrite = false;
+    bool bGenerateMissingNormals = true;
 };

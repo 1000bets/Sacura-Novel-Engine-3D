@@ -1,33 +1,23 @@
 #include "Assets/AssetTypes.h"
 
-const char* AssetTypeToString(AssetType Type)
+#include <functional>
+
+size_t AssetTypeHash::operator()(const AssetType& Type) const
 {
-    switch (Type)
-    {
-    case AssetType::Model: return "Model";
-    case AssetType::Texture: return "Texture";
-    case AssetType::Material: return "Material";
-    case AssetType::StaticMesh: return "StaticMesh";
-    case AssetType::SkeletalMesh: return "SkeletalMesh";
-    case AssetType::Skeleton: return "Skeleton";
-    case AssetType::AnimationClip: return "AnimationClip";
-    case AssetType::SkinBinding: return "SkinBinding";
-    default: return "Unknown";
-    }
+    return std::hash<std::string>{}(Type.GetIdentifier());
+}
+
+const char* AssetTypeToString(const AssetType& Type)
+{
+    return Type.IsValid() ? Type.GetIdentifier().c_str() : "Unknown";
 }
 
 bool TryParseAssetType(const std::string& Text, AssetType& OutType)
 {
-    if (Text == "Model") { OutType = AssetType::Model; return true; }
-    if (Text == "Texture") { OutType = AssetType::Texture; return true; }
-    if (Text == "Material") { OutType = AssetType::Material; return true; }
-    if (Text == "StaticMesh") { OutType = AssetType::StaticMesh; return true; }
-    if (Text == "SkeletalMesh") { OutType = AssetType::SkeletalMesh; return true; }
-    if (Text == "Skeleton") { OutType = AssetType::Skeleton; return true; }
-    if (Text == "AnimationClip") { OutType = AssetType::AnimationClip; return true; }
-    if (Text == "SkinBinding") { OutType = AssetType::SkinBinding; return true; }
-    OutType = AssetType::Unknown;
-    return false;
+    OutType = Text.empty() || Text == "Unknown"
+        ? UnknownAssetType
+        : AssetType(Text);
+    return OutType.IsValid();
 }
 
 bool AssetKey::operator==(const AssetKey& Other) const

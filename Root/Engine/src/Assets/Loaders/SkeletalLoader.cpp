@@ -531,12 +531,12 @@ std::shared_ptr<const void> SkeletalLoader::Load(const AssetLoadContext& Context
         }
     }
 
-    if (RequestedType == AssetType::Skeleton)
+    if (RequestedType == SkeletonAssetType)
     {
         return BuildSkeletonResource(Asset, static_cast<size_t>(SelectorIndex), OutDiagnostic, Context.Key, Context.Entry.RelativePath);
     }
 
-    if (RequestedType == AssetType::AnimationClip)
+    if (RequestedType == AnimationClipAssetType)
     {
         if (Asset.skins.empty())
         {
@@ -553,7 +553,7 @@ std::shared_ptr<const void> SkeletalLoader::Load(const AssetLoadContext& Context
         return BuildAnimationClip(Asset, static_cast<size_t>(SelectorIndex), *Skeleton->Skeleton, OutDiagnostic, Context.Key, Context.Entry.RelativePath);
     }
 
-    if (RequestedType == AssetType::SkeletalMesh || RequestedType == AssetType::SkinBinding || RequestedType == AssetType::Model)
+    if (RequestedType == SkeletalMeshAssetType || RequestedType == SkinBindingAssetType || RequestedType == ModelAssetType)
     {
         if (Asset.skins.empty())
         {
@@ -617,7 +617,7 @@ std::shared_ptr<const void> SkeletalLoader::Load(const AssetLoadContext& Context
             return nullptr;
         }
 
-        if (RequestedType == AssetType::SkinBinding)
+        if (RequestedType == SkinBindingAssetType)
         {
             return Binding;
         }

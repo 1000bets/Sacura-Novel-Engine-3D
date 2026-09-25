@@ -110,7 +110,8 @@ size_t AlignUp(size_t Value, size_t Alignment)
 
 ImportResult FbxToGlbConverter::Convert(
     const std::filesystem::path& SourceFbxPath,
-    const std::filesystem::path& DestinationGlbPath)
+    const std::filesystem::path& DestinationGlbPath,
+    bool bGenerateMissingNormals)
 {
     ImportResult Result{};
 
@@ -139,7 +140,7 @@ ImportResult FbxToGlbConverter::Convert(
     }
 
     ufbx_load_opts Options{};
-    Options.generate_missing_normals = true;
+    Options.generate_missing_normals = bGenerateMissingNormals;
     ufbx_error Error{};
     ufbx_scene* Scene = ufbx_load_file(SourceFbxPath.string().c_str(), &Options, &Error);
     if (Scene == nullptr)
@@ -372,6 +373,13 @@ ImportResult FbxToGlbConverter::Convert(
         return Result;
     }
 
+    SubAssetRecord MeshSubAsset{};
+    MeshSubAsset.Id = Guid::Generate();
+    MeshSubAsset.Type = StaticMeshAssetType;
+    MeshSubAsset.Name = "StaticMesh";
+    MeshSubAsset.Selector.Kind = "mesh";
+    MeshSubAsset.Selector.Index = 0;
+    Result.Metadata.SubAssets.push_back(std::move(MeshSubAsset));
     Result.PublishedAbsolutePath = DestinationGlbPath;
     return Result;
 }

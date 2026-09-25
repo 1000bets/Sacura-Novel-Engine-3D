@@ -5,21 +5,46 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <utility>
 
-enum class AssetType
+class AssetType
 {
-    Unknown = 0,
-    Model,
-    Texture,
-    Material,
-    StaticMesh,
-    SkeletalMesh,
-    Skeleton,
-    AnimationClip,
-    SkinBinding
+public:
+    AssetType() = default;
+    explicit AssetType(std::string Identifier)
+        : Value(std::move(Identifier))
+    {
+    }
+
+    bool IsValid() const { return !Value.empty(); }
+    const std::string& GetIdentifier() const { return Value; }
+
+    bool operator==(const AssetType& Other) const { return Value == Other.Value; }
+    bool operator!=(const AssetType& Other) const { return Value != Other.Value; }
+    bool operator<(const AssetType& Other) const { return Value < Other.Value; }
+
+private:
+    std::string Value;
 };
 
-const char* AssetTypeToString(AssetType Type);
+struct AssetTypeHash
+{
+    size_t operator()(const AssetType& Type) const;
+};
+
+inline const AssetType UnknownAssetType{};
+inline const AssetType SceneAssetType{"Scene"};
+inline const AssetType StoryAssetType{"Story"};
+inline const AssetType ModelAssetType{"Model"};
+inline const AssetType TextureAssetType{"Texture"};
+inline const AssetType MaterialAssetType{"Material"};
+inline const AssetType StaticMeshAssetType{"StaticMesh"};
+inline const AssetType SkeletalMeshAssetType{"SkeletalMesh"};
+inline const AssetType SkeletonAssetType{"Skeleton"};
+inline const AssetType AnimationClipAssetType{"AnimationClip"};
+inline const AssetType SkinBindingAssetType{"SkinBinding"};
+
+const char* AssetTypeToString(const AssetType& Type);
 bool TryParseAssetType(const std::string& Text, AssetType& OutType);
 
 struct AssetKey

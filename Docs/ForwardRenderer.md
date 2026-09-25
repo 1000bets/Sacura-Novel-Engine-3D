@@ -37,7 +37,7 @@ BLEND реализован через weighted blended OIT. Результат �
 
 `Engine::RegisterRenderSurface`, `ConfigureRenderSurface`, `ResizeRenderSurface`, `UnregisterRenderSurface` управляют независимыми native surfaces. Surface 1 создаёт device; следующие поверхности используют тот же device/context и собственные swapchain, размер, камеру, HDR/depth/OIT-буферы, атлас и query ring. Для нескольких native surfaces нужен D3D12 или Vulkan. OpenGL остаётся резервным вариантом одной поверхности.
 
-Редактор показывает Scene и Game одновременно. Scene использует EditWorld и редакторскую камеру; Game — активный мир и CameraComponent. API позволяет задавать отдельные настройки каждому виду. В редакторе есть общие controls для exposure, IBL, bloom и FXAA.
+Редактор использует один viewport. В Edit он показывает EditWorld через редакторскую камеру и ImGuizmo; при Play тот же surface переключается на PlayWorld и primary CameraComponent, а Hierarchy становится read-only представлением PlayWorld. API renderer сохраняет поддержку нескольких независимых surfaces для тестов и будущих инструментов. В редакторе есть общие controls для exposure, IBL, bloom и FXAA.
 
 Скрытые/нулевые поверхности приостанавливаются. Qt сообщает об уничтожении native surface до её удаления; detach ждёт GPU idle. Resize и shutdown также используют ожидание idle: это сознательно простой вариант, который может кратковременно остановить все поверхности при resize. В обычном кадре такого ожидания нет.
 

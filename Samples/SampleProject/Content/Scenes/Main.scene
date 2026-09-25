@@ -4,44 +4,149 @@
   "name": "Main",
   "objects": [
     {
+      "bActive": true,
+      "bVisual": true,
+      "components": [
+        {
+          "bEnabled": true,
+          "id": "obj_1_comp_1",
+          "properties": {
+            "aspect_ratio": 1.7777777910232544,
+            "far_plane": 1000.0,
+            "field_of_view": 60.0,
+            "near_plane": 0.10000000149011612,
+            "primary": true
+          },
+          "type": "engine.CameraComponent",
+          "typeVersion": 1
+        }
+      ],
       "id": "obj_1",
       "name": "Main Camera",
       "parent": null,
-      "bActive": true,
-      "bVisual": true,
       "transform": {
-        "position": [0.0, 1.6, 4.0],
-        "rotation": [0.0, 0.0, 0.0, 1.0],
-        "scale": [1.0, 1.0, 1.0]
-      },
-      "components": [
-        {
-          "id": "obj_1_comp_1",
-          "type": "engine.CameraComponent",
-          "typeVersion": 1,
-          "bEnabled": true,
-          "properties": {
-            "field_of_view": 60.0,
-            "near_plane": 0.1,
-            "far_plane": 1000.0,
-            "aspect_ratio": 1.777777791,
-            "primary": true
-          }
-        }
-      ]
+        "position": [
+          0.0,
+          2.5,
+          4.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      }
     },
     {
+      "bActive": true,
+      "bVisual": true,
+      "components": [],
       "id": "obj_2",
       "name": "Anchor",
       "parent": "obj_1",
+      "transform": {
+        "position": [
+          0.0,
+          0.0,
+          -2.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      }
+    },
+    {
       "bActive": true,
       "bVisual": true,
+      "components": [
+        {
+          "bEnabled": true,
+          "id": "2337df8c-2d76-4563-9ad7-7c015ed128d9",
+          "properties": {
+            "aspect_ratio": 1.7777777910232544,
+            "far_plane": 1000.0,
+            "field_of_view": 60.0,
+            "near_plane": 0.10000000149011612,
+            "primary": true
+          },
+          "type": "engine.CameraComponent",
+          "typeVersion": 1
+        }
+      ],
+      "id": "abb8fbc7-c147-4a33-9f33-9a3def852e95",
+      "name": "GameObject",
+      "parent": null,
       "transform": {
-        "position": [0.0, 0.0, -2.0],
-        "rotation": [0.0, 0.0, 0.0, 1.0],
-        "scale": [1.0, 1.0, 1.0]
-      },
-      "components": []
+        "position": [
+          -1.3199999332427979,
+          0.0,
+          0.0
+        ],
+        "rotation": [
+          0.0,
+          -0.14449243247509003,
+          0.0,
+          0.9895058870315552
+        ],
+        "scale": [
+          3.3600001335144043,
+          0.30000001192092896,
+          1.0
+        ]
+      }
+    },
+    {
+      "bActive": true,
+      "bVisual": true,
+      "components": [
+        {
+          "bEnabled": true,
+          "id": "bb68e635-b536-4358-b23f-7b294dfcd7c6",
+          "properties": {
+            "material_asset_id": "",
+            "mesh_asset_id": "5409950f-d6f6-43b9-8289-4b68286cc4fe",
+            "mesh_sub_asset_id": "f8877e20-2efb-4cad-82e8-76bd7e009951",
+            "visible": true
+          },
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1
+        }
+      ],
+      "id": "d7c29c6d-8ad3-4e2b-88a9-0799118fc5a4",
+      "name": "TestCube",
+      "parent": null,
+      "transform": {
+        "position": [
+          -0.8017673492431641,
+          -0.152268186211586,
+          0.0609072744846344
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      }
     }
   ]
 }

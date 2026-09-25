@@ -8,7 +8,7 @@ class SkeletalLoader : public IAssetLoader
 public:
     explicit SkeletalLoader(ModelLoader& SharedModelLoader);
 
-    AssetType GetAssetType() const override { return AssetType::SkeletalMesh; }
+    AssetType GetAssetType() const override { return SkeletalMeshAssetType; }
     const char* GetLoaderName() const override { return "SkeletalLoader"; }
 
     std::shared_ptr<const void> Load(const AssetLoadContext& Context, AssetDiagnostic& OutDiagnostic) override;

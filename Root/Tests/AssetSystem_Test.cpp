@@ -126,11 +126,11 @@ void TestGuidAndMeta(const std::filesystem::path& Root)
 
     AssetMetadata Metadata{};
     Metadata.Guid = First;
-    Metadata.Type = AssetType::Texture;
+    Metadata.Type = TextureAssetType;
     Metadata.SchemaVersion = 1;
     SubAssetRecord Sub{};
     Sub.Id = Guid::Generate();
-    Sub.Type = AssetType::StaticMesh;
+    Sub.Type = StaticMeshAssetType;
     Sub.Name = "Part";
     Sub.Selector = {"mesh", 0};
     Metadata.SubAssets.push_back(Sub);
@@ -141,6 +141,12 @@ void TestGuidAndMeta(const std::filesystem::path& Root)
     AssetMetadata Loaded{};
     Expect(AssetMetadataIO::TryLoadFromFile(MetaPath.string(), Loaded, Error), "Load .meta");
     Expect(Loaded.Guid == Metadata.Guid && Loaded.SubAssets.size() == 1, "Metadata preserves GUID/subassets");
+
+    AssetType ParsedType = UnknownAssetType;
+    Expect(TryParseAssetType(AssetTypeToString(SceneAssetType), ParsedType)
+        && ParsedType == SceneAssetType, "Scene asset type roundtrip");
+    Expect(TryParseAssetType(AssetTypeToString(StoryAssetType), ParsedType)
+        && ParsedType == StoryAssetType, "Story asset type roundtrip");
 
     AssetMetadata Bad{};
     nlohmann::json Broken = {{"schemaVersion", 99}, {"guid", First.ToString()}, {"assetType", "Texture"}};
@@ -158,7 +164,7 @@ void TestRegistry(const std::filesystem::path& Root)
 
     AssetMetadata Metadata{};
     Metadata.Guid = Guid::Generate();
-    Metadata.Type = AssetType::Texture;
+    Metadata.Type = TextureAssetType;
     ContentHash Hash{};
     AssetDiagnostic HashError{};
     Expect(ContentHash::TryHashFile((Root / "Content" / "Textures" / "Red.png").string(), Hash, HashError), "Hash texture");
@@ -181,12 +187,60 @@ void TestRegistry(const std::filesystem::path& Root)
     AssetDiagnostic DupError = Eng.GetAssetRegistry().RegisterExistingAsset("Textures/Other.png", Duplicate);
     Expect(DupError.Code == AssetErrorCode::DuplicateId, "Duplicate GUID diagnosed");
 
+    WriteMinimalPng(Root / "Content" / "Textures" / "Delete.png");
+    AssetMetadata DeleteMetadata{};
+    DeleteMetadata.Guid = Guid::Generate();
+    DeleteMetadata.Type = TextureAssetType;
+    Expect(
+        ContentHash::TryHashFile(
+            (Root / "Content" / "Textures" / "Delete.png").string(),
+            DeleteMetadata.SourceFingerprint,
+            HashError),
+        "Hash asset for deletion");
+    Expect(
+        !Eng.GetAssetRegistry().RegisterExistingAsset("Textures/Delete.png", DeleteMetadata).HasError(),
+        "Register asset for deletion");
+    Expect(
+        !Eng.GetAssetRegistry().DeletePair("Textures/Delete.png").HasError(),
+        "Delete data and metadata pair");
+    Expect(
+        !std::filesystem::exists(Root / "Content" / "Textures" / "Delete.png")
+            && !std::filesystem::exists(Root / "Content" / "Textures" / "Delete.png.meta"),
+        "Deleted asset files are absent");
+    Expect(!Eng.GetAssetRegistry().Exists(DeleteMetadata.Guid), "Deleted asset is unregistered");
+
     const std::filesystem::path CorruptMeta = Root / "Content" / "Textures" / "Broken.png.meta";
     {
         std::ofstream Stream(CorruptMeta);
         Stream << "{ not json";
     }
     WriteMinimalPng(Root / "Content" / "Textures" / "Broken.png");
+
+    std::filesystem::create_directories(Root / "Content" / "Scenes");
+    std::filesystem::create_directories(Root / "Content" / "Stories");
+    std::filesystem::create_directories(Root / "Content" / "Dialogue");
+    {
+        std::ofstream SceneStream(Root / "Content" / "Scenes" / "Main.scene");
+        SceneStream << R"({"format":"sakura.scene","version":1,"objects":[]})";
+    }
+    {
+        std::ofstream StoryStream(Root / "Content" / "Stories" / "Demo.story");
+        StoryStream << R"({"format":"sakura.story","version":1,"name":"Demo","startNodeId":"","nodes":[]})";
+    }
+    {
+        std::ofstream DialogueStream(Root / "Content" / "Dialogue" / "Opening.dialogue");
+        DialogueStream << R"({"line":"Hello"})";
+    }
+
+    const AssetType DialogueAssetType("game.Dialogue");
+    Expect(
+        !Eng.GetAssetRegistry().RegisterAssetType({
+            DialogueAssetType,
+            "Dialogue",
+            {".dialogue"},
+            true}).HasError(),
+        "Register project-defined asset type");
+
     Eng.GetAssetRegistry().ScanContent();
     bool FoundCorrupt = false;
     for (const AssetDiagnostic& Diagnostic : Eng.GetAssetRegistry().GetScanDiagnostics())
@@ -197,6 +251,28 @@ void TestRegistry(const std::filesystem::path& Root)
         }
     }
     Expect(FoundCorrupt, "Corrupt .meta diagnosed on scan");
+    AssetRegistryEntry SceneEntry{};
+    AssetRegistryEntry StoryEntry{};
+    AssetRegistryEntry DialogueEntry{};
+    Expect(
+        Eng.GetAssetRegistry().TryGetByPath("Scenes/Main.scene", SceneEntry)
+            && SceneEntry.Metadata.Type == SceneAssetType,
+        "Metadata-less scene discovered as asset");
+    Expect(
+        Eng.GetAssetRegistry().TryGetByPath("Stories/Demo.story", StoryEntry)
+            && StoryEntry.Metadata.Type == StoryAssetType,
+        "Metadata-less story discovered as asset");
+    Expect(
+        Eng.GetAssetRegistry().TryGetByPath("Dialogue/Opening.dialogue", DialogueEntry)
+            && DialogueEntry.Metadata.Type == DialogueAssetType,
+        "Project-defined extension discovered without engine enum changes");
+    Expect(
+        std::filesystem::exists(Root / "Content" / "Scenes" / "Main.scene.meta")
+            && std::filesystem::exists(Root / "Content" / "Stories" / "Demo.story.meta"),
+        "Document metadata generated beside Content files");
+    Expect(
+        !Eng.GetAssetRegistry().DeletePair("Dialogue/Opening.dialogue").HasError(),
+        "Project-defined asset uses common delete operation");
 
     Eng.Shutdown();
 }
@@ -253,7 +329,7 @@ void TestImportAndLoad(const std::filesystem::path& Root)
 
     AssetMetadata MaterialMeta{};
     MaterialMeta.Guid = Guid::Generate();
-    MaterialMeta.Type = AssetType::Material;
+    MaterialMeta.Type = MaterialAssetType;
     Expect(!Eng.GetAssetRegistry().RegisterExistingAsset("Materials/Basic.material", MaterialMeta).HasError(), "Register material");
 
     AssetKey MaterialKey{};
@@ -271,7 +347,7 @@ void TestImportAndLoad(const std::filesystem::path& Root)
     WriteMinimalMaterial(BrokenMaterialPath, MissingTexture);
     AssetMetadata BrokenMeta{};
     BrokenMeta.Guid = Guid::Generate();
-    BrokenMeta.Type = AssetType::Material;
+    BrokenMeta.Type = MaterialAssetType;
     Eng.GetAssetRegistry().RegisterExistingAsset("Materials/Broken.material", BrokenMeta);
     AssetKey BrokenKey{};
     BrokenKey.Asset = BrokenMeta.Guid;
@@ -281,21 +357,38 @@ void TestImportAndLoad(const std::filesystem::path& Root)
         || Eng.GetAssetManager().GetLastDiagnostic(BrokenKey).Code == AssetErrorCode::NotFound,
         "Dependency failure diagnostic");
 
+    Eng.GetAssetManager().InvalidateAsset(PngResult.Metadata.Guid);
+    Expect(
+        Eng.GetAssetManager().GetLoadState(TextureKey) == AssetLoadState::Unloaded,
+        "Invalidate asset removes loaded slots");
+
     Eng.Shutdown();
 }
 
-void TestGlbCreateImportAndLoad(const std::filesystem::path& Root)
+void TestGlbCubeImportAndLoad(const std::filesystem::path& Root)
 {
-    std::cout << "\n=== GLB create + import + load ===\n";
+    std::cout << "\n=== GLB cube import + load ===\n";
 
-    const auto ExternalGlb = Root / "External" / "Triangle.glb";
+    const auto ExternalGlb = Root / "External" / "Cube.glb";
     {
         std::vector<float> Positions = {
-            -0.5f, -0.5f, 0.f,
-             0.5f, -0.5f, 0.f,
-             0.0f,  0.5f, 0.f
+            -0.5f, -0.5f, -0.5f,
+             0.5f, -0.5f, -0.5f,
+             0.5f,  0.5f, -0.5f,
+            -0.5f,  0.5f, -0.5f,
+            -0.5f, -0.5f,  0.5f,
+             0.5f, -0.5f,  0.5f,
+             0.5f,  0.5f,  0.5f,
+            -0.5f,  0.5f,  0.5f
         };
-        std::vector<uint32_t> Indices = {0, 1, 2};
+        std::vector<uint32_t> Indices = {
+            0, 2, 1, 0, 3, 2,
+            4, 5, 6, 4, 6, 7,
+            0, 1, 5, 0, 5, 4,
+            3, 7, 6, 3, 6, 2,
+            0, 4, 7, 0, 7, 3,
+            1, 2, 6, 1, 6, 5
+        };
         std::vector<std::byte> BufferBytes(Positions.size() * sizeof(float) + Indices.size() * sizeof(uint32_t));
         std::memcpy(BufferBytes.data(), Positions.data(), Positions.size() * sizeof(float));
         std::memcpy(BufferBytes.data() + Positions.size() * sizeof(float), Indices.data(), Indices.size() * sizeof(uint32_t));
@@ -332,14 +425,14 @@ void TestGlbCreateImportAndLoad(const std::filesystem::path& Root)
         fastgltf::Accessor PositionAccessor{};
         PositionAccessor.bufferViewIndex = 0;
         PositionAccessor.componentType = fastgltf::ComponentType::Float;
-        PositionAccessor.count = 3;
+        PositionAccessor.count = Positions.size() / 3;
         PositionAccessor.type = fastgltf::AccessorType::Vec3;
         Asset.accessors.push_back(std::move(PositionAccessor));
 
         fastgltf::Accessor IndexAccessor{};
         IndexAccessor.bufferViewIndex = 1;
         IndexAccessor.componentType = fastgltf::ComponentType::UnsignedInt;
-        IndexAccessor.count = 3;
+        IndexAccessor.count = Indices.size();
         IndexAccessor.type = fastgltf::AccessorType::Scalar;
         Asset.accessors.push_back(std::move(IndexAccessor));
 
@@ -363,7 +456,7 @@ void TestGlbCreateImportAndLoad(const std::filesystem::path& Root)
 
         fastgltf::Exporter Exporter;
         auto ExportResult = Exporter.writeGltfBinary(Asset, fastgltf::ExportOptions::None);
-        Expect(static_cast<bool>(ExportResult), "Export triangle GLB");
+        Expect(static_cast<bool>(ExportResult), "Export cube GLB");
         if (!ExportResult)
         {
             return;
@@ -374,7 +467,7 @@ void TestGlbCreateImportAndLoad(const std::filesystem::path& Root)
         Output.write(
             reinterpret_cast<const char*>(ExportResult->output.data()),
             static_cast<std::streamsize>(ExportResult->output.size()));
-        Expect(static_cast<bool>(Output), "Write triangle GLB file");
+        Expect(static_cast<bool>(Output), "Write cube GLB file");
     }
 
     Engine Eng;
@@ -383,15 +476,62 @@ void TestGlbCreateImportAndLoad(const std::filesystem::path& Root)
 
     ImportRequest Request{};
     Request.SourcePath = ExternalGlb;
-    Request.DestinationRelativePath = "Models/Triangle.glb";
+    Request.DestinationRelativePath = "Models/Cube.glb";
     Request.StagingDirectory = Root / "Staging";
     ImportResult Result = Importer.Import(Request);
-    Expect(Result.Succeeded(), "Import triangle GLB");
+    Expect(Result.Succeeded(), "Import cube GLB");
     if (!Result.Succeeded())
     {
         std::cout << "  Import error: " << Result.Diagnostic.Message << '\n';
         Eng.Shutdown();
         return;
+    }
+
+    Expect(Result.Metadata.SubAssets.size() == 1, "Cube import publishes one mesh subasset");
+    if (Result.Metadata.SubAssets.size() != 1)
+    {
+        Eng.Shutdown();
+        return;
+    }
+    const SubAssetRecord& CubeMeshSubAsset = Result.Metadata.SubAssets.front();
+    Expect(CubeMeshSubAsset.Type == StaticMeshAssetType, "Cube subasset is StaticMesh");
+    Expect(CubeMeshSubAsset.Name == "Cube", "Single imported mesh uses container name");
+    Expect(CubeMeshSubAsset.Selector.Kind == "mesh", "Cube subasset selector kind");
+    Expect(CubeMeshSubAsset.Selector.Index == 0, "Cube subasset selector index");
+
+    ImportRequest DuplicateNameRequest = Request;
+    DuplicateNameRequest.DestinationRelativePath = "Other/Cube.glb";
+    ImportResult DuplicateNameResult = Importer.Import(DuplicateNameRequest);
+    Expect(DuplicateNameResult.Succeeded(), "Import second cube with duplicate source name");
+    Expect(
+        DuplicateNameResult.Metadata.SubAssets.size() == 1
+            && DuplicateNameResult.Metadata.SubAssets.front().Name == "Cube_2",
+        "Imported mesh receives project-unique name");
+    if (DuplicateNameResult.Succeeded() && DuplicateNameResult.Metadata.SubAssets.size() == 1)
+    {
+        AssetKey FirstMeshKey{};
+        FirstMeshKey.Asset = Result.Metadata.Guid;
+        FirstMeshKey.SubAsset = CubeMeshSubAsset.Id;
+        Expect(
+            Eng.GetAssetRegistry().RenameSubAsset(FirstMeshKey, "Cube_2").Code == AssetErrorCode::ImportConflict,
+            "Subasset rename rejects duplicate project name");
+        Expect(
+            !Eng.GetAssetRegistry().RenameSubAsset(FirstMeshKey, "RenamedCube").HasError(),
+            "Rename visible mesh asset");
+        Expect(
+            !Eng.GetAssetRegistry().RenameSubAsset(FirstMeshKey, "Cube").HasError(),
+            "Restore visible mesh asset name");
+
+        AssetKey SecondMeshKey{};
+        SecondMeshKey.Asset = DuplicateNameResult.Metadata.Guid;
+        SecondMeshKey.SubAsset = DuplicateNameResult.Metadata.SubAssets.front().Id;
+        Expect(
+            !Eng.GetAssetRegistry().DeleteSubAsset(SecondMeshKey).HasError(),
+            "Delete last mesh leaf and backing pair");
+        Expect(
+            !Eng.GetAssetRegistry().Exists(DuplicateNameResult.Metadata.Guid)
+                && !std::filesystem::exists(Root / "Content" / "Other" / "Cube.glb"),
+            "Deleting last leaf removes hidden container");
     }
 
     std::filesystem::remove(ExternalGlb);
@@ -408,6 +548,22 @@ void TestGlbCreateImportAndLoad(const std::filesystem::path& Root)
         Expect(!Model->Document->Meshes.empty(), "Model has mesh parts");
     }
 
+    AssetKey MeshKey{};
+    MeshKey.Asset = Result.Metadata.Guid;
+    MeshKey.SubAsset = CubeMeshSubAsset.Id;
+    Eng.GetAssetManager().LoadAsync<StaticMeshResource>(MeshKey);
+    Expect(PumpUntil(Eng, MeshKey, AssetLoadState::Ready), "Imported cube StaticMesh Ready");
+
+    AssetHandle<StaticMeshResource> CubeMesh;
+    Expect(
+        Eng.GetAssetManager().TryGetLoaded(MeshKey, CubeMesh) && CubeMesh.IsValid(),
+        "Imported cube StaticMesh loaded");
+    if (CubeMesh.IsValid())
+    {
+        Expect(CubeMesh->Vertices.size() == 8, "Imported cube has eight vertices");
+        Expect(CubeMesh->Indices.size() == 36, "Imported cube has twelve triangles");
+    }
+
     Eng.Shutdown();
 }
 
@@ -421,11 +577,11 @@ void TestAssetLoadContextOwnsSubAssetByValue()
         AssetRegistryEntry Entry{};
         Entry.RelativePath = "Models/Owned.glb";
         Entry.Metadata.Guid = Guid::Generate();
-        Entry.Metadata.Type = AssetType::Model;
+        Entry.Metadata.Type = ModelAssetType;
 
         SubAssetRecord Record{};
         Record.Id = ExpectedId;
-        Record.Type = AssetType::StaticMesh;
+        Record.Type = StaticMeshAssetType;
         Record.Name = "Mesh0";
         Record.Selector.Kind = "mesh";
         Record.Selector.Index = 2;
@@ -447,7 +603,7 @@ void TestAssetLoadContextOwnsSubAssetByValue()
     if (WorkerContext->SubAsset.has_value())
     {
         Expect(WorkerContext->SubAsset->Id == ExpectedId, "SubAssetId preserved");
-        Expect(WorkerContext->SubAsset->Type == AssetType::StaticMesh, "SubAsset Type preserved");
+        Expect(WorkerContext->SubAsset->Type == StaticMeshAssetType, "SubAsset Type preserved");
         Expect(WorkerContext->SubAsset->Selector.Index == 2, "Selector.Index preserved");
         Expect(WorkerContext->SubAsset->Name == "Mesh0", "SubAsset Name preserved");
     }
@@ -555,10 +711,10 @@ void TestSubAssetLoadAfterProducerReturns(const std::filesystem::path& Root)
 
     AssetMetadata Metadata{};
     Metadata.Guid = Guid::Generate();
-    Metadata.Type = AssetType::Model;
+    Metadata.Type = ModelAssetType;
     SubAssetRecord MeshSub{};
     MeshSub.Id = Guid::Generate();
-    MeshSub.Type = AssetType::StaticMesh;
+    MeshSub.Type = StaticMeshAssetType;
     MeshSub.Name = "Triangle";
     MeshSub.Selector.Kind = "mesh";
     MeshSub.Selector.Index = 0;
@@ -604,15 +760,14 @@ void TestAssetManagerLifetimeAndCancel(const std::filesystem::path& Root)
 {
     std::cout << "\n=== AssetManager lifetime / cancel / fault ===\n";
 
-    WriteMinimalPng(Root / "Content" / "Textures" / "Life.png");
-
     {
         Engine Eng;
         Eng.InitializeHeadless(Root / "Content");
+        WriteMinimalPng(Root / "Content" / "Textures" / "Life.png");
 
         AssetMetadata Metadata{};
         Metadata.Guid = Guid::Generate();
-        Metadata.Type = AssetType::Texture;
+        Metadata.Type = TextureAssetType;
         Eng.GetAssetRegistry().RegisterExistingAsset("Textures/Life.png", Metadata);
 
         auto ReleaseFlag = std::make_shared<std::atomic<bool>>(false);
@@ -657,7 +812,7 @@ void TestAssetManagerLifetimeAndCancel(const std::filesystem::path& Root)
 
         AssetMetadata Metadata{};
         Metadata.Guid = Guid::Generate();
-        Metadata.Type = AssetType::Texture;
+        Metadata.Type = TextureAssetType;
         Registry.RegisterExistingAsset("Textures/Life.png", Metadata);
 
         auto ReleaseFlag = std::make_shared<std::atomic<bool>>(false);
@@ -688,7 +843,7 @@ void TestAssetManagerLifetimeAndCancel(const std::filesystem::path& Root)
 
         AssetMetadata MaterialMeta{};
         MaterialMeta.Guid = Guid::Generate();
-        MaterialMeta.Type = AssetType::Material;
+        MaterialMeta.Type = MaterialAssetType;
         Eng.GetAssetRegistry().RegisterExistingAsset("Materials/LifeBroken.material", MaterialMeta);
 
         AssetKey MaterialKey{};
@@ -708,7 +863,7 @@ void TestHeadlessShutdown(const std::filesystem::path& Root)
     WriteMinimalPng(Root / "Content" / "Textures" / "Shutdown.png");
     AssetMetadata Metadata{};
     Metadata.Guid = Guid::Generate();
-    Metadata.Type = AssetType::Texture;
+    Metadata.Type = TextureAssetType;
     Eng.GetAssetRegistry().RegisterExistingAsset("Textures/Shutdown.png", Metadata);
 
     AssetKey Key{};
@@ -771,7 +926,7 @@ int main()
     TestRegistry(Root);
     TestAssetLoadContextOwnsSubAssetByValue();
     TestImportAndLoad(Root);
-    TestGlbCreateImportAndLoad(Root);
+    TestGlbCubeImportAndLoad(Root);
     TestSubAssetLoadAfterProducerReturns(Root);
     TestAssetManagerLifetimeAndCancel(Root);
     TestHeadlessShutdown(Root);

@@ -19,9 +19,19 @@ struct AssetRegistryEntry
     bool bRegistered = true;
 };
 
+struct AssetTypeRegistration
+{
+    AssetType Type = UnknownAssetType;
+    std::string DisplayName;
+    std::vector<std::string> Extensions;
+    bool bVisibleInContentBrowser = true;
+};
+
 class AssetRegistry
 {
 public:
+    AssetRegistry();
+
     void SetContentRoot(const std::filesystem::path& ContentRoot);
     void SetGameContentRoot(const std::filesystem::path& ContentRoot);
     void SetEngineContentRoot(const std::filesystem::path& ContentRoot);
@@ -32,6 +42,10 @@ public:
 
     void Clear();
     AssetDiagnostic ScanContent();
+
+    AssetDiagnostic RegisterAssetType(const AssetTypeRegistration& Registration);
+    bool TryGetAssetTypeRegistration(const AssetType& Type, AssetTypeRegistration& OutRegistration) const;
+    std::vector<AssetTypeRegistration> GetAssetTypeRegistrations() const;
 
     AssetDiagnostic RegisterExistingAsset(const std::string& RelativeOrVirtualPath, AssetMetadata Metadata);
     AssetDiagnostic Unregister(const AssetId& Id);
@@ -47,6 +61,10 @@ public:
     std::vector<AssetRegistryEntry> FindByDirectory(const std::string& RelativeOrVirtualDirectory) const;
 
     AssetDiagnostic RenamePair(const std::string& OldRelativeOrVirtualPath, const std::string& NewRelativeOrVirtualPath);
+    AssetDiagnostic DeletePair(const std::string& RelativeOrVirtualPath);
+    AssetDiagnostic RenameSubAsset(const AssetKey& Key, const std::string& NewName);
+    AssetDiagnostic DeleteSubAsset(const AssetKey& Key);
+    bool LeafNameExists(const std::string& Name, const AssetKey& IgnoredKey = {}) const;
 
     const std::vector<AssetDiagnostic>& GetScanDiagnostics() const { return ScanDiagnostics; }
 
@@ -58,11 +76,13 @@ private:
         AssetMount& OutMount,
         std::string& OutRelativeInsideContent,
         std::filesystem::path& OutContentRoot) const;
-    static AssetType InferTypeFromExtension(const std::string& RelativePath);
+    AssetType InferTypeFromExtension(const std::string& RelativePath) const;
 
     std::filesystem::path GameContentRoot;
     std::filesystem::path EngineContentRoot;
     std::unordered_map<AssetId, AssetRegistryEntry, GuidHash> EntriesById;
     std::unordered_map<std::string, AssetId> IdsByVirtualPath;
+    std::unordered_map<std::string, AssetTypeRegistration> TypeRegistrations;
+    std::unordered_map<std::string, AssetType> TypesByExtension;
     std::vector<AssetDiagnostic> ScanDiagnostics;
 };

@@ -2,18 +2,63 @@
 
 #include "EditorAssetMime.h"
 
+#include <imgui.h>
+#include <ImGuizmo.h>
+
+#include <QApplication>
+#include <QCursor>
 #include <QDragEnterEvent>
+#include <QDragMoveEvent>
 #include <QDropEvent>
+#include <QFocusEvent>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QResizeEvent>
+#include <QTimer>
+#include <QWheelEvent>
 
 #include <algorithm>
-#include <array>
 #include <cmath>
 
 using namespace DirectX::SimpleMath;
+
+namespace
+{
+constexpr float DegreesToRadians = 0.01745329251994329577f;
+constexpr float RadiansToDegrees = 57.2957795130823208768f;
+constexpr float MinFocusDistance = 0.25f;
+constexpr float MaxPitchDegrees = 89.0f;
+constexpr float LookSensitivity = 0.18f;
+constexpr float OrbitSensitivity = 0.25f;
+constexpr float PanSensitivity = 0.01f;
+constexpr float DollySensitivity = 0.0025f;
+constexpr float WheelDollyFactor = 0.12f;
+constexpr float MinMoveSpeed = 0.25f;
+constexpr float MaxMoveSpeed = 250.0f;
+
+float ClampPitch(float PitchDegrees)
+{
+    return std::clamp(PitchDegrees, -MaxPitchDegrees, MaxPitchDegrees);
+}
+
+void ExtractYawPitch(const Vector3& Forward, float& OutYawDegrees, float& OutPitchDegrees)
+{
+    const Vector3 SafeForward = Forward.LengthSquared() > 0.000001f ? Forward : Vector3::Forward;
+    OutYawDegrees = std::atan2(SafeForward.x, SafeForward.z) * RadiansToDegrees;
+    OutPitchDegrees = std::asin(std::clamp(SafeForward.y, -1.0f, 1.0f)) * RadiansToDegrees;
+}
+
+Vector3 DirectionFromYawPitch(float YawDegrees, float PitchDegrees)
+{
+    const float Yaw = YawDegrees * DegreesToRadians;
+    const float Pitch = PitchDegrees * DegreesToRadians;
+    const float CosPitch = std::cos(Pitch);
+    Vector3 Direction(std::sin(Yaw) * CosPitch, std::sin(Pitch), std::cos(Yaw) * CosPitch);
+    Direction.Normalize();
+    return Direction;
+}
+}
 
 class EditorGizmoOverlay : public QWidget
 {
@@ -26,7 +71,19 @@ public:
         setAttribute(Qt::WA_ShowWithoutActivating, true);
         setMouseTracking(true);
         setAcceptDrops(true);
-        setFocusPolicy(Qt::ClickFocus);
+        setFocusPolicy(Qt::StrongFocus);
+        ImGuiContextInstance = ImGui::CreateContext();
+        ImGui::SetCurrentContext(ImGuiContextInstance);
+        ImGui::GetIO().IniFilename = nullptr;
+        unsigned char* FontPixels = nullptr;
+        int FontWidth = 0;
+        int FontHeight = 0;
+        ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&FontPixels, &FontWidth, &FontHeight);
+    }
+
+    ~EditorGizmoOverlay() override
+    {
+        ImGui::DestroyContext(ImGuiContextInstance);
     }
 
     void SyncGeometry()
@@ -36,6 +93,7 @@ public:
         {
             show();
             raise();
+            update();
         }
     }
 
@@ -50,159 +108,147 @@ public:
     void ClearSelectedTransform()
     {
         bHasSelection = false;
-        bDragging = false;
+        bManipulating = false;
         update();
     }
 
-    void SetOperation(EditorGizmoOperation InOperation)
+    bool IsManipulating() const
     {
-        Operation = InOperation;
-        update();
+        return bManipulating;
     }
 
 protected:
     void paintEvent(QPaintEvent*) override
     {
+        ImGui::SetCurrentContext(ImGuiContextInstance);
+        ImGuiIO& InputOutput = ImGui::GetIO();
+        InputOutput.DisplaySize = ImVec2(static_cast<float>(width()), static_cast<float>(height()));
+        InputOutput.DeltaTime = 1.0f / 60.0f;
+        InputOutput.MousePos = ImVec2(static_cast<float>(MousePosition.x()), static_cast<float>(MousePosition.y()));
+        const bool bAllowGizmoMouse =
+            bLeftMouseDown
+            && !Owner->IsCameraNavigationActive()
+            && (QApplication::keyboardModifiers() & Qt::AltModifier) == Qt::NoModifier;
+        InputOutput.MouseDown[0] = bAllowGizmoMouse;
+        ImGui::NewFrame();
+        ImGuizmo::BeginFrame();
+        ImGuizmo::SetRect(0.0f, 0.0f, static_cast<float>(width()), static_cast<float>(height()));
+
+        if (bHasSelection && !Owner->IsCameraNavigationActive())
+        {
+            Matrix ViewMatrix = Matrix::CreateLookAt(
+                Owner->GetViewCamera().Position,
+                Owner->GetViewCamera().Target,
+                Owner->GetViewCamera().Up);
+            Matrix ProjectionMatrix = Matrix::CreatePerspectiveFieldOfView(
+                Owner->GetViewCamera().FieldOfViewDegrees * DegreesToRadians,
+                static_cast<float>(std::max(1, width())) / static_cast<float>(std::max(1, height())),
+                Owner->GetViewCamera().NearPlane,
+                Owner->GetViewCamera().FarPlane);
+            Matrix WorldMatrix = SelectedWorld.GetMatrix();
+            Matrix ImGuizmoView = ViewMatrix.Transpose();
+            Matrix ImGuizmoProjection = ProjectionMatrix.Transpose();
+            Matrix ImGuizmoWorld = WorldMatrix.Transpose();
+            const ImGuizmo::OPERATION OperationMask =
+                ImGuizmo::TRANSLATE | ImGuizmo::ROTATE | ImGuizmo::SCALE;
+            const bool bChanged = ImGuizmo::Manipulate(
+                &ImGuizmoView._11,
+                &ImGuizmoProjection._11,
+                OperationMask,
+                ImGuizmo::LOCAL,
+                &ImGuizmoWorld._11);
+            if (bChanged)
+            {
+                ApplyManipulatedWorld(ImGuizmoWorld.Transpose());
+            }
+            if (ImGuizmo::IsUsing() && !bManipulating)
+            {
+                DragStartLocal = SelectedLocal;
+                bManipulating = true;
+            }
+        }
+
+        ImGui::Render();
         QPainter Painter(this);
         Painter.setRenderHint(QPainter::Antialiasing, true);
-        Painter.setPen(QColor(225, 215, 222));
-        Painter.drawText(QRect(8, 6, 210, 22), Qt::AlignLeft | Qt::AlignVCenter,
-            Operation == EditorGizmoOperation::Translate ? tr("W  Move")
-            : Operation == EditorGizmoOperation::Rotate ? tr("E  Rotate")
-            : tr("R  Scale"));
-        if (!bHasSelection)
-        {
-            return;
-        }
-        QPointF Center;
-        if (!Project(SelectedWorld.Position, Center))
-        {
-            return;
-        }
-        const std::array<Vector3, 3> Axes = {Vector3::Right, Vector3::Up, Vector3::Backward};
-        const std::array<QColor, 3> Colors = {QColor(235, 72, 72), QColor(82, 220, 112), QColor(80, 145, 245)};
-        for (int AxisIndex = 0; AxisIndex < 3; ++AxisIndex)
-        {
-            Painter.setPen(QPen(Colors[AxisIndex], ActiveAxis == AxisIndex ? 5.0 : 3.0));
-            if (Operation == EditorGizmoOperation::Rotate)
-            {
-                const double Radius = 35.0 + AxisIndex * 7.0;
-                Painter.drawEllipse(Center, Radius, Radius);
-                continue;
-            }
-            QPointF End;
-            if (!Project(SelectedWorld.Position + Axes[AxisIndex], End))
-            {
-                continue;
-            }
-            QLineF Direction(Center, End);
-            Direction.setLength(72.0);
-            Painter.drawLine(Direction);
-            if (Operation == EditorGizmoOperation::Translate)
-            {
-                Painter.drawEllipse(Direction.p2(), 4.0, 4.0);
-            }
-            else
-            {
-                Painter.drawRect(QRectF(Direction.p2().x() - 4.0, Direction.p2().y() - 4.0, 8.0, 8.0));
-            }
-        }
-    }
-
-    void keyPressEvent(QKeyEvent* Event) override
-    {
-        if (Event->key() == Qt::Key_W)
-        {
-            SetOperation(EditorGizmoOperation::Translate);
-        }
-        else if (Event->key() == Qt::Key_E)
-        {
-            SetOperation(EditorGizmoOperation::Rotate);
-        }
-        else if (Event->key() == Qt::Key_R)
-        {
-            SetOperation(EditorGizmoOperation::Scale);
-        }
-        else
-        {
-            QWidget::keyPressEvent(Event);
-        }
+        DrawImGui(Painter, ImGui::GetDrawData());
     }
 
     void mousePressEvent(QMouseEvent* Event) override
     {
-        setFocus();
-        if (Event->button() != Qt::LeftButton || !bHasSelection)
+        Owner->setFocus(Qt::MouseFocusReason);
+        MousePosition = Event->position();
+        if (Event->button() == Qt::LeftButton)
         {
-            return;
+            ImGui::SetCurrentContext(ImGuiContextInstance);
+            bLeftMouseDown = true;
+            bPressedOverGizmo = ImGuizmo::IsOver();
+            bSelectionClickCandidate =
+                !bPressedOverGizmo
+                && Owner->bEditorToolsEnabled
+                && !Owner->IsCameraNavigationActive()
+                && (Event->modifiers() & Qt::AltModifier) == Qt::NoModifier;
+            PressPosition = Event->position();
         }
-        ActiveAxis = HitTest(Event->position());
-        if (ActiveAxis < 0)
-        {
-            update();
-            return;
-        }
-        DragStart = Event->position();
-        DragStartLocal = SelectedLocal;
-        bDragging = true;
+        Owner->HandleCameraMousePress(Event);
         update();
     }
 
     void mouseMoveEvent(QMouseEvent* Event) override
     {
-        if (!bDragging || ActiveAxis < 0)
-        {
-            return;
-        }
-        const QPointF Movement = Event->position() - DragStart;
-        const float SignedPixels = static_cast<float>(Movement.x() - Movement.y());
-        Transform Updated = DragStartLocal;
-        const Vector3 Axis = ActiveAxis == 0 ? Vector3::Right : ActiveAxis == 1 ? Vector3::Up : Vector3::Backward;
-        if (Operation == EditorGizmoOperation::Translate)
-        {
-            Updated.Position += Axis * (SignedPixels * 0.015f);
-        }
-        else if (Operation == EditorGizmoOperation::Rotate)
-        {
-            Updated.Rotation = Quaternion::CreateFromAxisAngle(Axis, SignedPixels * 0.01f) * DragStartLocal.Rotation;
-            Updated.Rotation.Normalize();
-        }
-        else
-        {
-            const float Amount = SignedPixels * 0.01f;
-            if (ActiveAxis == 0)
-            {
-                Updated.Scale.x = std::max(0.001f, DragStartLocal.Scale.x + Amount);
-            }
-            else if (ActiveAxis == 1)
-            {
-                Updated.Scale.y = std::max(0.001f, DragStartLocal.Scale.y + Amount);
-            }
-            else
-            {
-                Updated.Scale.z = std::max(0.001f, DragStartLocal.Scale.z + Amount);
-            }
-        }
-        SelectedLocal = Updated;
-        if (Owner->PreviewCallback)
-        {
-            Owner->PreviewCallback(Updated);
-        }
+        MousePosition = Event->position();
+        Owner->HandleCameraMouseMove(Event);
         update();
     }
 
     void mouseReleaseEvent(QMouseEvent* Event) override
     {
-        if (Event->button() == Qt::LeftButton && bDragging)
+        MousePosition = Event->position();
+        Owner->HandleCameraMouseRelease(Event);
+        if (Event->button() == Qt::LeftButton)
         {
-            bDragging = false;
-            if (Owner->CommitCallback)
+            bLeftMouseDown = false;
+            update();
+            const bool bWasManipulating = bManipulating;
+            if (bManipulating && Owner->CommitCallback)
             {
                 Owner->CommitCallback(DragStartLocal, SelectedLocal);
             }
-            ActiveAxis = -1;
-            update();
+            bManipulating = false;
+            const QPointF ClickDelta = Event->position() - PressPosition;
+            if (!bWasManipulating
+                && bSelectionClickCandidate
+                && ClickDelta.manhattanLength() <= 4.0
+                && Owner->bEditorToolsEnabled)
+            {
+                emit Owner->ObjectSelectionRequested(Event->position().toPoint());
+            }
+            bPressedOverGizmo = false;
+            bSelectionClickCandidate = false;
         }
+    }
+
+    void wheelEvent(QWheelEvent* Event) override
+    {
+        Owner->HandleCameraWheel(Event);
+    }
+
+    void keyPressEvent(QKeyEvent* Event) override
+    {
+        Owner->HandleCameraKeyPress(Event);
+    }
+
+    void keyReleaseEvent(QKeyEvent* Event) override
+    {
+        Owner->HandleCameraKeyRelease(Event);
+    }
+
+    void focusOutEvent(QFocusEvent* Event) override
+    {
+        Owner->ResetCameraNavigation();
+        bLeftMouseDown = false;
+        bManipulating = false;
+        QWidget::focusOutEvent(Event);
     }
 
     void dragEnterEvent(QDragEnterEvent* Event) override
@@ -210,7 +256,18 @@ protected:
         EditorAssetPayload Payload;
         if (DecodeEditorAssetPayload(Event->mimeData(), Payload))
         {
-            Event->acceptProposedAction();
+            Event->setDropAction(Qt::CopyAction);
+            Event->accept();
+        }
+    }
+
+    void dragMoveEvent(QDragMoveEvent* Event) override
+    {
+        EditorAssetPayload Payload;
+        if (DecodeEditorAssetPayload(Event->mimeData(), Payload))
+        {
+            Event->setDropAction(Qt::CopyAction);
+            Event->accept();
         }
     }
 
@@ -224,99 +281,118 @@ protected:
         emit Owner->AssetDropped(
             QString::fromStdString(Payload.Key.Asset.ToString()),
             Payload.Key.HasSubAsset() ? QString::fromStdString(Payload.Key.SubAsset->ToString()) : QString{},
-            static_cast<int>(Payload.Type),
+            QString::fromStdString(Payload.Type.GetIdentifier()),
             Payload.VirtualPath,
             Event->position().toPoint());
-        Event->acceptProposedAction();
+        Event->setDropAction(Qt::CopyAction);
+        Event->accept();
     }
 
 private:
-    bool Project(const Vector3& Position, QPointF& OutPosition) const
+    void ApplyManipulatedWorld(const Matrix& WorldMatrix)
     {
-        const RenderViewCamera& Camera = Owner->GetViewCamera();
-        const float AspectRatio = static_cast<float>(std::max(1, width())) / static_cast<float>(std::max(1, height()));
-        const Matrix ViewProjection = Matrix::CreateLookAt(Camera.Position, Camera.Target, Camera.Up)
-            * Matrix::CreatePerspectiveFieldOfView(
-                Camera.FieldOfViewDegrees * 0.0174532925f,
-                AspectRatio,
-                Camera.NearPlane,
-                Camera.FarPlane);
-        const Vector4 Clip = Vector4::Transform(Vector4(Position.x, Position.y, Position.z, 1.f), ViewProjection);
-        if (Clip.w <= 0.001f)
+        Matrix ParentWorld = SelectedLocal.GetMatrix().Invert() * SelectedWorld.GetMatrix();
+        Matrix LocalMatrix = WorldMatrix * ParentWorld.Invert();
+        Transform Updated;
+        if (!LocalMatrix.Decompose(Updated.Scale, Updated.Rotation, Updated.Position))
         {
-            return false;
+            return;
         }
-        OutPosition = QPointF(
-            (Clip.x / Clip.w * 0.5f + 0.5f) * width(),
-            (0.5f - Clip.y / Clip.w * 0.5f) * height());
-        return true;
+        Updated.Rotation.Normalize();
+        SelectedLocal = Updated;
+        Matrix UpdatedWorld = WorldMatrix;
+        UpdatedWorld.Decompose(SelectedWorld.Scale, SelectedWorld.Rotation, SelectedWorld.Position);
+        SelectedWorld.Rotation.Normalize();
+        if (Owner->PreviewCallback)
+        {
+            Owner->PreviewCallback(Updated);
+        }
     }
 
-    int HitTest(const QPointF& Position) const
+    void DrawImGui(QPainter& Painter, const ImDrawData* DrawData)
     {
-        QPointF Center;
-        if (!Project(SelectedWorld.Position, Center))
+        if (DrawData == nullptr)
         {
-            return -1;
+            return;
         }
-        if (Operation == EditorGizmoOperation::Rotate)
+        for (int ListIndex = 0; ListIndex < DrawData->CmdListsCount; ++ListIndex)
         {
-            const double Distance = QLineF(Center, Position).length();
-            for (int AxisIndex = 0; AxisIndex < 3; ++AxisIndex)
+            const ImDrawList* DrawList = DrawData->CmdLists[ListIndex];
+            for (int CommandIndex = 0; CommandIndex < DrawList->CmdBuffer.Size; ++CommandIndex)
             {
-                if (std::abs(Distance - (35.0 + AxisIndex * 7.0)) <= 6.0)
+                const ImDrawCmd& Command = DrawList->CmdBuffer[CommandIndex];
+                Painter.save();
+                Painter.setClipRect(QRectF(
+                    Command.ClipRect.x,
+                    Command.ClipRect.y,
+                    Command.ClipRect.z - Command.ClipRect.x,
+                    Command.ClipRect.w - Command.ClipRect.y));
+                for (unsigned int ElementIndex = 0; ElementIndex + 2 < Command.ElemCount; ElementIndex += 3)
                 {
-                    return AxisIndex;
+                    QPolygonF Triangle;
+                    QColor TriangleColor;
+                    ImVec2 FirstTextureCoordinate;
+                    bool bSolidTriangle = true;
+                    for (unsigned int VertexOffset = 0; VertexOffset < 3; ++VertexOffset)
+                    {
+                        const ImDrawIdx VertexIndex = DrawList->IdxBuffer[
+                            static_cast<int>(Command.IdxOffset + ElementIndex + VertexOffset)];
+                        const ImDrawVert& Vertex = DrawList->VtxBuffer[
+                            static_cast<int>(Command.VtxOffset + VertexIndex)];
+                        Triangle << QPointF(Vertex.pos.x, Vertex.pos.y);
+                        if (VertexOffset == 0)
+                        {
+                            FirstTextureCoordinate = Vertex.uv;
+                            TriangleColor = QColor(
+                                static_cast<int>((Vertex.col >> IM_COL32_R_SHIFT) & 0xff),
+                                static_cast<int>((Vertex.col >> IM_COL32_G_SHIFT) & 0xff),
+                                static_cast<int>((Vertex.col >> IM_COL32_B_SHIFT) & 0xff),
+                                static_cast<int>((Vertex.col >> IM_COL32_A_SHIFT) & 0xff));
+                        }
+                        else if (std::abs(Vertex.uv.x - FirstTextureCoordinate.x) > 0.000001f
+                            || std::abs(Vertex.uv.y - FirstTextureCoordinate.y) > 0.000001f)
+                        {
+                            bSolidTriangle = false;
+                        }
+                    }
+                    if (!bSolidTriangle)
+                    {
+                        continue;
+                    }
+                    Painter.setPen(Qt::NoPen);
+                    Painter.setBrush(TriangleColor);
+                    Painter.drawPolygon(Triangle);
                 }
-            }
-            return -1;
-        }
-        const std::array<Vector3, 3> Axes = {Vector3::Right, Vector3::Up, Vector3::Backward};
-        double BestDistance = 10.0;
-        int BestAxis = -1;
-        for (int AxisIndex = 0; AxisIndex < 3; ++AxisIndex)
-        {
-            QPointF AxisPoint;
-            if (!Project(SelectedWorld.Position + Axes[AxisIndex], AxisPoint))
-            {
-                continue;
-            }
-            QLineF AxisLine(Center, AxisPoint);
-            AxisLine.setLength(72.0);
-            const QPointF Direction = AxisLine.p2() - AxisLine.p1();
-            const double LengthSquared = Direction.x() * Direction.x() + Direction.y() * Direction.y();
-            const QPointF Offset = Position - Center;
-            const double Alpha = std::clamp(
-                (Offset.x() * Direction.x() + Offset.y() * Direction.y()) / LengthSquared,
-                0.0,
-                1.0);
-            const QPointF Closest = Center + Direction * Alpha;
-            const double Distance = QLineF(Closest, Position).length();
-            if (Distance < BestDistance)
-            {
-                BestDistance = Distance;
-                BestAxis = AxisIndex;
+                Painter.restore();
             }
         }
-        return BestAxis;
     }
 
     EditorViewportWidget* Owner = nullptr;
+    ImGuiContext* ImGuiContextInstance = nullptr;
     Transform SelectedLocal{};
     Transform SelectedWorld{};
     Transform DragStartLocal{};
-    QPointF DragStart;
-    EditorGizmoOperation Operation = EditorGizmoOperation::Translate;
-    int ActiveAxis = -1;
+    QPointF MousePosition;
+    QPointF PressPosition;
     bool bHasSelection = false;
-    bool bDragging = false;
+    bool bLeftMouseDown = false;
+    bool bManipulating = false;
+    bool bPressedOverGizmo = false;
+    bool bSelectionClickCandidate = false;
 };
 
 EditorViewportWidget::EditorViewportWidget(QWidget* Parent)
     : RenderViewportWidget(Parent)
 {
+    setAcceptDrops(true);
+    setFocusPolicy(Qt::StrongFocus);
+    setMouseTracking(true);
     Gizmo = new EditorGizmoOverlay(this);
     Gizmo->SyncGeometry();
+    NavigationTimer = new QTimer(this);
+    NavigationTimer->setInterval(16);
+    connect(NavigationTimer, &QTimer::timeout, this, &EditorViewportWidget::TickCameraNavigation);
 }
 
 void EditorViewportWidget::SetSelectedTransform(const Transform& LocalTransform, const Transform& WorldTransform)
@@ -335,14 +411,13 @@ void EditorViewportWidget::SetTransformCallbacks(TransformPreviewCallback Previe
     CommitCallback = std::move(Commit);
 }
 
-void EditorViewportWidget::SetGizmoOperation(EditorGizmoOperation Operation)
-{
-    Gizmo->SetOperation(Operation);
-}
-
 void EditorViewportWidget::SetEditorToolsEnabled(bool bEnabled)
 {
     bEditorToolsEnabled = bEnabled;
+    if (!bEnabled)
+    {
+        ResetCameraNavigation();
+    }
     SyncGizmoOverlay();
 }
 
@@ -354,6 +429,98 @@ void EditorViewportWidget::SyncGizmoOverlay()
         return;
     }
     Gizmo->SyncGeometry();
+}
+
+bool EditorViewportWidget::IsCameraNavigationActive() const
+{
+    return ActiveCameraMode != CameraMode::None;
+}
+
+void EditorViewportWidget::SetCameraMoveSpeed(float Speed)
+{
+    MoveSpeed = std::clamp(Speed, MinMoveSpeed, MaxMoveSpeed);
+}
+
+float EditorViewportWidget::GetCameraMoveSpeed() const
+{
+    return MoveSpeed;
+}
+
+void EditorViewportWidget::dragEnterEvent(QDragEnterEvent* Event)
+{
+    EditorAssetPayload Payload;
+    if (DecodeEditorAssetPayload(Event->mimeData(), Payload))
+    {
+        Event->setDropAction(Qt::CopyAction);
+        Event->accept();
+    }
+}
+
+void EditorViewportWidget::dragMoveEvent(QDragMoveEvent* Event)
+{
+    EditorAssetPayload Payload;
+    if (DecodeEditorAssetPayload(Event->mimeData(), Payload))
+    {
+        Event->setDropAction(Qt::CopyAction);
+        Event->accept();
+    }
+}
+
+void EditorViewportWidget::dropEvent(QDropEvent* Event)
+{
+    EditorAssetPayload Payload;
+    if (!DecodeEditorAssetPayload(Event->mimeData(), Payload))
+    {
+        return;
+    }
+    emit AssetDropped(
+        QString::fromStdString(Payload.Key.Asset.ToString()),
+        Payload.Key.HasSubAsset() ? QString::fromStdString(Payload.Key.SubAsset->ToString()) : QString{},
+        QString::fromStdString(Payload.Type.GetIdentifier()),
+        Payload.VirtualPath,
+        Event->position().toPoint());
+    Event->setDropAction(Qt::CopyAction);
+    Event->accept();
+}
+
+void EditorViewportWidget::mousePressEvent(QMouseEvent* Event)
+{
+    setFocus();
+    HandleCameraMousePress(Event);
+    RenderViewportWidget::mousePressEvent(Event);
+}
+
+void EditorViewportWidget::mouseMoveEvent(QMouseEvent* Event)
+{
+    HandleCameraMouseMove(Event);
+    RenderViewportWidget::mouseMoveEvent(Event);
+}
+
+void EditorViewportWidget::mouseReleaseEvent(QMouseEvent* Event)
+{
+    HandleCameraMouseRelease(Event);
+    RenderViewportWidget::mouseReleaseEvent(Event);
+}
+
+void EditorViewportWidget::wheelEvent(QWheelEvent* Event)
+{
+    HandleCameraWheel(Event);
+}
+
+void EditorViewportWidget::keyPressEvent(QKeyEvent* Event)
+{
+    HandleCameraKeyPress(Event);
+}
+
+void EditorViewportWidget::keyReleaseEvent(QKeyEvent* Event)
+{
+    HandleCameraKeyRelease(Event);
+}
+
+void EditorViewportWidget::focusOutEvent(QFocusEvent* Event)
+{
+    ResetCameraNavigation();
+    RenderViewportWidget::focusOutEvent(Event);
 }
 
 void EditorViewportWidget::resizeEvent(QResizeEvent* Event)
@@ -370,6 +537,315 @@ void EditorViewportWidget::showEvent(QShowEvent* Event)
 
 void EditorViewportWidget::hideEvent(QHideEvent* Event)
 {
+    ResetCameraNavigation();
     Gizmo->hide();
     RenderViewportWidget::hideEvent(Event);
+}
+
+void EditorViewportWidget::HandleCameraMousePress(QMouseEvent* Event)
+{
+    if (!bEditorToolsEnabled || Event == nullptr)
+    {
+        return;
+    }
+
+    LastMousePosition = Event->position();
+    const bool bAltHeld = (Event->modifiers() & Qt::AltModifier) != 0;
+    if (Event->button() == Qt::RightButton)
+    {
+        ActiveCameraMode = bAltHeld ? CameraMode::Dolly : CameraMode::FlyLook;
+        setCursor(Qt::BlankCursor);
+        if (ActiveCameraMode == CameraMode::FlyLook)
+        {
+            grabKeyboard();
+            bKeyboardCaptured = true;
+            if (!NavigationTimer->isActive())
+            {
+                NavigationTimer->start();
+            }
+        }
+        Event->accept();
+        return;
+    }
+    if (Event->button() == Qt::MiddleButton)
+    {
+        ActiveCameraMode = bAltHeld ? CameraMode::Pan : CameraMode::Pan;
+        setCursor(Qt::ClosedHandCursor);
+        Event->accept();
+        return;
+    }
+    if (Event->button() == Qt::LeftButton && bAltHeld && !Gizmo->IsManipulating())
+    {
+        ActiveCameraMode = CameraMode::Orbit;
+        setCursor(Qt::SizeAllCursor);
+        Event->accept();
+    }
+}
+
+void EditorViewportWidget::HandleCameraMouseMove(QMouseEvent* Event)
+{
+    if (!bEditorToolsEnabled || Event == nullptr || ActiveCameraMode == CameraMode::None)
+    {
+        return;
+    }
+
+    const QPointF Delta = Event->position() - LastMousePosition;
+    LastMousePosition = Event->position();
+    const float DeltaX = static_cast<float>(Delta.x());
+    const float DeltaY = static_cast<float>(Delta.y());
+    if (ActiveCameraMode == CameraMode::FlyLook)
+    {
+        ApplyFlyLook(DeltaX, DeltaY);
+    }
+    else if (ActiveCameraMode == CameraMode::Pan)
+    {
+        ApplyPan(DeltaX, DeltaY);
+    }
+    else if (ActiveCameraMode == CameraMode::Orbit)
+    {
+        ApplyOrbit(DeltaX, DeltaY);
+    }
+    else if (ActiveCameraMode == CameraMode::Dolly)
+    {
+        ApplyDolly(-(DeltaY + DeltaX) * DollySensitivity * GetFocusDistance());
+    }
+    Event->accept();
+}
+
+void EditorViewportWidget::HandleCameraMouseRelease(QMouseEvent* Event)
+{
+    if (Event == nullptr)
+    {
+        return;
+    }
+    if (Event->button() == Qt::RightButton
+        || Event->button() == Qt::MiddleButton
+        || (Event->button() == Qt::LeftButton && ActiveCameraMode == CameraMode::Orbit))
+    {
+        if (ActiveCameraMode == CameraMode::FlyLook)
+        {
+            HeldKeys.clear();
+            NavigationTimer->stop();
+            if (bKeyboardCaptured)
+            {
+                releaseKeyboard();
+                bKeyboardCaptured = false;
+            }
+        }
+        ActiveCameraMode = CameraMode::None;
+        unsetCursor();
+        Event->accept();
+    }
+}
+
+void EditorViewportWidget::HandleCameraWheel(QWheelEvent* Event)
+{
+    if (!bEditorToolsEnabled || Event == nullptr)
+    {
+        return;
+    }
+
+    const float WheelSteps = static_cast<float>(Event->angleDelta().y()) / 120.0f;
+    if (ActiveCameraMode == CameraMode::FlyLook)
+    {
+        const float PreviousSpeed = MoveSpeed;
+        MoveSpeed = std::clamp(MoveSpeed * (WheelSteps > 0.0f ? 1.25f : 0.8f), MinMoveSpeed, MaxMoveSpeed);
+        if (std::abs(PreviousSpeed - MoveSpeed) > 0.0001f)
+        {
+            emit CameraMoveSpeedChanged(MoveSpeed);
+        }
+        Event->accept();
+        return;
+    }
+
+    ApplyDolly(-WheelSteps * GetFocusDistance() * WheelDollyFactor);
+    Event->accept();
+}
+
+void EditorViewportWidget::HandleCameraKeyPress(QKeyEvent* Event)
+{
+    if (!bEditorToolsEnabled || Event == nullptr || Event->isAutoRepeat())
+    {
+        return;
+    }
+    HeldKeys.insert(Event->key());
+    if (ActiveCameraMode == CameraMode::FlyLook)
+    {
+        Event->accept();
+    }
+}
+
+void EditorViewportWidget::HandleCameraKeyRelease(QKeyEvent* Event)
+{
+    if (Event == nullptr || Event->isAutoRepeat())
+    {
+        return;
+    }
+    HeldKeys.remove(Event->key());
+    if (ActiveCameraMode == CameraMode::FlyLook)
+    {
+        Event->accept();
+    }
+}
+
+void EditorViewportWidget::ResetCameraNavigation()
+{
+    ActiveCameraMode = CameraMode::None;
+    HeldKeys.clear();
+    NavigationTimer->stop();
+    if (bKeyboardCaptured)
+    {
+        releaseKeyboard();
+        bKeyboardCaptured = false;
+    }
+    unsetCursor();
+}
+
+void EditorViewportWidget::TickCameraNavigation()
+{
+    if (!bEditorToolsEnabled || ActiveCameraMode != CameraMode::FlyLook)
+    {
+        return;
+    }
+
+    Vector3 MoveDirection = Vector3::Zero;
+    const Vector3 Forward = GetCameraForward();
+    const Vector3 Right = GetCameraRight();
+    if (HeldKeys.contains(Qt::Key_W))
+    {
+        MoveDirection += Forward;
+    }
+    if (HeldKeys.contains(Qt::Key_S))
+    {
+        MoveDirection -= Forward;
+    }
+    if (HeldKeys.contains(Qt::Key_D))
+    {
+        MoveDirection += Right;
+    }
+    if (HeldKeys.contains(Qt::Key_A))
+    {
+        MoveDirection -= Right;
+    }
+    if (HeldKeys.contains(Qt::Key_E) || HeldKeys.contains(Qt::Key_Space))
+    {
+        MoveDirection += Vector3::Up;
+    }
+    if (HeldKeys.contains(Qt::Key_Q))
+    {
+        MoveDirection -= Vector3::Up;
+    }
+    if (MoveDirection.LengthSquared() <= 0.000001f)
+    {
+        return;
+    }
+    MoveDirection.Normalize();
+    MoveCamera(MoveDirection * GetCurrentMoveSpeed() * (16.0f / 1000.0f));
+}
+
+void EditorViewportWidget::ApplyFlyLook(float DeltaX, float DeltaY)
+{
+    float YawDegrees = 0.0f;
+    float PitchDegrees = 0.0f;
+    ExtractYawPitch(GetCameraForward(), YawDegrees, PitchDegrees);
+    YawDegrees -= DeltaX * LookSensitivity;
+    PitchDegrees = ClampPitch(PitchDegrees - DeltaY * LookSensitivity);
+    const Vector3 Forward = DirectionFromYawPitch(YawDegrees, PitchDegrees);
+    RenderViewCamera Updated = GetViewCamera();
+    Updated.Target = Updated.Position + Forward * GetFocusDistance();
+    CommitCamera(Updated);
+}
+
+void EditorViewportWidget::ApplyPan(float DeltaX, float DeltaY)
+{
+    const float Distance = GetFocusDistance();
+    const Vector3 Right = GetCameraRight();
+    const Vector3 Up = Right.Cross(GetCameraForward());
+    MoveCamera((-Right * DeltaX + Up * DeltaY) * Distance * PanSensitivity);
+}
+
+void EditorViewportWidget::ApplyOrbit(float DeltaX, float DeltaY)
+{
+    RenderViewCamera Updated = GetViewCamera();
+    Vector3 Offset = Updated.Position - Updated.Target;
+    float Distance = Offset.Length();
+    if (Distance < MinFocusDistance)
+    {
+        Distance = MinFocusDistance;
+    }
+    float YawDegrees = 0.0f;
+    float PitchDegrees = 0.0f;
+    ExtractYawPitch(Offset, YawDegrees, PitchDegrees);
+    YawDegrees -= DeltaX * OrbitSensitivity;
+    PitchDegrees = ClampPitch(PitchDegrees - DeltaY * OrbitSensitivity);
+    Updated.Position = Updated.Target + DirectionFromYawPitch(YawDegrees, PitchDegrees) * Distance;
+    CommitCamera(Updated);
+}
+
+void EditorViewportWidget::ApplyDolly(float DistanceDelta)
+{
+    RenderViewCamera Updated = GetViewCamera();
+    const Vector3 Forward = GetCameraForward();
+    float Distance = GetFocusDistance() + DistanceDelta;
+    if (Distance < MinFocusDistance)
+    {
+        Distance = MinFocusDistance;
+    }
+    Updated.Position = Updated.Target - Forward * Distance;
+    CommitCamera(Updated);
+}
+
+void EditorViewportWidget::MoveCamera(const Vector3& WorldDelta)
+{
+    RenderViewCamera Updated = GetViewCamera();
+    Updated.Position += WorldDelta;
+    Updated.Target += WorldDelta;
+    CommitCamera(Updated);
+}
+
+void EditorViewportWidget::CommitCamera(const RenderViewCamera& Updated)
+{
+    SetViewCamera(Updated);
+    emit CameraChanged();
+}
+
+Vector3 EditorViewportWidget::GetCameraForward() const
+{
+    Vector3 Forward = GetViewCamera().Target - GetViewCamera().Position;
+    if (Forward.LengthSquared() <= 0.000001f)
+    {
+        return Vector3::Forward;
+    }
+    Forward.Normalize();
+    return Forward;
+}
+
+Vector3 EditorViewportWidget::GetCameraRight() const
+{
+    Vector3 Right = GetCameraForward().Cross(GetViewCamera().Up);
+    if (Right.LengthSquared() <= 0.000001f)
+    {
+        Right = Vector3::Right;
+    }
+    Right.Normalize();
+    return Right;
+}
+
+float EditorViewportWidget::GetFocusDistance() const
+{
+    return std::max(MinFocusDistance, (GetViewCamera().Target - GetViewCamera().Position).Length());
+}
+
+float EditorViewportWidget::GetCurrentMoveSpeed() const
+{
+    float Speed = MoveSpeed;
+    if ((QApplication::keyboardModifiers() & Qt::ShiftModifier) != 0)
+    {
+        Speed *= 4.0f;
+    }
+    if ((QApplication::keyboardModifiers() & Qt::ControlModifier) != 0)
+    {
+        Speed *= 0.25f;
+    }
+    return Speed;
 }

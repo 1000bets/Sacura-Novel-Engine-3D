@@ -48,6 +48,7 @@ public:
 
     void Initialize(AssetRegistry& Registry, JobSystem& Jobs);
     void Shutdown();
+    AssetDiagnostic RegisterLoader(const AssetType& Type, IAssetLoader& Loader);
 
     template <typename ResourceType>
     void LoadAsync(const AssetKey& Key);
@@ -59,6 +60,7 @@ public:
     AssetDiagnostic GetLastDiagnostic(const AssetKey& Key) const;
 
     void CancelLoad(const AssetKey& Key);
+    void InvalidateAsset(const AssetId& Id);
     void PumpCompletions();
     void UnloadUnused();
 
@@ -78,7 +80,7 @@ private:
         AssetKey Key{};
         uint64_t Generation = 0;
         AssetLoadState State = AssetLoadState::Unloaded;
-        AssetType Type = AssetType::Unknown;
+        AssetType Type = UnknownAssetType;
         std::shared_ptr<const void> Resource;
         AssetDiagnostic Diagnostic = AssetDiagnostic::Ok();
         std::vector<AssetKey> PendingDependencies;
@@ -123,6 +125,7 @@ private:
     TextureLoader TextureLoaderInstance;
     MaterialLoader MaterialLoaderInstance;
     SkeletalLoader SkeletalLoaderInstance;
+    std::unordered_map<AssetType, IAssetLoader*, AssetTypeHash> LoadersByType;
 
     mutable std::mutex SlotsMutex;
     std::unordered_map<AssetKey, AssetSlot, AssetKeyHash> Slots;
@@ -144,35 +147,35 @@ AssetType AssetManager::ResourceAssetType()
 {
     if constexpr (std::is_same_v<ResourceType, ModelResource>)
     {
-        return AssetType::Model;
+        return ModelAssetType;
     }
     else if constexpr (std::is_same_v<ResourceType, TextureResource>)
     {
-        return AssetType::Texture;
+        return TextureAssetType;
     }
     else if constexpr (std::is_same_v<ResourceType, MaterialResource>)
     {
-        return AssetType::Material;
+        return MaterialAssetType;
     }
     else if constexpr (std::is_same_v<ResourceType, StaticMeshResource>)
     {
-        return AssetType::StaticMesh;
+        return StaticMeshAssetType;
     }
     else if constexpr (std::is_same_v<ResourceType, SkeletalMeshResource>)
     {
-        return AssetType::SkeletalMesh;
+        return SkeletalMeshAssetType;
     }
     else if constexpr (std::is_same_v<ResourceType, SkeletonResource>)
     {
-        return AssetType::Skeleton;
+        return SkeletonAssetType;
     }
     else if constexpr (std::is_same_v<ResourceType, AnimationClipResource>)
     {
-        return AssetType::AnimationClip;
+        return AnimationClipAssetType;
     }
     else
     {
-        return AssetType::Unknown;
+        return UnknownAssetType;
     }
 }
 
@@ -192,11 +195,11 @@ bool AssetManager::TryGetLoaded(const AssetKey& Key, AssetHandle<ResourceType>& 
         return false;
     }
 
-    if (Slot->Type != ResourceAssetType<ResourceType>() && ResourceAssetType<ResourceType>() != AssetType::Unknown)
+    if (Slot->Type != ResourceAssetType<ResourceType>() && ResourceAssetType<ResourceType>().IsValid())
     {
         if constexpr (std::is_same_v<ResourceType, StaticMeshResource>)
         {
-            if (Slot->Type != AssetType::StaticMesh)
+            if (Slot->Type != StaticMeshAssetType)
             {
                 return false;
             }

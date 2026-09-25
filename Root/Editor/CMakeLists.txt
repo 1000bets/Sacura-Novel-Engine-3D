@@ -54,6 +54,7 @@ set(CMAKE_AUTORCC ON)
 
 set(EDITOR_SRC
     src/Editor.cpp
+    src/AssetImportDialog.cpp
     src/ContentBrowserWidget.cpp
     src/EditorMainWindow.cpp
     src/EditorViewportWidget.cpp
@@ -64,6 +65,7 @@ set(EDITOR_SRC
 
 set(EDITOR_HDR
     inc/Editor.h
+    inc/AssetImportDialog.h
     inc/ContentBrowserWidget.h
     inc/EditorAssetMime.h
     inc/EditorMainWindow.h
@@ -87,6 +89,7 @@ target_include_directories(Editor PUBLIC
 
 target_link_libraries(Editor PUBLIC
     EditorCore
+    Sakura::EditorThirdParty
 )
 
 target_compile_definitions(Editor PUBLIC

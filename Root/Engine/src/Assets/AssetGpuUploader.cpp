@@ -272,6 +272,64 @@ bool AssetGpuUploader::TryGetTexture(const AssetKey& Key, TextureHandle& OutText
     return OutTexture.IsValid();
 }
 
+void AssetGpuUploader::InvalidateAsset(const AssetId& Id)
+{
+    AssertGameThread();
+    std::vector<MeshHandle> ReleasedMeshes;
+    std::vector<TextureHandle> ReleasedTextures;
+    {
+        std::lock_guard<std::mutex> Lock(Mutex);
+        for (auto Iterator = Meshes.begin(); Iterator != Meshes.end();)
+        {
+            if (Iterator->first.Asset != Id)
+            {
+                ++Iterator;
+                continue;
+            }
+            if (Iterator->second.Mesh.IsValid())
+            {
+                ReleasedMeshes.push_back(Iterator->second.Mesh);
+            }
+            Iterator = Meshes.erase(Iterator);
+        }
+        for (auto Iterator = Textures.begin(); Iterator != Textures.end();)
+        {
+            if (Iterator->first.Asset != Id)
+            {
+                ++Iterator;
+                continue;
+            }
+            if (Iterator->second.Texture.IsValid())
+            {
+                ReleasedTextures.push_back(Iterator->second.Texture);
+            }
+            Iterator = Textures.erase(Iterator);
+        }
+    }
+
+    RenderThread* Thread = RenderThread::Get();
+    if (Thread != nullptr && Thread->IsReady() && (!ReleasedMeshes.empty() || !ReleasedTextures.empty()))
+    {
+        const uint64_t CompletionValue = Thread->GetRetirementValue();
+        Thread->Enqueue([
+            Thread,
+            CompletionValue,
+            ReleasedMeshes = std::move(ReleasedMeshes),
+            ReleasedTextures = std::move(ReleasedTextures)]()
+        {
+            auto& Resources = Thread->GetRenderer()->GetResources();
+            for (MeshHandle Mesh : ReleasedMeshes)
+            {
+                Resources.ReleaseMesh(Mesh, CompletionValue);
+            }
+            for (TextureHandle Texture : ReleasedTextures)
+            {
+                Resources.ReleaseTexture(Texture, CompletionValue);
+            }
+        });
+    }
+}
+
 void AssetGpuUploader::Clear()
 {
     std::vector<MeshHandle> ReleasedMeshes;

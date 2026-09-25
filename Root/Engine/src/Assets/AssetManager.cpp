@@ -12,6 +12,14 @@
 AssetManager::AssetManager()
     : SkeletalLoaderInstance(ModelLoaderInstance)
 {
+    RegisterLoader(ModelAssetType, ModelLoaderInstance);
+    RegisterLoader(StaticMeshAssetType, ModelLoaderInstance);
+    RegisterLoader(TextureAssetType, TextureLoaderInstance);
+    RegisterLoader(MaterialAssetType, MaterialLoaderInstance);
+    RegisterLoader(SkeletalMeshAssetType, SkeletalLoaderInstance);
+    RegisterLoader(SkeletonAssetType, SkeletalLoaderInstance);
+    RegisterLoader(AnimationClipAssetType, SkeletalLoaderInstance);
+    RegisterLoader(SkinBindingAssetType, SkeletalLoaderInstance);
 }
 
 AssetManager::~AssetManager()
@@ -42,6 +50,26 @@ void AssetManager::ClearWorkerLoadFault()
 {
     std::lock_guard<std::mutex> Lock(WorkerLoadFaultMutex);
     WorkerLoadFault = nullptr;
+}
+
+AssetDiagnostic AssetManager::RegisterLoader(const AssetType& Type, IAssetLoader& Loader)
+{
+    if (!Type.IsValid())
+    {
+        return AssetDiagnostic::Fail(
+            AssetErrorCode::InvalidData,
+            "AssetManager",
+            "Cannot register a loader for an empty asset type");
+    }
+    if (LoadersByType.find(Type) != LoadersByType.end())
+    {
+        return AssetDiagnostic::Fail(
+            AssetErrorCode::ImportConflict,
+            "AssetManager",
+            "Loader is already registered for asset type " + Type.GetIdentifier());
+    }
+    LoadersByType.emplace(Type, &Loader);
+    return AssetDiagnostic::Ok();
 }
 
 void AssetManager::ResetOutstandingLoadsGroup()
@@ -157,6 +185,25 @@ void AssetManager::CancelLoad(const AssetKey& Key)
     }
 }
 
+void AssetManager::InvalidateAsset(const AssetId& Id)
+{
+    AssertGameThread();
+    std::lock_guard<std::mutex> Lock(SlotsMutex);
+    for (auto Iterator = Slots.begin(); Iterator != Slots.end();)
+    {
+        if (Iterator->first.Asset != Id)
+        {
+            ++Iterator;
+            continue;
+        }
+        if (Iterator->second.CancelFlag)
+        {
+            Iterator->second.CancelFlag->store(true, std::memory_order_release);
+        }
+        Iterator = Slots.erase(Iterator);
+    }
+}
+
 AssetManager::AssetSlot* AssetManager::FindSlot(const AssetKey& Key)
 {
     auto Iterator = Slots.find(Key);
@@ -201,37 +248,22 @@ AssetDiagnostic AssetManager::GetLastDiagnostic(const AssetKey& Key) const
 
 IAssetLoader* AssetManager::ResolveLoader(AssetType Type)
 {
-    switch (Type)
-    {
-    case AssetType::Model:
-    case AssetType::StaticMesh:
-        return &ModelLoaderInstance;
-    case AssetType::Texture:
-        return &TextureLoaderInstance;
-    case AssetType::Material:
-        return &MaterialLoaderInstance;
-    case AssetType::SkeletalMesh:
-    case AssetType::Skeleton:
-    case AssetType::AnimationClip:
-    case AssetType::SkinBinding:
-        return &SkeletalLoaderInstance;
-    default:
-        return nullptr;
-    }
+    auto Found = LoadersByType.find(Type);
+    return Found != LoadersByType.end() ? Found->second : nullptr;
 }
 
 AssetType AssetManager::ResolveExpectedType(const AssetKey& Key) const
 {
     if (Registry == nullptr)
     {
-        return AssetType::Unknown;
+        return UnknownAssetType;
     }
 
     AssetRegistryEntry Entry{};
     const SubAssetRecord* SubAsset = nullptr;
     if (!Registry->TryResolveKey(Key, Entry, &SubAsset))
     {
-        return AssetType::Unknown;
+        return UnknownAssetType;
     }
 
     if (SubAsset != nullptr)
@@ -543,9 +575,9 @@ void AssetManager::BeginLoadWhenReady(AssetSlot& Slot)
     }
 
     AssetType Type = SubAsset != nullptr ? SubAsset->Type : Entry.Metadata.Type;
-    if (Slot.Type != AssetType::Unknown && Slot.Type != Type && !(Slot.Type == AssetType::StaticMesh && Type == AssetType::Model))
+    if (Slot.Type.IsValid() && Slot.Type != Type && !(Slot.Type == StaticMeshAssetType && Type == ModelAssetType))
     {
-        if (!(Type == AssetType::StaticMesh && Slot.Type == AssetType::StaticMesh))
+        if (!(Type == StaticMeshAssetType && Slot.Type == StaticMeshAssetType))
         {
             FailSlot(Slot, AssetDiagnostic::Fail(AssetErrorCode::TypeMismatch, "AssetManager", "Requested type mismatch", Slot.Key, Entry.RelativePath));
             NotifyParents(Slot.Key);
@@ -555,7 +587,7 @@ void AssetManager::BeginLoadWhenReady(AssetSlot& Slot)
 
     Slot.Type = Type;
     IAssetLoader* Loader = ResolveLoader(Type);
-    if (Loader == nullptr && Type == AssetType::StaticMesh)
+    if (Loader == nullptr && Type == StaticMeshAssetType)
     {
         Loader = &ModelLoaderInstance;
     }
@@ -636,7 +668,7 @@ void AssetManager::RequestLoad(const AssetKey& Key, AssetType ExpectedType)
         }
 
         const AssetType ResolvedType = SubAsset != nullptr ? SubAsset->Type : Entry.Metadata.Type;
-        Slot.Type = ExpectedType != AssetType::Unknown ? ExpectedType : ResolvedType;
+        Slot.Type = ExpectedType.IsValid() ? ExpectedType : ResolvedType;
 
         AssetLoadContext Context{};
         Context.Registry = Registry;
@@ -645,7 +677,7 @@ void AssetManager::RequestLoad(const AssetKey& Key, AssetType ExpectedType)
         Context.Key = Key;
 
         IAssetLoader* Loader = ResolveLoader(Slot.Type);
-        if (Loader == nullptr && Slot.Type == AssetType::StaticMesh)
+        if (Loader == nullptr && Slot.Type == StaticMeshAssetType)
         {
             Loader = &ModelLoaderInstance;
         }

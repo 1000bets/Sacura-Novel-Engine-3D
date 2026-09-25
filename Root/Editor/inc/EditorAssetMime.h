@@ -9,7 +9,7 @@
 struct EditorAssetPayload
 {
     AssetKey Key{};
-    AssetType Type = AssetType::Unknown;
+    AssetType Type = UnknownAssetType;
     QString VirtualPath;
 };
 
@@ -23,7 +23,7 @@ inline QByteArray EncodeEditorAssetPayload(const EditorAssetPayload& Payload)
     return QStringList{
         QString::fromStdString(Payload.Key.Asset.ToString()),
         SubAsset,
-        QString::number(static_cast<int>(Payload.Type)),
+        QString::fromStdString(Payload.Type.GetIdentifier()),
         Payload.VirtualPath}.join('\n').toUtf8();
 }
 
@@ -47,7 +47,10 @@ inline bool DecodeEditorAssetPayload(const QMimeData* MimeData, EditorAssetPaylo
         }
         OutPayload.Key.SubAsset = SubAsset;
     }
-    OutPayload.Type = static_cast<AssetType>(Parts[2].toInt());
+    if (!TryParseAssetType(Parts[2].toStdString(), OutPayload.Type))
+    {
+        return false;
+    }
     OutPayload.VirtualPath = Parts[3];
     return OutPayload.Key.IsValid();
 }

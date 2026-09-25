@@ -21,7 +21,6 @@
 #include "Project/ProjectPaths.h"
 #include "Rendering/SceneExtractor.h"
 #include "Story/StoryRuntime.h"
-#include "Story/StoryDocumentIO.h"
 #include "UI/StoryWidget.h"
 
 #include <QAbstractItemView>
@@ -39,13 +38,13 @@
 #include <QKeySequence>
 #include <QLabel>
 #include <QLineEdit>
-#include <QListWidget>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QLayout>
 #include <QProcess>
 #include <QPushButton>
+#include <QSignalBlocker>
 #include <QSplitter>
 #include <QStringList>
 #include <QStatusBar>
@@ -60,14 +59,17 @@
 
 #include "Reflection/Class.h"
 
-#include <memory>
+#include <algorithm>
 #include <cmath>
-#include <array>
+#include <limits>
+#include <memory>
 
 namespace
 {
 constexpr int HierarchyObjectIdRole = Qt::UserRole;
 constexpr int HierarchyObjectGenerationRole = Qt::UserRole + 1;
+constexpr float DegreesToRadians = 0.01745329251994329577f;
+constexpr float RadiansToDegrees = 57.295779513082320876f;
 
 void StoreObjectHandle(QTreeWidgetItem* Item, ObjectHandle Handle)
 {
@@ -81,6 +83,54 @@ ObjectHandle LoadObjectHandle(const QTreeWidgetItem* Item)
     Handle.Id = static_cast<ObjectID>(Item->data(0, HierarchyObjectIdRole).toULongLong());
     Handle.Generation = Item->data(0, HierarchyObjectGenerationRole).toUInt();
     return Handle;
+}
+
+Vector3 QuaternionToEulerDegrees(const Quaternion& Rotation)
+{
+    const float PitchSin = 2.0f * (Rotation.w * Rotation.y - Rotation.z * Rotation.x);
+    return Vector3(
+        std::atan2(
+            2.0f * (Rotation.w * Rotation.x + Rotation.y * Rotation.z),
+            1.0f - 2.0f * (Rotation.x * Rotation.x + Rotation.y * Rotation.y)) * RadiansToDegrees,
+        std::asin(std::clamp(PitchSin, -1.0f, 1.0f)) * RadiansToDegrees,
+        std::atan2(
+            2.0f * (Rotation.w * Rotation.z + Rotation.x * Rotation.y),
+            1.0f - 2.0f * (Rotation.y * Rotation.y + Rotation.z * Rotation.z)) * RadiansToDegrees);
+}
+
+bool RayIntersectsBounds(
+    const Vector3& RayOrigin,
+    const Vector3& RayDirection,
+    const AxisAlignedBounds& Bounds,
+    float& OutDistance)
+{
+    float MinimumDistance = 0.0f;
+    float MaximumDistance = std::numeric_limits<float>::max();
+    auto TestAxis = [&](float Origin, float Direction, float Minimum, float Maximum)
+    {
+        if (std::abs(Direction) < 0.000001f)
+        {
+            return Origin >= Minimum && Origin <= Maximum;
+        }
+        float FirstDistance = (Minimum - Origin) / Direction;
+        float SecondDistance = (Maximum - Origin) / Direction;
+        if (FirstDistance > SecondDistance)
+        {
+            std::swap(FirstDistance, SecondDistance);
+        }
+        MinimumDistance = std::max(MinimumDistance, FirstDistance);
+        MaximumDistance = std::min(MaximumDistance, SecondDistance);
+        return MinimumDistance <= MaximumDistance;
+    };
+
+    if (!TestAxis(RayOrigin.x, RayDirection.x, Bounds.Minimum.x, Bounds.Maximum.x)
+        || !TestAxis(RayOrigin.y, RayDirection.y, Bounds.Minimum.y, Bounds.Maximum.y)
+        || !TestAxis(RayOrigin.z, RayDirection.z, Bounds.Minimum.z, Bounds.Maximum.z))
+    {
+        return false;
+    }
+    OutDistance = MinimumDistance;
+    return MaximumDistance >= 0.0f;
 }
 }
 
@@ -103,8 +153,8 @@ EditorMainWindow::EditorMainWindow(Engine& InEngine, ProjectSession& InSession, 
     BuildToolbar();
     BuildUi();
     PopulateHierarchy();
-    PopulateStoryTree();
     PopulateDockPages();
+    RegisterBuiltInAssetEditors();
     RefreshProjectTitle();
     UpdateStatus();
 
@@ -151,6 +201,16 @@ bool EditorMainWindow::CaptureScreenshot(const QString& OutputFile)
     return grab().save(OutputFile, "PNG");
 }
 
+bool EditorMainWindow::RegisterAssetEditor(const AssetType& Type, AssetEditorHandler Handler)
+{
+    if (!Type.IsValid() || !Handler || AssetEditors.find(Type) != AssetEditors.end())
+    {
+        return false;
+    }
+    AssetEditors.emplace(Type, std::move(Handler));
+    return true;
+}
+
 void EditorMainWindow::BuildMenus()
 {
     QMenu* FileMenu = menuBar()->addMenu(QString::fromUtf8("\xD0\xA4\xD0\xB0\xD0\xB9\xD0\xBB"));
@@ -183,7 +243,7 @@ void EditorMainWindow::BuildMenus()
         }
         if (WorkspaceSplitter != nullptr)
         {
-            WorkspaceSplitter->setSizes({240, 900, 320});
+            WorkspaceSplitter->setSizes({320, 900, 240});
         }
         if (CenterSplitter != nullptr)
         {
@@ -210,18 +270,6 @@ void EditorMainWindow::BuildToolbar()
     Toolbar->setFloatable(false);
     Toolbar->setIconSize(QSize(16, 16));
 
-    auto* SubsceneLabel = new QLabel(QString::fromUtf8("\xD0\xA1\xD0\xB0\xD0\xB1\xD1\x81\xD1\x86\xD0\xB5\xD0\xBD\xD0\xB0"), Toolbar);
-    SubsceneLabel->setObjectName("MutedLabel");
-    Toolbar->addWidget(SubsceneLabel);
-
-    SubsceneCombo = new QComboBox(Toolbar);
-    SubsceneCombo->setMinimumWidth(180);
-    SubsceneCombo->addItem(QString::fromUtf8("Prologue Room"), "prologue");
-    SubsceneCombo->addItem(QString::fromUtf8("School Yard"), "school");
-    SubsceneCombo->addItem(QString::fromUtf8("Classroom"), "class");
-    Toolbar->addWidget(SubsceneCombo);
-    Toolbar->addSeparator();
-
     PlayButton = new QPushButton(QString::fromUtf8("\xE2\x96\xB6"), Toolbar);
     PlayButton->setObjectName("PlayButton");
     PlayButton->setCheckable(true);
@@ -242,27 +290,6 @@ void EditorMainWindow::BuildToolbar()
     ModeLabel->setObjectName("RoseLabel");
     ModeLabel->setStyleSheet("color: #c496ad; padding: 0 8px;");
     Toolbar->addWidget(ModeLabel);
-
-    for (const auto& Gizmo : std::array<std::pair<const char*, EditorGizmoOperation>, 3>{
-             std::pair{"W", EditorGizmoOperation::Translate},
-             std::pair{"E", EditorGizmoOperation::Rotate},
-             std::pair{"R", EditorGizmoOperation::Scale}})
-    {
-        auto* GizmoButton = new QPushButton(QString::fromUtf8(Gizmo.first), Toolbar);
-        GizmoButton->setFixedWidth(28);
-        GizmoButton->setToolTip(
-            Gizmo.second == EditorGizmoOperation::Translate ? tr("Move gizmo")
-            : Gizmo.second == EditorGizmoOperation::Rotate ? tr("Rotate gizmo")
-            : tr("Scale gizmo"));
-        Toolbar->addWidget(GizmoButton);
-        connect(GizmoButton, &QPushButton::clicked, this, [this, Operation = Gizmo.second]()
-        {
-            if (PrimaryViewport != nullptr)
-            {
-                PrimaryViewport->SetGizmoOperation(Operation);
-            }
-        });
-    }
 
     auto* Spacer = new QWidget(Toolbar);
     Spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
@@ -316,18 +343,8 @@ void EditorMainWindow::BuildUi()
     HierarchyTree->setDropIndicatorShown(true);
     HierarchyTree->setDefaultDropAction(Qt::MoveAction);
     HierarchyTree->setDragDropMode(QAbstractItemView::InternalMove);
-    StoryTree = new QTreeWidget(HierarchyTabs);
-    StoryTree->setHeaderHidden(true);
     HierarchyTabs->addTab(HierarchyTree, QString::fromUtf8("\xD0\x98\xD0\xB5\xD1\x80\xD0\xB0\xD1\x80\xD1\x85\xD0\xB8\xD1\x8F"));
-    HierarchyTabs->addTab(StoryTree, QString::fromUtf8("\xD0\x98\xD1\x81\xD1\x82\xD0\xBE\xD1\x80\xD0\xB8\xD1\x8F"));
     HierarchyLayout->addWidget(HierarchyTabs, 1);
-
-    auto* SubsceneHeader = new QLabel(QString::fromUtf8("\xD0\xA1\xD0\xB0\xD0\xB1\xD1\x81\xD1\x86\xD0\xB5\xD0\xBD\xD1\x8B"), HierarchyPanel);
-    SubsceneHeader->setObjectName("PanelHeader");
-    HierarchyLayout->addWidget(SubsceneHeader);
-    SubsceneList = new QListWidget(HierarchyPanel);
-    SubsceneList->setMaximumHeight(120);
-    HierarchyLayout->addWidget(SubsceneList);
 
     auto* CenterPanel = new QWidget(WorkspaceSplitter);
     auto* CenterLayout = new QVBoxLayout(CenterPanel);
@@ -343,19 +360,14 @@ void EditorMainWindow::BuildUi()
     ViewportLayout->setContentsMargins(0, 0, 0, 0);
     ViewportLayout->setSpacing(0);
 
-    ViewportTabs = new QTabWidget(ViewportPanel);
-    auto* ScenePage = new QWidget(ViewportTabs);
-    auto* SceneLayout = new QVBoxLayout(ScenePage);
-    SceneLayout->setContentsMargins(4, 4, 4, 4);
-    SceneLayout->setSpacing(4);
-
     PrimaryViewport = new EditorViewportWidget(ViewportPanel);
     PrimaryViewport->SetViewId(RenderViewId{1});
     PrimaryViewport->SetEditorToolsEnabled(true);
-    SceneLayout->addWidget(new QLabel(tr("Scene camera"), ScenePage));
     connect(PrimaryViewport, &EditorViewportWidget::NativeSurfaceChanged, this, &EditorMainWindow::OnViewportSurfaceChanged);
     connect(PrimaryViewport, &EditorViewportWidget::ViewportResized, this, &EditorMainWindow::OnViewportResized);
+    connect(PrimaryViewport, &EditorViewportWidget::ObjectSelectionRequested, this, &EditorMainWindow::OnViewportSelectionRequested);
     connect(PrimaryViewport, &EditorViewportWidget::AssetDropped, this, &EditorMainWindow::OnAssetDropped);
+    connect(PrimaryViewport, &EditorViewportWidget::CameraChanged, this, &EditorMainWindow::ConfigureRenderView);
     PrimaryViewport->SetTransformCallbacks(
         [this](const Transform& Value)
         {
@@ -376,7 +388,43 @@ void EditorMainWindow::BuildUi()
             ExecuteCommand(MakeSetTransformCommand(EditScene, Selected->GetObjectHandle(), NewValue));
         });
 
-    auto* LiveStrip = new QFrame(ScenePage);
+    auto* ViewportHeader = new QFrame(ViewportPanel);
+    ViewportHeader->setObjectName("ViewportHeader");
+    auto* ViewportHeaderLayout = new QHBoxLayout(ViewportHeader);
+    ViewportHeaderLayout->setContentsMargins(10, 4, 10, 4);
+    ViewportModeLabel = new QLabel(QString::fromUtf8("Scene · Edit World"), ViewportHeader);
+    ViewportModeLabel->setObjectName("RoseLabel");
+    ViewportHeaderLayout->addWidget(ViewportModeLabel);
+    ViewportHeaderLayout->addStretch(1);
+    ViewportHeaderLayout->addWidget(new QLabel(tr("Camera Speed"), ViewportHeader));
+    CameraSpeedSpin = new QDoubleSpinBox(ViewportHeader);
+    CameraSpeedSpin->setRange(0.25, 250.0);
+    CameraSpeedSpin->setDecimals(2);
+    CameraSpeedSpin->setSingleStep(0.5);
+    CameraSpeedSpin->setValue(PrimaryViewport->GetCameraMoveSpeed());
+    CameraSpeedSpin->setSuffix(tr(" u/s"));
+    CameraSpeedSpin->setFixedWidth(110);
+    CameraSpeedSpin->setToolTip(tr("Editor camera fly speed. Shift multiplies, Ctrl divides, RMB+wheel adjusts."));
+    ViewportHeaderLayout->addWidget(CameraSpeedSpin);
+    connect(CameraSpeedSpin, qOverload<double>(&QDoubleSpinBox::valueChanged), this, [this](double Value)
+    {
+        if (PrimaryViewport != nullptr)
+        {
+            PrimaryViewport->SetCameraMoveSpeed(static_cast<float>(Value));
+        }
+    });
+    connect(PrimaryViewport, &EditorViewportWidget::CameraMoveSpeedChanged, this, [this](float Speed)
+    {
+        if (CameraSpeedSpin == nullptr)
+        {
+            return;
+        }
+        const QSignalBlocker Blocker(CameraSpeedSpin);
+        CameraSpeedSpin->setValue(Speed);
+    });
+    ViewportLayout->addWidget(ViewportHeader);
+
+    auto* LiveStrip = new QFrame(ViewportPanel);
     LiveStrip->setObjectName("LiveStrip");
     auto* LiveLayout = new QHBoxLayout(LiveStrip);
     LiveLayout->setContentsMargins(10, 4, 10, 4);
@@ -385,81 +433,8 @@ void EditorMainWindow::BuildUi()
     StoryOverlayLabel->setWordWrap(true);
     LiveLayout->addWidget(StoryOverlayLabel, 1);
     LiveLayout->addWidget(new QLabel(QString::fromUtf8("Active: 0"), LiveStrip));
-    SceneLayout->addWidget(LiveStrip);
-
-    auto* GamePage = new QWidget(ViewportTabs);
-    auto* GameLayout = new QVBoxLayout(GamePage);
-    GameLayout->addWidget(new QLabel(tr("Game camera"), GamePage));
-    auto* CamerasPage = MakePlaceholderPage(
-        QString::fromUtf8("\xD0\x9A\xD0\xB0\xD0\xBC\xD0\xB5\xD1\x80\xD1\x8B"),
-        QString::fromUtf8("Camera library preview"));
-    ViewportTabs->addTab(ScenePage, QString::fromUtf8("\xD0\xA0\xD0\xB5\xD0\xB4\xD0\xB0\xD0\xBA\xD1\x82\xD0\xBE\xD1\x80 \xD1\x81\xD1\x86\xD0\xB5\xD0\xBD\xD1\x8B"));
-    ViewportTabs->addTab(GamePage, QString::fromUtf8("\xD0\x98\xD0\xB3\xD1\x80\xD0\xB0"));
-    ViewportTabs->addTab(CamerasPage, QString::fromUtf8("\xD0\x9A\xD0\xB0\xD0\xBC\xD0\xB5\xD1\x80\xD1\x8B"));
-    ViewportTabs->setMaximumHeight(110);
-    ViewportLayout->addWidget(ViewportTabs);
-    auto* RenderSplitter = new QSplitter(Qt::Horizontal, ViewportPanel);
-    auto* SceneContainer = new QWidget(RenderSplitter);
-    auto* SceneContainerLayout = new QVBoxLayout(SceneContainer);
-    SceneContainerLayout->setContentsMargins(0, 0, 0, 0);
-    SceneContainerLayout->addWidget(new QLabel(tr("Scene"), SceneContainer));
-    SceneContainerLayout->addWidget(PrimaryViewport, 1);
-    auto* GameContainer = new QWidget(RenderSplitter);
-    auto* GameContainerLayout = new QVBoxLayout(GameContainer);
-    GameContainerLayout->setContentsMargins(0, 0, 0, 0);
-    GameContainerLayout->addWidget(new QLabel(tr("Game"), GameContainer));
-    GameViewport = new EditorViewportWidget(GameContainer);
-    GameViewport->SetViewId(RenderViewId{2});
-    GameContainerLayout->addWidget(GameViewport, 1);
-    connect(GameViewport, &EditorViewportWidget::NativeSurfaceChanged, this, &EditorMainWindow::OnViewportSurfaceChanged);
-    connect(GameViewport, &EditorViewportWidget::ViewportResized, this, &EditorMainWindow::OnViewportResized);
-    RenderSplitter->addWidget(SceneContainer);
-    RenderSplitter->addWidget(GameContainer);
-    RenderSplitter->setStretchFactor(0, 1);
-    RenderSplitter->setStretchFactor(1, 1);
-    ViewportLayout->addWidget(RenderSplitter, 1);
-    RenderStatisticsLabel = new QLabel(ViewportPanel);
-    RenderStatisticsLabel->setWordWrap(true);
-    ViewportLayout->addWidget(RenderStatisticsLabel);
-    auto* SettingsRow = new QHBoxLayout();
-    auto* Exposure = new QDoubleSpinBox(ViewportPanel);
-    Exposure->setRange(0.01, 20.0);
-    Exposure->setSingleStep(0.1);
-    Exposure->setValue(RenderConfiguration.Exposure);
-    SettingsRow->addWidget(new QLabel(tr("Exposure"), ViewportPanel));
-    SettingsRow->addWidget(Exposure);
-    connect(Exposure, qOverload<double>(&QDoubleSpinBox::valueChanged), this, [this](double Value)
-    {
-        RenderConfiguration.Exposure = static_cast<float>(Value);
-    });
-    auto* Environment = new QDoubleSpinBox(ViewportPanel);
-    Environment->setRange(0.0, 10.0);
-    Environment->setSingleStep(0.1);
-    Environment->setValue(RenderConfiguration.EnvironmentIntensity);
-    SettingsRow->addWidget(new QLabel(tr("IBL"), ViewportPanel));
-    SettingsRow->addWidget(Environment);
-    connect(Environment, qOverload<double>(&QDoubleSpinBox::valueChanged), this, [this](double Value)
-    {
-        RenderConfiguration.EnvironmentIntensity = static_cast<float>(Value);
-    });
-    auto* Bloom = new QDoubleSpinBox(ViewportPanel);
-    Bloom->setRange(0.0, 1.0);
-    Bloom->setSingleStep(0.01);
-    Bloom->setValue(RenderConfiguration.BloomIntensity);
-    SettingsRow->addWidget(new QLabel(tr("Bloom"), ViewportPanel));
-    SettingsRow->addWidget(Bloom);
-    connect(Bloom, qOverload<double>(&QDoubleSpinBox::valueChanged), this, [this](double Value)
-    {
-        RenderConfiguration.BloomIntensity = static_cast<float>(Value);
-    });
-    auto* Antialiasing = new QCheckBox(tr("FXAA"), ViewportPanel);
-    Antialiasing->setChecked(RenderConfiguration.bAntialiasing);
-    SettingsRow->addWidget(Antialiasing);
-    connect(Antialiasing, &QCheckBox::toggled, this, [this](bool bEnabled)
-    {
-        RenderConfiguration.bAntialiasing = bEnabled;
-    });
-    ViewportLayout->addLayout(SettingsRow);
+    ViewportLayout->addWidget(LiveStrip);
+    ViewportLayout->addWidget(PrimaryViewport, 1);
     GameDialogue = new StoryWidget(StoryPlayback, ViewportPanel);
     ViewportLayout->addWidget(GameDialogue);
     GameDialogue->hide();
@@ -515,6 +490,7 @@ void EditorMainWindow::BuildUi()
         return Row;
     };
     TransformForm->addRow(QString::fromUtf8("Position"), MakeAxisRow(PositionXSpin, PositionYSpin, PositionZSpin));
+    TransformForm->addRow(QString::fromUtf8("Rotation"), MakeAxisRow(RotationXSpin, RotationYSpin, RotationZSpin));
     TransformForm->addRow(QString::fromUtf8("Scale"), MakeAxisRow(ScaleXSpin, ScaleYSpin, ScaleZSpin));
     ObjectInspectorLayout->addLayout(TransformForm);
 
@@ -525,11 +501,7 @@ void EditorMainWindow::BuildUi()
     Inspector->SetAssetRegistry(&BoundEngine.GetAssetRegistry());
     ObjectInspectorLayout->addWidget(Inspector, 1);
 
-    auto* SubsceneInspector = MakePlaceholderPage(
-        QString::fromUtf8("\xD0\xA1\xD0\xB0\xD0\xB1\xD1\x81\xD1\x86\xD0\xB5\xD0\xBD\xD0\xB0"),
-        QString::fromUtf8("Subscene settings, entry, cast, transitions"));
     InspectorTabs->addTab(ObjectInspectorPage, QString::fromUtf8("\xD0\x98\xD0\xBD\xD1\x81\xD0\xBF\xD0\xB5\xD0\xBA\xD1\x82\xD0\xBE\xD1\x80"));
-    InspectorTabs->addTab(SubsceneInspector, QString::fromUtf8("\xD0\xA1\xD0\xB0\xD0\xB1\xD1\x81\xD1\x86\xD0\xB5\xD0\xBD\xD0\xB0"));
     InspectorLayout->addWidget(InspectorTabs);
 
     Inspector->SetPropertyCommitCallback([this](Object* Instance, const PropertyId& Property, const ReflectedValue& NewValue)
@@ -593,6 +565,9 @@ void EditorMainWindow::BuildUi()
     connect(PositionXSpin, &QDoubleSpinBox::editingFinished, this, &EditorMainWindow::OnTransformEdited);
     connect(PositionYSpin, &QDoubleSpinBox::editingFinished, this, &EditorMainWindow::OnTransformEdited);
     connect(PositionZSpin, &QDoubleSpinBox::editingFinished, this, &EditorMainWindow::OnTransformEdited);
+    connect(RotationXSpin, &QDoubleSpinBox::editingFinished, this, &EditorMainWindow::OnTransformEdited);
+    connect(RotationYSpin, &QDoubleSpinBox::editingFinished, this, &EditorMainWindow::OnTransformEdited);
+    connect(RotationZSpin, &QDoubleSpinBox::editingFinished, this, &EditorMainWindow::OnTransformEdited);
     connect(ScaleXSpin, &QDoubleSpinBox::editingFinished, this, &EditorMainWindow::OnTransformEdited);
     connect(ScaleYSpin, &QDoubleSpinBox::editingFinished, this, &EditorMainWindow::OnTransformEdited);
     connect(ScaleZSpin, &QDoubleSpinBox::editingFinished, this, &EditorMainWindow::OnTransformEdited);
@@ -602,13 +577,13 @@ void EditorMainWindow::BuildUi()
         UpdateWindowTitleDirty();
     });
 
-    WorkspaceSplitter->addWidget(HierarchyPanel);
-    WorkspaceSplitter->addWidget(CenterPanel);
     WorkspaceSplitter->addWidget(InspectorPanel);
+    WorkspaceSplitter->addWidget(CenterPanel);
+    WorkspaceSplitter->addWidget(HierarchyPanel);
     WorkspaceSplitter->setStretchFactor(0, 0);
     WorkspaceSplitter->setStretchFactor(1, 1);
     WorkspaceSplitter->setStretchFactor(2, 0);
-    WorkspaceSplitter->setSizes({240, 900, 320});
+    WorkspaceSplitter->setSizes({320, 900, 240});
 
     RootLayout->addWidget(WorkspaceSplitter, 1);
     setCentralWidget(Root);
@@ -618,8 +593,6 @@ void EditorMainWindow::BuildUi()
     statusBar()->addWidget(StatusIssuesLabel);
     statusBar()->addPermanentWidget(StatusSelectionLabel);
 
-    connect(HierarchyTabs, &QTabWidget::currentChanged, this, &EditorMainWindow::OnHierarchyTabChanged);
-    connect(ViewportTabs, &QTabWidget::currentChanged, this, &EditorMainWindow::OnViewportModeChanged);
     connect(DockTabs, &QTabWidget::currentChanged, this, &EditorMainWindow::OnDockTabChanged);
     connect(HierarchyTree, &QTreeWidget::itemSelectionChanged, this, &EditorMainWindow::OnHierarchySelectionChanged);
     connect(HierarchyTree, &QTreeWidget::customContextMenuRequested, this, &EditorMainWindow::OnHierarchyContextMenu);
@@ -647,10 +620,10 @@ void EditorMainWindow::PopulateHierarchy()
     HierarchyTree->blockSignals(true);
     HierarchyTree->clear();
 
-    Scene* EditScene = GetEditScene();
-    if (EditScene != nullptr)
+    Scene* HierarchyScene = GetHierarchyScene();
+    if (HierarchyScene != nullptr)
     {
-        for (GameObject* RootObject : EditScene->GetRootObjects())
+        for (GameObject* RootObject : HierarchyScene->GetRootObjects())
         {
             AddHierarchyItem(nullptr, RootObject);
         }
@@ -658,13 +631,6 @@ void EditorMainWindow::PopulateHierarchy()
 
     HierarchyTree->expandAll();
     HierarchyTree->blockSignals(false);
-
-    SubsceneList->clear();
-    if (const ProjectDescriptor* Descriptor = BoundSession.GetProject())
-    {
-        SubsceneList->addItem(QString::fromStdString(Descriptor->Name));
-        SubsceneList->setCurrentRow(0);
-    }
 
     if (SelectedObject.IsValid() && GetSelectedGameObject() != nullptr)
     {
@@ -693,43 +659,14 @@ void EditorMainWindow::AddHierarchyItem(QTreeWidgetItem* ParentItem, GameObject*
         Item = new QTreeWidgetItem(HierarchyTree, {QString::fromStdString(ObjectInstance->GetName())});
     }
     StoreObjectHandle(Item, ObjectInstance->GetObjectHandle());
-    Item->setFlags(Item->flags() | Qt::ItemIsEditable | Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled);
+    if (!BoundEngine.GetPlaySession().IsSimulating())
+    {
+        Item->setFlags(Item->flags() | Qt::ItemIsEditable | Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled);
+    }
 
     for (GameObject* Child : ObjectInstance->GetChildren())
     {
         AddHierarchyItem(Item, Child);
-    }
-}
-
-void EditorMainWindow::PopulateStoryTree()
-{
-    StoryTree->clear();
-    const ProjectDescriptor* Project = BoundSession.GetProject();
-    if (Project == nullptr || Project->StartupStory.empty())
-    {
-        return;
-    }
-    StoryDocument LoadedStory;
-    const StorySerializeResult Loaded = StoryDocumentIO::LoadFromFile(Project->StartupStory, LoadedStory);
-    if (!Loaded.bOk)
-    {
-        PrintString("Editor story load failed: " + Loaded.Error);
-        return;
-    }
-    auto* Chapter = new QTreeWidgetItem(StoryTree, {QString::fromStdString(LoadedStory.Name)});
-    Chapter->setExpanded(true);
-    for (const StoryNode& Node : LoadedStory.Nodes)
-    {
-        QString Label = QString::fromStdString(Node.Id);
-        if (!Node.Speaker.empty())
-        {
-            Label += " · " + QString::fromStdString(Node.Speaker);
-        }
-        if (!Node.Text.empty())
-        {
-            Label += " · " + QString::fromStdString(Node.Text);
-        }
-        new QTreeWidgetItem(Chapter, {Label});
     }
 }
 
@@ -740,8 +677,92 @@ void EditorMainWindow::BuildStoryDockPage()
     DockTabs->addTab(StoryDockPage, tr("Story"));
 }
 
+void EditorMainWindow::BuildRenderStatisticsDockPage()
+{
+    auto* Page = new QWidget(DockTabs);
+    auto* Layout = new QVBoxLayout(Page);
+    Layout->setContentsMargins(16, 16, 16, 16);
+    Layout->setSpacing(8);
+    auto* TitleLabel = new QLabel(QString::fromUtf8("\xD0\x9D\xD0\xB0\xD1\x81\xD1\x82\xD1\x80\xD0\xBE\xD0\xB9\xD0\xBA\xD0\xB8 \xD1\x81\xD1\x82\xD0\xB0\xD1\x82\xD0\xB8\xD1\x81\xD1\x82\xD0\xB8\xD0\xBA\xD0\xB8"), Page);
+    TitleLabel->setStyleSheet("color: #ead4df; font-size: 16px; font-weight: 600;");
+    Layout->addWidget(TitleLabel);
+    RenderStatisticsLabel = new QLabel(Page);
+    RenderStatisticsLabel->setWordWrap(true);
+    RenderStatisticsLabel->setObjectName("MutedLabel");
+    RenderStatisticsLabel->setStyleSheet("color: #95909e;");
+    RenderStatisticsLabel->setText(tr("Waiting for render statistics…"));
+    Layout->addWidget(RenderStatisticsLabel);
+    Layout->addStretch(1);
+    DockTabs->addTab(Page, QString::fromUtf8("\xD0\x9D\xD0\xB0\xD1\x81\xD1\x82\xD1\x80\xD0\xBE\xD0\xB9\xD0\xBA\xD0\xB8 \xD1\x81\xD1\x82\xD0\xB0\xD1\x82\xD0\xB8\xD1\x81\xD1\x82\xD0\xB8\xD0\xBA\xD0\xB8"));
+}
+
+void EditorMainWindow::BuildPostprocessDockPage()
+{
+    auto* Page = new QWidget(DockTabs);
+    auto* Layout = new QVBoxLayout(Page);
+    Layout->setContentsMargins(16, 16, 16, 16);
+    Layout->setSpacing(8);
+    auto* TitleLabel = new QLabel(QString::fromUtf8("\xD0\x9D\xD0\xB0\xD1\x81\xD1\x82\xD1\x80\xD0\xBE\xD0\xB9\xD0\xBA\xD0\xB8 \xD0\xBF\xD0\xBE\xD1\x81\xD1\x82\xD0\xBE\xD0\xB1\xD1\x80\xD0\xB0\xD0\xB1\xD0\xBE\xD1\x82\xD0\xBA\xD0\xB8"), Page);
+    TitleLabel->setStyleSheet("color: #ead4df; font-size: 16px; font-weight: 600;");
+    Layout->addWidget(TitleLabel);
+
+    auto* Form = new QFormLayout();
+    Form->setContentsMargins(0, 0, 0, 0);
+    Form->setSpacing(8);
+
+    auto* Exposure = new QDoubleSpinBox(Page);
+    Exposure->setRange(0.01, 20.0);
+    Exposure->setSingleStep(0.1);
+    Exposure->setDecimals(2);
+    Exposure->setValue(RenderConfiguration.Exposure);
+    Form->addRow(tr("Exposure"), Exposure);
+    connect(Exposure, qOverload<double>(&QDoubleSpinBox::valueChanged), this, [this](double Value)
+    {
+        RenderConfiguration.Exposure = static_cast<float>(Value);
+    });
+
+    auto* Environment = new QDoubleSpinBox(Page);
+    Environment->setRange(0.0, 10.0);
+    Environment->setSingleStep(0.1);
+    Environment->setDecimals(2);
+    Environment->setValue(RenderConfiguration.EnvironmentIntensity);
+    Form->addRow(tr("IBL"), Environment);
+    connect(Environment, qOverload<double>(&QDoubleSpinBox::valueChanged), this, [this](double Value)
+    {
+        RenderConfiguration.EnvironmentIntensity = static_cast<float>(Value);
+    });
+
+    auto* Bloom = new QDoubleSpinBox(Page);
+    Bloom->setRange(0.0, 1.0);
+    Bloom->setSingleStep(0.01);
+    Bloom->setDecimals(2);
+    Bloom->setValue(RenderConfiguration.BloomIntensity);
+    Form->addRow(tr("Bloom"), Bloom);
+    connect(Bloom, qOverload<double>(&QDoubleSpinBox::valueChanged), this, [this](double Value)
+    {
+        RenderConfiguration.BloomIntensity = static_cast<float>(Value);
+    });
+
+    auto* Antialiasing = new QCheckBox(tr("FXAA"), Page);
+    Antialiasing->setChecked(RenderConfiguration.bAntialiasing);
+    Form->addRow(QString(), Antialiasing);
+    connect(Antialiasing, &QCheckBox::toggled, this, [this](bool bEnabled)
+    {
+        RenderConfiguration.bAntialiasing = bEnabled;
+    });
+
+    Layout->addLayout(Form);
+    Layout->addStretch(1);
+    DockTabs->addTab(Page, QString::fromUtf8("\xD0\x9D\xD0\xB0\xD1\x81\xD1\x82\xD1\x80\xD0\xBE\xD0\xB9\xD0\xBA\xD0\xB8 \xD0\xBF\xD0\xBE\xD1\x81\xD1\x82\xD0\xBE\xD0\xB1\xD1\x80\xD0\xB0\xD0\xB1\xD0\xBE\xD1\x82\xD0\xBA\xD0\xB8"));
+}
+
 void EditorMainWindow::PopulateDockPages()
 {
+    ContentBrowser = new ContentBrowserWidget(DockTabs);
+    ContentBrowser->SetEngine(&BoundEngine);
+    connect(ContentBrowser, &ContentBrowserWidget::AssetActivated, this, &EditorMainWindow::OnAssetActivated);
+    DockTabs->addTab(ContentBrowser, tr("Content"));
+
     BuildStoryDockPage();
 
     struct DockPage
@@ -756,11 +777,9 @@ void EditorMainWindow::PopulateDockPages()
         {"\xD0\x9A\xD0\xB0\xD0\xBC\xD0\xB5\xD1\x80\xD1\x8B", "Camera library and framing"},
         {"\xD0\x9F\xD0\xBE\xD1\x81\xD1\x82\xD0\xB0\xD0\xBD\xD0\xBE\xD0\xB2\xD0\xBA\xD0\xB0", "Staging · before / during / after line"},
         {"\xD0\xA1\xD0\xBE\xD0\xB1\xD1\x8B\xD1\x82\xD0\xB8\xD0\xB5", "Event · action groups and actions"},
-        {"\xD0\xA1\xD0\xBE\xD0\xB7\xD0\xB4\xD0\xB0\xD0\xBD\xD0\xB8\xD0\xB5", "Authoring library for actions and groups"},
         {"\xD0\x9F\xD1\x80\xD0\xBE\xD0\xB5\xD0\xBA\xD1\x82", "Asset browser · scenes / events / audio"},
         {"\xD0\x97\xD0\xB2\xD1\x83\xD0\xBA", "Sound workspace and meters"},
         {"\xD0\xAD\xD1\x84\xD1\x84\xD0\xB5\xD0\xBA\xD1\x82\xD1\x8B", "Effect samples playground"},
-        {"\xD0\x90\xD0\xBA\xD1\x82\xD0\xB8\xD0\xB2\xD0\xBD\xD1\x8B\xD0\xB5", "Active effects and event instances"},
         {"\xD0\x9E\xD1\x88\xD0\xB8\xD0\xB1\xD0\xBA\xD0\xB8", "Validation issues and failure lab"},
     };
 
@@ -770,9 +789,74 @@ void EditorMainWindow::PopulateDockPages()
             MakePlaceholderPage(QString::fromUtf8(Page.TitleUtf8), QString::fromUtf8(Page.BodyUtf8)),
             QString::fromUtf8(Page.TitleUtf8));
     }
-    ContentBrowser = new ContentBrowserWidget(DockTabs);
-    ContentBrowser->SetRegistry(&BoundEngine.GetAssetRegistry());
-    DockTabs->addTab(ContentBrowser, tr("Content"));
+    BuildRenderStatisticsDockPage();
+    BuildPostprocessDockPage();
+}
+
+void EditorMainWindow::RegisterBuiltInAssetEditors()
+{
+    RegisterAssetEditor(SceneAssetType, [this](
+        const AssetKey&,
+        const AssetRegistryEntry& Entry,
+        const QString& VirtualPath)
+    {
+        if (BoundEngine.GetPlaySession().IsSimulating())
+        {
+            statusBar()->showMessage(tr("Stop Play before opening another scene"), 2500);
+            return;
+        }
+        if (!PromptSaveIfDirty())
+        {
+            return;
+        }
+
+        std::string Error;
+        if (!Document.Open(Entry.AbsolutePath, Error))
+        {
+            QMessageBox::warning(
+                this,
+                tr("Open Scene"),
+                QString::fromStdString(Error.empty() ? "Failed to open scene" : Error));
+            return;
+        }
+
+        ClearSelection();
+        CommandStack.Clear();
+        StoryPlayback.BindScene(Document.GetScene());
+        PopulateHierarchy();
+        ConfigureRenderView();
+        UpdateWindowTitleDirty();
+        UpdateStatus();
+        statusBar()->showMessage(tr("Opened scene %1").arg(VirtualPath), 2500);
+    });
+
+    RegisterAssetEditor(StoryAssetType, [this](
+        const AssetKey&,
+        const AssetRegistryEntry& Entry,
+        const QString& VirtualPath)
+    {
+        StoryPlayback.BindScene(GetEditScene());
+        if (!StoryPlayback.LoadFromFile(Entry.AbsolutePath))
+        {
+            QMessageBox::warning(
+                this,
+                tr("Open Story"),
+                QString::fromStdString(StoryPlayback.GetLastError().empty()
+                    ? "Failed to open story"
+                    : StoryPlayback.GetLastError()));
+            return;
+        }
+        for (int TabIndex = 0; TabIndex < DockTabs->count(); ++TabIndex)
+        {
+            if (DockTabs->widget(TabIndex) == StoryDockPage)
+            {
+                DockTabs->setCurrentIndex(TabIndex);
+                break;
+            }
+        }
+        RefreshStoryPlaybackUi();
+        statusBar()->showMessage(tr("Opened story %1").arg(VirtualPath), 2500);
+    });
 }
 
 void EditorMainWindow::RefreshProjectTitle()
@@ -865,6 +949,18 @@ void EditorMainWindow::OnPlayToggled(bool bChecked)
         ? QString::fromUtf8("\xD0\x9F\xD1\x80\xD0\xB5\xD0\xB4\xD0\xBF\xD1\x80\xD0\xBE\xD1\x81\xD0\xBC\xD0\xBE\xD1\x82\xD1\x80")
         : QString::fromUtf8("\xD0\xA0\xD0\xB5\xD0\xB4\xD0\xB0\xD0\xBA\xD1\x82\xD0\xB8\xD1\x80\xD0\xBE\xD0\xB2\xD0\xB0\xD0\xBD\xD0\xB8\xD0\xB5"));
     PlayButton->setText(bPlaying ? QString::fromUtf8("\xE2\x96\xA0") : QString::fromUtf8("\xE2\x96\xB6"));
+    PrimaryViewport->SetEditorToolsEnabled(!bPlaying);
+    if (CameraSpeedSpin != nullptr)
+    {
+        CameraSpeedSpin->setEnabled(!bPlaying);
+    }
+    ViewportModeLabel->setText(bPlaying
+        ? QString::fromUtf8("Game · Play World")
+        : QString::fromUtf8("Scene · Edit World"));
+    GameDialogue->setVisible(bPlaying);
+    ClearSelection();
+    PopulateHierarchy();
+    ConfigureRenderView();
     if (bPlaying)
     {
         statusBar()->showMessage(QString::fromUtf8("Play mode — hierarchy edits disabled"), 3000);
@@ -909,27 +1005,12 @@ void EditorMainWindow::OnStepClicked()
     statusBar()->showMessage(tr("Step frame"), 1500);
 }
 
-void EditorMainWindow::OnViewportModeChanged(int Index)
-{
-    GameDialogue->setVisible(Index == 1);
-    ConfigureRenderView();
-    if (Index == 1 && !bPlaying)
-    {
-        statusBar()->showMessage(QString::fromUtf8("Game viewport · press Play for playtest"), 2000);
-    }
-}
-
 void EditorMainWindow::OnDockTabChanged(int Index)
 {
     if (Index >= 0)
     {
         statusBar()->showMessage(QString::fromUtf8("Dock: ") + DockTabs->tabText(Index), 1200);
     }
-}
-
-void EditorMainWindow::OnHierarchyTabChanged(int)
-{
-    UpdateStatus();
 }
 
 void EditorMainWindow::OnLayoutModeChanged(int Index)
@@ -943,7 +1024,14 @@ void EditorMainWindow::OnLayoutModeChanged(int Index)
     if (Mode == "graph")
     {
         CenterSplitter->setSizes({120, 680});
-        DockTabs->setCurrentIndex(0);
+        for (int TabIndex = 0; TabIndex < DockTabs->count(); ++TabIndex)
+        {
+            if (DockTabs->tabText(TabIndex) == tr("Story"))
+            {
+                DockTabs->setCurrentIndex(TabIndex);
+                break;
+            }
+        }
     }
     else if (Mode == "scene")
     {
@@ -951,15 +1039,15 @@ void EditorMainWindow::OnLayoutModeChanged(int Index)
     }
     else if (Mode == "hierarchy")
     {
-        WorkspaceSplitter->setSizes({520, 500, 200});
+        WorkspaceSplitter->setSizes({200, 500, 520});
     }
     else if (Mode == "inspector")
     {
-        WorkspaceSplitter->setSizes({180, 500, 540});
+        WorkspaceSplitter->setSizes({540, 500, 180});
     }
     else
     {
-        WorkspaceSplitter->setSizes({240, 900, 320});
+        WorkspaceSplitter->setSizes({320, 900, 240});
         CenterSplitter->setSizes({520, 280});
     }
 }
@@ -1111,6 +1199,78 @@ void EditorMainWindow::OnViewportResized(RenderViewportWidget* Viewport)
     BoundEngine.ResizeRenderSurface(RenderSurfaceId{Viewport->GetViewId().Value}, Info.Width, Info.Height);
 }
 
+void EditorMainWindow::OnViewportSelectionRequested(QPoint Position)
+{
+    Scene* EditScene = GetEditScene();
+    if (EditScene == nullptr
+        || PrimaryViewport == nullptr
+        || BoundEngine.GetPlaySession().IsSimulating())
+    {
+        return;
+    }
+
+    const RenderViewCamera& Camera = PrimaryViewport->GetViewCamera();
+    Vector3 Forward = Camera.Target - Camera.Position;
+    if (Forward.LengthSquared() <= 0.000001f)
+    {
+        return;
+    }
+    Forward.Normalize();
+    Vector3 Right = Forward.Cross(Camera.Up);
+    if (Right.LengthSquared() <= 0.000001f)
+    {
+        return;
+    }
+    Right.Normalize();
+    Vector3 Up = Right.Cross(Forward);
+    Up.Normalize();
+
+    const float ViewportWidth = static_cast<float>(std::max(1, PrimaryViewport->width()));
+    const float ViewportHeight = static_cast<float>(std::max(1, PrimaryViewport->height()));
+    const float NormalizedX = static_cast<float>(Position.x()) / ViewportWidth * 2.0f - 1.0f;
+    const float NormalizedY = 1.0f - static_cast<float>(Position.y()) / ViewportHeight * 2.0f;
+    const float HalfVerticalField = std::tan(Camera.FieldOfViewDegrees * DegreesToRadians * 0.5f);
+    Vector3 RayDirection = Forward
+        + Right * (NormalizedX * HalfVerticalField * ViewportWidth / ViewportHeight)
+        + Up * (NormalizedY * HalfVerticalField);
+    RayDirection.Normalize();
+
+    GameObject* ClosestObject = nullptr;
+    float ClosestDistance = std::numeric_limits<float>::max();
+    for (GameObject* Candidate : EditScene->GetAllObjects())
+    {
+        if (Candidate == nullptr || !Candidate->IsActiveInHierarchy())
+        {
+            continue;
+        }
+        MeshRendererComponent* MeshRenderer = Candidate->GetComponent<MeshRendererComponent>();
+        if (MeshRenderer == nullptr || !MeshRenderer->bVisible)
+        {
+            continue;
+        }
+
+        float HitDistance = 0.0f;
+        const AxisAlignedBounds WorldBounds = MeshRenderer->LocalBounds.TransformedBy(Candidate->GetWorldMatrix());
+        if (RayIntersectsBounds(Camera.Position, RayDirection, WorldBounds, HitDistance)
+            && HitDistance < ClosestDistance)
+        {
+            ClosestDistance = HitDistance;
+            ClosestObject = Candidate;
+        }
+    }
+
+    if (ClosestObject != nullptr)
+    {
+        SelectObject(ClosestObject->GetObjectHandle());
+    }
+    else
+    {
+        HierarchyTree->clearSelection();
+        ClearSelection();
+        UpdateStatus();
+    }
+}
+
 void EditorMainWindow::EnsurePresenting(RenderViewportWidget* Viewport)
 {
     if (Viewport == nullptr || !Viewport->HasValidNativeHandle() || !Viewport->isVisible())
@@ -1128,45 +1288,61 @@ void EditorMainWindow::ConfigureRenderView()
 {
     PrimaryViewport->SyncGizmoOverlay();
     EnsurePresenting(PrimaryViewport);
-    EnsurePresenting(GameViewport);
-    const NativeWindowInfo Info = PrimaryViewport->BuildNativeWindowInfo();
-    RenderCamera Camera;
-    PrimaryViewport->GetViewCamera().BuildRenderCamera(
-        static_cast<float>(qMax(1u, Info.Width)) / static_cast<float>(qMax(1u, Info.Height)), Camera);
-    BoundEngine.ConfigureRenderSurface(RenderSurfaceId{1}, true, Camera, RenderConfiguration);
-    BoundEngine.ConfigureRenderSurface(RenderSurfaceId{2}, false, RenderCamera{}, RenderConfiguration);
-    QStringList Lines;
-    for (uint32_t SurfaceIndex : {1u, 2u})
+    if (BoundEngine.GetPlaySession().IsSimulating())
     {
-        const RenderStatistics Statistics = BoundEngine.GetRenderStatistics(RenderSurfaceId{SurfaceIndex});
-        QString Timings = tr("GPU timings pending or unsupported");
-        if (Statistics.bGpuTimingsAvailable)
-        {
-            Timings = tr("GPU: shadow %1 / opaque %2 / transparency %3 / post %4 ms")
-                .arg(Statistics.ShadowMilliseconds, 0, 'f', 2).arg(Statistics.OpaqueMilliseconds, 0, 'f', 2)
-                .arg(Statistics.TransparencyMilliseconds, 0, 'f', 2).arg(Statistics.PostprocessMilliseconds, 0, 'f', 2);
-        }
-        QString Name = tr("Scene");
-        if (SurfaceIndex == 2)
-        {
-            Name = tr("Game");
-        }
-        Lines.push_back(tr("%1: %2 visible, %3 culled, %4 draws, CPU %5 ms. %6")
-            .arg(Name).arg(Statistics.VisibleObjects).arg(Statistics.CulledObjects).arg(Statistics.DrawCalls)
+        BoundEngine.ConfigureRenderSurface(RenderSurfaceId{1}, false, RenderCamera{}, RenderConfiguration);
+    }
+    else
+    {
+        const NativeWindowInfo Info = PrimaryViewport->BuildNativeWindowInfo();
+        RenderCamera Camera;
+        PrimaryViewport->GetViewCamera().BuildRenderCamera(
+            static_cast<float>(qMax(1u, Info.Width)) / static_cast<float>(qMax(1u, Info.Height)), Camera);
+        BoundEngine.ConfigureRenderSurface(RenderSurfaceId{1}, true, Camera, RenderConfiguration);
+    }
+    const RenderStatistics Statistics = BoundEngine.GetRenderStatistics(RenderSurfaceId{1});
+    QString Timings = tr("GPU timings pending or unsupported");
+    if (Statistics.bGpuTimingsAvailable)
+    {
+        Timings = tr("GPU: shadow %1 / opaque %2 / transparency %3 / post %4 ms")
+            .arg(Statistics.ShadowMilliseconds, 0, 'f', 2).arg(Statistics.OpaqueMilliseconds, 0, 'f', 2)
+            .arg(Statistics.TransparencyMilliseconds, 0, 'f', 2).arg(Statistics.PostprocessMilliseconds, 0, 'f', 2);
+    }
+    if (RenderStatisticsLabel != nullptr)
+    {
+        RenderStatisticsLabel->setText(tr("%1: %2 visible, %3 culled, %4 draws, CPU %5 ms. %6")
+            .arg(bPlaying ? tr("Game") : tr("Scene"))
+            .arg(Statistics.VisibleObjects).arg(Statistics.CulledObjects).arg(Statistics.DrawCalls)
             .arg(Statistics.CpuMilliseconds, 0, 'f', 2).arg(Timings));
     }
-    RenderStatisticsLabel->setText(Lines.join("\n"));
 }
 
 void EditorMainWindow::OnFocusActionsAndEvents()
 {
-    DockTabs->setCurrentIndex(6);
+    const QString EventTabTitle = QString::fromUtf8("\xD0\xA1\xD0\xBE\xD0\xB1\xD1\x8B\xD1\x82\xD0\xB8\xD0\xB5");
+    for (int TabIndex = 0; TabIndex < DockTabs->count(); ++TabIndex)
+    {
+        if (DockTabs->tabText(TabIndex) == EventTabTitle)
+        {
+            DockTabs->setCurrentIndex(TabIndex);
+            break;
+        }
+    }
     LayoutCombo->setCurrentIndex(1);
 }
 
 Scene* EditorMainWindow::GetEditScene() const
 {
     return Document.GetScene();
+}
+
+Scene* EditorMainWindow::GetHierarchyScene() const
+{
+    if (BoundEngine.GetPlaySession().IsSimulating())
+    {
+        return BoundEngine.GetPlaySession().GetPlayWorld();
+    }
+    return GetEditScene();
 }
 
 bool EditorMainWindow::ExecuteCommand(std::unique_ptr<EditorCommand> Command)
@@ -1222,12 +1398,12 @@ ObjectHandle EditorMainWindow::GetSelectedObjectHandle() const
 
 GameObject* EditorMainWindow::GetSelectedGameObject() const
 {
-    Scene* EditScene = GetEditScene();
-    if (EditScene == nullptr || !SelectedObject.IsValid())
+    Scene* HierarchyScene = GetHierarchyScene();
+    if (HierarchyScene == nullptr || !SelectedObject.IsValid())
     {
         return nullptr;
     }
-    return EditScene->FindByHandle(SelectedObject);
+    return HierarchyScene->FindByHandle(SelectedObject);
 }
 
 void EditorMainWindow::RefreshSelectionUi()
@@ -1236,9 +1412,14 @@ void EditorMainWindow::RefreshSelectionUi()
 
     GameObject* Selected = GetSelectedGameObject();
     const bool bHasSelection = Selected != nullptr;
+    const bool bEditableSelection = bHasSelection && !BoundEngine.GetPlaySession().IsSimulating();
+    if (Inspector != nullptr)
+    {
+        Inspector->setEnabled(!BoundEngine.GetPlaySession().IsSimulating());
+    }
     if (ObjectNameEdit != nullptr)
     {
-        ObjectNameEdit->setEnabled(bHasSelection);
+        ObjectNameEdit->setEnabled(bEditableSelection);
         ObjectNameEdit->setText(bHasSelection ? QString::fromStdString(Selected->GetName()) : QString());
     }
 
@@ -1248,7 +1429,7 @@ void EditorMainWindow::RefreshSelectionUi()
         {
             return;
         }
-        Spin->setEnabled(bHasSelection);
+        Spin->setEnabled(bEditableSelection);
         Spin->setValue(Value);
     };
 
@@ -1262,6 +1443,10 @@ void EditorMainWindow::RefreshSelectionUi()
         SetSpinEnabled(PositionXSpin, ObjectTransform.Position.x);
         SetSpinEnabled(PositionYSpin, ObjectTransform.Position.y);
         SetSpinEnabled(PositionZSpin, ObjectTransform.Position.z);
+        const Vector3 RotationDegrees = QuaternionToEulerDegrees(ObjectTransform.Rotation);
+        SetSpinEnabled(RotationXSpin, RotationDegrees.x);
+        SetSpinEnabled(RotationYSpin, RotationDegrees.y);
+        SetSpinEnabled(RotationZSpin, RotationDegrees.z);
         SetSpinEnabled(ScaleXSpin, ObjectTransform.Scale.x);
         SetSpinEnabled(ScaleYSpin, ObjectTransform.Scale.y);
         SetSpinEnabled(ScaleZSpin, ObjectTransform.Scale.z);
@@ -1275,6 +1460,9 @@ void EditorMainWindow::RefreshSelectionUi()
         SetSpinEnabled(PositionXSpin, 0.0);
         SetSpinEnabled(PositionYSpin, 0.0);
         SetSpinEnabled(PositionZSpin, 0.0);
+        SetSpinEnabled(RotationXSpin, 0.0);
+        SetSpinEnabled(RotationYSpin, 0.0);
+        SetSpinEnabled(RotationZSpin, 0.0);
         SetSpinEnabled(ScaleXSpin, 1.0);
         SetSpinEnabled(ScaleYSpin, 1.0);
         SetSpinEnabled(ScaleZSpin, 1.0);
@@ -1318,7 +1506,7 @@ void EditorMainWindow::RefreshSelectionUi()
             }
         }
         ComponentCombo->setCurrentIndex(SelectedIndex);
-        ComponentCombo->setEnabled(ComponentCombo->count() > 0);
+        ComponentCombo->setEnabled(ComponentCombo->count() > 0 && !BoundEngine.GetPlaySession().IsSimulating());
         ComponentCombo->blockSignals(false);
         OnInspectedComponentChanged(SelectedIndex);
     }
@@ -1351,6 +1539,10 @@ void EditorMainWindow::OnHierarchySelectionChanged()
 
 void EditorMainWindow::OnHierarchyContextMenu(const QPoint& Position)
 {
+    if (BoundEngine.GetPlaySession().IsSimulating())
+    {
+        return;
+    }
     QMenu Menu(this);
     Menu.addAction(QString::fromUtf8("Create Object"), this, &EditorMainWindow::OnCreateObject);
     Menu.addAction(QString::fromUtf8("Delete Object"), this, &EditorMainWindow::OnDeleteSelectedObject);
@@ -1507,6 +1699,11 @@ void EditorMainWindow::OnTransformEdited()
         static_cast<float>(PositionXSpin->value()),
         static_cast<float>(PositionYSpin->value()),
         static_cast<float>(PositionZSpin->value()));
+    Updated.Rotation = Quaternion::CreateFromYawPitchRoll(
+        static_cast<float>(RotationYSpin->value()) * DegreesToRadians,
+        static_cast<float>(RotationXSpin->value()) * DegreesToRadians,
+        static_cast<float>(RotationZSpin->value()) * DegreesToRadians);
+    Updated.Rotation.Normalize();
     Updated.Scale = Vector3(
         static_cast<float>(ScaleXSpin->value()),
         static_cast<float>(ScaleYSpin->value()),
@@ -1514,10 +1711,59 @@ void EditorMainWindow::OnTransformEdited()
     ExecuteCommand(MakeSetTransformCommand(EditScene, Selected->GetObjectHandle(), Updated));
 }
 
+void EditorMainWindow::OnAssetActivated(
+    QString AssetId,
+    QString SubAssetIdentifier,
+    QString AssetTypeIdentifier,
+    QString VirtualPath)
+{
+    AssetKey Key{};
+    if (!Guid::TryParse(AssetId.toStdString(), Key.Asset))
+    {
+        return;
+    }
+    if (!SubAssetIdentifier.isEmpty())
+    {
+        SubAssetId ParsedSubAsset{};
+        if (!Guid::TryParse(SubAssetIdentifier.toStdString(), ParsedSubAsset))
+        {
+            return;
+        }
+        Key.SubAsset = ParsedSubAsset;
+    }
+
+    AssetRegistryEntry Entry{};
+    const SubAssetRecord* SubAsset = nullptr;
+    if (!BoundEngine.GetAssetRegistry().TryResolveKey(Key, Entry, &SubAsset))
+    {
+        statusBar()->showMessage(tr("Asset is no longer registered"), 2500);
+        return;
+    }
+    AssetType Type = UnknownAssetType;
+    if (SubAsset != nullptr)
+    {
+        Type = SubAsset->Type;
+    }
+    else if (!TryParseAssetType(AssetTypeIdentifier.toStdString(), Type))
+    {
+        return;
+    }
+
+    auto FoundEditor = AssetEditors.find(Type);
+    if (FoundEditor == AssetEditors.end())
+    {
+        statusBar()->showMessage(
+            tr("No editor is registered for %1 assets").arg(QString::fromUtf8(AssetTypeToString(Type))),
+            2500);
+        return;
+    }
+    FoundEditor->second(Key, Entry, VirtualPath);
+}
+
 void EditorMainWindow::OnAssetDropped(
     QString AssetId,
     QString SubAssetIdentifier,
-    int AssetTypeValue,
+    QString AssetTypeIdentifier,
     QString VirtualPath,
     QPoint Position)
 {
@@ -1539,14 +1785,18 @@ void EditorMainWindow::OnAssetDropped(
             Key.SubAsset = ParsedSubAsset;
         }
     }
-    AssetType Type = static_cast<AssetType>(AssetTypeValue);
+    AssetType Type = UnknownAssetType;
+    if (!TryParseAssetType(AssetTypeIdentifier.toStdString(), Type))
+    {
+        return;
+    }
     AssetRegistryEntry Entry{};
     if (!BoundEngine.GetAssetRegistry().TryGetById(Key.Asset, Entry))
     {
         return;
     }
 
-    if (Type == AssetType::Material)
+    if (Type == MaterialAssetType)
     {
         GameObject* Selected = GetSelectedGameObject();
         MeshRendererComponent* MeshRenderer = Selected != nullptr
@@ -1565,19 +1815,19 @@ void EditorMainWindow::OnAssetDropped(
         return;
     }
 
-    if (Type == AssetType::Model && !Key.HasSubAsset())
+    if (Type == ModelAssetType && !Key.HasSubAsset())
     {
         for (const SubAssetRecord& SubAsset : Entry.Metadata.SubAssets)
         {
-            if (SubAsset.Type == AssetType::StaticMesh)
+            if (SubAsset.Type == StaticMeshAssetType)
             {
                 Key.SubAsset = SubAsset.Id;
-                Type = AssetType::StaticMesh;
+                Type = StaticMeshAssetType;
                 break;
             }
         }
     }
-    if (Type != AssetType::StaticMesh || !Key.HasSubAsset())
+    if (Type != StaticMeshAssetType || !Key.HasSubAsset())
     {
         statusBar()->showMessage(tr("Only Model/StaticMesh assets can create scene objects"), 2500);
         return;
@@ -1719,8 +1969,6 @@ bool EditorMainWindow::PromptSaveIfDirty()
 
 void EditorMainWindow::StartStoryPlayback()
 {
-    PopulateStoryTree();
-    ViewportTabs->setCurrentIndex(1);
     RefreshStoryPlaybackUi();
 }
 

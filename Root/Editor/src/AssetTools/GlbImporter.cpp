@@ -110,6 +110,25 @@ ImportResult GlbImporter::ValidateAndCopy(
         }
     }
 
+    for (size_t MeshIndex = 0; MeshIndex < AssetResult->meshes.size(); ++MeshIndex)
+    {
+        const fastgltf::Mesh& Mesh = AssetResult->meshes[MeshIndex];
+        if (Mesh.primitives.empty())
+        {
+            continue;
+        }
+
+        SubAssetRecord MeshSubAsset{};
+        MeshSubAsset.Id = Guid::Generate();
+        MeshSubAsset.Type = StaticMeshAssetType;
+        MeshSubAsset.Name = Mesh.name.empty()
+            ? "Mesh_" + std::to_string(MeshIndex)
+            : std::string(Mesh.name);
+        MeshSubAsset.Selector.Kind = "mesh";
+        MeshSubAsset.Selector.Index = static_cast<int32_t>(MeshIndex);
+        Result.Metadata.SubAssets.push_back(std::move(MeshSubAsset));
+    }
+
     std::filesystem::create_directories(DestinationPath.parent_path(), ErrorCode);
     std::filesystem::copy_file(SourcePath, DestinationPath, std::filesystem::copy_options::overwrite_existing, ErrorCode);
     if (ErrorCode)

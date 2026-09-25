@@ -74,7 +74,7 @@ bool AssetMetadataIO::TryFromJson(const nlohmann::json& Document, AssetMetadata&
         return false;
     }
 
-    AssetType ParsedType = AssetType::Unknown;
+    AssetType ParsedType = UnknownAssetType;
     if (!TryParseAssetType(Document["assetType"].get<std::string>(), ParsedType))
     {
         OutError = AssetDiagnostic::Fail(AssetErrorCode::InvalidMetadata, "AssetMetadata", "Unknown assetType");

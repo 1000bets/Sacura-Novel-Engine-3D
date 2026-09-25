@@ -416,7 +416,7 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
         });
         Menu->addSeparator();
 
-        AssetType Filter = AssetType::Unknown;
+        AssetType Filter = UnknownAssetType;
         TryParseAssetType(Descriptor.Attributes.AssetTypeFilter, Filter);
         std::vector<AssetRegistryEntry> Entries;
         if (Registry != nullptr)

@@ -5,7 +5,7 @@
 class MaterialLoader : public IAssetLoader
 {
 public:
-    AssetType GetAssetType() const override { return AssetType::Material; }
+    AssetType GetAssetType() const override { return MaterialAssetType; }
     const char* GetLoaderName() const override { return "MaterialLoader"; }
 
     void CollectDependencies(const AssetLoadContext& Context, std::vector<AssetKey>& OutDependencies) const override;

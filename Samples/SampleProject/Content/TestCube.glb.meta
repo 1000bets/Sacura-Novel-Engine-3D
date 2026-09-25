@@ -1,0 +1,24 @@
+{
+  "assetType": "Model",
+  "guid": "5409950f-d6f6-43b9-8289-4b68286cc4fe",
+  "importInfo": {
+    "convertedTo": "glb",
+    "generateMissingNormals": true,
+    "importer": "FbxToGlbConverter",
+    "source": "C:/Users/sgsgg/Downloads/TestCube.fbx"
+  },
+  "loadSettings": {},
+  "schemaVersion": 1,
+  "sourceFingerprint": "8828761563e8a1fd",
+  "subAssets": [
+    {
+      "id": "f8877e20-2efb-4cad-82e8-76bd7e009951",
+      "name": "TestCube",
+      "selector": {
+        "index": 0,
+        "kind": "mesh"
+      },
+      "type": "StaticMesh"
+    }
+  ]
+}

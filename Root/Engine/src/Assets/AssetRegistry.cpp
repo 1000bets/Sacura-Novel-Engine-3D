@@ -1,9 +1,99 @@
 #include "Assets/AssetRegistry.h"
 
+#include "Assets/ContentHash.h"
 #include "Core/Threading/ThreadContext.h"
 
 #include <algorithm>
 #include <cctype>
+
+AssetRegistry::AssetRegistry()
+{
+    RegisterAssetType({SceneAssetType, "Scene", {".scene"}, true});
+    RegisterAssetType({StoryAssetType, "Story", {".story"}, true});
+    RegisterAssetType({ModelAssetType, "Model", {".glb"}, false});
+    RegisterAssetType({TextureAssetType, "Texture", {".png", ".jpg", ".jpeg"}, true});
+    RegisterAssetType({MaterialAssetType, "Material", {".material"}, true});
+    RegisterAssetType({StaticMeshAssetType, "Static Mesh", {}, true});
+    RegisterAssetType({SkeletalMeshAssetType, "Skeletal Mesh", {}, true});
+    RegisterAssetType({SkeletonAssetType, "Skeleton", {}, true});
+    RegisterAssetType({AnimationClipAssetType, "Animation Clip", {}, true});
+    RegisterAssetType({SkinBindingAssetType, "Skin Binding", {}, false});
+}
+
+AssetDiagnostic AssetRegistry::RegisterAssetType(const AssetTypeRegistration& Registration)
+{
+    if (!Registration.Type.IsValid() || Registration.DisplayName.empty())
+    {
+        return AssetDiagnostic::Fail(
+            AssetErrorCode::InvalidData,
+            "AssetRegistry",
+            "Asset type registration requires an identifier and display name");
+    }
+
+    const std::string& Identifier = Registration.Type.GetIdentifier();
+    if (TypeRegistrations.find(Identifier) != TypeRegistrations.end())
+    {
+        return AssetDiagnostic::Fail(
+            AssetErrorCode::ImportConflict,
+            "AssetRegistry",
+            "Asset type is already registered: " + Identifier);
+    }
+
+    AssetTypeRegistration Normalized = Registration;
+    for (std::string& Extension : Normalized.Extensions)
+    {
+        std::transform(Extension.begin(), Extension.end(), Extension.begin(), [](unsigned char Character)
+        {
+            return static_cast<char>(std::tolower(Character));
+        });
+        if (Extension.empty() || Extension.front() != '.')
+        {
+            Extension.insert(Extension.begin(), '.');
+        }
+        if (TypesByExtension.find(Extension) != TypesByExtension.end())
+        {
+            return AssetDiagnostic::Fail(
+                AssetErrorCode::ImportConflict,
+                "AssetRegistry",
+                "Asset extension is already registered: " + Extension);
+        }
+    }
+
+    TypeRegistrations.emplace(Identifier, Normalized);
+    for (const std::string& Extension : Normalized.Extensions)
+    {
+        TypesByExtension.emplace(Extension, Normalized.Type);
+    }
+    return AssetDiagnostic::Ok();
+}
+
+bool AssetRegistry::TryGetAssetTypeRegistration(
+    const AssetType& Type,
+    AssetTypeRegistration& OutRegistration) const
+{
+    auto Found = TypeRegistrations.find(Type.GetIdentifier());
+    if (Found == TypeRegistrations.end())
+    {
+        return false;
+    }
+    OutRegistration = Found->second;
+    return true;
+}
+
+std::vector<AssetTypeRegistration> AssetRegistry::GetAssetTypeRegistrations() const
+{
+    std::vector<AssetTypeRegistration> Registrations;
+    Registrations.reserve(TypeRegistrations.size());
+    for (const auto& Pair : TypeRegistrations)
+    {
+        Registrations.push_back(Pair.second);
+    }
+    std::sort(Registrations.begin(), Registrations.end(), [](const AssetTypeRegistration& First, const AssetTypeRegistration& Second)
+    {
+        return First.DisplayName < Second.DisplayName;
+    });
+    return Registrations;
+}
 
 void AssetRegistry::SetContentRoot(const std::filesystem::path& InContentRoot)
 {
@@ -40,7 +130,7 @@ void AssetRegistry::Clear()
     ScanDiagnostics.clear();
 }
 
-AssetType AssetRegistry::InferTypeFromExtension(const std::string& RelativePath)
+AssetType AssetRegistry::InferTypeFromExtension(const std::string& RelativePath) const
 {
     const std::filesystem::path Path(RelativePath);
     std::string Extension = Path.extension().string();
@@ -49,19 +139,8 @@ AssetType AssetRegistry::InferTypeFromExtension(const std::string& RelativePath)
         return static_cast<char>(std::tolower(Character));
     });
 
-    if (Extension == ".glb")
-    {
-        return AssetType::Model;
-    }
-    if (Extension == ".png" || Extension == ".jpg" || Extension == ".jpeg")
-    {
-        return AssetType::Texture;
-    }
-    if (Extension == ".material")
-    {
-        return AssetType::Material;
-    }
-    return AssetType::Unknown;
+    auto Found = TypesByExtension.find(Extension);
+    return Found != TypesByExtension.end() ? Found->second : UnknownAssetType;
 }
 
 bool AssetRegistry::ResolvePathRoots(
@@ -104,6 +183,27 @@ AssetDiagnostic AssetRegistry::IngestMetaFile(AssetMount Mount, const std::files
             {Metadata.Guid},
             AbsoluteAssetPath.string());
     }
+    if (TypeRegistrations.find(Metadata.Type.GetIdentifier()) == TypeRegistrations.end())
+    {
+        return AssetDiagnostic::Fail(
+            AssetErrorCode::UnsupportedFormat,
+            "AssetRegistry",
+            "Asset type is not registered: " + Metadata.Type.GetIdentifier(),
+            {Metadata.Guid},
+            AbsoluteAssetPath.generic_string());
+    }
+    for (const SubAssetRecord& Record : Metadata.SubAssets)
+    {
+        if (TypeRegistrations.find(Record.Type.GetIdentifier()) == TypeRegistrations.end())
+        {
+            return AssetDiagnostic::Fail(
+                AssetErrorCode::UnsupportedFormat,
+                "AssetRegistry",
+                "Subasset type is not registered: " + Record.Type.GetIdentifier(),
+                {Metadata.Guid},
+                AbsoluteAssetPath.generic_string());
+        }
+    }
 
     const std::filesystem::path& ContentRoot = (Mount == AssetMount::Engine) ? EngineContentRoot : GameContentRoot;
     std::string RelativePath;
@@ -132,6 +232,41 @@ AssetDiagnostic AssetRegistry::IngestMetaFile(AssetMount Mount, const std::files
             "Duplicate virtual path during scan",
             {Metadata.Guid},
             VirtualPath);
+    }
+
+    if (Mount == AssetMount::Game && Metadata.SubAssets.empty()
+        && LeafNameExists(AbsoluteAssetPath.stem().string()))
+    {
+        return AssetDiagnostic::Fail(
+            AssetErrorCode::ImportConflict,
+            "AssetRegistry",
+            "Asset name already exists in project",
+            {Metadata.Guid},
+            VirtualPath);
+    }
+    if (Mount == AssetMount::Game && !Metadata.SubAssets.empty())
+    {
+        std::vector<std::string> IncomingNames;
+        for (const SubAssetRecord& Record : Metadata.SubAssets)
+        {
+            std::string NormalizedName = Record.Name;
+            std::transform(NormalizedName.begin(), NormalizedName.end(), NormalizedName.begin(), [](unsigned char Character)
+            {
+                return static_cast<char>(std::tolower(Character));
+            });
+            if (Record.Name.empty()
+                || LeafNameExists(Record.Name)
+                || std::find(IncomingNames.begin(), IncomingNames.end(), NormalizedName) != IncomingNames.end())
+            {
+                return AssetDiagnostic::Fail(
+                    AssetErrorCode::ImportConflict,
+                    "AssetRegistry",
+                    "Subasset name must be unique in project",
+                    {Metadata.Guid},
+                    VirtualPath);
+            }
+            IncomingNames.push_back(std::move(NormalizedName));
+        }
     }
 
     AssetRegistryEntry Entry{};
@@ -170,6 +305,8 @@ AssetDiagnostic AssetRegistry::ScanMount(AssetMount Mount, const std::filesystem
         }
     }
 
+    std::vector<std::filesystem::path> AssetFiles;
+    std::vector<std::filesystem::path> MetadataFiles;
     Error.clear();
     for (const std::filesystem::directory_entry& Entry : std::filesystem::recursive_directory_iterator(ContentRoot, Error))
     {
@@ -188,16 +325,14 @@ AssetDiagnostic AssetRegistry::ScanMount(AssetMount Mount, const std::filesystem
         }
 
         const std::string PathString = Entry.path().generic_string();
-        if (!AssetPath::HasMetaSuffix(PathString))
+        if (AssetPath::HasMetaSuffix(PathString))
         {
+            MetadataFiles.push_back(Entry.path());
             continue;
         }
-
-        AssetDiagnostic Diagnostic = IngestMetaFile(Mount, Entry.path());
-        if (Diagnostic.HasError())
+        if (InferTypeFromExtension(PathString).IsValid())
         {
-            ScanDiagnostics.push_back(Diagnostic);
-            PrintString(std::string("AssetRegistry scan: ") + AssetErrorCodeToString(Diagnostic.Code) + " — " + Diagnostic.Message + " @ " + Diagnostic.Path);
+            AssetFiles.push_back(Entry.path());
         }
     }
 
@@ -209,6 +344,42 @@ AssetDiagnostic AssetRegistry::ScanMount(AssetMount Mount, const std::filesystem
             "Failed while iterating content root: " + Error.message(),
             {},
             ContentRoot.generic_string());
+    }
+
+    std::sort(AssetFiles.begin(), AssetFiles.end());
+    for (const std::filesystem::path& AssetFile : AssetFiles)
+    {
+        const std::filesystem::path MetadataFile = AssetFile.string() + ".meta";
+        if (std::filesystem::exists(MetadataFile))
+        {
+            continue;
+        }
+
+        AssetMetadata Metadata{};
+        Metadata.Guid = Guid::Generate();
+        Metadata.Type = InferTypeFromExtension(AssetFile.generic_string());
+        AssetDiagnostic Diagnostic{};
+        if (!ContentHash::TryHashFile(AssetFile.string(), Metadata.SourceFingerprint, Diagnostic)
+            || !AssetMetadataIO::TrySaveToFile(MetadataFile.string(), Metadata, Diagnostic))
+        {
+            ScanDiagnostics.push_back(Diagnostic);
+            PrintString(std::string("AssetRegistry scan: failed to create metadata for ") + AssetFile.generic_string());
+            continue;
+        }
+        MetadataFiles.push_back(MetadataFile);
+        PrintString(std::string("AssetRegistry scan: created metadata for ") + AssetFile.generic_string());
+    }
+
+    std::sort(MetadataFiles.begin(), MetadataFiles.end());
+    MetadataFiles.erase(std::unique(MetadataFiles.begin(), MetadataFiles.end()), MetadataFiles.end());
+    for (const std::filesystem::path& MetadataFile : MetadataFiles)
+    {
+        AssetDiagnostic Diagnostic = IngestMetaFile(Mount, MetadataFile);
+        if (Diagnostic.HasError())
+        {
+            ScanDiagnostics.push_back(Diagnostic);
+            PrintString(std::string("AssetRegistry scan: ") + AssetErrorCodeToString(Diagnostic.Code) + " — " + Diagnostic.Message + " @ " + Diagnostic.Path);
+        }
     }
 
     return AssetDiagnostic::Ok();
@@ -276,9 +447,18 @@ AssetDiagnostic AssetRegistry::RegisterExistingAsset(const std::string& Relative
     {
         Metadata.Guid = Guid::Generate();
     }
-    if (Metadata.Type == AssetType::Unknown)
+    if (!Metadata.Type.IsValid())
     {
         Metadata.Type = InferTypeFromExtension(Normalized);
+    }
+    if (TypeRegistrations.find(Metadata.Type.GetIdentifier()) == TypeRegistrations.end())
+    {
+        return AssetDiagnostic::Fail(
+            AssetErrorCode::UnsupportedFormat,
+            "AssetRegistry",
+            "Asset type is not registered: " + Metadata.Type.GetIdentifier(),
+            {Metadata.Guid},
+            VirtualPath);
     }
     if (EntriesById.find(Metadata.Guid) != EntriesById.end())
     {
@@ -287,6 +467,41 @@ AssetDiagnostic AssetRegistry::RegisterExistingAsset(const std::string& Relative
     if (IdsByVirtualPath.find(VirtualPath) != IdsByVirtualPath.end())
     {
         return AssetDiagnostic::Fail(AssetErrorCode::ImportConflict, "AssetRegistry", "Path already registered", {Metadata.Guid}, VirtualPath);
+    }
+    if (Metadata.SubAssets.empty())
+    {
+        if (Mount == AssetMount::Game && LeafNameExists(std::filesystem::path(Normalized).stem().string()))
+        {
+            return AssetDiagnostic::Fail(AssetErrorCode::ImportConflict, "AssetRegistry", "Asset name already exists in project", {Metadata.Guid}, VirtualPath);
+        }
+    }
+    else
+    {
+        std::vector<std::string> IncomingNames;
+        for (const SubAssetRecord& Record : Metadata.SubAssets)
+        {
+            if (TypeRegistrations.find(Record.Type.GetIdentifier()) == TypeRegistrations.end())
+            {
+                return AssetDiagnostic::Fail(
+                    AssetErrorCode::UnsupportedFormat,
+                    "AssetRegistry",
+                    "Subasset type is not registered: " + Record.Type.GetIdentifier(),
+                    {Metadata.Guid},
+                    VirtualPath);
+            }
+            std::string NormalizedName = Record.Name;
+            std::transform(NormalizedName.begin(), NormalizedName.end(), NormalizedName.begin(), [](unsigned char Character)
+            {
+                return static_cast<char>(std::tolower(Character));
+            });
+            if (Record.Name.empty()
+                || (Mount == AssetMount::Game && LeafNameExists(Record.Name))
+                || std::find(IncomingNames.begin(), IncomingNames.end(), NormalizedName) != IncomingNames.end())
+            {
+                return AssetDiagnostic::Fail(AssetErrorCode::ImportConflict, "AssetRegistry", "Subasset name must be unique in project", {Metadata.Guid}, VirtualPath);
+            }
+            IncomingNames.push_back(std::move(NormalizedName));
+        }
     }
 
     const std::string MetaRelative = AssetPath::MetaPathForAsset(Normalized);
@@ -452,6 +667,14 @@ AssetDiagnostic AssetRegistry::RenamePair(const std::string& OldRelativeOrVirtua
     {
         return AssetDiagnostic::Fail(AssetErrorCode::ImportConflict, "AssetRegistry", "Destination path already registered", {Entry.Metadata.Guid}, NewVirtualPath);
     }
+    AssetKey IgnoredKey{};
+    IgnoredKey.Asset = Entry.Metadata.Guid;
+    if (Entry.Metadata.SubAssets.empty()
+        && NewMount == AssetMount::Game
+        && LeafNameExists(std::filesystem::path(NewNormalized).stem().string(), IgnoredKey))
+    {
+        return AssetDiagnostic::Fail(AssetErrorCode::ImportConflict, "AssetRegistry", "Asset name already exists in project", {Entry.Metadata.Guid}, NewVirtualPath);
+    }
 
     const std::filesystem::path NewAbsolute = AssetPath::CombineContent(NewContentRoot, NewNormalized);
     const std::filesystem::path NewMetaAbsolute = AssetPath::CombineContent(NewContentRoot, AssetPath::MetaPathForAsset(NewNormalized));
@@ -482,4 +705,197 @@ AssetDiagnostic AssetRegistry::RenamePair(const std::string& OldRelativeOrVirtua
     IdsByVirtualPath[NewVirtualPath] = Entry.Metadata.Guid;
     EntriesById[Entry.Metadata.Guid] = Entry;
     return AssetDiagnostic::Ok();
+}
+
+AssetDiagnostic AssetRegistry::DeletePair(const std::string& RelativeOrVirtualPath)
+{
+    AssertGameThread();
+
+    AssetRegistryEntry Entry{};
+    if (!TryGetByPath(RelativeOrVirtualPath, Entry))
+    {
+        return AssetDiagnostic::Fail(
+            AssetErrorCode::NotFound,
+            "AssetRegistry",
+            "Asset not found",
+            {},
+            RelativeOrVirtualPath);
+    }
+    if (Entry.Mount != AssetMount::Game)
+    {
+        return AssetDiagnostic::Fail(
+            AssetErrorCode::InvalidData,
+            "AssetRegistry",
+            "Engine assets are read-only",
+            {Entry.Metadata.Guid},
+            Entry.VirtualPath);
+    }
+
+    const std::filesystem::path DataPath(Entry.AbsolutePath);
+    const std::filesystem::path MetadataPath(Entry.AbsoluteMetaPath);
+    const std::string DeleteSuffix = ".sakura-delete-" + Entry.Metadata.Guid.ToString();
+    const std::filesystem::path StagedDataPath = DataPath.string() + DeleteSuffix;
+    const std::filesystem::path StagedMetadataPath = MetadataPath.string() + DeleteSuffix;
+
+    std::error_code Error;
+    std::filesystem::rename(DataPath, StagedDataPath, Error);
+    if (Error)
+    {
+        return AssetDiagnostic::Fail(
+            AssetErrorCode::InternalError,
+            "AssetRegistry",
+            Error.message(),
+            {Entry.Metadata.Guid},
+            Entry.VirtualPath);
+    }
+
+    std::filesystem::rename(MetadataPath, StagedMetadataPath, Error);
+    if (Error)
+    {
+        std::error_code RollbackError;
+        std::filesystem::rename(StagedDataPath, DataPath, RollbackError);
+        return AssetDiagnostic::Fail(
+            AssetErrorCode::InternalError,
+            "AssetRegistry",
+            "Failed to stage .meta for deletion; data file rolled back",
+            {Entry.Metadata.Guid},
+            Entry.VirtualPath);
+    }
+
+    IdsByVirtualPath.erase(Entry.VirtualPath);
+    EntriesById.erase(Entry.Metadata.Guid);
+    std::filesystem::remove(StagedDataPath, Error);
+    Error.clear();
+    std::filesystem::remove(StagedMetadataPath, Error);
+    return AssetDiagnostic::Ok();
+}
+
+AssetDiagnostic AssetRegistry::RenameSubAsset(const AssetKey& Key, const std::string& NewName)
+{
+    AssertGameThread();
+    if (!Key.HasSubAsset() || NewName.empty())
+    {
+        return AssetDiagnostic::Fail(AssetErrorCode::InvalidData, "AssetRegistry", "Invalid subasset rename request", Key);
+    }
+
+    auto Found = EntriesById.find(Key.Asset);
+    if (Found == EntriesById.end() || Found->second.Mount != AssetMount::Game)
+    {
+        return AssetDiagnostic::Fail(AssetErrorCode::NotFound, "AssetRegistry", "Game subasset not found", Key);
+    }
+    if (LeafNameExists(NewName, Key))
+    {
+        return AssetDiagnostic::Fail(AssetErrorCode::ImportConflict, "AssetRegistry", "Asset name already exists in project", Key);
+    }
+
+    AssetMetadata UpdatedMetadata = Found->second.Metadata;
+    auto SubAsset = std::find_if(
+        UpdatedMetadata.SubAssets.begin(),
+        UpdatedMetadata.SubAssets.end(),
+        [&Key](const SubAssetRecord& Record)
+        {
+            return Record.Id == *Key.SubAsset;
+        });
+    if (SubAsset == UpdatedMetadata.SubAssets.end())
+    {
+        return AssetDiagnostic::Fail(AssetErrorCode::NotFound, "AssetRegistry", "Subasset not found", Key);
+    }
+    SubAsset->Name = NewName;
+
+    AssetDiagnostic Error{};
+    if (!AssetMetadataIO::TrySaveToFile(Found->second.AbsoluteMetaPath, UpdatedMetadata, Error))
+    {
+        return Error;
+    }
+    Found->second.Metadata = std::move(UpdatedMetadata);
+    return AssetDiagnostic::Ok();
+}
+
+AssetDiagnostic AssetRegistry::DeleteSubAsset(const AssetKey& Key)
+{
+    AssertGameThread();
+    if (!Key.HasSubAsset())
+    {
+        return AssetDiagnostic::Fail(AssetErrorCode::InvalidData, "AssetRegistry", "Invalid subasset delete request", Key);
+    }
+
+    auto Found = EntriesById.find(Key.Asset);
+    if (Found == EntriesById.end() || Found->second.Mount != AssetMount::Game)
+    {
+        return AssetDiagnostic::Fail(AssetErrorCode::NotFound, "AssetRegistry", "Game subasset not found", Key);
+    }
+    if (Found->second.Metadata.SubAssets.size() == 1
+        && Found->second.Metadata.SubAssets.front().Id == *Key.SubAsset)
+    {
+        return DeletePair(Found->second.VirtualPath);
+    }
+
+    AssetMetadata UpdatedMetadata = Found->second.Metadata;
+    const auto NewEnd = std::remove_if(
+        UpdatedMetadata.SubAssets.begin(),
+        UpdatedMetadata.SubAssets.end(),
+        [&Key](const SubAssetRecord& Record)
+        {
+            return Record.Id == *Key.SubAsset;
+        });
+    if (NewEnd == UpdatedMetadata.SubAssets.end())
+    {
+        return AssetDiagnostic::Fail(AssetErrorCode::NotFound, "AssetRegistry", "Subasset not found", Key);
+    }
+    UpdatedMetadata.SubAssets.erase(NewEnd, UpdatedMetadata.SubAssets.end());
+
+    AssetDiagnostic Error{};
+    if (!AssetMetadataIO::TrySaveToFile(Found->second.AbsoluteMetaPath, UpdatedMetadata, Error))
+    {
+        return Error;
+    }
+    Found->second.Metadata = std::move(UpdatedMetadata);
+    return AssetDiagnostic::Ok();
+}
+
+bool AssetRegistry::LeafNameExists(const std::string& Name, const AssetKey& IgnoredKey) const
+{
+    std::string NormalizedName = Name;
+    std::transform(NormalizedName.begin(), NormalizedName.end(), NormalizedName.begin(), [](unsigned char Character)
+    {
+        return static_cast<char>(std::tolower(Character));
+    });
+
+    for (const auto& Pair : EntriesById)
+    {
+        const AssetRegistryEntry& Entry = Pair.second;
+        if (Entry.Mount != AssetMount::Game)
+        {
+            continue;
+        }
+        if (Entry.Metadata.SubAssets.empty())
+        {
+            std::string ExistingName = std::filesystem::path(Entry.RelativePath).stem().string();
+            std::transform(ExistingName.begin(), ExistingName.end(), ExistingName.begin(), [](unsigned char Character)
+            {
+                return static_cast<char>(std::tolower(Character));
+            });
+            if (ExistingName == NormalizedName && Entry.Metadata.Guid != IgnoredKey.Asset)
+            {
+                return true;
+            }
+            continue;
+        }
+        for (const SubAssetRecord& Record : Entry.Metadata.SubAssets)
+        {
+            std::string ExistingName = Record.Name;
+            std::transform(ExistingName.begin(), ExistingName.end(), ExistingName.begin(), [](unsigned char Character)
+            {
+                return static_cast<char>(std::tolower(Character));
+            });
+            const bool bIgnored = IgnoredKey.Asset == Entry.Metadata.Guid
+                && IgnoredKey.HasSubAsset()
+                && *IgnoredKey.SubAsset == Record.Id;
+            if (!bIgnored && ExistingName == NormalizedName)
+            {
+                return true;
+            }
+        }
+    }
+    return false;
 }

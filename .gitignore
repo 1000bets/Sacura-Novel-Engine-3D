@@ -59,6 +59,7 @@ Root/Engine/ThirdParty/PhysX/
 Root/Engine/ThirdParty/asset/**/_src/
 Root/Engine/ThirdParty/**/_src/
 Root/Editor/ThirdParty/**/_src/
+Root/Editor/ThirdParty/ImGuizmo/
 Root/Editor/ThirdParty/Qt/
 
 # CMake generated files

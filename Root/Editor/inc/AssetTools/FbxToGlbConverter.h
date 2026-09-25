@@ -9,5 +9,6 @@ class FbxToGlbConverter
 public:
     static ImportResult Convert(
         const std::filesystem::path& SourceFbxPath,
-        const std::filesystem::path& DestinationGlbPath);
+        const std::filesystem::path& DestinationGlbPath,
+        bool bGenerateMissingNormals);
 };

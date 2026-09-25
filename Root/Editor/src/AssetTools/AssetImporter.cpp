@@ -7,6 +7,8 @@
 #include "Core/Threading/ThreadContext.h"
 
 #include <algorithm>
+#include <cctype>
+#include <unordered_set>
 
 namespace
 {
@@ -26,11 +28,45 @@ AssetImporter::AssetImporter(AssetRegistry& InRegistry)
 {
 }
 
+std::vector<SubAssetRecord> AssetImporter::BuildUniqueSubAssets(
+    const std::string& DestinationRelativePath,
+    const std::vector<SubAssetRecord>& SourceSubAssets) const
+{
+    std::vector<SubAssetRecord> Result = SourceSubAssets;
+    const std::string ContainerName = std::filesystem::path(DestinationRelativePath).stem().string();
+    std::unordered_set<std::string> AssignedNames;
+    for (size_t SubAssetIndex = 0; SubAssetIndex < Result.size(); ++SubAssetIndex)
+    {
+        SubAssetRecord& Record = Result[SubAssetIndex];
+        std::string BaseName = Result.size() == 1
+            ? ContainerName
+            : ContainerName + "_" + (Record.Name.empty() ? "Mesh_" + std::to_string(SubAssetIndex) : Record.Name);
+        std::string Candidate = BaseName;
+        int32_t Suffix = 2;
+        auto Normalize = [](std::string Value)
+        {
+            std::transform(Value.begin(), Value.end(), Value.begin(), [](unsigned char Character)
+            {
+                return static_cast<char>(std::tolower(Character));
+            });
+            return Value;
+        };
+        while (Registry.LeafNameExists(Candidate) || AssignedNames.find(Normalize(Candidate)) != AssignedNames.end())
+        {
+            Candidate = BaseName + "_" + std::to_string(Suffix++);
+        }
+        Record.Name = Candidate;
+        AssignedNames.insert(Normalize(Candidate));
+    }
+    return Result;
+}
+
 ImportResult AssetImporter::PublishPair(
     const ImportRequest& Request,
     const std::filesystem::path& StagedDataPath,
     AssetType Type,
-    const nlohmann::json& ImportInfo)
+    const nlohmann::json& ImportInfo,
+    const std::vector<SubAssetRecord>& SubAssets)
 {
     ImportResult Result{};
 
@@ -102,6 +138,7 @@ ImportResult AssetImporter::PublishPair(
     Metadata.Guid = Guid::Generate();
     Metadata.Type = Type;
     Metadata.ImportInfo = ImportInfo;
+    Metadata.SubAssets = BuildUniqueSubAssets(NormalizedDestination, SubAssets);
     ContentHash Fingerprint{};
     AssetDiagnostic HashError{};
     if (!ContentHash::TryHashFile(DestinationAbsolute.string(), Fingerprint, HashError))
@@ -150,7 +187,12 @@ ImportResult AssetImporter::ImportGlb(const ImportRequest& Request)
         {"source", Request.SourcePath.string()},
         {"importer", "GlbImporter"}
     };
-    return PublishPair(Request, StagedPath, AssetType::Model, ImportInfo);
+    return PublishPair(
+        Request,
+        StagedPath,
+        ModelAssetType,
+        ImportInfo,
+        StageResult.Metadata.SubAssets);
 }
 
 ImportResult AssetImporter::ImportImage(const ImportRequest& Request)
@@ -170,7 +212,7 @@ ImportResult AssetImporter::ImportImage(const ImportRequest& Request)
         {"source", Request.SourcePath.string()},
         {"importer", "ImageImporter"}
     };
-    return PublishPair(Request, StagedPath, AssetType::Texture, ImportInfo);
+    return PublishPair(Request, StagedPath, TextureAssetType, ImportInfo);
 }
 
 ImportResult AssetImporter::ImportFbx(const ImportRequest& Request)
@@ -189,7 +231,10 @@ ImportResult AssetImporter::ImportFbx(const ImportRequest& Request)
     Adjusted.DestinationRelativePath = DestinationGlb.generic_string();
 
     const std::filesystem::path StagedPath = StagingRoot / Adjusted.DestinationRelativePath;
-    ImportResult ConvertResult = FbxToGlbConverter::Convert(Request.SourcePath, StagedPath);
+    ImportResult ConvertResult = FbxToGlbConverter::Convert(
+        Request.SourcePath,
+        StagedPath,
+        Request.bGenerateMissingNormals);
     if (!ConvertResult.Succeeded())
     {
         return ConvertResult;
@@ -198,9 +243,15 @@ ImportResult AssetImporter::ImportFbx(const ImportRequest& Request)
     nlohmann::json ImportInfo = {
         {"source", Request.SourcePath.string()},
         {"importer", "FbxToGlbConverter"},
-        {"convertedTo", "glb"}
+        {"convertedTo", "glb"},
+        {"generateMissingNormals", Request.bGenerateMissingNormals}
     };
-    return PublishPair(Adjusted, StagedPath, AssetType::Model, ImportInfo);
+    return PublishPair(
+        Adjusted,
+        StagedPath,
+        ModelAssetType,
+        ImportInfo,
+        ConvertResult.Metadata.SubAssets);
 }
 
 ImportResult AssetImporter::Import(const ImportRequest& Request)
