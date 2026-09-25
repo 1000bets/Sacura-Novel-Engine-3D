@@ -25,5 +25,5 @@ struct RenderLight
     float InnerConeAngle = 0.f;
     float OuterConeAngle = 45.f;
 
-    bool bCastShadows = false;
+    bool bCastShadows = true;
 };

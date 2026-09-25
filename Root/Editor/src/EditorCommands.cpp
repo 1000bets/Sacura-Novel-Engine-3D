@@ -209,6 +209,76 @@ public:
     const char* GetDisplayName() const override { return "Create Object"; }
 };
 
+class PasteSubtreeCommand : public EditorCommand
+{
+public:
+    Scene* TargetScene = nullptr;
+    ObjectHandle Parent;
+    ObjectHandle Created;
+    std::string CapturedSubtree;
+    ObjectHandle* OutCreated = nullptr;
+
+    bool Do() override
+    {
+        if (TargetScene == nullptr || CapturedSubtree.empty())
+        {
+            return false;
+        }
+
+        GameObject* ParentObject = ResolveObject(TargetScene, Parent);
+        if (Parent.IsValid() && ParentObject == nullptr)
+        {
+            return false;
+        }
+
+        GameObject* Restored = nullptr;
+        SceneSerializeResult RestoredResult = SceneSerializer::DeserializeSubtreeFromJson(
+            *TargetScene,
+            CapturedSubtree,
+            ParentObject,
+            Restored);
+        if (!RestoredResult.bOk || Restored == nullptr)
+        {
+            PrintString(std::string("PasteSubtreeCommand failed: ") + RestoredResult.Error);
+            return false;
+        }
+
+        Created = Restored->GetObjectHandle();
+        CapturedSubtree.clear();
+        if (OutCreated != nullptr)
+        {
+            *OutCreated = Created;
+            OutCreated = nullptr;
+        }
+        return true;
+    }
+
+    bool Undo() override
+    {
+        GameObject* ObjectInstance = ResolveObject(TargetScene, Created);
+        if (ObjectInstance == nullptr)
+        {
+            return false;
+        }
+
+        SceneSerializeResult Captured = SceneSerializer::SerializeSubtreeToJson(*ObjectInstance, CapturedSubtree);
+        if (!Captured.bOk)
+        {
+            PrintString(std::string("PasteSubtreeCommand undo capture failed: ") + Captured.Error);
+            return false;
+        }
+        if (!TargetScene->DestroyGameObject(ObjectInstance))
+        {
+            CapturedSubtree.clear();
+            return false;
+        }
+        Created = ObjectHandle{};
+        return true;
+    }
+
+    const char* GetDisplayName() const override { return "Paste Object"; }
+};
+
 class DeleteObjectCommand : public EditorCommand
 {
 public:
@@ -708,6 +778,30 @@ std::unique_ptr<EditorCommand> MakeCreateObjectCommand(
     Command->TargetScene = TargetScene;
     Command->Name = std::move(Name);
     Command->Parent = Parent;
+    Command->OutCreated = OutCreated;
+    return Command;
+}
+
+std::unique_ptr<EditorCommand> MakePasteSubtreeCommand(
+    Scene* TargetScene,
+    std::string SerializedSubtree,
+    ObjectHandle Parent,
+    ObjectHandle* OutCreated)
+{
+    std::string RemappedSubtree;
+    SceneSerializeResult Remapped = SceneSerializer::RemapSubtreePersistentIds(
+        SerializedSubtree,
+        RemappedSubtree);
+    if (!Remapped.bOk)
+    {
+        PrintString(std::string("MakePasteSubtreeCommand failed: ") + Remapped.Error);
+        return nullptr;
+    }
+
+    auto Command = std::make_unique<PasteSubtreeCommand>();
+    Command->TargetScene = TargetScene;
+    Command->Parent = Parent;
+    Command->CapturedSubtree = std::move(RemappedSubtree);
     Command->OutCreated = OutCreated;
     return Command;
 }

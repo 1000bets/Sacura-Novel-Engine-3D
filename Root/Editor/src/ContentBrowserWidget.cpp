@@ -3,20 +3,25 @@
 #include "AssetImportDialog.h"
 #include "AssetTools/AssetImporter.h"
 #include "AssetTools/ImportRequest.h"
+#include "Assets/AssetMetadata.h"
 #include "EditorAssetMime.h"
 #include "Engine.h"
 
 #include <QAction>
 #include <QAbstractButton>
 #include <QButtonGroup>
+#include <QClipboard>
 #include <QDrag>
+#include <QEvent>
 #include <QDragEnterEvent>
 #include <QDragMoveEvent>
 #include <QDropEvent>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QInputDialog>
+#include <QKeyEvent>
 #include <QKeySequence>
 #include <QLineEdit>
 #include <QListWidget>
@@ -31,6 +36,7 @@
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <filesystem>
 #include <functional>
 #include <map>
 #include <set>
@@ -51,6 +57,34 @@ bool IsSupportedImportFile(const QString& Path)
         || Extension == "png" || Extension == "jpg" || Extension == "jpeg";
 }
 
+bool TryBuildAssetPayload(QListWidgetItem* Item, EditorAssetPayload& OutPayload)
+{
+    if (Item == nullptr || Item->data(AssetIdRole).toString().isEmpty())
+    {
+        return false;
+    }
+    if (!Guid::TryParse(Item->data(AssetIdRole).toString().toStdString(), OutPayload.Key.Asset))
+    {
+        return false;
+    }
+    const QString SubAssetText = Item->data(SubAssetIdRole).toString();
+    if (!SubAssetText.isEmpty())
+    {
+        SubAssetId ParsedSubAsset{};
+        if (!Guid::TryParse(SubAssetText.toStdString(), ParsedSubAsset))
+        {
+            return false;
+        }
+        OutPayload.Key.SubAsset = ParsedSubAsset;
+    }
+    if (!TryParseAssetType(Item->data(AssetTypeRole).toString().toStdString(), OutPayload.Type))
+    {
+        return false;
+    }
+    OutPayload.VirtualPath = Item->data(VirtualPathRole).toString();
+    return true;
+}
+
 class AssetListWidget : public QListWidget
 {
 public:
@@ -63,29 +97,11 @@ protected:
     void startDrag(Qt::DropActions) override
     {
         QListWidgetItem* Item = currentItem();
-        if (Item == nullptr || Item->data(AssetIdRole).toString().isEmpty())
-        {
-            return;
-        }
         EditorAssetPayload Payload;
-        if (!Guid::TryParse(Item->data(AssetIdRole).toString().toStdString(), Payload.Key.Asset))
+        if (!TryBuildAssetPayload(Item, Payload))
         {
             return;
         }
-        const QString SubAssetText = Item->data(SubAssetIdRole).toString();
-        if (!SubAssetText.isEmpty())
-        {
-            SubAssetId SubAsset{};
-            if (Guid::TryParse(SubAssetText.toStdString(), SubAsset))
-            {
-                Payload.Key.SubAsset = SubAsset;
-            }
-        }
-        if (!TryParseAssetType(Item->data(AssetTypeRole).toString().toStdString(), Payload.Type))
-        {
-            return;
-        }
-        Payload.VirtualPath = Item->data(VirtualPathRole).toString();
         auto* MimeData = new QMimeData();
         MimeData->setData(SakuraAssetMimeType, EncodeEditorAssetPayload(Payload));
         auto* Drag = new QDrag(this);
@@ -326,6 +342,8 @@ ContentBrowserWidget::ContentBrowserWidget(QWidget* Parent)
     {
         MoveAsset(Payload.VirtualPath, DestinationFolder);
     };
+    SourcesTree->installEventFilter(this);
+    AssetView->installEventFilter(this);
     BrowserSplitter->addWidget(SourcesTree);
     BrowserSplitter->addWidget(AssetView);
     BrowserSplitter->setStretchFactor(0, 0);
@@ -378,6 +396,7 @@ ContentBrowserWidget::ContentBrowserWidget(QWidget* Parent)
     DeleteAction->setShortcutContext(Qt::WidgetShortcut);
     AssetView->addAction(DeleteAction);
     connect(DeleteAction, &QAction::triggered, this, &ContentBrowserWidget::DeleteSelectedAsset);
+
 }
 
 void ContentBrowserWidget::SetEngine(Engine* EngineInstance)
@@ -710,20 +729,192 @@ void ContentBrowserWidget::ImportFiles(const QStringList& SourceFiles)
     }
 }
 
+bool ContentBrowserWidget::eventFilter(QObject* Watched, QEvent* Event)
+{
+    if (Event != nullptr
+        && (Event->type() == QEvent::ShortcutOverride || Event->type() == QEvent::KeyPress)
+        && (Watched == SourcesTree || Watched == AssetView))
+    {
+        auto* KeyEvent = static_cast<QKeyEvent*>(Event);
+        if (KeyEvent->matches(QKeySequence::Copy) || KeyEvent->matches(QKeySequence::Paste))
+        {
+            if (Event->type() == QEvent::ShortcutOverride)
+            {
+                KeyEvent->accept();
+                return true;
+            }
+            if (KeyEvent->matches(QKeySequence::Copy))
+            {
+                CopySelectionToClipboard();
+            }
+            else
+            {
+                PasteFromClipboard();
+            }
+            KeyEvent->accept();
+            return true;
+        }
+    }
+    return QWidget::eventFilter(Watched, Event);
+}
+
+bool ContentBrowserWidget::CopySelectionToClipboard()
+{
+    EditorAssetPayload Payload;
+    if (!TryBuildAssetPayload(AssetView != nullptr ? AssetView->currentItem() : nullptr, Payload))
+    {
+        return false;
+    }
+
+    auto* MimeData = new QMimeData();
+    MimeData->setData(SakuraAssetMimeType, EncodeEditorAssetPayload(Payload));
+    MimeData->setText(Payload.VirtualPath);
+    QGuiApplication::clipboard()->setMimeData(MimeData);
+    return true;
+}
+
+bool ContentBrowserWidget::PasteFromClipboard()
+{
+    return DuplicateClipboardAsset();
+}
+
+bool ContentBrowserWidget::DuplicateClipboardAsset()
+{
+    if (Registry == nullptr
+        || (CurrentFolder != "/Game" && !CurrentFolder.startsWith("/Game/")))
+    {
+        return false;
+    }
+
+    EditorAssetPayload Payload;
+    if (!DecodeEditorAssetPayload(QGuiApplication::clipboard()->mimeData(), Payload))
+    {
+        return false;
+    }
+
+    AssetRegistryEntry SourceEntry{};
+    if (!Registry->TryResolveKey(Payload.Key, SourceEntry))
+    {
+        QMessageBox::warning(this, tr("Paste Failed"), tr("The copied asset is no longer registered."));
+        return false;
+    }
+
+    AssetMetadata DuplicatedMetadata{};
+    AssetDiagnostic MetadataDiagnostic{};
+    if (!AssetMetadataIO::TryLoadFromFile(
+            SourceEntry.AbsoluteMetaPath,
+            DuplicatedMetadata,
+            MetadataDiagnostic))
+    {
+        QMessageBox::warning(this, tr("Paste Failed"), QString::fromStdString(MetadataDiagnostic.Message));
+        return false;
+    }
+
+    const QFileInfo SourceInformation(QString::fromStdString(SourceEntry.AbsolutePath));
+    const QString Extension = SourceInformation.suffix();
+    const QString BaseName = SourceInformation.completeBaseName() + QStringLiteral("_Copy");
+    const std::filesystem::path DestinationDirectory =
+        Registry->GetGameContentRoot()
+        / (CurrentFolder == "/Game"
+            ? std::filesystem::path{}
+            : std::filesystem::path(CurrentFolder.mid(QStringLiteral("/Game/").size()).toStdString()));
+
+    std::error_code FileError;
+    std::filesystem::create_directories(DestinationDirectory, FileError);
+    if (FileError)
+    {
+        QMessageBox::warning(this, tr("Paste Failed"), QString::fromStdString(FileError.message()));
+        return false;
+    }
+
+    QString DestinationBaseName = BaseName;
+    int NameSuffix = 2;
+    auto MakeDestinationPath = [&]()
+    {
+        return DestinationDirectory / (
+            DestinationBaseName
+            + (Extension.isEmpty() ? QString{} : QStringLiteral(".") + Extension)).toStdString();
+    };
+    while (std::filesystem::exists(MakeDestinationPath())
+        || (DuplicatedMetadata.SubAssets.empty()
+            && Registry->LeafNameExists(DestinationBaseName.toStdString())))
+    {
+        DestinationBaseName = BaseName + QStringLiteral("_") + QString::number(NameSuffix);
+        ++NameSuffix;
+    }
+
+    std::set<QString> ReservedNames;
+    for (SubAssetRecord& SubAsset : DuplicatedMetadata.SubAssets)
+    {
+        const QString SubAssetBaseName = QString::fromStdString(SubAsset.Name) + QStringLiteral("_Copy");
+        QString SubAssetName = SubAssetBaseName;
+        int SubAssetSuffix = 2;
+        while (Registry->LeafNameExists(SubAssetName.toStdString())
+            || ReservedNames.find(SubAssetName.toLower()) != ReservedNames.end())
+        {
+            SubAssetName = SubAssetBaseName + QStringLiteral("_") + QString::number(SubAssetSuffix);
+            ++SubAssetSuffix;
+        }
+        ReservedNames.insert(SubAssetName.toLower());
+        SubAsset.Id = Guid::Generate();
+        SubAsset.Name = SubAssetName.toStdString();
+    }
+    DuplicatedMetadata.Guid = Guid::Generate();
+
+    const std::filesystem::path DestinationPath = MakeDestinationPath();
+    std::filesystem::copy_file(
+        SourceEntry.AbsolutePath,
+        DestinationPath,
+        std::filesystem::copy_options::none,
+        FileError);
+    if (FileError)
+    {
+        QMessageBox::warning(this, tr("Paste Failed"), QString::fromStdString(FileError.message()));
+        return false;
+    }
+
+    const std::filesystem::path DestinationMetaPath = DestinationPath.string() + ".meta";
+    if (!AssetMetadataIO::TrySaveToFile(
+            DestinationMetaPath.generic_string(),
+            DuplicatedMetadata,
+            MetadataDiagnostic))
+    {
+        std::filesystem::remove(DestinationPath, FileError);
+        QMessageBox::warning(this, tr("Paste Failed"), QString::fromStdString(MetadataDiagnostic.Message));
+        return false;
+    }
+
+    const AssetDiagnostic ScanResult = Registry->ScanContent();
+    if (ScanResult.HasError())
+    {
+        QMessageBox::warning(this, tr("Paste Failed"), QString::fromStdString(ScanResult.Message));
+        Refresh();
+        return false;
+    }
+
+    Refresh();
+    return true;
+}
+
 void ContentBrowserWidget::ShowAssetContextMenu(const QPoint& Position)
 {
     QListWidgetItem* Item = AssetView->itemAt(Position);
-    if (Item == nullptr
-        || Item->data(ItemKindRole).toInt() != AssetItemKind
-        || !Item->data(VirtualPathRole).toString().startsWith("/Game/"))
-    {
-        return;
-    }
-
-    AssetView->setCurrentItem(Item);
     QMenu Menu(this);
-    Menu.addAction(tr("Rename"), this, &ContentBrowserWidget::RenameSelectedAsset);
-    Menu.addAction(tr("Delete"), this, &ContentBrowserWidget::DeleteSelectedAsset);
+    if (Item != nullptr && Item->data(ItemKindRole).toInt() == AssetItemKind)
+    {
+        AssetView->setCurrentItem(Item);
+        Menu.addAction(tr("Copy"), this, &ContentBrowserWidget::CopySelectionToClipboard);
+        if (Item->data(VirtualPathRole).toString().startsWith("/Game/"))
+        {
+            Menu.addAction(tr("Rename"), this, &ContentBrowserWidget::RenameSelectedAsset);
+            Menu.addAction(tr("Delete"), this, &ContentBrowserWidget::DeleteSelectedAsset);
+        }
+        Menu.addSeparator();
+    }
+    QAction* PasteAction = Menu.addAction(tr("Paste"), this, &ContentBrowserWidget::PasteFromClipboard);
+    PasteAction->setEnabled(
+        (CurrentFolder == "/Game" || CurrentFolder.startsWith("/Game/"))
+        && QGuiApplication::clipboard()->mimeData()->hasFormat(SakuraAssetMimeType));
     Menu.exec(AssetView->viewport()->mapToGlobal(Position));
 }
 

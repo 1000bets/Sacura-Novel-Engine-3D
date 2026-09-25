@@ -3,6 +3,8 @@
 #include "Rendering/RenderSettings.h"
 
 #include "Assets/AssetRegistry.h"
+#include "EditorAction.h"
+#include "EditorActionContext.h"
 #include "EditorCommandStack.h"
 #include "EditorViewportWidget.h"
 #include "Gameplay/ObjectHandle.h"
@@ -15,6 +17,7 @@
 #include <filesystem>
 #include <functional>
 #include <unordered_map>
+#include <vector>
 
 class Engine;
 class StoryWidget;
@@ -27,6 +30,7 @@ class QDoubleSpinBox;
 class QElapsedTimer;
 class QLabel;
 class QLineEdit;
+class QMenu;
 class QPushButton;
 class QSplitter;
 class QTabWidget;
@@ -34,6 +38,9 @@ class QTimer;
 class QTreeWidget;
 class QTreeWidgetItem;
 class QCloseEvent;
+class QEvent;
+class QButtonGroup;
+class QVBoxLayout;
 
 class EditorMainWindow : public QMainWindow
 {
@@ -51,6 +58,7 @@ public:
 
 protected:
     void closeEvent(QCloseEvent* Event) override;
+    bool eventFilter(QObject* Watched, QEvent* Event) override;
 
 private slots:
     void OnPlayToggled(bool bChecked);
@@ -70,13 +78,13 @@ private slots:
     void OnHierarchyContextMenu(const QPoint& Position);
     void OnUndo();
     void OnRedo();
-    void OnCreateObject();
+    void OnCopy();
+    void OnPaste();
+    void OnCreateEmptyObject();
     void OnDeleteSelectedObject();
-    void OnAddCameraComponent();
-    void OnAddLightComponent();
     void OnObjectNameEdited();
     void OnTransformEdited();
-    void OnInspectedComponentChanged(int Index);
+    void OnComponentFilterChanged(int Index);
     void OnAssetActivated(QString AssetId, QString SubAssetIdentifier, QString AssetTypeIdentifier, QString VirtualPath);
     void OnAssetDropped(QString AssetId, QString SubAssetIdentifier, QString AssetTypeIdentifier, QString VirtualPath, QPoint Position);
 
@@ -85,6 +93,7 @@ private:
     void BindDocumentFromSession();
     void BuildMenus();
     void BuildToolbar();
+    void PopulateCreateMenus(QMenu* ObjectsMenu, QMenu* ComponentsMenu);
     void PopulateHierarchy();
     void PopulateDockPages();
     void RegisterBuiltInAssetEditors();
@@ -100,9 +109,23 @@ private:
     ObjectHandle GetSelectedObjectHandle() const;
     GameObject* GetSelectedGameObject() const;
     void AddHierarchyItem(QTreeWidgetItem* ParentItem, GameObject* ObjectInstance);
+    bool ReparentHierarchyObject(ObjectHandle Target, ObjectHandle NewParent);
     QWidget* MakePlaceholderPage(const QString& Title, const QString& Description);
     void UpdateStatus();
     void UpdateWindowTitleDirty();
+    void ConfigureComponentInspector(ReflectionInspector* ComponentInspector);
+    void RebuildComponentInspectors();
+    EditorActionContext MakeEditorActionContext();
+    void RunEditorAction(EditorAction* Action);
+    void RunEditorActionByTypeId(const char* TypeIdString);
+    bool CopySelectedObjectToClipboard();
+    bool PasteObjectFromClipboard();
+    bool CopyFocusedTextWidget();
+    bool PasteFocusedTextWidget();
+    bool HandleClipboardShortcut(QEvent* Event);
+    bool HandleGizmoModeHotkey(QEvent* Event);
+    void SyncGizmoModeButtons();
+    static bool IsTextClipboardWidget(QWidget* Candidate);
     bool PromptSaveIfDirty();
     bool LaunchEditorProcessForProject(const std::filesystem::path& ProjectFile);
     void EnsurePresenting(RenderViewportWidget* Viewport);
@@ -116,7 +139,7 @@ private:
     SceneDocument Document;
     EditorCommandStack CommandStack;
     ObjectHandle SelectedObject;
-    ObjectHandle InspectedComponent;
+    QString ComponentFilter;
 
     QLabel* ProjectTitleLabel = nullptr;
     QLabel* ModeLabel = nullptr;
@@ -134,6 +157,10 @@ private:
     EditorViewportWidget* PrimaryViewport = nullptr;
     QLabel* ViewportModeLabel = nullptr;
     QDoubleSpinBox* CameraSpeedSpin = nullptr;
+    QButtonGroup* GizmoModeButtons = nullptr;
+    QPushButton* TranslateGizmoButton = nullptr;
+    QPushButton* RotateGizmoButton = nullptr;
+    QPushButton* ScaleGizmoButton = nullptr;
     QLabel* RenderStatisticsLabel = nullptr;
     RenderSettings RenderConfiguration;
     QTabWidget* DockTabs = nullptr;
@@ -154,7 +181,8 @@ private:
     QDoubleSpinBox* ScaleYSpin = nullptr;
     QDoubleSpinBox* ScaleZSpin = nullptr;
     QComboBox* ComponentCombo = nullptr;
-    ReflectionInspector* Inspector = nullptr;
+    QVBoxLayout* ComponentInspectorLayout = nullptr;
+    std::vector<ReflectionInspector*> ComponentInspectors;
     ContentBrowserWidget* ContentBrowser = nullptr;
     std::unordered_map<AssetType, AssetEditorHandler, AssetTypeHash> AssetEditors;
 

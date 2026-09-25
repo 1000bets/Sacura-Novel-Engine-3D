@@ -1,5 +1,6 @@
 #include "Game/SceneSerializer.h"
 
+#include "Assets/Guid.h"
 #include "Core/MemorySubsystem.h"
 #include "Core/Threading/ThreadContext.h"
 #include "Core/Transform.h"
@@ -751,6 +752,36 @@ bool TrySerializeObjectEntry(
 
     return true;
 }
+
+void RemapJsonStrings(
+    nlohmann::json& Value,
+    const std::unordered_map<std::string, std::string>& RemappedIds)
+{
+    if (Value.is_string())
+    {
+        const auto Found = RemappedIds.find(Value.get<std::string>());
+        if (Found != RemappedIds.end())
+        {
+            Value = Found->second;
+        }
+        return;
+    }
+    if (Value.is_array())
+    {
+        for (nlohmann::json& Element : Value)
+        {
+            RemapJsonStrings(Element, RemappedIds);
+        }
+        return;
+    }
+    if (Value.is_object())
+    {
+        for (auto Iterator = Value.begin(); Iterator != Value.end(); ++Iterator)
+        {
+            RemapJsonStrings(Iterator.value(), RemappedIds);
+        }
+    }
+}
 }
 
 SceneSerializeResult SceneSerializer::SerializeSubtreeToJson(const GameObject& RootObject, std::string& OutJsonText)
@@ -784,6 +815,68 @@ SceneSerializeResult SceneSerializer::SerializeSubtreeToJson(const GameObject& R
     }
 
     OutJsonText = Root.dump(2);
+    Result.bOk = true;
+    return Result;
+}
+
+SceneSerializeResult SceneSerializer::RemapSubtreePersistentIds(
+    const std::string& JsonText,
+    std::string& OutRemappedJsonText)
+{
+    SceneSerializeResult Result{};
+    nlohmann::json Root;
+    try
+    {
+        Root = nlohmann::json::parse(JsonText);
+    }
+    catch (const std::exception& Exception)
+    {
+        Result.Error = std::string("Failed to parse subtree JSON: ") + Exception.what();
+        return Result;
+    }
+
+    if (!Root.is_object() || !Root.contains("objects") || !Root.at("objects").is_array())
+    {
+        Result.Error = "Subtree JSON requires objects array";
+        return Result;
+    }
+
+    std::unordered_map<std::string, std::string> RemappedIds;
+    for (const nlohmann::json& ObjectJson : Root.at("objects"))
+    {
+        if (!ObjectJson.is_object() || !ObjectJson.contains("id") || !ObjectJson.at("id").is_string())
+        {
+            Result.Error = "Subtree object requires string id";
+            return Result;
+        }
+        const std::string ObjectId = ObjectJson.at("id").get<std::string>();
+        if (ObjectId.empty() || !RemappedIds.emplace(ObjectId, Guid::Generate().ToString()).second)
+        {
+            Result.Error = "Subtree contains duplicate or empty object id";
+            return Result;
+        }
+        if (!ObjectJson.contains("components") || !ObjectJson.at("components").is_array())
+        {
+            continue;
+        }
+        for (const nlohmann::json& ComponentJson : ObjectJson.at("components"))
+        {
+            if (!ComponentJson.is_object() || !ComponentJson.contains("id") || !ComponentJson.at("id").is_string())
+            {
+                Result.Error = "Subtree component requires string id";
+                return Result;
+            }
+            const std::string ComponentId = ComponentJson.at("id").get<std::string>();
+            if (ComponentId.empty() || !RemappedIds.emplace(ComponentId, Guid::Generate().ToString()).second)
+            {
+                Result.Error = "Subtree contains duplicate or empty component id";
+                return Result;
+            }
+        }
+    }
+
+    RemapJsonStrings(Root, RemappedIds);
+    OutRemappedJsonText = Root.dump(2);
     Result.bOk = true;
     return Result;
 }

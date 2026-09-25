@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "Platform/NativeWindowInfo.h"
 #include "Platform/GraphicsBackend.h"
@@ -6,21 +6,25 @@
 #include "Rendering/RHI/GpuBuffer.h"
 #include "Rendering/RHI/RenderResourceManager.h"
 #include "Rendering/RenderResourceHandles.h"
+#include "Rendering/ImGuiOverlaySnapshot.h"
 
 #include <cstdint>
-#include <memory>
 #include <string>
 #include <unordered_map>
 #include "Rendering/RenderSettings.h"
 
 struct RenderFrameData;
 struct RenderViewFrame;
+struct ImGuiContext;
 
 namespace Diligent
 {
 struct IPipelineState;
 struct IShaderResourceBinding;
 struct IShader;
+struct IDeviceContext;
+struct ISwapChain;
+class ImGuiDiligentRenderer;
 }
 
 class Renderer
@@ -45,13 +49,17 @@ private:
     bool CreatePipeline(const std::string& ShaderDirectory);
     bool CreateSurfaceResources(RenderSurfaceId Surface);
     void RenderView(const RenderViewFrame& View, uint64_t FrameIndex);
+    void CreateImGuiOverlay();
+    void DestroyImGuiOverlay();
+    void RenderImGuiOverlay(Diligent::IDeviceContext* Context, Diligent::ISwapChain* SwapChain, const ImGuiOverlaySnapshot& Overlay);
 
     bool bInitialized = false;
     RenderDevice Device;
     RenderResourceManager Resources;
     MeshHandle DefaultMesh;
 
-
     struct PipelineState;
     PipelineState* Pipeline = nullptr;
+    ImGuiContext* OverlayImGuiContext = nullptr;
+    Diligent::ImGuiDiligentRenderer* OverlayImGuiRenderer = nullptr;
 };

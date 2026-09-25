@@ -8,6 +8,7 @@
 #include <functional>
 
 class EditorGizmoOverlay;
+class Engine;
 class QDragEnterEvent;
 class QDragMoveEvent;
 class QDropEvent;
@@ -22,11 +23,19 @@ class EditorViewportWidget : public RenderViewportWidget
     Q_OBJECT
 
 public:
+    enum class GizmoOperation
+    {
+        Translate,
+        Rotate,
+        Scale
+    };
+
     using TransformPreviewCallback = std::function<void(const Transform& Value)>;
     using TransformCommitCallback = std::function<void(const Transform& OldValue, const Transform& NewValue)>;
 
     explicit EditorViewportWidget(QWidget* Parent = nullptr);
 
+    void SetEngine(Engine* EngineInstance);
     void SetSelectedTransform(const Transform& LocalTransform, const Transform& WorldTransform);
     void ClearSelectedTransform();
     void SetTransformCallbacks(TransformPreviewCallback Preview, TransformCommitCallback Commit);
@@ -35,12 +44,15 @@ public:
     bool IsCameraNavigationActive() const;
     void SetCameraMoveSpeed(float Speed);
     float GetCameraMoveSpeed() const;
+    void SetGizmoOperation(GizmoOperation Operation);
+    GizmoOperation GetGizmoOperation() const;
 
 signals:
     void AssetDropped(QString AssetId, QString SubAssetId, QString AssetTypeIdentifier, QString VirtualPath, QPoint Position);
     void ObjectSelectionRequested(QPoint Position);
     void CameraChanged();
     void CameraMoveSpeedChanged(float Speed);
+    void GizmoOperationChanged(EditorViewportWidget::GizmoOperation Operation);
 
 protected:
     void dragEnterEvent(QDragEnterEvent* Event) override;
@@ -89,12 +101,14 @@ private:
     float GetCurrentMoveSpeed() const;
 
     EditorGizmoOverlay* Gizmo = nullptr;
+    Engine* BoundEngine = nullptr;
     TransformPreviewCallback PreviewCallback;
     TransformCommitCallback CommitCallback;
     QTimer* NavigationTimer = nullptr;
     QPointF LastMousePosition;
     QSet<int> HeldKeys;
     CameraMode ActiveCameraMode = CameraMode::None;
+    GizmoOperation ActiveGizmoOperation = GizmoOperation::Translate;
     float MoveSpeed = 8.0f;
     bool bEditorToolsEnabled = false;
     bool bKeyboardCaptured = false;

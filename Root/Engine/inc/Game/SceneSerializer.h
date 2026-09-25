@@ -26,6 +26,9 @@ public:
     static SceneSerializeResult DeserializeFromFile(const std::filesystem::path& AbsolutePath, Scene*& OutScene);
 
     static SceneSerializeResult SerializeSubtreeToJson(const GameObject& RootObject, std::string& OutJsonText);
+    static SceneSerializeResult RemapSubtreePersistentIds(
+        const std::string& JsonText,
+        std::string& OutRemappedJsonText);
     static SceneSerializeResult DeserializeSubtreeFromJson(
         Scene& TargetScene,
         const std::string& JsonText,

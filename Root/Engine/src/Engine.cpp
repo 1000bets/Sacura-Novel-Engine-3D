@@ -460,6 +460,16 @@ void Engine::ConfigureRenderSurface(RenderSurfaceId Surface, bool bEditScene, co
     }
 }
 
+void Engine::SetRenderSurfaceImGuiOverlay(RenderSurfaceId Surface, ImGuiOverlaySnapshot Overlay)
+{
+    AssertGameThread();
+    auto Existing = Presentations.find(Surface.Value);
+    if (Existing != Presentations.end())
+    {
+        Existing->second.Overlay = std::move(Overlay);
+    }
+}
+
 void Engine::Tick(float DeltaTime)
 {
     AssertGameThread();
@@ -540,9 +550,9 @@ void Engine::EndFrame()
         }
     }
 
-    for (const auto& Entry : Presentations)
+    for (auto& Entry : Presentations)
     {
-        const PresentationState& Presentation = Entry.second;
+        PresentationState& Presentation = Entry.second;
         if (Presentation.Window.Width == 0 || Presentation.Window.Height == 0)
         {
             continue;
@@ -571,6 +581,7 @@ void Engine::EndFrame()
                 Camera.FieldOfView * 0.0174532925f, Camera.AspectRatio, Camera.NearPlane, Camera.FarPlane);
             Camera.ViewProjection = Camera.View * Camera.Projection;
         }
+        View.Overlay = std::move(Presentation.Overlay);
         Frame->Views.push_back(std::move(View));
     }
     Render.SubmitFrame(std::move(Frame));

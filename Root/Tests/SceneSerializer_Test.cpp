@@ -122,6 +122,37 @@ int main()
     }
 
     {
+        Scene* Source = MemorySubsystem::Get()->NewObject<Scene>("Clipboard");
+        GameObject* Parent = Source->CreateGameObject("CopiedParent");
+        GameObject* Child = Source->CreateGameObject("CopiedChild");
+        Child->SetParent(Parent);
+        Child->AddComponent<CameraComponent>();
+
+        std::string SerializedSubtree;
+        std::string RemappedSubtree;
+        Expect(
+            SceneSerializer::SerializeSubtreeToJson(*Parent, SerializedSubtree).bOk,
+            "Serialize clipboard subtree");
+        Expect(
+            SceneSerializer::RemapSubtreePersistentIds(SerializedSubtree, RemappedSubtree).bOk,
+            "Remap clipboard subtree identities");
+        GameObject* PastedRoot = nullptr;
+        Expect(
+            SceneSerializer::DeserializeSubtreeFromJson(*Source, RemappedSubtree, nullptr, PastedRoot).bOk,
+            "Paste remapped subtree beside source");
+        Expect(Source->GetObjectCount() == 4, "Pasted subtree duplicates all objects");
+        Expect(
+            PastedRoot != nullptr && PastedRoot->GetPersistentId() != Parent->GetPersistentId(),
+            "Pasted root receives a new persistent identity");
+        Expect(
+            PastedRoot != nullptr
+                && !PastedRoot->GetChildren().empty()
+                && PastedRoot->GetChildren().front()->GetComponent<CameraComponent>() != nullptr,
+            "Pasted subtree preserves hierarchy and components");
+        MemorySubsystem::Get()->DestroyObject(Source);
+    }
+
+    {
         std::filesystem::create_directories(TempRoot / "blocked");
         const std::filesystem::path Blocker = TempRoot / "blocked" / "not_a_dir";
         {

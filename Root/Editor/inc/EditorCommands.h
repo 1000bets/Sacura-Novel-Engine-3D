@@ -15,6 +15,11 @@ std::unique_ptr<EditorCommand> MakeCreateObjectCommand(
     std::string Name,
     ObjectHandle Parent,
     ObjectHandle* OutCreated = nullptr);
+std::unique_ptr<EditorCommand> MakePasteSubtreeCommand(
+    Scene* TargetScene,
+    std::string SerializedSubtree,
+    ObjectHandle Parent,
+    ObjectHandle* OutCreated = nullptr);
 std::unique_ptr<EditorCommand> MakeDeleteObjectCommand(Scene* TargetScene, ObjectHandle Target);
 std::unique_ptr<EditorCommand> MakeReparentObjectCommand(Scene* TargetScene, ObjectHandle Target, ObjectHandle NewParent);
 std::unique_ptr<EditorCommand> MakeAddComponentCommand(

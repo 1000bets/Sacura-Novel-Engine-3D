@@ -38,6 +38,7 @@ public:
     void SetPropertyResetCallback(PropertyResetCallback Callback);
     void SetAssetRegistry(AssetRegistry* Registry);
     void SetAssetCommitCallback(AssetCommitCallback Callback);
+    void SetTypeLabelVisible(bool bVisible);
 
     void Rebuild();
 

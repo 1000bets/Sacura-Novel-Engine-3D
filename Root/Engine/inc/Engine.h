@@ -12,6 +12,7 @@
 #include "Project/ProjectDescriptor.h"
 #include "Game/PlaySession.h"
 #include "Rendering/SceneExtractor.h"
+#include "Rendering/ImGuiOverlaySnapshot.h"
 #include "Scripting/ScriptingSubsystem.h"
 #include "Story/StoryRuntime.h"
 #include <memory>
@@ -76,6 +77,7 @@ public:
     void UnregisterRenderSurface(RenderSurfaceId Surface);
     void ResizeRenderSurface(RenderSurfaceId Surface, uint32_t Width, uint32_t Height);
     void ConfigureRenderSurface(RenderSurfaceId Surface, bool bEditScene, const RenderCamera& Camera, const RenderSettings& Settings = {});
+    void SetRenderSurfaceImGuiOverlay(RenderSurfaceId Surface, ImGuiOverlaySnapshot Overlay);
     RenderStatistics GetRenderStatistics(RenderSurfaceId Surface) const { return Render.GetStatistics(Surface); }
     bool IsInitialized() const { return bInitialized; }
     bool IsGameRunning() const { return bGameRunning; }
@@ -128,6 +130,7 @@ private:
         NativeWindowInfo Window;
         RenderCamera Camera;
         RenderSettings Settings;
+        ImGuiOverlaySnapshot Overlay;
         bool bEditScene = false;
     };
     std::unordered_map<uint32_t, PresentationState> Presentations;

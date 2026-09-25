@@ -12,6 +12,7 @@ set(EDITOR_CORE_SRC
     src/AssetTools/FbxToGlbConverter.cpp
     src/AssetTools/GlbImporter.cpp
     src/AssetTools/ImageImporter.cpp
+    src/EditorAction.cpp
     src/EditorCommandStack.cpp
     src/EditorCommands.cpp
     src/SceneDocument.cpp
@@ -24,6 +25,8 @@ set(EDITOR_CORE_HDR
     inc/AssetTools/ImageImporter.h
     inc/AssetTools/ImportRequest.h
     inc/AssetTools/ImportResult.h
+    inc/EditorAction.h
+    inc/EditorActionContext.h
     inc/EditorCommandStack.h
     inc/EditorCommands.h
     inc/SceneDocument.h
@@ -57,6 +60,7 @@ set(EDITOR_SRC
     src/AssetImportDialog.cpp
     src/ContentBrowserWidget.cpp
     src/EditorMainWindow.cpp
+    src/EditorReflectionAnchor.cpp
     src/EditorViewportWidget.cpp
     src/ProjectBrowserDialog.cpp
     src/ReflectionInspector.cpp
@@ -65,10 +69,13 @@ set(EDITOR_SRC
 
 set(EDITOR_HDR
     inc/Editor.h
+    inc/Actions/BuiltinEditorActions.h
     inc/AssetImportDialog.h
     inc/ContentBrowserWidget.h
     inc/EditorAssetMime.h
+    inc/EditorClipboard.h
     inc/EditorMainWindow.h
+    inc/EditorReflectionAnchor.h
     inc/EditorTheme.h
     inc/EditorViewportWidget.h
     inc/ProjectBrowserDialog.h

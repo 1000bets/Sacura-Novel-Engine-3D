@@ -1,5 +1,8 @@
 #include "EditorMainWindow.h"
 
+#include "Actions/BuiltinEditorActions.h"
+#include "EditorAction.h"
+#include "EditorClipboard.h"
 #include "EditorCommands.h"
 #include "ContentBrowserWidget.h"
 #include "EditorTheme.h"
@@ -7,6 +10,7 @@
 #include "Engine.h"
 #include "Game/PlaySession.h"
 #include "Game/Scene.h"
+#include "Game/SceneSerializer.h"
 #include "Gameplay/CameraComponent.h"
 #include "Gameplay/Component.h"
 #include "Gameplay/GameObject.h"
@@ -24,17 +28,27 @@
 #include "UI/StoryWidget.h"
 
 #include <QAbstractItemView>
+#include <QAbstractButton>
+#include <QAbstractSpinBox>
 #include <QApplication>
+#include <QButtonGroup>
 #include <QCloseEvent>
 #include <QCheckBox>
+#include <QClipboard>
 #include <QComboBox>
 #include <QCoreApplication>
 #include <QDoubleSpinBox>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
 #include <QElapsedTimer>
+#include <QEvent>
 #include <QFileDialog>
 #include <QFormLayout>
 #include <QFrame>
+#include <QGroupBox>
 #include <QHBoxLayout>
+#include <QKeyEvent>
 #include <QKeySequence>
 #include <QLabel>
 #include <QLineEdit>
@@ -42,8 +56,11 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QLayout>
+#include <QMimeData>
+#include <QPlainTextEdit>
 #include <QProcess>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QSignalBlocker>
 #include <QSplitter>
 #include <QStringList>
@@ -51,6 +68,7 @@
 #include <QTabWidget>
 #include <QTimer>
 #include <QToolBar>
+#include <QTextEdit>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
 #include <QTreeWidgetItemIterator>
@@ -58,9 +76,11 @@
 #include <QWidget>
 
 #include "Reflection/Class.h"
+#include "Reflection/ReflectionSubsystem.h"
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <limits>
 #include <memory>
 
@@ -84,6 +104,100 @@ ObjectHandle LoadObjectHandle(const QTreeWidgetItem* Item)
     Handle.Generation = Item->data(0, HierarchyObjectGenerationRole).toUInt();
     return Handle;
 }
+
+bool HierarchyItemIsDescendant(const QTreeWidgetItem* Ancestor, const QTreeWidgetItem* Candidate)
+{
+    for (const QTreeWidgetItem* Walk = Candidate; Walk != nullptr; Walk = Walk->parent())
+    {
+        if (Walk == Ancestor)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+class HierarchyTreeWidget : public QTreeWidget
+{
+public:
+    using QTreeWidget::QTreeWidget;
+    std::function<bool(ObjectHandle, ObjectHandle)> ReparentRequested;
+
+protected:
+    void dragEnterEvent(QDragEnterEvent* Event) override
+    {
+        if (Event->source() == this)
+        {
+            QTreeWidget::dragEnterEvent(Event);
+            Event->setDropAction(Qt::CopyAction);
+            Event->accept();
+            return;
+        }
+        Event->ignore();
+    }
+
+    void dragMoveEvent(QDragMoveEvent* Event) override
+    {
+        if (Event->source() != this)
+        {
+            Event->ignore();
+            return;
+        }
+
+        QTreeWidget::dragMoveEvent(Event);
+
+        QTreeWidgetItem* Dragged = currentItem();
+        QTreeWidgetItem* DropItem = itemAt(Event->position().toPoint());
+        if (Dragged != nullptr
+            && DropItem != nullptr
+            && dropIndicatorPosition() == QAbstractItemView::OnItem
+            && HierarchyItemIsDescendant(Dragged, DropItem))
+        {
+            Event->ignore();
+            return;
+        }
+
+        Event->setDropAction(Qt::CopyAction);
+        Event->accept();
+    }
+
+    void dropEvent(QDropEvent* Event) override
+    {
+        QTreeWidgetItem* Dragged = currentItem();
+        if (Dragged == nullptr || !ReparentRequested || Event->source() != this)
+        {
+            Event->ignore();
+            return;
+        }
+
+        QTreeWidgetItem* DropItem = itemAt(Event->position().toPoint());
+        ObjectHandle NewParent;
+        const QAbstractItemView::DropIndicatorPosition DropPosition = dropIndicatorPosition();
+        if (DropItem != nullptr && DropPosition == QAbstractItemView::OnItem)
+        {
+            if (HierarchyItemIsDescendant(Dragged, DropItem) || DropItem == Dragged)
+            {
+                Event->setDropAction(Qt::IgnoreAction);
+                Event->accept();
+                return;
+            }
+            NewParent = LoadObjectHandle(DropItem);
+        }
+        else if (DropItem != nullptr
+            && DropItem != Dragged
+            && DropItem->parent() != nullptr
+            && (DropPosition == QAbstractItemView::AboveItem
+                || DropPosition == QAbstractItemView::BelowItem))
+        {
+            NewParent = LoadObjectHandle(DropItem->parent());
+        }
+
+        const ObjectHandle Target = LoadObjectHandle(Dragged);
+        ReparentRequested(Target, NewParent);
+        Event->setDropAction(Qt::IgnoreAction);
+        Event->accept();
+    }
+};
 
 Vector3 QuaternionToEulerDegrees(const Quaternion& Rotation)
 {
@@ -224,13 +338,16 @@ void EditorMainWindow::BuildMenus()
     EditMenu->addAction(QString::fromUtf8("Undo"), this, &EditorMainWindow::OnUndo, QKeySequence::Undo);
     EditMenu->addAction(QString::fromUtf8("Redo"), this, &EditorMainWindow::OnRedo, QKeySequence::Redo);
     EditMenu->addSeparator();
-    EditMenu->addAction(QString::fromUtf8("Create Object"), this, &EditorMainWindow::OnCreateObject);
+    EditMenu->addAction(QString::fromUtf8("Copy"), this, &EditorMainWindow::OnCopy, QKeySequence::Copy);
+    EditMenu->addAction(QString::fromUtf8("Paste"), this, &EditorMainWindow::OnPaste, QKeySequence::Paste);
+    EditMenu->addSeparator();
+    EditMenu->addAction(QString::fromUtf8("Create Object"), this, &EditorMainWindow::OnCreateEmptyObject);
     EditMenu->addAction(QString::fromUtf8("Delete Object"), this, &EditorMainWindow::OnDeleteSelectedObject, QKeySequence::Delete);
 
     QMenu* CreateMenu = menuBar()->addMenu(QString::fromUtf8("\xD0\xA1\xD0\xBE\xD0\xB7\xD0\xB4\xD0\xB0\xD1\x82\xD1\x8C"));
-    CreateMenu->addAction(QString::fromUtf8("Object"), this, &EditorMainWindow::OnCreateObject);
-    CreateMenu->addAction(QString::fromUtf8("Camera Component"), this, &EditorMainWindow::OnAddCameraComponent);
-    CreateMenu->addAction(QString::fromUtf8("Light Component"), this, &EditorMainWindow::OnAddLightComponent);
+    QMenu* CreateObjectsMenu = CreateMenu->addMenu(QString::fromUtf8("\xD0\x9E\xD0\xB1\xD1\x8A\xD0\xB5\xD0\xBA\xD1\x82\xD1\x8B"));
+    QMenu* CreateComponentsMenu = CreateMenu->addMenu(QString::fromUtf8("\xD0\x9A\xD0\xBE\xD0\xBC\xD0\xBF\xD0\xBE\xD0\xBD\xD0\xB5\xD0\xBD\xD1\x82\xD1\x8B"));
+    PopulateCreateMenus(CreateObjectsMenu, CreateComponentsMenu);
     CreateMenu->addSeparator();
     CreateMenu->addAction(QString::fromUtf8("\xD0\x94\xD0\xB5\xD0\xB9\xD1\x81\xD1\x82\xD0\xB2\xD0\xB8\xD1\x8F \xD0\xB8 \xD1\x81\xD0\xBE\xD0\xB1\xD1\x8B\xD1\x82\xD0\xB8\xD1\x8F"), this, &EditorMainWindow::OnFocusActionsAndEvents);
 
@@ -335,14 +452,20 @@ void EditorMainWindow::BuildUi()
     HierarchyLayout->setSpacing(0);
 
     HierarchyTabs = new QTabWidget(HierarchyPanel);
-    HierarchyTree = new QTreeWidget(HierarchyTabs);
+    auto* Tree = new HierarchyTreeWidget(HierarchyTabs);
+    HierarchyTree = Tree;
     HierarchyTree->setHeaderHidden(true);
     HierarchyTree->setContextMenuPolicy(Qt::CustomContextMenu);
     HierarchyTree->setDragEnabled(true);
     HierarchyTree->setAcceptDrops(true);
     HierarchyTree->setDropIndicatorShown(true);
-    HierarchyTree->setDefaultDropAction(Qt::MoveAction);
-    HierarchyTree->setDragDropMode(QAbstractItemView::InternalMove);
+    HierarchyTree->setDefaultDropAction(Qt::CopyAction);
+    HierarchyTree->setDragDropMode(QAbstractItemView::DragDrop);
+    HierarchyTree->installEventFilter(this);
+    Tree->ReparentRequested = [this](ObjectHandle Target, ObjectHandle NewParent)
+    {
+        return ReparentHierarchyObject(Target, NewParent);
+    };
     HierarchyTabs->addTab(HierarchyTree, QString::fromUtf8("\xD0\x98\xD0\xB5\xD1\x80\xD0\xB0\xD1\x80\xD1\x85\xD0\xB8\xD1\x8F"));
     HierarchyLayout->addWidget(HierarchyTabs, 1);
 
@@ -362,7 +485,9 @@ void EditorMainWindow::BuildUi()
 
     PrimaryViewport = new EditorViewportWidget(ViewportPanel);
     PrimaryViewport->SetViewId(RenderViewId{1});
+    PrimaryViewport->SetEngine(&BoundEngine);
     PrimaryViewport->SetEditorToolsEnabled(true);
+    PrimaryViewport->installEventFilter(this);
     connect(PrimaryViewport, &EditorViewportWidget::NativeSurfaceChanged, this, &EditorMainWindow::OnViewportSurfaceChanged);
     connect(PrimaryViewport, &EditorViewportWidget::ViewportResized, this, &EditorMainWindow::OnViewportResized);
     connect(PrimaryViewport, &EditorViewportWidget::ObjectSelectionRequested, this, &EditorMainWindow::OnViewportSelectionRequested);
@@ -396,6 +521,48 @@ void EditorMainWindow::BuildUi()
     ViewportModeLabel->setObjectName("RoseLabel");
     ViewportHeaderLayout->addWidget(ViewportModeLabel);
     ViewportHeaderLayout->addStretch(1);
+
+    GizmoModeButtons = new QButtonGroup(ViewportHeader);
+    GizmoModeButtons->setExclusive(true);
+    auto MakeGizmoModeButton = [&](const QString& Label, const QString& ToolTip, int ModeId)
+    {
+        auto* Button = new QPushButton(Label, ViewportHeader);
+        Button->setObjectName("ViewportGizmoButton");
+        Button->setCheckable(true);
+        Button->setFixedHeight(24);
+        Button->setMinimumWidth(28);
+        Button->setToolTip(ToolTip);
+        GizmoModeButtons->addButton(Button, ModeId);
+        ViewportHeaderLayout->addWidget(Button);
+        return Button;
+    };
+    TranslateGizmoButton = MakeGizmoModeButton(
+        QStringLiteral("W"),
+        tr("Translate gizmo (W)"),
+        static_cast<int>(EditorViewportWidget::GizmoOperation::Translate));
+    RotateGizmoButton = MakeGizmoModeButton(
+        QStringLiteral("E"),
+        tr("Rotate gizmo (E)"),
+        static_cast<int>(EditorViewportWidget::GizmoOperation::Rotate));
+    ScaleGizmoButton = MakeGizmoModeButton(
+        QStringLiteral("R"),
+        tr("Scale gizmo (R)"),
+        static_cast<int>(EditorViewportWidget::GizmoOperation::Scale));
+    TranslateGizmoButton->setChecked(true);
+    connect(GizmoModeButtons, &QButtonGroup::idClicked, this, [this](int ModeId)
+    {
+        if (PrimaryViewport != nullptr)
+        {
+            PrimaryViewport->SetGizmoOperation(
+                static_cast<EditorViewportWidget::GizmoOperation>(ModeId));
+        }
+    });
+    connect(PrimaryViewport, &EditorViewportWidget::GizmoOperationChanged, this, [this](EditorViewportWidget::GizmoOperation)
+    {
+        SyncGizmoModeButtons();
+    });
+
+    ViewportHeaderLayout->addSpacing(8);
     ViewportHeaderLayout->addWidget(new QLabel(tr("Camera Speed"), ViewportHeader));
     CameraSpeedSpin = new QDoubleSpinBox(ViewportHeader);
     CameraSpeedSpin->setRange(0.25, 250.0);
@@ -463,6 +630,8 @@ void EditorMainWindow::BuildUi()
     InspectorTabs = new QTabWidget(InspectorPanel);
 
     auto* ObjectInspectorPage = new QWidget(InspectorTabs);
+    ObjectInspectorPage->setObjectName("ObjectInspectorPage");
+    ObjectInspectorPage->setAttribute(Qt::WA_StyledBackground, true);
     auto* ObjectInspectorLayout = new QVBoxLayout(ObjectInspectorPage);
     ObjectInspectorLayout->setContentsMargins(8, 8, 8, 8);
     ObjectInspectorLayout->setSpacing(6);
@@ -497,69 +666,21 @@ void EditorMainWindow::BuildUi()
     ComponentCombo = new QComboBox(ObjectInspectorPage);
     ObjectInspectorLayout->addWidget(ComponentCombo);
 
-    Inspector = new ReflectionInspector(ObjectInspectorPage);
-    Inspector->SetAssetRegistry(&BoundEngine.GetAssetRegistry());
-    ObjectInspectorLayout->addWidget(Inspector, 1);
+    auto* ComponentScrollArea = new QScrollArea(ObjectInspectorPage);
+    ComponentScrollArea->setObjectName("ComponentInspectorScroll");
+    ComponentScrollArea->setWidgetResizable(true);
+    ComponentScrollArea->setFrameShape(QFrame::NoFrame);
+    auto* ComponentInspectorContainer = new QWidget(ComponentScrollArea);
+    ComponentInspectorContainer->setObjectName("ComponentInspectorList");
+    ComponentInspectorContainer->setAttribute(Qt::WA_StyledBackground, true);
+    ComponentInspectorLayout = new QVBoxLayout(ComponentInspectorContainer);
+    ComponentInspectorLayout->setContentsMargins(0, 0, 0, 0);
+    ComponentInspectorLayout->setSpacing(6);
+    ComponentScrollArea->setWidget(ComponentInspectorContainer);
+    ObjectInspectorLayout->addWidget(ComponentScrollArea, 1);
 
     InspectorTabs->addTab(ObjectInspectorPage, QString::fromUtf8("\xD0\x98\xD0\xBD\xD1\x81\xD0\xBF\xD0\xB5\xD0\xBA\xD1\x82\xD0\xBE\xD1\x80"));
     InspectorLayout->addWidget(InspectorTabs);
-
-    Inspector->SetPropertyCommitCallback([this](Object* Instance, const PropertyId& Property, const ReflectedValue& NewValue)
-    {
-        if (Instance == nullptr || GetEditScene() == nullptr)
-        {
-            return false;
-        }
-        return ExecuteCommand(MakeSetPropertyCommand(
-            GetEditScene(),
-            Instance->GetObjectHandle(),
-            Property,
-            NewValue));
-    });
-    Inspector->SetPropertyResetCallback([this](Object* Instance, const PropertyId& Property)
-    {
-        if (Instance == nullptr || GetEditScene() == nullptr)
-        {
-            return false;
-        }
-        return ExecuteCommand(MakeResetPropertyCommand(
-            GetEditScene(),
-            Instance->GetObjectHandle(),
-            Property));
-    });
-    Inspector->SetAssetCommitCallback([this](
-        Object* Instance,
-        const PropertyId& Property,
-        const PropertyId& CompanionProperty,
-        const AssetKey& Key)
-    {
-        if (Instance == nullptr || GetEditScene() == nullptr)
-        {
-            return false;
-        }
-        CommandStack.BeginGroup("Assign Asset");
-        bool bResult = CommandStack.Execute(MakeSetPropertyCommand(
-            GetEditScene(),
-            Instance->GetObjectHandle(),
-            Property,
-            ReflectedValue::MakeString(Key.IsValid() ? Key.Asset.ToString() : std::string{})));
-        if (bResult && !CompanionProperty.Value.empty())
-        {
-            bResult = CommandStack.Execute(MakeSetPropertyCommand(
-                GetEditScene(),
-                Instance->GetObjectHandle(),
-                CompanionProperty,
-                ReflectedValue::MakeString(Key.HasSubAsset() ? Key.SubAsset->ToString() : std::string{})));
-        }
-        CommandStack.EndGroup();
-        if (bResult)
-        {
-            RefreshSelectionUi();
-            UpdateWindowTitleDirty();
-            UpdateStatus();
-        }
-        return bResult;
-    });
 
     connect(ObjectNameEdit, &QLineEdit::editingFinished, this, &EditorMainWindow::OnObjectNameEdited);
     connect(PositionXSpin, &QDoubleSpinBox::editingFinished, this, &EditorMainWindow::OnTransformEdited);
@@ -571,11 +692,7 @@ void EditorMainWindow::BuildUi()
     connect(ScaleXSpin, &QDoubleSpinBox::editingFinished, this, &EditorMainWindow::OnTransformEdited);
     connect(ScaleYSpin, &QDoubleSpinBox::editingFinished, this, &EditorMainWindow::OnTransformEdited);
     connect(ScaleZSpin, &QDoubleSpinBox::editingFinished, this, &EditorMainWindow::OnTransformEdited);
-    connect(ComponentCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, &EditorMainWindow::OnInspectedComponentChanged);
-    connect(Inspector, &ReflectionInspector::PropertyChanged, this, [this]()
-    {
-        UpdateWindowTitleDirty();
-    });
+    connect(ComponentCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, &EditorMainWindow::OnComponentFilterChanged);
 
     WorkspaceSplitter->addWidget(InspectorPanel);
     WorkspaceSplitter->addWidget(CenterPanel);
@@ -640,6 +757,41 @@ void EditorMainWindow::PopulateHierarchy()
     {
         ClearSelection();
     }
+}
+
+bool EditorMainWindow::ReparentHierarchyObject(ObjectHandle Target, ObjectHandle NewParent)
+{
+    Scene* EditScene = GetEditScene();
+    if (EditScene == nullptr || BoundEngine.GetPlaySession().IsSimulating() || !Target.IsValid())
+    {
+        PopulateHierarchy();
+        return false;
+    }
+
+    GameObject* ObjectInstance = EditScene->FindByHandle(Target);
+    if (ObjectInstance == nullptr)
+    {
+        PopulateHierarchy();
+        return false;
+    }
+
+    ObjectHandle CurrentParent;
+    if (ObjectInstance->GetParent() != nullptr)
+    {
+        CurrentParent = ObjectInstance->GetParent()->GetObjectHandle();
+    }
+    if (CurrentParent == NewParent)
+    {
+        PopulateHierarchy();
+        return true;
+    }
+
+    if (!ExecuteCommand(MakeReparentObjectCommand(EditScene, Target, NewParent)))
+    {
+        PopulateHierarchy();
+        return false;
+    }
+    return true;
 }
 
 void EditorMainWindow::AddHierarchyItem(QTreeWidgetItem* ParentItem, GameObject* ObjectInstance)
@@ -953,6 +1105,18 @@ void EditorMainWindow::OnPlayToggled(bool bChecked)
     if (CameraSpeedSpin != nullptr)
     {
         CameraSpeedSpin->setEnabled(!bPlaying);
+    }
+    if (TranslateGizmoButton != nullptr)
+    {
+        TranslateGizmoButton->setEnabled(!bPlaying);
+    }
+    if (RotateGizmoButton != nullptr)
+    {
+        RotateGizmoButton->setEnabled(!bPlaying);
+    }
+    if (ScaleGizmoButton != nullptr)
+    {
+        ScaleGizmoButton->setEnabled(!bPlaying);
     }
     ViewportModeLabel->setText(bPlaying
         ? QString::fromUtf8("Game · Play World")
@@ -1366,11 +1530,7 @@ bool EditorMainWindow::ExecuteCommand(std::unique_ptr<EditorCommand> Command)
 void EditorMainWindow::ClearSelection()
 {
     SelectedObject = ObjectHandle{};
-    InspectedComponent = ObjectHandle{};
-    if (Inspector != nullptr)
-    {
-        Inspector->SetInspectedObject(nullptr);
-    }
+    ComponentFilter.clear();
     RefreshSelectionUi();
 }
 
@@ -1406,6 +1566,144 @@ GameObject* EditorMainWindow::GetSelectedGameObject() const
     return HierarchyScene->FindByHandle(SelectedObject);
 }
 
+void EditorMainWindow::ConfigureComponentInspector(ReflectionInspector* ComponentInspector)
+{
+    ComponentInspector->SetAssetRegistry(&BoundEngine.GetAssetRegistry());
+    ComponentInspector->SetTypeLabelVisible(false);
+    ComponentInspector->SetPropertyCommitCallback([this](
+        Object* Instance,
+        const PropertyId& Property,
+        const ReflectedValue& NewValue)
+    {
+        if (Instance == nullptr || GetEditScene() == nullptr)
+        {
+            return false;
+        }
+        return ExecuteCommand(MakeSetPropertyCommand(
+            GetEditScene(),
+            Instance->GetObjectHandle(),
+            Property,
+            NewValue));
+    });
+    ComponentInspector->SetPropertyResetCallback([this](Object* Instance, const PropertyId& Property)
+    {
+        if (Instance == nullptr || GetEditScene() == nullptr)
+        {
+            return false;
+        }
+        return ExecuteCommand(MakeResetPropertyCommand(
+            GetEditScene(),
+            Instance->GetObjectHandle(),
+            Property));
+    });
+    ComponentInspector->SetAssetCommitCallback([this](
+        Object* Instance,
+        const PropertyId& Property,
+        const PropertyId& CompanionProperty,
+        const AssetKey& Key)
+    {
+        if (Instance == nullptr || GetEditScene() == nullptr)
+        {
+            return false;
+        }
+        CommandStack.BeginGroup("Assign Asset");
+        bool bResult = CommandStack.Execute(MakeSetPropertyCommand(
+            GetEditScene(),
+            Instance->GetObjectHandle(),
+            Property,
+            ReflectedValue::MakeString(Key.IsValid() ? Key.Asset.ToString() : std::string{})));
+        if (bResult && !CompanionProperty.Value.empty())
+        {
+            bResult = CommandStack.Execute(MakeSetPropertyCommand(
+                GetEditScene(),
+                Instance->GetObjectHandle(),
+                CompanionProperty,
+                ReflectedValue::MakeString(Key.HasSubAsset() ? Key.SubAsset->ToString() : std::string{})));
+        }
+        CommandStack.EndGroup();
+        if (bResult)
+        {
+            RefreshSelectionUi();
+            UpdateWindowTitleDirty();
+            UpdateStatus();
+        }
+        return bResult;
+    });
+    connect(ComponentInspector, &ReflectionInspector::PropertyChanged, this, [this]()
+    {
+        UpdateWindowTitleDirty();
+    });
+}
+
+void EditorMainWindow::RebuildComponentInspectors()
+{
+    if (ComponentCombo == nullptr || ComponentInspectorLayout == nullptr)
+    {
+        return;
+    }
+
+    while (QLayoutItem* Item = ComponentInspectorLayout->takeAt(0))
+    {
+        if (QWidget* ItemWidget = Item->widget())
+        {
+            ItemWidget->deleteLater();
+        }
+        delete Item;
+    }
+    ComponentInspectors.clear();
+
+    GameObject* Selected = GetSelectedGameObject();
+    QStringList ComponentTypes;
+    if (Selected != nullptr)
+    {
+        for (Component* ComponentInstance : Selected->GetAllComponents())
+        {
+            if (ComponentInstance == nullptr)
+            {
+                continue;
+            }
+            const QString ComponentType = ComponentInstance->GetClass() != nullptr
+                ? QString::fromStdString(ComponentInstance->GetClass()->GetTypeId().Value)
+                : QString::fromStdString(ComponentInstance->GetName());
+            if (!ComponentTypes.contains(ComponentType))
+            {
+                ComponentTypes.push_back(ComponentType);
+            }
+
+            auto* ComponentCard = new QGroupBox(ComponentType);
+            ComponentCard->setObjectName("ComponentInspectorCard");
+            ComponentCard->setProperty("componentType", ComponentType);
+            auto* ComponentCardLayout = new QVBoxLayout(ComponentCard);
+            ComponentCardLayout->setContentsMargins(6, 8, 6, 6);
+            auto* ComponentInspector = new ReflectionInspector(ComponentCard);
+            ConfigureComponentInspector(ComponentInspector);
+            ComponentInspector->SetInspectedObject(ComponentInstance);
+            ComponentInspector->setEnabled(!BoundEngine.GetPlaySession().IsSimulating());
+            ComponentCardLayout->addWidget(ComponentInspector);
+            ComponentInspectorLayout->addWidget(ComponentCard);
+            ComponentInspectors.push_back(ComponentInspector);
+        }
+    }
+    ComponentInspectorLayout->addStretch(1);
+
+    QSignalBlocker ComboSignalBlocker(ComponentCombo);
+    ComponentCombo->clear();
+    ComponentCombo->addItem(QStringLiteral("All"), QString{});
+    for (const QString& ComponentType : ComponentTypes)
+    {
+        ComponentCombo->addItem(ComponentType, ComponentType);
+    }
+    int FilterIndex = ComponentCombo->findData(ComponentFilter);
+    if (FilterIndex < 0)
+    {
+        ComponentFilter.clear();
+        FilterIndex = 0;
+    }
+    ComponentCombo->setCurrentIndex(FilterIndex);
+    ComponentCombo->setEnabled(Selected != nullptr && !ComponentTypes.isEmpty());
+    OnComponentFilterChanged(FilterIndex);
+}
+
 void EditorMainWindow::RefreshSelectionUi()
 {
     bUpdatingSelectionUi = true;
@@ -1413,10 +1711,6 @@ void EditorMainWindow::RefreshSelectionUi()
     GameObject* Selected = GetSelectedGameObject();
     const bool bHasSelection = Selected != nullptr;
     const bool bEditableSelection = bHasSelection && !BoundEngine.GetPlaySession().IsSimulating();
-    if (Inspector != nullptr)
-    {
-        Inspector->setEnabled(!BoundEngine.GetPlaySession().IsSimulating());
-    }
     if (ObjectNameEdit != nullptr)
     {
         ObjectNameEdit->setEnabled(bEditableSelection);
@@ -1468,48 +1762,7 @@ void EditorMainWindow::RefreshSelectionUi()
         SetSpinEnabled(ScaleZSpin, 1.0);
     }
 
-    if (ComponentCombo != nullptr)
-    {
-        ComponentCombo->blockSignals(true);
-        ComponentCombo->clear();
-        int SelectedIndex = -1;
-        if (bHasSelection)
-        {
-            const std::vector<Component*>& Components = Selected->GetAllComponents();
-            for (int Index = 0; Index < static_cast<int>(Components.size()); ++Index)
-            {
-                Component* ComponentInstance = Components[static_cast<size_t>(Index)];
-                if (ComponentInstance == nullptr)
-                {
-                    continue;
-                }
-                const QString Label = ComponentInstance->GetClass() != nullptr
-                    ? QString::fromStdString(ComponentInstance->GetClass()->GetTypeId().Value)
-                    : QString::fromStdString(ComponentInstance->GetName());
-                ComponentCombo->addItem(Label);
-                ComponentCombo->setItemData(
-                    ComponentCombo->count() - 1,
-                    QVariant::fromValue<qulonglong>(ComponentInstance->GetObjectHandle().Id),
-                    HierarchyObjectIdRole);
-                ComponentCombo->setItemData(
-                    ComponentCombo->count() - 1,
-                    QVariant::fromValue<uint>(ComponentInstance->GetObjectHandle().Generation),
-                    HierarchyObjectGenerationRole);
-                if (ComponentInstance->GetObjectHandle() == InspectedComponent)
-                {
-                    SelectedIndex = ComponentCombo->count() - 1;
-                }
-            }
-            if (SelectedIndex < 0 && ComponentCombo->count() > 0)
-            {
-                SelectedIndex = 0;
-            }
-        }
-        ComponentCombo->setCurrentIndex(SelectedIndex);
-        ComponentCombo->setEnabled(ComponentCombo->count() > 0 && !BoundEngine.GetPlaySession().IsSimulating());
-        ComponentCombo->blockSignals(false);
-        OnInspectedComponentChanged(SelectedIndex);
-    }
+    RebuildComponentInspectors();
 
     bUpdatingSelectionUi = false;
 }
@@ -1525,7 +1778,7 @@ void EditorMainWindow::OnHierarchySelectionChanged()
     }
 
     SelectedObject = LoadObjectHandle(Current);
-    InspectedComponent = ObjectHandle{};
+    ComponentFilter.clear();
     if (GetSelectedGameObject() == nullptr)
     {
         ClearSelection();
@@ -1544,11 +1797,17 @@ void EditorMainWindow::OnHierarchyContextMenu(const QPoint& Position)
         return;
     }
     QMenu Menu(this);
-    Menu.addAction(QString::fromUtf8("Create Object"), this, &EditorMainWindow::OnCreateObject);
-    Menu.addAction(QString::fromUtf8("Delete Object"), this, &EditorMainWindow::OnDeleteSelectedObject);
+    Menu.addAction(QString::fromUtf8("Copy"), this, &EditorMainWindow::OnCopy);
+    QAction* PasteAction = Menu.addAction(QString::fromUtf8("Paste"), this, &EditorMainWindow::OnPaste);
+    PasteAction->setEnabled(
+        !BoundEngine.GetPlaySession().IsSimulating()
+        && QApplication::clipboard()->mimeData()->hasFormat(SakuraSceneSubtreeMimeType));
     Menu.addSeparator();
-    Menu.addAction(QString::fromUtf8("Add Camera"), this, &EditorMainWindow::OnAddCameraComponent);
-    Menu.addAction(QString::fromUtf8("Add Light"), this, &EditorMainWindow::OnAddLightComponent);
+    QMenu* CreateObjectsMenu = Menu.addMenu(QString::fromUtf8("\xD0\x9E\xD0\xB1\xD1\x8A\xD0\xB5\xD0\xBA\xD1\x82\xD1\x8B"));
+    QMenu* CreateComponentsMenu = Menu.addMenu(QString::fromUtf8("\xD0\x9A\xD0\xBE\xD0\xBC\xD0\xBF\xD0\xBE\xD0\xBD\xD0\xB5\xD0\xBD\xD1\x82\xD1\x8B"));
+    PopulateCreateMenus(CreateObjectsMenu, CreateComponentsMenu);
+    Menu.addSeparator();
+    Menu.addAction(QString::fromUtf8("Delete Object"), this, &EditorMainWindow::OnDeleteSelectedObject);
     Menu.exec(HierarchyTree->viewport()->mapToGlobal(Position));
 }
 
@@ -1580,21 +1839,396 @@ void EditorMainWindow::OnRedo()
     UpdateStatus();
 }
 
-void EditorMainWindow::OnCreateObject()
+bool EditorMainWindow::IsTextClipboardWidget(QWidget* Candidate)
+{
+    if (Candidate == nullptr)
+    {
+        return false;
+    }
+    if (qobject_cast<QLineEdit*>(Candidate) != nullptr
+        || qobject_cast<QPlainTextEdit*>(Candidate) != nullptr
+        || qobject_cast<QTextEdit*>(Candidate) != nullptr
+        || qobject_cast<QAbstractSpinBox*>(Candidate) != nullptr)
+    {
+        return true;
+    }
+    if (auto* Combo = qobject_cast<QComboBox*>(Candidate))
+    {
+        return Combo->isEditable();
+    }
+    return qobject_cast<QAbstractSpinBox*>(Candidate->parentWidget()) != nullptr;
+}
+
+bool EditorMainWindow::CopyFocusedTextWidget()
+{
+    QWidget* FocusedWidget = QApplication::focusWidget();
+    if (!IsTextClipboardWidget(FocusedWidget))
+    {
+        return false;
+    }
+    if (auto* LineEdit = qobject_cast<QLineEdit*>(FocusedWidget))
+    {
+        LineEdit->copy();
+        return true;
+    }
+    if (auto* PlainTextEdit = qobject_cast<QPlainTextEdit*>(FocusedWidget))
+    {
+        PlainTextEdit->copy();
+        return true;
+    }
+    if (auto* TextEdit = qobject_cast<QTextEdit*>(FocusedWidget))
+    {
+        TextEdit->copy();
+        return true;
+    }
+    if (auto* NestedLineEdit = FocusedWidget->findChild<QLineEdit*>())
+    {
+        NestedLineEdit->copy();
+        return true;
+    }
+    return false;
+}
+
+bool EditorMainWindow::PasteFocusedTextWidget()
+{
+    QWidget* FocusedWidget = QApplication::focusWidget();
+    if (!IsTextClipboardWidget(FocusedWidget))
+    {
+        return false;
+    }
+    if (auto* LineEdit = qobject_cast<QLineEdit*>(FocusedWidget))
+    {
+        LineEdit->paste();
+        return true;
+    }
+    if (auto* PlainTextEdit = qobject_cast<QPlainTextEdit*>(FocusedWidget))
+    {
+        PlainTextEdit->paste();
+        return true;
+    }
+    if (auto* TextEdit = qobject_cast<QTextEdit*>(FocusedWidget))
+    {
+        TextEdit->paste();
+        return true;
+    }
+    if (auto* NestedLineEdit = FocusedWidget->findChild<QLineEdit*>())
+    {
+        NestedLineEdit->paste();
+        return true;
+    }
+    return false;
+}
+
+bool EditorMainWindow::HandleClipboardShortcut(QEvent* Event)
+{
+    if (Event == nullptr
+        || (Event->type() != QEvent::ShortcutOverride && Event->type() != QEvent::KeyPress))
+    {
+        return false;
+    }
+
+    auto* KeyEvent = static_cast<QKeyEvent*>(Event);
+    if (!KeyEvent->matches(QKeySequence::Copy) && !KeyEvent->matches(QKeySequence::Paste))
+    {
+        return false;
+    }
+    if (IsTextClipboardWidget(QApplication::focusWidget()))
+    {
+        return false;
+    }
+    if (Event->type() == QEvent::ShortcutOverride)
+    {
+        KeyEvent->accept();
+        return true;
+    }
+    if (KeyEvent->matches(QKeySequence::Copy))
+    {
+        OnCopy();
+    }
+    else
+    {
+        OnPaste();
+    }
+    KeyEvent->accept();
+    return true;
+}
+
+bool EditorMainWindow::HandleGizmoModeHotkey(QEvent* Event)
+{
+    if (Event == nullptr
+        || PrimaryViewport == nullptr
+        || BoundEngine.GetPlaySession().IsSimulating()
+        || (Event->type() != QEvent::ShortcutOverride && Event->type() != QEvent::KeyPress))
+    {
+        return false;
+    }
+    if (IsTextClipboardWidget(QApplication::focusWidget()) || PrimaryViewport->IsCameraNavigationActive())
+    {
+        return false;
+    }
+
+    auto* KeyEvent = static_cast<QKeyEvent*>(Event);
+    if (KeyEvent->modifiers() != Qt::NoModifier)
+    {
+        return false;
+    }
+
+    const quint32 ScanCode = KeyEvent->nativeScanCode();
+    EditorViewportWidget::GizmoOperation Operation = PrimaryViewport->GetGizmoOperation();
+    bool bMatched = false;
+    if (ScanCode == 0x11)
+    {
+        Operation = EditorViewportWidget::GizmoOperation::Translate;
+        bMatched = true;
+    }
+    else if (ScanCode == 0x12)
+    {
+        Operation = EditorViewportWidget::GizmoOperation::Rotate;
+        bMatched = true;
+    }
+    else if (ScanCode == 0x13)
+    {
+        Operation = EditorViewportWidget::GizmoOperation::Scale;
+        bMatched = true;
+    }
+    if (!bMatched)
+    {
+        return false;
+    }
+    if (Event->type() == QEvent::ShortcutOverride)
+    {
+        KeyEvent->accept();
+        return true;
+    }
+    PrimaryViewport->SetGizmoOperation(Operation);
+    KeyEvent->accept();
+    return true;
+}
+
+void EditorMainWindow::SyncGizmoModeButtons()
+{
+    if (GizmoModeButtons == nullptr || PrimaryViewport == nullptr)
+    {
+        return;
+    }
+    QAbstractButton* Button = GizmoModeButtons->button(
+        static_cast<int>(PrimaryViewport->GetGizmoOperation()));
+    if (Button != nullptr)
+    {
+        const QSignalBlocker Blocker(GizmoModeButtons);
+        Button->setChecked(true);
+    }
+}
+
+bool EditorMainWindow::eventFilter(QObject* Watched, QEvent* Event)
+{
+    if ((Watched == HierarchyTree || Watched == PrimaryViewport) && HandleClipboardShortcut(Event))
+    {
+        return true;
+    }
+    if ((Watched == HierarchyTree || Watched == PrimaryViewport) && HandleGizmoModeHotkey(Event))
+    {
+        return true;
+    }
+    return QMainWindow::eventFilter(Watched, Event);
+}
+
+bool EditorMainWindow::CopySelectedObjectToClipboard()
+{
+    GameObject* Selected = GetSelectedGameObject();
+    if (Selected == nullptr)
+    {
+        return false;
+    }
+
+    std::string SerializedSubtree;
+    SceneSerializeResult Serialized = SceneSerializer::SerializeSubtreeToJson(
+        *Selected,
+        SerializedSubtree);
+    if (!Serialized.bOk)
+    {
+        statusBar()->showMessage(
+            tr("Copy failed: %1").arg(QString::fromStdString(Serialized.Error)),
+            2500);
+        return false;
+    }
+
+    auto* MimeData = new QMimeData();
+    MimeData->setData(
+        SakuraSceneSubtreeMimeType,
+        QByteArray::fromStdString(SerializedSubtree));
+    QApplication::clipboard()->setMimeData(MimeData);
+    statusBar()->showMessage(tr("Copied object subtree"), 1500);
+    return true;
+}
+
+bool EditorMainWindow::PasteObjectFromClipboard()
 {
     Scene* EditScene = GetEditScene();
-    if (EditScene == nullptr)
+    const QMimeData* MimeData = QApplication::clipboard()->mimeData();
+    if (EditScene == nullptr
+        || BoundEngine.GetPlaySession().IsSimulating()
+        || MimeData == nullptr
+        || !MimeData->hasFormat(SakuraSceneSubtreeMimeType))
+    {
+        return false;
+    }
+
+    ObjectHandle Parent;
+    if (GameObject* Selected = GetSelectedGameObject())
+    {
+        if (Selected->GetParent() != nullptr)
+        {
+            Parent = Selected->GetParent()->GetObjectHandle();
+        }
+    }
+
+    ObjectHandle Created;
+    std::unique_ptr<EditorCommand> Command = MakePasteSubtreeCommand(
+        EditScene,
+        MimeData->data(SakuraSceneSubtreeMimeType).toStdString(),
+        Parent,
+        &Created);
+    if (!ExecuteCommand(std::move(Command)))
+    {
+        statusBar()->showMessage(tr("Paste failed"), 2500);
+        return false;
+    }
+    SelectObject(Created);
+    statusBar()->showMessage(tr("Pasted object subtree"), 1500);
+    return true;
+}
+
+void EditorMainWindow::OnCopy()
+{
+    if (CopyFocusedTextWidget())
+    {
+        return;
+    }
+    QWidget* FocusedWidget = QApplication::focusWidget();
+    if (ContentBrowser != nullptr
+        && FocusedWidget != nullptr
+        && (FocusedWidget == ContentBrowser || ContentBrowser->isAncestorOf(FocusedWidget)))
+    {
+        ContentBrowser->CopySelectionToClipboard();
+        return;
+    }
+    CopySelectedObjectToClipboard();
+}
+
+void EditorMainWindow::OnPaste()
+{
+    if (PasteFocusedTextWidget())
+    {
+        return;
+    }
+    QWidget* FocusedWidget = QApplication::focusWidget();
+    if (ContentBrowser != nullptr
+        && FocusedWidget != nullptr
+        && (FocusedWidget == ContentBrowser || ContentBrowser->isAncestorOf(FocusedWidget)))
+    {
+        ContentBrowser->PasteFromClipboard();
+        return;
+    }
+    PasteObjectFromClipboard();
+}
+
+void EditorMainWindow::PopulateCreateMenus(QMenu* ObjectsMenu, QMenu* ComponentsMenu)
+{
+    if (ObjectsMenu == nullptr || ComponentsMenu == nullptr)
     {
         return;
     }
 
-    ObjectHandle Parent = GetSelectedObjectHandle();
-    ObjectHandle Created;
-    if (!ExecuteCommand(MakeCreateObjectCommand(EditScene, "GameObject", Parent, &Created)))
+    ObjectsMenu->clear();
+    ComponentsMenu->clear();
+
+    EditorActionContext Context = MakeEditorActionContext();
+    int PreviousObjectSortOrder = -1;
+    int PreviousComponentSortOrder = -1;
+    for (EditorAction* Action : EditorAction::CollectPublishedActions())
+    {
+        if (Action == nullptr)
+        {
+            continue;
+        }
+
+        QMenu* TargetMenu = nullptr;
+        int* PreviousSortOrder = nullptr;
+        if (std::strcmp(Action->GetMenuCategory(), EditorAction::ObjectsCategory) == 0)
+        {
+            TargetMenu = ObjectsMenu;
+            PreviousSortOrder = &PreviousObjectSortOrder;
+        }
+        else if (std::strcmp(Action->GetMenuCategory(), EditorAction::ComponentsCategory) == 0)
+        {
+            TargetMenu = ComponentsMenu;
+            PreviousSortOrder = &PreviousComponentSortOrder;
+        }
+        if (TargetMenu == nullptr || PreviousSortOrder == nullptr)
+        {
+            continue;
+        }
+
+        if (*PreviousSortOrder >= 0 && Action->GetSortOrder() - *PreviousSortOrder >= 50)
+        {
+            TargetMenu->addSeparator();
+        }
+        *PreviousSortOrder = Action->GetSortOrder();
+
+        QAction* MenuAction = TargetMenu->addAction(QString::fromUtf8(Action->GetDisplayName()));
+        MenuAction->setEnabled(Action->CanExecute(Context));
+        connect(MenuAction, &QAction::triggered, this, [this, Action]()
+        {
+            RunEditorAction(Action);
+        });
+    }
+}
+
+EditorActionContext EditorMainWindow::MakeEditorActionContext()
+{
+    EditorActionContext Context;
+    Context.EditScene = GetEditScene();
+    Context.CommandStack = &CommandStack;
+    Context.SelectedObject = GetSelectedObjectHandle();
+    Context.ExecuteCommand = [this](std::unique_ptr<EditorCommand> Command)
+    {
+        return ExecuteCommand(std::move(Command));
+    };
+    Context.SelectObject = [this](ObjectHandle Target)
+    {
+        SelectObject(Target);
+    };
+    return Context;
+}
+
+void EditorMainWindow::RunEditorAction(EditorAction* Action)
+{
+    if (Action == nullptr)
     {
         return;
     }
-    SelectObject(Created);
+    EditorActionContext Context = MakeEditorActionContext();
+    if (!Action->CanExecute(Context))
+    {
+        return;
+    }
+    Action->Execute(Context);
+}
+
+void EditorMainWindow::RunEditorActionByTypeId(const char* TypeIdString)
+{
+    Class* ActionClass = ReflectionSubsystem::Get().FindClass(TypeIdString);
+    if (ActionClass == nullptr || ActionClass->GetClassDefaultObject() == nullptr)
+    {
+        return;
+    }
+    RunEditorAction(static_cast<EditorAction*>(ActionClass->GetClassDefaultObject()));
+}
+
+void EditorMainWindow::OnCreateEmptyObject()
+{
+    RunEditorActionByTypeId(CreateEmptyObjectAction::StaticReflectionTypeId());
 }
 
 void EditorMainWindow::OnDeleteSelectedObject()
@@ -1612,50 +2246,6 @@ void EditorMainWindow::OnDeleteSelectedObject()
         return;
     }
     ClearSelection();
-}
-
-void EditorMainWindow::OnAddCameraComponent()
-{
-    Scene* EditScene = GetEditScene();
-    GameObject* Selected = GetSelectedGameObject();
-    if (EditScene == nullptr || Selected == nullptr)
-    {
-        return;
-    }
-
-    ObjectHandle CreatedComponent;
-    if (!ExecuteCommand(MakeAddComponentCommand(
-            EditScene,
-            Selected->GetObjectHandle(),
-            TypeId{CameraComponent::StaticReflectionTypeId()},
-            &CreatedComponent)))
-    {
-        return;
-    }
-    InspectedComponent = CreatedComponent;
-    RefreshSelectionUi();
-}
-
-void EditorMainWindow::OnAddLightComponent()
-{
-    Scene* EditScene = GetEditScene();
-    GameObject* Selected = GetSelectedGameObject();
-    if (EditScene == nullptr || Selected == nullptr)
-    {
-        return;
-    }
-
-    ObjectHandle CreatedComponent;
-    if (!ExecuteCommand(MakeAddComponentCommand(
-            EditScene,
-            Selected->GetObjectHandle(),
-            TypeId{LightComponent::StaticReflectionTypeId()},
-            &CreatedComponent)))
-    {
-        return;
-    }
-    InspectedComponent = CreatedComponent;
-    RefreshSelectionUi();
 }
 
 void EditorMainWindow::OnObjectNameEdited()
@@ -1902,36 +2492,26 @@ void EditorMainWindow::OnAssetDropped(
     }
 }
 
-void EditorMainWindow::OnInspectedComponentChanged(int Index)
+void EditorMainWindow::OnComponentFilterChanged(int Index)
 {
-    if (Inspector == nullptr)
+    if (ComponentCombo == nullptr || Index < 0 || Index >= ComponentCombo->count())
     {
         return;
     }
 
-    GameObject* Selected = GetSelectedGameObject();
-    if (Selected == nullptr || Index < 0 || ComponentCombo == nullptr || Index >= ComponentCombo->count())
+    ComponentFilter = ComponentCombo->itemData(Index).toString();
+    for (ReflectionInspector* ComponentInspector : ComponentInspectors)
     {
-        InspectedComponent = ObjectHandle{};
-        Inspector->SetInspectedObject(nullptr);
-        return;
-    }
-
-    ObjectHandle ComponentHandle;
-    ComponentHandle.Id = static_cast<ObjectID>(ComponentCombo->itemData(Index, HierarchyObjectIdRole).toULongLong());
-    ComponentHandle.Generation = ComponentCombo->itemData(Index, HierarchyObjectGenerationRole).toUInt();
-    InspectedComponent = ComponentHandle;
-
-    Component* ComponentInstance = nullptr;
-    for (Component* Candidate : Selected->GetAllComponents())
-    {
-        if (Candidate != nullptr && Candidate->GetObjectHandle() == ComponentHandle)
+        if (ComponentInspector == nullptr || ComponentInspector->GetInspectedObject() == nullptr)
         {
-            ComponentInstance = Candidate;
-            break;
+            continue;
         }
+        Object* ComponentInstance = ComponentInspector->GetInspectedObject();
+        const QString ComponentType = ComponentInstance->GetClass() != nullptr
+            ? QString::fromStdString(ComponentInstance->GetClass()->GetTypeId().Value)
+            : QString::fromStdString(ComponentInstance->GetName());
+        ComponentInspector->parentWidget()->setVisible(ComponentFilter.isEmpty() || ComponentFilter == ComponentType);
     }
-    Inspector->SetInspectedObject(ComponentInstance);
 }
 
 bool EditorMainWindow::PromptSaveIfDirty()

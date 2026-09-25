@@ -55,6 +55,7 @@ set(ENGINE_SRC
     src/Reflection/ReflectionSubsystem.cpp
     src/Rendering/RHI/RenderDevice.cpp
     src/Rendering/RHI/Renderer.cpp
+    src/Rendering/RHI/ImGuiOverlayPass.cpp
     src/Rendering/RHI/EnvironmentLighting.cpp
     src/Rendering/RenderView.cpp
     src/Rendering/RHI/GpuBuffer.cpp

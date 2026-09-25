@@ -19,7 +19,7 @@ public:
     float Range = 10.f;
     float InnerConeAngle = 0.f;
     float OuterConeAngle = 45.f;
-    bool bCastShadows = false;
+    bool bCastShadows = true;
 
     int64_t GetLightTypeValue() const { return static_cast<int64_t>(Type); }
     void SetLightTypeValue(int64_t Value)

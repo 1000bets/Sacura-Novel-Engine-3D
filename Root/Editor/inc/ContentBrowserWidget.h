@@ -9,6 +9,7 @@
 #include <vector>
 
 class Engine;
+class QEvent;
 class QButtonGroup;
 class QLineEdit;
 class QListWidget;
@@ -27,6 +28,11 @@ public:
 
     void SetEngine(Engine* EngineInstance);
     void Refresh();
+    bool CopySelectionToClipboard();
+    bool PasteFromClipboard();
+
+protected:
+    bool eventFilter(QObject* Watched, QEvent* Event) override;
 
 signals:
     void AssetActivated(QString AssetId, QString SubAssetIdentifier, QString AssetTypeIdentifier, QString VirtualPath);
@@ -44,6 +50,7 @@ private:
     void ShowAssetContextMenu(const QPoint& Position);
     void RenameSelectedAsset();
     void DeleteSelectedAsset();
+    bool DuplicateClipboardAsset();
     void MoveAsset(const QString& SourceVirtualPath, const QString& DestinationFolder);
 
     Engine* BoundEngine = nullptr;

@@ -75,6 +75,11 @@ void ReflectionInspector::SetAssetCommitCallback(AssetCommitCallback Callback)
     AssetCallback = std::move(Callback);
 }
 
+void ReflectionInspector::SetTypeLabelVisible(bool bVisible)
+{
+    TypeLabel->setVisible(bVisible);
+}
+
 bool ReflectionInspector::CommitProperty(const PropertyId& Property, const ReflectedValue& NewValue)
 {
     if (InspectedObject == nullptr)

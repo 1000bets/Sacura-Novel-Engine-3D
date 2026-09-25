@@ -1,6 +1,7 @@
 #include "Core/EnginePaths.h"
 #include "Core/Threading/ThreadContext.h"
 #include "EditorMainWindow.h"
+#include "EditorReflectionAnchor.h"
 #include "Engine.h"
 #include "Project/ProjectSession.h"
 #include "ProjectBrowserDialog.h"
@@ -57,6 +58,7 @@ int main(int ArgumentCount, char** Arguments)
     }
 
     Engine BoundEngine;
+    ForceTouchEditorRegistrars();
     BoundEngine.InitializeHeadless({});
 
     ProjectSession Session;

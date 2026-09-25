@@ -147,6 +147,9 @@ bool Renderer::Initialize(const NativeWindowInfo& WindowInfo, GraphicsBackend Ba
         Shutdown();
         return false;
     }
+
+    CreateImGuiOverlay();
+
     PrintString("Renderer: Forward PBR, shadow atlas, weighted transparency and HDR ready");
     return true;
 }
@@ -748,6 +751,7 @@ void Renderer::RenderView(const RenderViewFrame& View, uint64_t FrameIndex)
     }
     Statistics.CpuMilliseconds = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - CpuStart).count();
     Target.Statistics = Statistics;
+    RenderImGuiOverlay(Context, SwapChain, View.Overlay);
     SwapChain->Present(0);
 }
 
@@ -823,6 +827,7 @@ void Renderer::Shutdown()
 {
     AssertRenderThread();
     Device.WaitForIdle();
+    DestroyImGuiOverlay();
     delete Pipeline;
     Pipeline = nullptr;
     Resources.Shutdown();
