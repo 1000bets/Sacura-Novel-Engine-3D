@@ -666,6 +666,7 @@ function GraphCanvas({
   const api = useReactFlow(),
     [nodes, setNodes] = useState([]),
     [zoom, setZoom] = useState(1),
+    [showMinimap, setShowMinimap] = useState(false),
     [selectedEdge, setSelectedEdge] = useState(null),
     initKey = useRef(null),
     container = useRef(),
@@ -829,7 +830,7 @@ function GraphCanvas({
       color: "#747F8E",
     },
     style: {
-      stroke: e.id === selectedEdge ? "#B8C7D9" : "#747F8E",
+      stroke: e.id === selectedEdge ? "var(--accent)" : "var(--graph-edge)",
       strokeWidth: e.id === selectedEdge ? 2 : 1.25,
     },
     labelStyle: { fill: "#ADB4C0", fontSize: 11 },
@@ -888,15 +889,15 @@ function GraphCanvas({
           variant={BackgroundVariant.Dots}
           gap={28}
           size={0.7}
-          color="#343941"
+          color="var(--graph-grid)"
         />
-        <MiniMap
+        {showMinimap && <MiniMap
           pannable
           zoomable
-          nodeColor="#555E6B"
-          maskColor="#17191DCC"
+          nodeColor="var(--text-muted)"
+          maskColor="var(--app-background)"
           position="bottom-right"
-        />
+        />}
         <Panel position="bottom-left">
           <div className="graph-navigation">
             <Button
@@ -912,6 +913,7 @@ function GraphCanvas({
               title="Увеличить масштаб"
               onClick={() => api.zoomIn()}
             />
+            <Button icon="Map" title="Миникарта графа" aria-pressed={showMinimap} onClick={() => setShowMinimap(v => !v)} />
             <span />
             <Button
               icon="Focus"

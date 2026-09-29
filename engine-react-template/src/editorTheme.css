@@ -1,25 +1,27 @@
 /* Sacura / Quiet Studio. UI/UX Pro Max: Minimalism & Swiss Style.
    Layout is defined in editor.css; this file owns the visual language. */
 :root {
-  --app-background: #101318;
-  --surface-1: #20252d;
-  --surface-2: #2c333e;
-  --surface-hover: #343d49;
-  --surface-active: #3b4b5e;
-  --divider: #39424e;
-  --text-primary: #f0f2f5;
-  --text-secondary: #c3cad4;
-  --text-muted: #afbbc9;
-  --accent: #a9c8ed;
-  --accent-soft: #3b4b5e;
+  --app-background: #181a1d;
+  --surface-1: #222427;
+  --surface-2: #2b2e32;
+  --surface-hover: #34383d;
+  --surface-active: #38434e;
+  --divider: #33363b;
+  --text-primary: #e8eaed;
+  --text-secondary: #c1c5cb;
+  --text-muted: #aab1ba;
+  --accent: #a5bdd3;
+  --accent-soft: #38434e;
   --error: #eea2a2;
   --warning: #d6be8d;
   --success: #a0c8b0;
-  --surface-chrome: #161a20;
-  --surface-heading: #272e38;
-  --surface-input: #161c24;
-  --surface-node: #252d38;
+  --surface-chrome: #222427;
+  --surface-heading: #222427;
+  --surface-input: #2b2e32;
+  --surface-node: #292c30;
   --brand-mark: #c6aa94;
+  --graph-grid: #303337;
+  --graph-edge: #697079;
   --space-1: 4px; --space-2: 8px; --space-3: 12px;
   --space-4: 16px; --space-5: 24px; --space-6: 32px;
   --radius-control: 4px; --radius-node: 5px;
@@ -48,7 +50,7 @@ input[type=checkbox], input[type=range] { accent-color: var(--accent); }
 select option, select optgroup { background: var(--surface-2); color: var(--text-primary); }
 ::selection { background: var(--surface-active); color: var(--text-primary); }
 * { scrollbar-color: #464e59 transparent; }
-.editor-app { --field: var(--surface-2); background: var(--app-background); grid-template-rows: 36px 40px minmax(0,1fr) 26px; }
+.editor-app { --field: var(--surface-2); background: var(--app-background); grid-template-rows: 44px minmax(0,1fr) 24px; }
 .editor-menubar { background: var(--surface-chrome); border: 0; padding-inline: var(--space-4); }
 .editor-brand { color: var(--text-primary); margin-right: var(--space-5); gap: var(--space-2); }
 .editor-brand>svg { color: var(--brand-mark); width: 18px; }
@@ -184,7 +186,7 @@ select option, select optgroup { background: var(--surface-2); color: var(--text
 .enode.is-playing>header { color: var(--success); background: transparent; }
 .enode.has-error { border-color: var(--error); }
 .node-copy { padding: 8px 14px 12px; color: var(--text-primary); font-size: 14px; line-height: 1.6; min-height: 76px; }
-.node-phase-slots { background: #202732; border: 0; padding: 0 8px 8px; gap: 0; }
+.node-phase-slots { background: transparent; border: 0; padding: 0 8px 8px; gap: 0; }
 .node-phase-slots>button { flex-direction: row; gap: 5px; padding: 5px 3px; min-height: 26px; font-size: 11px; color: var(--text-muted); border-radius: 3px; }
 .node-phase-slots>button+button { border: 0; }
 .node-phase-slots button.filled, .node-phase-slots button b { color: var(--text-secondary); background: transparent; font-size: 11px; font-weight: 400; }
@@ -337,3 +339,80 @@ select option, select optgroup { background: var(--surface-2); color: var(--text
 .create-overlay { backdrop-filter: none; }
 
 .viewport-commandbar .scene-edit-bar button.active:not(.transform-tool) { background: transparent; box-shadow: none; color: var(--accent); }
+
+/* Continuous workspace: one command bar, quiet side rails, unframed content. */
+.editor-menubar { gap: 4px; padding-inline: 12px; }
+.editor-brand { margin-right: 16px; }
+.editor-brand strong { font-size: 14px; }
+.editor-brand strong span { display: none; }
+.project-title { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; margin-right: 8px; }
+.main-play-controls { margin-inline: 20px 24px; }
+.main-play-controls button:first-child { background: transparent; }
+.main-play-controls button:first-child:hover { background: var(--surface-hover); }
+.main-play-controls button.playing { background: var(--surface-active); }
+.toolbar-layout { gap: 4px; }
+.toolbar-layout select { background: transparent; }
+.play-label[hidden] { display: none; }
+.panel-tabs, .hierarchy-panel>.panel-tabs, .inspector-panel>.panel-tabs, .viewport-tabs, .dock-tabs { height: 36px; background: var(--surface-1); }
+.panel-tabs>button.active, .viewport-tabs>button.active, .dock-tabs>button.active, .dock-more>button.active { background: transparent; font-weight: 500; }
+.panel-tabs>button.active:after { height: 1px; background: var(--text-secondary); }
+.hierarchy-panel>.panel-tabs>button.active, .inspector-panel>.panel-tabs>button.active { font-weight: 500; }
+.viewport-tabs .toolbar-project { margin-left: 20px; gap: 4px; min-width: 0; }
+.viewport-tabs .toolbar-context-label { display: none; }
+.viewport-tabs .scene-selector { background: transparent; font-size: 12px; }
+.viewport-commandbar { padding-block: 3px; min-height: 32px; }
+.viewport-commandbar .scene-edit-bar .tool-label { display: none; }
+.viewport-commandbar .scene-edit-bar button { min-width: 28px; }
+.viewport-commandbar .scene-edit-bar button.active.transform-tool { background: var(--surface-active); box-shadow: none; }
+.scene-edit-add { margin-right: 12px; }
+.viewport-commandbar .viewport-state>span>svg { display: none; }
+.splitter { background: var(--app-background); }
+.panel-search { background: transparent; margin: 4px 12px 0; padding-inline: 0; }
+.panel-search:focus-within { background: var(--surface-2); border-radius: 4px; }
+.tree-object>button:first-child { min-height: 28px; }
+.tree-folder { padding-top: 14px; }
+.tree-object.selected { box-shadow: none; }
+.subscene-list, .hierarchy-footer { background: transparent; }
+.hierarchy-footer { padding-block: 8px; }
+.subscene-list { padding-top: 14px; }
+.subscene-list>header { color: var(--text-muted); }
+.inspector-identity { background: transparent; min-height: 64px; padding: 16px 16px 12px; margin-bottom: 8px; }
+.inspector-identity .identity-icon, .inspector-identity>svg { display: none; }
+.inspector-identity strong { font-size: 14px; font-weight: 500; }
+.inspector-identity .subtle { align-self: center; }
+.inspector-section { margin-bottom: 20px; }
+.inspector-section>summary, .inspector-section[open]>summary { padding: 6px 14px; font-size: 12px; }
+.inspector-fields { padding-top: 6px; gap: 8px; }
+.inspector-fields input, .inspector-fields select { min-height: 28px; }
+.inspector-fields textarea { padding: 8px; line-height: 1.6; }
+.phase-inspector-row { padding-block: 4px; }
+.graph-toolbar { background: var(--app-background); min-height: 32px; }
+.graph-back:disabled { display: none; }
+.graph-toolbar .rose-button { background: transparent; }
+.graph-toolbar .graph-help { margin-right: 8px; }
+.enode, .enode.choice, .enode.gate, .enode.portal, .enode.marker, .enode.fork, .enode.join, .enode.action { box-shadow: none; border-radius: 3px; }
+.enode.is-selected { border-color: transparent; box-shadow: inset 2px 0 var(--accent); }
+.enode.is-playing { box-shadow: inset 2px 0 var(--success); border-color: transparent; }
+.enode.has-error { box-shadow: inset 2px 0 var(--error); border-color: transparent; }
+.enode>header>strong { font-weight: 500; color: var(--text-secondary); }
+.enode.is-selected>header>strong { color: var(--text-primary); }
+.node-copy { min-height: 68px; font-size: 14px; padding-block: 6px 8px; }
+.node-phase-slots { background: transparent; padding: 0 10px 8px; }
+.node-phase-slots>button { font-size: 11px; }
+.graph-navigation { background: transparent; }
+.graph-navigation button { min-width: 26px; height: 28px; }
+.graph-navigation>span { border: 0; margin-inline: 4px; }
+.editor-status { border: 0; background: var(--surface-1); }
+@media(max-width:1400px) {
+  .project-title { max-width: 165px; }
+  .main-play-controls { margin-inline: 12px; }
+}
+@media(max-width:1000px) {
+  .editor-menubar { flex-wrap: wrap; }
+  .editor-app { grid-template-rows: 76px minmax(0,1fr) 24px; }
+  .toolbar-layout select { max-width: 130px; }
+  .viewport-tabs .toolbar-project { margin-left: 8px; max-width: 210px; }
+}
+
+.editor-menubar>button { min-height: 28px; }
+.editor-menu { max-height: calc(100dvh - 60px); overflow-y: auto; }

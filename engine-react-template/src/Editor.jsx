@@ -328,6 +328,7 @@ export default function Editor() {
     [compactPanel,setCompactPanel]=useState('workspace'),
     [picker, setPicker] = useState(null),
     [menu, setMenu] = useState(null),
+    [menuAnchor, setMenuAnchor] = useState({left: 100, top: 40}),
     [projectDialog,setProjectDialog]=useState(null),
     [projectFileError,setProjectFileError]=useState(''),
     [projectFileBusy,setProjectFileBusy]=useState(false),
@@ -1966,13 +1967,18 @@ export default function Editor() {
           <button
             className={menu === m ? "active" : ""}
             key={m}
-            onClick={() => setMenu(menu === m ? null : m)}
+            aria-expanded={menu === m}
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setMenuAnchor({left: Math.max(8, Math.min(rect.left, window.innerWidth - 250)), top: rect.bottom + 4});
+              setMenu(menu === m ? null : m);
+            }}
           >
             {m}
           </button>
         ))}
         <div className="flex-space" />
-        <span className="project-title">
+        <span className="project-title" title={project.title}>
           <Icon name="FolderOpen" size={14} />
           {project.title}
         </span>
@@ -1983,19 +1989,6 @@ export default function Editor() {
         >
           <Icon name={saveError ? "TriangleAlert" : "CloudCheck"} size={15} />
         </button>
-      </header>
-      <div className="editor-toolbar">
-        <div className="toolbar-project">
-          <span className="toolbar-context-label">Сабсцена</span>
-          <EditorSelect
-            label="Текущая сабсцена"
-            value={displayScene.id}
-            onChange={(id) =>
-              openSubscenes('edit',id)
-            }
-            options={project.subscenes.map((s) => [s.id, s.name])}
-          />
-        </div>
         <div className="main-play-controls">
           <Button
             className={running ? "playing" : ""}
@@ -2027,7 +2020,7 @@ export default function Editor() {
           />
         </div>
         <div className="toolbar-layout">
-          <span className={running ? "play-label" : "edit-label"}>
+          <span className="play-label" hidden={!running}>
             {running
               ? preview.paused
                 ? "На паузе"
@@ -2052,7 +2045,7 @@ export default function Editor() {
             ]}
           />
         </div>
-      </div>
+      </header>
       <div className={'editor-workspace compact-'+compactPanel+(layout.hiddenHierarchy?' hierarchy-hidden':'')+(layout.hiddenInspector?' inspector-hidden':'')+(['scene','graph'].includes(maximized)?' focus-center':maximized==='hierarchy'?' focus-hierarchy':maximized==='inspector'?' focus-inspector':'')}>
         <nav className="compact-panel-tabs" aria-label="Панели редактора">
           {[['hierarchy','ListTree','Объекты сцены'],['workspace','PanelsTopLeft','Рабочая область'],['inspector','Settings2','Свойства']].map(([id,icon,label])=><button key={id} aria-pressed={compactPanel===id} onClick={()=>{if(['hierarchy','inspector'].includes(maximized))setMaximized(null);setCompactPanel(id);}}><Icon name={icon} size={13}/>{label}</button>)}
@@ -2222,12 +2215,13 @@ export default function Editor() {
           <section className="viewport-panel">
             <div className="panel-tabs viewport-tabs">
               <button
+                aria-label="Редактор сцены"
                 aria-pressed={mode === "scene"}
                 className={mode === "scene" ? "active" : ""}
                 onClick={editScene}
               >
                 <Icon name="Box" size={14} />
-                Редактор сцены
+                Сцена
               </button>
               <button
                 aria-pressed={mode === "game"}
@@ -2237,7 +2231,17 @@ export default function Editor() {
                 <Icon name="Gamepad2" size={15} />
                 Игра
               </button>
-              <span className="viewport-location">{displayScene.location}</span>
+              <div className="toolbar-project">
+          <span className="toolbar-context-label">Сабсцена</span>
+          <EditorSelect
+            label="Текущая сабсцена"
+            value={displayScene.id}
+            onChange={(id) =>
+              openSubscenes('edit',id)
+            }
+            options={project.subscenes.map((s) => [s.id, s.name])}
+          />
+        </div>
               <div className="flex-space" />
               <button
                 title="Диалог в игровом кадре"
@@ -2741,16 +2745,7 @@ export default function Editor() {
       {menu && (
         <div
           className="editor-menu"
-          style={{
-            left:
-              menu === "Файл"
-                ? 247
-                : menu === "Правка"
-                  ? 293
-                  : menu === "Создать"
-                    ? 351
-                    : 422,
-          }}
+          style={menuAnchor}
         >
           {menu === "Файл" ? (
             <>
