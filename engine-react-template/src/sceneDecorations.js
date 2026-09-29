@@ -6,7 +6,7 @@ export const DECORATION_CATALOG = [
   {id:'room-left-wall',name:'Левая стена',kind:'living',color:'#515961',position:[-4.5,1.3,0]},
   {id:'room-right-wall',name:'Правая стена',kind:'living',color:'#666067',position:[4.5,1.45,0]},
   {id:'room-ceiling',name:'Потолок',kind:'living',color:'#8b8180',position:[0,3.04,0]},
-  {id:'room-window',name:'Окно',kind:'living',color:'#7b9eac',position:[1.35,1.53,-3.06]},
+  {id:'room-window',name:'Оконная рама',kind:'living',color:'#7b9eac',position:[1.35,1.53,-3.06]},
   {id:'room-rug',name:'Ковёр',kind:'living',color:'#776370',position:[-.6,.01,.8]},
   {id:'room-side-table',name:'Столик у лампы',kind:'living',color:'#7a6655',position:[-3.65,0,.85]},
   {id:'room-lamp',name:'Настольная лампа',kind:'living',color:'#d6b886',position:[-3.65,.84,.85]},

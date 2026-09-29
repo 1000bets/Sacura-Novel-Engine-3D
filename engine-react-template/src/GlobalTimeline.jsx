@@ -193,10 +193,12 @@ export default function GlobalTimeline({project,currentSceneId,currentBeatId,run
       <Button icon="Maximize" onClick={() => flow.current?.fitView(FIT_ALL)}>Вся история</Button>
       <Button icon="LayoutGrid" disabled={!onLayoutChange || !Object.keys(savedPositions).length} title="Вернуть автоматическое расположение всех узлов. Ctrl+Z отменяет сброс." onClick={restoreAutoLayout}>Автораскладка</Button>
     </div></header>
-    <div className="global-timeline-direction"><span>НАЧАЛО</span><i/><Icon name="ArrowRight" size={19}/><span>ХОД ИСТОРИИ</span><small>Порядок переходов; время зависит от чтения и выборов игрока</small></div>
+    <div className="global-timeline-direction" title="Порядок переходов; время зависит от чтения и выборов игрока"><span>НАЧАЛО</span><i/><Icon name="ArrowRight" size={19}/><span>ХОД ИСТОРИИ</span><small>Порядок переходов; время зависит от чтения и выборов игрока</small></div>
     <nav className="global-timeline-scenes" aria-label="Сабсцены на таймлайне">{(project.subscenes || []).map(scene => <button key={scene.id} className={scene.id === (activeNode?.sceneId || currentSceneId)?'active':''} title="Показать начало сабсцены на таймлайне. Двойной щелчок — открыть сцену." onClick={() => {const node = firstInScene(scene.id);if (node) {selectNode(node.id);focusNode(node.id);}}} onDoubleClick={() => onOpenScene?.(scene.id)}><i style={{background:scene.color || '#bd94a9'}}/>{scene.name}</button>)}</nav>
     <div className="global-timeline-variables"><strong><Icon name="Variable" size={16}/>Глобальные переменные</strong>{model.variables.map(item => <button key={item.id} className={`${variableId === item.id?'active ':''}${item.missing?'missing':''}`} title={`${item.id} · ${item.usedBy.length} выборов. Нажмите, чтобы показать связи условий.`} onClick={() => setVariableId(current => current === item.id?null:item.id)}><span>{item.name}</span><b>{timelineVariableValue(currentValues[item.id])}</b><small>{item.usedBy.length}</small></button>)}{!model.variables.length && <span>Переменные ещё не созданы</span>}{onOpenVariables && <Button icon="SlidersHorizontal" title="Редактировать глобальные переменные" onClick={onOpenVariables}/>}</div>
     <div className="global-timeline-canvas"><ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
+      panOnDrag={[0, 1, 2]} panOnScroll zoomOnScroll={false} zoomActivationKeyCode="Control" selectionOnDrag={false}
+      onPaneContextMenu={event => event.preventDefault()}
       nodesDraggable={true} nodeDragThreshold={4} nodesConnectable={false} edgesReconnectable={false} minZoom={MIN_ZOOM} maxZoom={1.65}
       onInit={instance => {flow.current=instance;}}
       onNodesChange={onNodesChange}
@@ -210,7 +212,7 @@ export default function GlobalTimeline({project,currentSceneId,currentBeatId,run
       <Background color="#3b3441" gap={24}/><Controls showInteractive={false} fitViewOptions={FIT_ALL}/><MiniMap nodeColor={node => node.data.node?.kind === 'ending'?'#cbb080':node.data.node?.kind === 'choice'?'#909dc4':node.data.node?.color || '#ac9cbb'} maskColor="rgba(28,26,33,.77)" pannable zoomable/>
     </ReactFlow>
     {!model.nodes.length && <div className="global-timeline-empty">Добавьте сабсцену и первую реплику — здесь появится история.</div>}
-    <div className="global-timeline-legend"><span><i/>Сабсцена</span><span><i className="choice"/>Выбор / условие</span><span><i className="ending"/>Концовка</span><span className="return">↶ Возврат</span><small>Потяните карточку · двойной щелчок — сценарий · Ctrl+Z — отмена</small></div></div>
+    <div className="global-timeline-legend"><span><i/>Сабсцена</span><span><i className="choice"/>Выбор / условие</span><span><i className="ending"/>Концовка</span><span className="return">↶ Возврат</span><small>ПКМ — панорама · Ctrl + колесо — масштаб · двойной щелчок — сценарий</small></div></div>
     <footer className="global-timeline-details">{shownEdge?<>
       <div><strong><Icon name={shownEdge.isReturn?'Undo2':'ArrowRight'}/>Переход{shownEdge.isReturn?' с возвращением':''}</strong><span>{model.nodes.find(node => node.id === shownEdge.source)?.sceneName} → {model.nodes.find(node => node.id === shownEdge.target)?.sceneName}</span></div>
       <p>{shownEdge.label}<small>{shownEdge.conditionLabel} · {shownEdge.from} → {shownEdge.to || 'продолжение не задано'}</small></p>

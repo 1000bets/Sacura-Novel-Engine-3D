@@ -2,3 +2,5 @@ node_modules/
 dist/
 .sites-runtime/
 *.log
+
+.agents/

@@ -3,3 +3,5 @@ import {createRoot} from 'react-dom/client';
 import App from './Editor.jsx';
 import './editor.css';
 createRoot(document.getElementById('root')).render(<App/>);
+
+import "./editorTheme.css";

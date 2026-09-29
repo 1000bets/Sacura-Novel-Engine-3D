@@ -668,7 +668,8 @@ function GraphCanvas({
     [zoom, setZoom] = useState(1),
     [selectedEdge, setSelectedEdge] = useState(null),
     initKey = useRef(null),
-    container = useRef();
+    container = useRef(),
+    panGesture = useRef(null);
   const graph = useMemo(
     () =>
       mode === "story"
@@ -837,7 +838,10 @@ function GraphCanvas({
     labelBgBorderRadius: 3,
   }));
   return (
-    <div className="graph-canvas" ref={container}>
+    <div className="graph-canvas" ref={container}
+      onPointerDownCapture={e => {panGesture.current = {x:e.clientX,y:e.clientY,moved:false};}}
+      onPointerMoveCapture={e => {const pan=panGesture.current;if(pan && e.buttons && Math.hypot(e.clientX-pan.x,e.clientY-pan.y)>5)pan.moved=true;}}
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -860,7 +864,7 @@ function GraphCanvas({
         onPaneClick={() => setSelectedEdge(null)}
         onPaneContextMenu={(e) => {
           e.preventDefault();
-          onContext?.();
+          if (!panGesture.current?.moved) onContext?.();
         }}
         onConnect={(c) => onConnect?.(c)}
         onReconnect={(e, c) =>

@@ -61,10 +61,10 @@ import GlobalTimeline from './GlobalTimeline.jsx';
 const PROJECT_KEY = "sacura-studio-v2",
   LAYOUT_KEY = "sacura-workspace-v3";
 const defaultSceneHeight = () =>
-  Math.max(320, Math.round(window.innerHeight * 0.52));
+  Math.max(260, Math.round(window.innerHeight * 0.46));
 const initialLayout = {
-  left: 224,
-  right: 300,
+  left: 210,
+  right: 280,
   height: defaultSceneHeight(),
   scope: "chapter",
   positions: {},
@@ -907,8 +907,8 @@ export default function Editor() {
   const resetLayout = () => {
     setLayout((l) => ({
       ...l,
-      left: 224,
-      right: 300,
+      left: 210,
+      right: 280,
       height: defaultSceneHeight(),
       hiddenHierarchy:false,hiddenInspector:false,
     }));
@@ -1916,7 +1916,7 @@ export default function Editor() {
             Sacura<span>Novel Studio</span>
           </strong>
         </div>
-        {["Файл", "Правка", "Создать", "Окно"].map((m) => (
+        {["Файл", "Правка", "Создать", "Панели"].map((m) => (
           <button
             className={menu === m ? "active" : ""}
             key={m}
@@ -2162,7 +2162,7 @@ export default function Editor() {
           axis="x"
           label="Ширина иерархии"
           onMove={(d) => resize("left", d)}
-          onReset={() => setLayout((l) => ({ ...l, left: 224 }))}
+          onReset={() => setLayout((l) => ({ ...l, left: 210 }))}
         />
         <section
           className={
@@ -2212,6 +2212,35 @@ export default function Editor() {
                 />
               </button>
             </div>
+            <div className="viewport-commandbar" aria-label="Инструменты сцены">
+              {mode==='scene'&&!cameraPilotId&&<div className="scene-edit-bar">
+                <button className="scene-edit-add" onClick={()=>setPicker({kind:'object'})}><Icon name="Plus" size={14}/>Объект</button>
+                {[['select','MousePointer2','Выбор','Q'],['translate','Move','Сдвиг','W'],['rotate','Rotate3D','Поворот','E'],['scale','Scaling','Масштаб','R']].map(([tool,icon,label,key])=><button key={tool} disabled={running||(selection.kind==='camera'&&(tool==='scale'||(tool==='rotate'&&displayScene.cameras?.find(c=>c.id===selection.id)?.mode==='follow')))} title={label+' · '+key} className={editTool===tool?'active':''} onClick={()=>setEditTool(tool)}><Icon name={icon} size={14}/><span className="tool-label">{label}</span></button>)}
+                <button title="Привязка: 0,25 м / 15° / 0,1×" className={snap?'active':''} onClick={()=>setSnap(v=>!v)}><Icon name="Magnet" size={14}/></button>
+                <select aria-label="Оси трансформации" value={editSpace} onChange={e=>setEditSpace(e.target.value)}><option value="world">Мир</option><option value="local">Объект</option></select>
+                <Button icon="Video" title="Показать камеры в 3D" className={showCameras?"active":""} onClick={()=>setShowCameras(v=>!v)}/>
+                <Button icon="Grid3X3" title="Сетка сцены" onClick={()=>setShowGrid(v=>!v)}/>
+                <Button icon="Focus" title="Приблизить выбранный объект · F" disabled={selection.kind!=='object'} onClick={()=>setFocusRequest({nonce:uid('focus')})}/>
+              </div>}
+              {cameraPilotId&&mode==='scene'&&<div className="camera-pilot-bar"><Icon name="Video"/><span>Настройка: {displayScene.cameras?.find(c=>c.id===cameraPilotId)?.name}<small>Обзор мышью · правая кнопка — сдвиг · колесо — приближение</small></span><Button icon="Check" onClick={()=>captureCamera(cameraPilotId)}>Сохранить ракурс</Button><Button icon="X" title="Вернуться без сохранения" onClick={()=>setCameraPilotId(null)}/></div>}
+              {mode==='game'&&<div className="camera-view-badge"><Icon name={resolveCamera(displayScene,world,objects,cameraPreviewId).mode==='follow'?'UserRoundCheck':'Video'} size={14}/>{resolveCamera(displayScene,world,objects,cameraPreviewId).name}{cameraPreviewId&&<button onClick={()=>setCameraPreviewId(null)}>По сценарию <Icon name="X" size={12}/></button>}</div>}
+              <div className="viewport-state">
+                <span>
+                  <Icon
+                    name={
+                      world.weather === "Гроза" ? "CloudLightning" : "CloudRain"
+                    }
+                    size={13}
+                  />
+                  <select aria-label="Погода в превью" value={world.weather||'Ясно'} onChange={e=>running?rt.controlEffect('weather','set',e.target.value):mutate(p=>p.subscenes.find(s=>s.id===scene.id).weather=e.target.value)}>{['Ясно','Дождь','Гроза','Туман','Снег'].map(w=><option key={w}>{w}</option>)}</select>
+                </span>
+                <span>
+                  <Icon name="Moon" size={13} />
+                  <select aria-label="Время суток в превью" value={world.time||'День'} onChange={e=>running?rt.controlEffect('time','set',e.target.value):mutate(p=>p.subscenes.find(s=>s.id===scene.id).time=e.target.value)}>{['Рассвет','День','Закат','Ночь'].map(t=><option key={t}>{t}</option>)}</select>
+                </span>
+              </div>
+              <details className="viewport-help"><summary title="Управление сценой" aria-label="Управление сценой"><Icon name="CircleHelp" size={15}/></summary><div>Q / W / E / R — инструменты<br/>Shift + щелчок — мультивыбор<br/>Alt + ЛКМ — орбита · СКМ — панорама<br/>ПКМ + WASD / QE — полёт<br/>F — выделение в кадр</div></details>
+            </div>
             <div
               className="scene-viewport"
               tabIndex={0}
@@ -2242,33 +2271,6 @@ export default function Editor() {
                 onSelect={selectObject}
                 onInteract={interact}
               />
-              {mode==='scene'&&!cameraPilotId&&<div className="scene-edit-bar">
-                <button className="scene-edit-add" onClick={()=>setPicker({kind:'object'})}><Icon name="Plus" size={14}/>Объект</button>
-                {[['select','MousePointer2','Выбор','Q'],['translate','Move','Сдвиг','W'],['rotate','Rotate3D','Поворот','E'],['scale','Scaling','Масштаб','R']].map(([tool,icon,label,key])=><button key={tool} disabled={running||(selection.kind==='camera'&&(tool==='scale'||(tool==='rotate'&&displayScene.cameras?.find(c=>c.id===selection.id)?.mode==='follow')))} title={label+' · '+key} className={editTool===tool?'active':''} onClick={()=>setEditTool(tool)}><Icon name={icon} size={14}/>{label}</button>)}
-                <button title="Привязка: 0,25 м / 15° / 0,1×" className={snap?'active':''} onClick={()=>setSnap(v=>!v)}><Icon name="Magnet" size={14}/></button>
-                <select aria-label="Оси трансформации" value={editSpace} onChange={e=>setEditSpace(e.target.value)}><option value="world">Мир</option><option value="local">Объект</option></select>
-                <Button icon="Video" title="Показать камеры в 3D" className={showCameras?"active":""} onClick={()=>setShowCameras(v=>!v)}/>
-                <Button icon="Grid3X3" title="Сетка сцены" onClick={()=>setShowGrid(v=>!v)}/>
-                <Button icon="Focus" title="Приблизить выбранный объект · F" disabled={selection.kind!=='object'} onClick={()=>setFocusRequest({nonce:uid('focus')})}/>
-              </div>}
-              {mode==='scene'&&!cameraPilotId&&<div className="scene-edit-hint">{running?'Остановите воспроизведение для редактирования':selection.kind==='camera'?'Камера · тяните цветную ось или настройте ракурс мышью':selectedObjects.length>1?`Выбрано: ${selectedObjects.length} · общая трансформация`:selection.kind==='object'?`${inspectedObject?.name||'Объект'} · тяните цветную ось`:'Выберите объект в сцене или иерархии'}<span>Shift + щелчок — мультивыбор · Alt + ЛКМ — орбита · СКМ — панорама · ПКМ + WASD/QE — полёт · F — всё выделение в кадр</span></div>}
-              {cameraPilotId&&mode==='scene'&&<div className="camera-pilot-bar"><Icon name="Video"/><span>Настройка: {displayScene.cameras?.find(c=>c.id===cameraPilotId)?.name}<small>Обзор мышью · правая кнопка — сдвиг · колесо — приближение</small></span><Button icon="Check" onClick={()=>captureCamera(cameraPilotId)}>Сохранить ракурс</Button><Button icon="X" title="Вернуться без сохранения" onClick={()=>setCameraPilotId(null)}/></div>}
-              {mode==='game'&&<div className="camera-view-badge"><Icon name={resolveCamera(displayScene,world,objects,cameraPreviewId).mode==='follow'?'UserRoundCheck':'Video'} size={14}/>{resolveCamera(displayScene,world,objects,cameraPreviewId).name}{cameraPreviewId&&<button onClick={()=>setCameraPreviewId(null)}>По сценарию <Icon name="X" size={12}/></button>}</div>}
-              <div className="viewport-state">
-                <span>
-                  <Icon
-                    name={
-                      world.weather === "Гроза" ? "CloudLightning" : "CloudRain"
-                    }
-                    size={13}
-                  />
-                  <select aria-label="Погода в превью" value={world.weather||'Ясно'} onChange={e=>running?rt.controlEffect('weather','set',e.target.value):mutate(p=>p.subscenes.find(s=>s.id===scene.id).weather=e.target.value)}>{['Ясно','Дождь','Гроза','Туман','Снег'].map(w=><option key={w}>{w}</option>)}</select>
-                </span>
-                <span>
-                  <Icon name="Moon" size={13} />
-                  <select aria-label="Время суток в превью" value={world.time||'День'} onChange={e=>running?rt.controlEffect('time','set',e.target.value):mutate(p=>p.subscenes.find(s=>s.id===scene.id).time=e.target.value)}>{['Рассвет','День','Закат','Ночь'].map(t=><option key={t}>{t}</option>)}</select>
-                </span>
-              </div>
               <GameDialogue
                 beat={playBeat}
                 preview={preview}
@@ -2355,11 +2357,11 @@ export default function Editor() {
                 ["sound", "Music2", "Звук"],
                 ["samples", "Sparkles", "Эффекты"],
                 ["active", "Activity", "Активные"],
-                ["issues", "TriangleAlert", "Ошибки"],
+                ["issues", "TriangleAlert", "Проблемы"],
               ].map(([id, icon, label]) => (
                 <button
                   key={id}
-                  className={dock === id ? "active" : ""}
+                  className={(dock === id ? "active " : "")+(id === "issues" ? "diagnostic-tab" : "")}
                   disabled={id === "event" && !event}
                   onClick={() => {
                     setDock(id);
@@ -2430,6 +2432,7 @@ export default function Editor() {
                   </span>
                 )}
                 <div className="flex-space" />
+                <details className="viewport-help graph-help"><summary title="Навигация по графу" aria-label="Навигация по графу"><Icon name="CircleHelp" size={15}/></summary><div>ПКМ — панорама<br/>Ctrl + колесо — масштаб<br/>ЛКМ — выбор и перемещение узла<br/>Двойной щелчок — открыть узел</div></details>
                 {dock === "story" && beat.kind === "choice" && (
                   <Button
                     icon="GitFork"
@@ -2611,7 +2614,7 @@ export default function Editor() {
                       )}
                     </div>
                   ))}
-                  <FailureLab />
+                  <details className="diagnostic-examples"><summary>Примеры диагностики</summary><FailureLab /></details>
                 </div>
               )}
             </div>
@@ -2621,7 +2624,7 @@ export default function Editor() {
           axis="x"
           label="Ширина инспектора"
           onMove={(d) => resize("right", -d)}
-          onReset={() => setLayout((l) => ({ ...l, right: 300 }))}
+          onReset={() => setLayout((l) => ({ ...l, right: 280 }))}
         />
         <aside className="inspector-panel">
           <button className="panel-restore" aria-label="Показать инспектор" title="Показать инспектор" onClick={()=>setLayout(l=>({...l,hiddenInspector:false}))}><Icon name="PanelRightOpen" size={18}/><span>Инспектор</span></button>
@@ -2697,12 +2700,12 @@ export default function Editor() {
         </aside>
       </div>
       <footer className="editor-status">
-        <button onClick={() => setDock("issues")}>
+        <button className={"diagnostic-status "+(issues.length?"has-issues":"clear")} onClick={() => setDock("issues")}>
           <Icon
             name={issues.length ? "TriangleAlert" : "CheckCheck"}
             size={13}
           />
-          {issues.length} проблемы
+          Диагностика · {issues.length}
         </button>
         <span className="status-divider" />
         <span>{saveError || notice || "Сохранено на этом компьютере"}</span>
