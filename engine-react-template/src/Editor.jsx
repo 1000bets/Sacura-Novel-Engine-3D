@@ -1,3 +1,4 @@
+import ThemePicker from './ThemePicker.jsx';
 import {normalizeSidechain} from './audioSettings.js';
 import React, {
   useCallback,
@@ -2045,6 +2046,7 @@ export default function Editor() {
             ]}
           />
         </div>
+        <ThemePicker onOpen={() => setMenu(null)} />
       </header>
       <div className={'editor-workspace compact-'+compactPanel+(layout.hiddenHierarchy?' hierarchy-hidden':'')+(layout.hiddenInspector?' inspector-hidden':'')+(['scene','graph'].includes(maximized)?' focus-center':maximized==='hierarchy'?' focus-hierarchy':maximized==='inspector'?' focus-inspector':'')}>
         <nav className="compact-panel-tabs" aria-label="Панели редактора">

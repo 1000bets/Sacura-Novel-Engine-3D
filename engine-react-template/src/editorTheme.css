@@ -1,27 +1,19 @@
 /* Sacura / Quiet Studio. UI/UX Pro Max: Minimalism & Swiss Style.
    Layout is defined in editor.css; this file owns the visual language. */
 :root {
-  --app-background: #181a1d;
-  --surface-1: #222427;
-  --surface-2: #2b2e32;
-  --surface-hover: #34383d;
-  --surface-active: #38434e;
-  --divider: #33363b;
-  --text-primary: #e8eaed;
-  --text-secondary: #c1c5cb;
-  --text-muted: #aab1ba;
-  --accent: #a5bdd3;
-  --accent-soft: #38434e;
-  --error: #eea2a2;
-  --warning: #d6be8d;
-  --success: #a0c8b0;
-  --surface-chrome: #222427;
-  --surface-heading: #222427;
-  --surface-input: #2b2e32;
-  --surface-node: #292c30;
-  --brand-mark: #c6aa94;
-  --graph-grid: #303337;
-  --graph-edge: #697079;
+  --app-background: var(--bg-app);
+  --surface-1: var(--bg-panel);
+  --surface-2: var(--bg-panel-elevated);
+  --surface-hover: var(--bg-hover);
+  --surface-active: var(--bg-active);
+  --surface-input: var(--bg-input);
+  --surface-chrome: var(--bg-panel);
+  --surface-heading: var(--bg-panel);
+  --surface-node: var(--graph-node);
+  --divider: var(--border-subtle);
+  --accent-soft: var(--accent-muted);
+  --graph-edge: var(--graph-connection);
+  --text: var(--text-primary);
   --space-1: 4px; --space-2: 8px; --space-3: 12px;
   --space-4: 16px; --space-5: 24px; --space-6: 32px;
   --radius-control: 4px; --radius-node: 5px;
@@ -33,7 +25,7 @@
   --line: var(--divider); --muted: var(--text-secondary); --field: var(--surface-2);
   --ivory: var(--text-primary); --slate: var(--text-secondary);
   --rose: var(--accent); --rose-dark: var(--accent-soft);
-  --green: var(--success); --amber: var(--warning); --info: var(--accent);
+  --green: var(--success); --amber: var(--warning);
   --toolbar-bg: var(--surface-1); --canvas-bg: var(--app-background); --inspector-bg: var(--surface-1);
   color: var(--text-primary); background: var(--app-background); color-scheme: dark;
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -49,7 +41,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 input[type=checkbox], input[type=range] { accent-color: var(--accent); }
 select option, select optgroup { background: var(--surface-2); color: var(--text-primary); }
 ::selection { background: var(--surface-active); color: var(--text-primary); }
-* { scrollbar-color: #464e59 transparent; }
+* { scrollbar-color: var(--border-strong) transparent; }
 .editor-app { --field: var(--surface-2); background: var(--app-background); grid-template-rows: 44px minmax(0,1fr) 24px; }
 .editor-menubar { background: var(--surface-chrome); border: 0; padding-inline: var(--space-4); }
 .editor-brand { color: var(--text-primary); margin-right: var(--space-5); gap: var(--space-2); }
@@ -147,13 +139,13 @@ select option, select optgroup { background: var(--surface-2); color: var(--text
 .viewport-help { position: relative; z-index: 20; }
 .viewport-help summary { list-style: none; display: grid; place-items: center; width: 26px; height: 26px; cursor: pointer; color: var(--text-muted); }
 .viewport-help summary::-webkit-details-marker { display: none; }
-.viewport-help>div { position: absolute; right: 0; top: 30px; width: 290px; padding: 12px; border: 1px solid var(--divider); background: var(--surface-2); line-height: 1.8; font-size: 12px; box-shadow: 0 8px 24px #0006; }
+.viewport-help>div { position: absolute; right: 0; top: 30px; width: 290px; padding: 12px; border: 1px solid var(--divider); background: var(--surface-2); line-height: 1.8; font-size: 12px; box-shadow: var(--shadow-popup); }
 .viewport-caption { color: var(--text-secondary); }
 .live-strip { background: var(--surface-1); border: 0; color: var(--text-muted); height: 26px; gap: 8px; }
 .live-strip button { font-size: 11px; }
 .game-name { border: 0; box-shadow: none; background: var(--surface-1); color: var(--text-primary); border-radius: 4px 4px 0 0; min-width: 0; padding: 8px 16px; margin-left: 0; font-weight: 500; }
 .game-name>svg { display: none; }
-.game-dialogue, .game-dialogue.can-advance:hover { border: 0; box-shadow: none; background: #171d26; border-radius: 0 4px 4px 4px; }
+.game-dialogue, .game-dialogue.can-advance:hover { border: 0; box-shadow: none; background: var(--game-dialogue); border-radius: 0 4px 4px 4px; }
 .game-dialogue p { color: var(--text-primary); }
 .game-dialogue-footer { border: 0; color: var(--text-secondary); }
 /* Text tabs plus a keyboard-operable disclosure replace the twelve-tool strip. */
@@ -164,7 +156,7 @@ select option, select optgroup { background: var(--surface-2); color: var(--text
 .dock-more { position: relative; display: flex; min-width: 0; }
 .dock-more>button { padding: 0 10px; font-size: 12px; border: 0; border-radius: 0; }
 .dock-more>button.active { color: var(--text-primary); background: var(--surface-active); }
-.dock-more-popup { position: absolute; top: calc(100% + 4px); right: 0; width: 192px; padding: 4px; background: var(--surface-2); border: 1px solid var(--divider); border-radius: 5px; box-shadow: 0 8px 24px #0006; }
+.dock-more-popup { position: absolute; top: calc(100% + 4px); right: 0; width: 192px; padding: 4px; background: var(--surface-2); border: 1px solid var(--divider); border-radius: 5px; box-shadow: var(--shadow-popup); }
 .dock-more.opens-up .dock-more-popup { top: auto; bottom: calc(100% + 4px); }
 .dock-more-popup { max-height: calc(100dvh - 120px); overflow-y: auto; }
 .dock-more-popup>button { display: flex; width: 100%; text-align: left; justify-content: flex-start; min-height: 32px; font-size: 12px; padding: 6px 10px; }
@@ -176,7 +168,7 @@ select option, select optgroup { background: var(--surface-2); color: var(--text
 .graph-toolbar select { border: 0; background: transparent; color: var(--text-secondary); }
 .rose-button { background: var(--surface-2); color: var(--text-primary); border: 0; }
 .graph-canvas, .graph-canvas .react-flow { background: var(--app-background); }
-.enode, .enode.choice, .enode.gate, .enode.portal, .enode.marker, .enode.fork, .enode.join, .enode.action { background: var(--surface-node); border: 1px solid transparent; border-radius: var(--radius-node); box-shadow: 0 3px 6px #0003; }
+.enode, .enode.choice, .enode.gate, .enode.portal, .enode.marker, .enode.fork, .enode.join, .enode.action { background: var(--surface-node); border: 1px solid transparent; border-radius: var(--radius-node); box-shadow: var(--shadow-soft); }
 .enode>header, .enode.choice>header, .enode.gate>header, .enode.portal>header, .enode.marker>header, .enode.fork>header, .enode.join>header, .enode.action>header { background: transparent; border: 0; color: var(--text-primary); padding: 12px 14px 4px; min-height: 32px; }
 .enode>header>strong { font-size: 13px; font-weight: 500; }
 .enode>header>span { font-size: 11px; color: var(--text-muted); }
@@ -296,7 +288,7 @@ select option, select optgroup { background: var(--surface-2); color: var(--text
 .tree-controls:hover>button, .tree-controls:focus-within>button { opacity: 1; }
 .tree-object>button:first-child { min-height: 30px; padding-left: 28px; font-size: 13px; }
 .tree-object.character>button:first-child { padding-left: 6px; }
-.tree-object.selected { box-shadow: inset 2px 0 var(--accent); }
+.tree-object.selected { box-shadow: inset 2px 0 var(--graph-node-selected); }
 .tree-scene { padding-block: 10px; margin-bottom: 0; }
 .tree-scene strong { font-size: 13px; }
 .tree-folder { padding-top: 10px; padding-bottom: 6px; }
@@ -335,7 +327,7 @@ select option, select optgroup { background: var(--surface-2); color: var(--text
 .tree-root-row .tree-controls>button { padding: 3px; width: 24px; height: 26px; }
 .tree-root-row:hover .tree-controls>button, .tree-root-row:focus-within .tree-controls>button { opacity: 1; }
 .tree-root-row .tree-scene strong { white-space: normal; text-align: left; line-height: 1.4; }
-.scene-activity { background: var(--surface-chrome); backdrop-filter: none; border: 0; box-shadow: 0 3px 10px #0003; }
+.scene-activity { background: var(--surface-chrome); backdrop-filter: none; border: 0; box-shadow: var(--shadow-soft); }
 .create-overlay { backdrop-filter: none; }
 
 .viewport-commandbar .scene-edit-bar button.active:not(.transform-tool) { background: transparent; box-shadow: none; color: var(--accent); }
@@ -355,7 +347,7 @@ select option, select optgroup { background: var(--surface-2); color: var(--text
 .play-label[hidden] { display: none; }
 .panel-tabs, .hierarchy-panel>.panel-tabs, .inspector-panel>.panel-tabs, .viewport-tabs, .dock-tabs { height: 36px; background: var(--surface-1); }
 .panel-tabs>button.active, .viewport-tabs>button.active, .dock-tabs>button.active, .dock-more>button.active { background: transparent; font-weight: 500; }
-.panel-tabs>button.active:after { height: 1px; background: var(--text-secondary); }
+.panel-tabs>button.active:after { height: 1px; background: var(--tab-indicator); }
 .hierarchy-panel>.panel-tabs>button.active, .inspector-panel>.panel-tabs>button.active { font-weight: 500; }
 .viewport-tabs .toolbar-project { margin-left: 20px; gap: 4px; min-width: 0; }
 .viewport-tabs .toolbar-context-label { display: none; }
@@ -391,7 +383,7 @@ select option, select optgroup { background: var(--surface-2); color: var(--text
 .graph-toolbar .rose-button { background: transparent; }
 .graph-toolbar .graph-help { margin-right: 8px; }
 .enode, .enode.choice, .enode.gate, .enode.portal, .enode.marker, .enode.fork, .enode.join, .enode.action { box-shadow: none; border-radius: 3px; }
-.enode.is-selected { border-color: transparent; box-shadow: inset 2px 0 var(--accent); }
+.enode.is-selected { border-color: transparent; box-shadow: inset 2px 0 var(--graph-node-selected); }
 .enode.is-playing { box-shadow: inset 2px 0 var(--success); border-color: transparent; }
 .enode.has-error { box-shadow: inset 2px 0 var(--error); border-color: transparent; }
 .enode>header>strong { font-weight: 500; color: var(--text-secondary); }
@@ -416,3 +408,15 @@ select option, select optgroup { background: var(--surface-2); color: var(--text
 
 .editor-menubar>button { min-height: 28px; }
 .editor-menu { max-height: calc(100dvh - 60px); overflow-y: auto; }
+
+/* State colors share the same semantic contract in every theme. */
+button:disabled, input:disabled, select:disabled, textarea:disabled { color: var(--text-disabled); opacity: 1; cursor: default; }
+.inspector-fields input:hover:not(:disabled), .inspector-fields select:hover:not(:disabled), .inspector-fields textarea:hover:not(:disabled) { background: var(--bg-hover); }
+input, select, textarea { caret-color: var(--accent); }
+button:focus-visible { outline-color: var(--accent); }
+.graph-navigation button[aria-pressed=true] { background: var(--bg-active); color: var(--accent); }
+.enode .react-flow__handle { background: var(--graph-connection); border-color: var(--graph-node); }
+
+.subscene-map .react-flow__controls-button { background: var(--bg-panel-elevated); color: var(--text-primary); fill: var(--text-primary); border-color: var(--border-subtle); }
+.subscene-map .react-flow__controls-button:hover { background: var(--bg-hover); }
+.global-timeline-node.playing { box-shadow: none; outline-color: var(--success); }

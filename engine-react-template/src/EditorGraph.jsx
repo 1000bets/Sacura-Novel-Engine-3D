@@ -34,17 +34,10 @@ import "@xyflow/react/dist/style.css";
 import ActionFields from "./ActionFields.jsx";
 
 const color = {
-  dialogue: "#bc899f",
-  choice: "#c2a06c",
-  gate: "#86adb5",
-  merge: "#a398bc",
-  end: "#b98e9e",
-  portal: "#839dbd",
-  event: "#b69bba",
-  action: "#97aba1",
-  marker: "#8d939d",
-  fork: "#b4a4bd",
-  join: "#a5b7a8",
+  dialogue: "var(--text-secondary)", choice: "var(--warning)",
+  gate: "var(--info)", merge: "var(--text-secondary)", end: "var(--warning)",
+  portal: "var(--info)", event: "var(--accent)", action: "var(--success)",
+  marker: "var(--text-muted)", fork: "var(--accent)", join: "var(--success)",
 };
 export function storyGraph(project, selectedId, scope = "chapter") {
   const selected =
@@ -827,14 +820,14 @@ function GraphCanvas({
       type: MarkerType.ArrowClosed,
       width: 15,
       height: 15,
-      color: "#747F8E",
+      color: "var(--graph-connection)",
     },
     style: {
       stroke: e.id === selectedEdge ? "var(--accent)" : "var(--graph-edge)",
       strokeWidth: e.id === selectedEdge ? 2 : 1.25,
     },
-    labelStyle: { fill: "#ADB4C0", fontSize: 11 },
-    labelBgStyle: { fill: "#17191D" },
+    labelStyle: { fill: "var(--text-secondary)", fontSize: 11 },
+    labelBgStyle: { fill: "var(--bg-app)" },
     labelBgPadding: [6, 3],
     labelBgBorderRadius: 3,
   }));
