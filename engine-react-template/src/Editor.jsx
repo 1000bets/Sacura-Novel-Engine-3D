@@ -61,7 +61,7 @@ import GlobalTimeline from './GlobalTimeline.jsx';
 const PROJECT_KEY = "sacura-studio-v2",
   LAYOUT_KEY = "sacura-workspace-v3";
 const defaultSceneHeight = () =>
-  Math.max(260, Math.round(window.innerHeight * 0.46));
+  Math.max(260, Math.round(window.innerHeight * 0.54));
 const initialLayout = {
   left: 210,
   right: 280,
@@ -94,7 +94,6 @@ function Fold({ title, icon, children, open = true, extra }) {
     <details className="inspector-section" open={open}>
       <summary>
         <Icon name="ChevronRight" size={12} />
-        <Icon name={icon} size={15} />
         <span>{title}</span>
         {extra}
       </summary>
@@ -243,6 +242,53 @@ function GameDialogue({
       </div>
     </div>
   );
+}
+
+// Keep everyday workspaces visible; secondary tools remain one click away.
+const dockTools = [
+  ["story", "Сценарий"], ["timeline", "Таймлайн"], ["subscenes", "Сабсцены"],
+  ["cameras", "Камеры"], ["staging", "Постановка"], ["event", "Событие"],
+  ["create", "Создание"], ["assets", "Проект"], ["sound", "Звук"],
+  ["samples", "Эффекты"], ["active", "Активные"], ["issues", "Проблемы"],
+];
+function DockTools({ dock, event, issueCount, onSelect }) {
+  const [open, setOpen] = useState(false);
+  const [opensUp, setOpensUp] = useState(false);
+  const popup = useRef(null), trigger = useRef(null);
+  const secondary = dockTools.slice(5);
+  const current = secondary.find(([id]) => id === dock);
+  useEffect(() => {
+    if (!open) return;
+    const outside = e => { if (!popup.current?.contains(e.target)) setOpen(false); };
+    const escape = e => {
+      if (e.key === "Escape") { e.stopPropagation(); setOpen(false); trigger.current?.focus(); }
+    };
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("keydown", escape, true);
+    return () => {
+      document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("keydown", escape, true);
+    };
+  }, [open]);
+  return <>
+    {dockTools.slice(0, 5).map(([id, label]) => <button key={id}
+      aria-pressed={dock === id} className={dock === id ? "active" : ""}
+      onClick={() => onSelect(id)}>{label}</button>)}
+    <div className={"dock-more" + (opensUp ? " opens-up" : "")} ref={popup} onBlur={e => {
+      if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false);
+    }}>
+      <button ref={trigger} className={current ? "active" : ""}
+        aria-expanded={open} aria-controls={open ? "dock-more-tools" : undefined}
+        onClick={e => {setOpensUp(window.innerHeight - e.currentTarget.getBoundingClientRect().bottom < 270); setOpen(v => !v);}}>{current?.[1] || "Ещё"}<Icon name="ChevronDown" size={12}/></button>
+      {open && <div className="dock-more-popup" id="dock-more-tools" aria-label="Другие инструменты">
+        {secondary.map(([id, label]) => <button key={id} disabled={id === "event" && !event}
+          aria-pressed={dock === id} onClick={() => {onSelect(id); setOpen(false); trigger.current?.focus();}}>
+          <span>{label}</span>{id === "issues" && issueCount > 0 && <span className="tool-issue-count">{issueCount}</span>}
+          {dock === id && <Icon name="Check" size={13}/>}
+        </button>)}
+      </div>}
+    </div>
+  </>;
 }
 
 export default function Editor() {
@@ -2019,7 +2065,6 @@ export default function Editor() {
               className={treeTab === "hierarchy" ? "active" : ""}
               onClick={() => {setTreeTab("hierarchy");setCompactPanel("hierarchy");}}
             >
-              <Icon name="ListTree" size={14} />
               Иерархия
             </button>
             <button
@@ -2040,6 +2085,7 @@ export default function Editor() {
           <div className="panel-search">
             <Icon name="Search" size={13} />
             <input
+              aria-label={treeTab === "story" ? "Поиск реплик" : "Поиск объектов"}
               placeholder={
                 treeTab === "story" ? "Найти реплику…" : "Найти объект…"
               }
@@ -2345,37 +2391,11 @@ export default function Editor() {
           />
           <section className="graph-dock">
             <div className="panel-tabs dock-tabs">
-              {[
-                ["story", "Workflow", "Сценарий"],
-                ["timeline", "Route", "Таймлайн"],
-                ["subscenes", "Network", "Сабсцены"],
-                ["cameras", "Video", "Камеры"],
-                ["staging", "Clapperboard", "Постановка"],
-                ["event", "Layers", "Событие"],
-                ["create", "Plus", "Создание"],
-                ["assets", "FolderOpen", "Проект"],
-                ["sound", "Music2", "Звук"],
-                ["samples", "Sparkles", "Эффекты"],
-                ["active", "Activity", "Активные"],
-                ["issues", "TriangleAlert", "Проблемы"],
-              ].map(([id, icon, label]) => (
-                <button
-                  key={id}
-                  className={(dock === id ? "active " : "")+(id === "issues" ? "diagnostic-tab" : "")}
-                  disabled={id === "event" && !event}
-                  onClick={() => {
-                    setDock(id);
-                    if(["create","timeline"].includes(id))setMaximized("graph");
-                    setDetailEditor(false);
-                  }}
-                >
-                  <Icon name={icon} size={13} />
-                  {label}
-                  {id === "issues" && issues.length > 0 && (
-                    <b>{issues.length}</b>
-                  )}
-                </button>
-              ))}
+              <DockTools dock={dock} event={event} issueCount={issues.length} onSelect={id => {
+                setDock(id);
+                if (["create", "timeline"].includes(id)) setMaximized("graph");
+                setDetailEditor(false);
+              }} />
               <div className="flex-space" />
               <Button
                 icon={maximized === "graph" ? "Minimize2" : "Maximize2"}

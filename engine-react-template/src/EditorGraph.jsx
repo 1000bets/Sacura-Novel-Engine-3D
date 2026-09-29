@@ -473,7 +473,7 @@ const EditorNode = memo(function EditorNode({ id, data, selected }) {
     >
       <Handle type="target" position={Position.Left} id="in" />
       <header className="node-grab">
-        <Icon name={icon} size={15} />
+        {kind !== "dialogue" && <Icon name={icon} size={15} />}
         <strong>{title}</strong>
         {data.active ? (
           <Icon name="Play" size={12} />
@@ -826,14 +826,14 @@ function GraphCanvas({
       type: MarkerType.ArrowClosed,
       width: 15,
       height: 15,
-      color: "#97919f",
+      color: "#747F8E",
     },
     style: {
-      stroke: e.id === selectedEdge ? "#d9a8bc" : "#807c8b",
-      strokeWidth: e.id === selectedEdge ? 2 : 1.5,
+      stroke: e.id === selectedEdge ? "#B8C7D9" : "#747F8E",
+      strokeWidth: e.id === selectedEdge ? 2 : 1.25,
     },
-    labelStyle: { fill: "#b8b1bf", fontSize: 11 },
-    labelBgStyle: { fill: "#202127" },
+    labelStyle: { fill: "#ADB4C0", fontSize: 11 },
+    labelBgStyle: { fill: "#17191D" },
     labelBgPadding: [6, 3],
     labelBgBorderRadius: 3,
   }));
@@ -885,16 +885,16 @@ function GraphCanvas({
         colorMode="dark"
       >
         <Background
-          variant={BackgroundVariant.Lines}
-          gap={24}
-          size={0.5}
-          color="#303139"
+          variant={BackgroundVariant.Dots}
+          gap={28}
+          size={0.7}
+          color="#343941"
         />
         <MiniMap
           pannable
           zoomable
-          nodeColor={(n) => color[n.data.kind] || "#917b98"}
-          maskColor="#15161dc4"
+          nodeColor="#555E6B"
+          maskColor="#17191DCC"
           position="bottom-right"
         />
         <Panel position="bottom-left">

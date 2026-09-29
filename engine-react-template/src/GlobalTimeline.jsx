@@ -163,13 +163,13 @@ export default function GlobalTimeline({project,currentSceneId,currentBeatId,run
   let returnIndex = 0;
   const edges = model.edges.map(edge => {
     const highlighted = edge.id === selectedEdge || (selected && [edge.source,edge.target].includes(selected));
-    const stroke = highlighted?'#efbfd5':edge.isReturn?'#c4a77c':edge.crossScene?'#b99aca':'#847989';
+    const stroke = highlighted?'#B8C7D9':edge.isReturn?'#ADA38E':edge.crossScene?'#8B99AB':'#747F8E';
     const label = edge.isReturn ? `Возврат${edge.choiceId?' · '+edge.label:''}` : edge.crossScene ? 'Другая сабсцена' : undefined;
     return {id:edge.id,source:edge.source,target:edge.target,sourceHandle:edge.choiceId,
       type:edge.isReturn?'return':'smoothstep',data:{laneY:edge.isReturn?storyTop-45-(returnIndex++)*34:0},label,
       markerEnd:{type:MarkerType.ArrowClosed,color:stroke,width:16,height:16},
       style:{stroke,strokeWidth:highlighted?2.7:1.7,strokeDasharray:edge.isReturn?'7 5':undefined},
-      labelStyle:{fill:'#d6cbd7',fontSize:11},labelBgStyle:{fill:'#292630'},
+      labelStyle:{fill:'#B0B7C2',fontSize:11},labelBgStyle:{fill:'#17191D'},
       pathOptions:{borderRadius:14,offset:28},interactionWidth:22};
   });
   if (variable) {
@@ -179,9 +179,9 @@ export default function GlobalTimeline({project,currentSceneId,currentBeatId,run
     nodes.push({id,type:'variable',position,measured:measurements[id],data:{variable,value:currentValues[variable.id]},style:{width:250}});
     for (const dependency of model.dependencies.filter(item => item.variableId === variableId)) edges.push({
       id:dependency.id,source:id,target:dependency.target,type:'bezier',
-      style:{stroke:'#a19bc8',strokeDasharray:'4 5',strokeWidth:1.7},
-      markerEnd:{type:MarkerType.ArrowClosed,color:'#a19bc8'},label:'условие',
-      labelStyle:{fill:'#c3bede',fontSize:11},labelBgStyle:{fill:'#292630'},
+      style:{stroke:'#8B99AB',strokeDasharray:'4 5',strokeWidth:1.7},
+      markerEnd:{type:MarkerType.ArrowClosed,color:'#8B99AB'},label:'условие',
+      labelStyle:{fill:'#B0B7C2',fontSize:11},labelBgStyle:{fill:'#17191D'},
     });
   }
   const firstInScene = sceneId => model.nodes.find(node => node.sceneId === sceneId && node.isSceneEntry) || model.nodes.find(node => node.sceneId === sceneId);
@@ -209,7 +209,7 @@ export default function GlobalTimeline({project,currentSceneId,currentBeatId,run
       onPaneClick={() => {setSelected(null);setSelectedEdge(null);}}
       proOptions={{hideAttribution:true}}>
       <InitialTimelineViewport nodeId={activeId || model.entryNodeId}/>
-      <Background color="#3b3441" gap={24}/><Controls showInteractive={false} fitViewOptions={FIT_ALL}/><MiniMap nodeColor={node => node.data.node?.kind === 'ending'?'#cbb080':node.data.node?.kind === 'choice'?'#909dc4':node.data.node?.color || '#ac9cbb'} maskColor="rgba(28,26,33,.77)" pannable zoomable/>
+      <Background color="#343941" gap={28} size={0.7}/><Controls showInteractive={false} fitViewOptions={FIT_ALL}/><MiniMap nodeColor={node => node.data.node?.kind === 'ending'?'#cbb080':node.data.node?.kind === 'choice'?'#909dc4':node.data.node?.color || '#ac9cbb'} maskColor="rgba(28,26,33,.77)" pannable zoomable/>
     </ReactFlow>
     {!model.nodes.length && <div className="global-timeline-empty">Добавьте сабсцену и первую реплику — здесь появится история.</div>}
     <div className="global-timeline-legend"><span><i/>Сабсцена</span><span><i className="choice"/>Выбор / условие</span><span><i className="ending"/>Концовка</span><span className="return">↶ Возврат</span><small>ПКМ — панорама · Ctrl + колесо — масштаб · двойной щелчок — сценарий</small></div></div>
