@@ -317,7 +317,7 @@ export default function Editor() {
     [dock, setDock] = useState("story"),
     [phase, setPhase] = useState("ALL"),
     [eventContext, setEventContext] = useState(null),
-    [mode, setMode] = useState("game"),
+    [mode, setMode] = useState("scene"),
     [showDialogue, setShowDialogue] = useState(true),
     [showGrid, setShowGrid] = useState(true),
     [maximized, setMaximized] = useState(null),
@@ -1971,7 +1971,6 @@ export default function Editor() {
             {m}
           </button>
         ))}
-        <Button icon="Plus" className="authoring-entry" onClick={()=>{setDock("create");setMaximized("graph");setDetailEditor(false);}}>Действия и события</Button>
         <div className="flex-space" />
         <span className="project-title">
           <Icon name="FolderOpen" size={14} />
@@ -1987,7 +1986,7 @@ export default function Editor() {
       </header>
       <div className="editor-toolbar">
         <div className="toolbar-project">
-          <Icon name="Box" size={15} />
+          <span className="toolbar-context-label">Сабсцена</span>
           <EditorSelect
             label="Текущая сабсцена"
             value={displayScene.id}
@@ -2007,7 +2006,7 @@ export default function Editor() {
                 : "Запустить с выбранной реплики"
             }
             onClick={() => (running ? rt.stop() : start())}
-          />
+          >{running ? "Стоп" : "Запуск"}</Button>
           <Button
             icon="Pause"
             title="Пауза / продолжить"
@@ -2223,6 +2222,7 @@ export default function Editor() {
           <section className="viewport-panel">
             <div className="panel-tabs viewport-tabs">
               <button
+                aria-pressed={mode === "scene"}
                 className={mode === "scene" ? "active" : ""}
                 onClick={editScene}
               >
@@ -2230,17 +2230,19 @@ export default function Editor() {
                 Редактор сцены
               </button>
               <button
+                aria-pressed={mode === "game"}
                 className={mode === "game" ? "active" : ""}
                 onClick={() => setMode("game")}
               >
                 <Icon name="Gamepad2" size={15} />
                 Игра
               </button>
-              <button className={dock==="cameras"?"active":""} onClick={openCameras}><Icon name="Video" size={14}/>Камеры</button>
               <span className="viewport-location">{displayScene.location}</span>
               <div className="flex-space" />
               <button
                 title="Диалог в игровом кадре"
+                hidden={mode !== "game"}
+                aria-pressed={showDialogue}
                 className={showDialogue ? "toggled" : ""}
                 onClick={() => setShowDialogue((v) => !v)}
               >
@@ -2261,11 +2263,11 @@ export default function Editor() {
             <div className="viewport-commandbar" aria-label="Инструменты сцены">
               {mode==='scene'&&!cameraPilotId&&<div className="scene-edit-bar">
                 <button className="scene-edit-add" onClick={()=>setPicker({kind:'object'})}><Icon name="Plus" size={14}/>Объект</button>
-                {[['select','MousePointer2','Выбор','Q'],['translate','Move','Сдвиг','W'],['rotate','Rotate3D','Поворот','E'],['scale','Scaling','Масштаб','R']].map(([tool,icon,label,key])=><button key={tool} disabled={running||(selection.kind==='camera'&&(tool==='scale'||(tool==='rotate'&&displayScene.cameras?.find(c=>c.id===selection.id)?.mode==='follow')))} title={label+' · '+key} className={editTool===tool?'active':''} onClick={()=>setEditTool(tool)}><Icon name={icon} size={14}/><span className="tool-label">{label}</span></button>)}
-                <button title="Привязка: 0,25 м / 15° / 0,1×" className={snap?'active':''} onClick={()=>setSnap(v=>!v)}><Icon name="Magnet" size={14}/></button>
+                {[['select','MousePointer2','Выбор','Q'],['translate','Move','Сдвиг','W'],['rotate','Rotate3D','Поворот','E'],['scale','Scaling','Масштаб','R']].map(([tool,icon,label,key])=><button key={tool} disabled={running||(selection.kind==='camera'&&(tool==='scale'||(tool==='rotate'&&displayScene.cameras?.find(c=>c.id===selection.id)?.mode==='follow')))} title={label+' · '+key} aria-pressed={editTool===tool} className={'transform-tool '+(editTool===tool?'active':'')} onClick={()=>setEditTool(tool)}><Icon name={icon} size={14}/><span className="tool-label">{label}</span></button>)}
+                <button title="Привязка: 0,25 м / 15° / 0,1×" aria-pressed={snap} className={snap?'active':''} onClick={()=>setSnap(v=>!v)}><Icon name="Magnet" size={14}/></button>
                 <select aria-label="Оси трансформации" value={editSpace} onChange={e=>setEditSpace(e.target.value)}><option value="world">Мир</option><option value="local">Объект</option></select>
-                <Button icon="Video" title="Показать камеры в 3D" className={showCameras?"active":""} onClick={()=>setShowCameras(v=>!v)}/>
-                <Button icon="Grid3X3" title="Сетка сцены" onClick={()=>setShowGrid(v=>!v)}/>
+                <Button icon="Video" title="Показать камеры в 3D" aria-pressed={showCameras} className={showCameras?"active":""} onClick={()=>setShowCameras(v=>!v)}/>
+                <Button icon="Grid3X3" title="Сетка сцены" aria-pressed={showGrid} className={showGrid?"active":""} onClick={()=>setShowGrid(v=>!v)}/>
                 <Button icon="Focus" title="Приблизить выбранный объект · F" disabled={selection.kind!=='object'} onClick={()=>setFocusRequest({nonce:uid('focus')})}/>
               </div>}
               {cameraPilotId&&mode==='scene'&&<div className="camera-pilot-bar"><Icon name="Video"/><span>Настройка: {displayScene.cameras?.find(c=>c.id===cameraPilotId)?.name}<small>Обзор мышью · правая кнопка — сдвиг · колесо — приближение</small></span><Button icon="Check" onClick={()=>captureCamera(cameraPilotId)}>Сохранить ракурс</Button><Button icon="X" title="Вернуться без сохранения" onClick={()=>setCameraPilotId(null)}/></div>}
@@ -2341,7 +2343,7 @@ export default function Editor() {
                 {(preview.activity||[]).slice(-4).map(a=><div className={'activity-item '+a.status} key={a.id}><Icon name={a.status==='running'?'LoaderCircle':'Check'} size={12}/><span>{TYPES[a.type]?.label} <b>{project.objects.find(o=>o.id===a.target)?.name||''} {String(a.value).slice(0,42)}</b></span>{a.status==='running'&&<progress max="1" value={a.progress||0}/>}</div>)}
                 {preview.error&&<span className="error-box">{preview.error}</span>}
               </div>}
-              <div className="viewport-caption">
+              {running && <div className="viewport-caption">
                 <Icon name="Video" size={12} />
                 {mode === "game"
                   ? "Главная камера"
@@ -2350,9 +2352,9 @@ export default function Editor() {
                 {running
                   ? `${playBeat.id} / ${preview.phase}`
                   : "3D · примитивы"}
-              </div>
+              </div>}
             </div>
-            <div className="live-strip">
+            {(running || [...soundDesk.tracks.values()].some(t=>["playing","error"].includes(t.status))) && <div className="live-strip">
               <output className="audio-output" title="Измеренный уровень на аудиовыходе" aria-label="Уровень звукового выхода"><Icon name="Volume2" size={13}/><meter min="0" max="1" value={[...soundDesk.tracks.values()].some(t=>t.status==='playing')?(soundDesk.output?.level()||0):0}/><span>{soundDesk.output?.context?.state==='running'?'Аудио включено':'Аудио · нажмите Play'}</span></output>
               <button onClick={() => setDock("active")}>
                 <Icon name="Activity" size={13} />
@@ -2379,7 +2381,7 @@ export default function Editor() {
               <button onClick={() => setDock("active")}>
                 Управление <Icon name="ChevronRight" size={12} />
               </button>
-            </div>
+            </div>}
           </section>
           <ResizeBar
             axis="y"
@@ -2734,9 +2736,7 @@ export default function Editor() {
           Выделено:{" "}
           {selection.kind === "object" ? inspectedObject?.name : beat.id}
         </span>
-        <span className="status-divider" />
-        <span>UI prototype 03</span>
-        <Icon name="Flower2" size={13} />
+
       </footer>
       {menu && (
         <div

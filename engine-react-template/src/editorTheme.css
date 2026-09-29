@@ -1,20 +1,24 @@
 /* Sacura / Quiet Studio. UI/UX Pro Max: Minimalism & Swiss Style.
    Layout is defined in editor.css; this file owns the visual language. */
 :root {
-  --app-background: #17191d;
-  --surface-1: #1d2025;
-  --surface-2: #25292f;
-  --surface-hover: #2b3037;
-  --surface-active: #353d48;
-  --divider: #30353c;
-  --text-primary: #e7e9ed;
-  --text-secondary: #b0b7c2;
-  --text-muted: #a0a9b6;
-  --accent: #b8c7d9;
-  --accent-soft: #353d48;
+  --app-background: #101318;
+  --surface-1: #20252d;
+  --surface-2: #2c333e;
+  --surface-hover: #343d49;
+  --surface-active: #3b4b5e;
+  --divider: #39424e;
+  --text-primary: #f0f2f5;
+  --text-secondary: #c3cad4;
+  --text-muted: #afbbc9;
+  --accent: #a9c8ed;
+  --accent-soft: #3b4b5e;
   --error: #eea2a2;
   --warning: #d6be8d;
   --success: #a0c8b0;
+  --surface-chrome: #161a20;
+  --surface-heading: #272e38;
+  --surface-input: #161c24;
+  --surface-node: #252d38;
   --brand-mark: #c6aa94;
   --space-1: 4px; --space-2: 8px; --space-3: 12px;
   --space-4: 16px; --space-5: 24px; --space-6: 32px;
@@ -45,13 +49,13 @@ select option, select optgroup { background: var(--surface-2); color: var(--text
 ::selection { background: var(--surface-active); color: var(--text-primary); }
 * { scrollbar-color: #464e59 transparent; }
 .editor-app { --field: var(--surface-2); background: var(--app-background); grid-template-rows: 36px 40px minmax(0,1fr) 26px; }
-.editor-menubar { background: var(--surface-1); border: 0; padding-inline: var(--space-4); }
+.editor-menubar { background: var(--surface-chrome); border: 0; padding-inline: var(--space-4); }
 .editor-brand { color: var(--text-primary); margin-right: var(--space-5); gap: var(--space-2); }
 .editor-brand>svg { color: var(--brand-mark); width: 18px; }
 .editor-brand strong { font-size: 15px; letter-spacing: 0; font-weight: 500; }
 .editor-brand strong span { color: var(--text-muted); font-size: 12px; font-weight: 400; margin-left: 6px; }
 .editor-menubar>button.active, .main-play-controls button.active, .main-play-controls button.playing { background: var(--surface-active); color: var(--text-primary); }
-.editor-toolbar { background: var(--surface-1); border-bottom: 1px solid var(--divider); gap: var(--space-4); }
+.editor-toolbar { background: var(--surface-chrome); border-bottom: 1px solid var(--divider); gap: var(--space-4); }
 .main-play-controls { background: transparent; border: 0; gap: var(--space-1); }
 .main-play-controls button:first-child { color: var(--success); }
 .toolbar-project, .project-title, .edit-label { color: var(--text-muted); }
@@ -59,10 +63,10 @@ select option, select optgroup { background: var(--surface-2); color: var(--text
 .scene-selector, .toolbar-layout select { background: transparent; border-color: transparent; }
 .authoring-entry { background: transparent; color: var(--text-secondary); border-color: transparent; padding: 4px 8px; }
 .hierarchy-panel, .inspector-panel { background: var(--surface-1); border: 0; }
-.panel-tabs { background: var(--surface-1); border: 0; padding: 0 var(--space-1); gap: var(--space-1); height: 36px; }
+.panel-tabs { background: var(--surface-heading); border: 0; padding: 0 var(--space-1); gap: var(--space-1); height: 36px; }
 .panel-tabs>button { border: 0; border-radius: 0; color: var(--text-muted); padding: 0 10px; font-size: 12px; font-weight: 400; }
-.panel-tabs>button.active { background: transparent; color: var(--text-primary); border: 0; font-weight: 500; }
-.panel-tabs>button.active:after { height: 2px; left: 10px; right: 10px; bottom: 0; background: var(--text-secondary); }
+.panel-tabs>button.active { background: var(--surface-1); color: var(--text-primary); border: 0; font-weight: 500; }
+.panel-tabs>button.active:after { height: 2px; left: 10px; right: 10px; bottom: 0; background: var(--accent); }
 .hierarchy-panel>.panel-tabs>button.active:after, .inspector-panel>.panel-tabs>button.active:after { display: none; }
 .panel-tabs button.toggled { color: var(--text-primary); background: var(--surface-hover); }
 .panel-tabs button>b { color: var(--warning); background: transparent; font-weight: 400; }
@@ -97,17 +101,17 @@ select option, select optgroup { background: var(--surface-2); color: var(--text
 .subscene-list small { background: transparent; color: var(--text-muted); }
 .compact-heading { font-size: 11px; color: var(--text-muted); }
 /* The inspector reads as one form, not a stack of cards. */
-.inspector-identity { background: transparent; padding: 16px; border: 0; min-height: 72px; }
+.inspector-identity { background: var(--surface-chrome); padding: 16px; border: 0; min-height: 72px; margin-bottom: 12px; }
 .inspector-identity strong { color: var(--text-primary); font-size: 14px; font-weight: 500; }
 .inspector-identity .identity-icon, .inspector-identity>svg { color: var(--text-secondary); }
 .inspector-identity small, .inspector-identity .subtle { color: var(--text-muted); font-size: 11px; }
-.inspector-section { background: transparent; border: 0; margin-bottom: 12px; }
-.inspector-section>summary, .inspector-section[open]>summary { background: transparent; color: var(--text-primary); border: 0; padding: 8px 14px; font-size: 12px; font-weight: 500; gap: 6px; }
+.inspector-section { background: transparent; border: 0; margin-bottom: 18px; }
+.inspector-section>summary, .inspector-section[open]>summary { background: transparent; color: var(--text-primary); border: 0; padding: 8px 14px; font-size: 13px; font-weight: 500; gap: 6px; }
 .inspector-section>summary:hover { background: var(--surface-hover); }
 .inspector-fields { padding: 8px 16px 4px; gap: 8px; }
 .inspector-fields .field>span { color: var(--text-secondary); font-size: 12px; }
 .inspector-fields>.field { grid-template-columns: 80px minmax(0,1fr); }
-.inspector-fields input, .inspector-fields select, .inspector-fields textarea { border-color: transparent; background: var(--surface-2); color: var(--text-primary); font-size: 12px; }
+.inspector-fields input, .inspector-fields select, .inspector-fields textarea { border-color: transparent; background: var(--surface-input); color: var(--text-primary); font-size: 12px; }
 .inspector-fields textarea { font-size: 13px; line-height: 1.6; padding: 10px; }
 .inspector-fields button { background: transparent; border-color: transparent; color: var(--text-secondary); font-size: 12px; }
 .inspector-fields button:hover { background: var(--surface-hover); color: var(--text-primary); }
@@ -147,7 +151,7 @@ select option, select optgroup { background: var(--surface-2); color: var(--text
 .live-strip button { font-size: 11px; }
 .game-name { border: 0; box-shadow: none; background: var(--surface-1); color: var(--text-primary); border-radius: 4px 4px 0 0; min-width: 0; padding: 8px 16px; margin-left: 0; font-weight: 500; }
 .game-name>svg { display: none; }
-.game-dialogue, .game-dialogue.can-advance:hover { border: 0; box-shadow: none; background: #1d2025f2; border-radius: 0 4px 4px 4px; }
+.game-dialogue, .game-dialogue.can-advance:hover { border: 0; box-shadow: none; background: #171d26; border-radius: 0 4px 4px 4px; }
 .game-dialogue p { color: var(--text-primary); }
 .game-dialogue-footer { border: 0; color: var(--text-secondary); }
 /* Text tabs plus a keyboard-operable disclosure replace the twelve-tool strip. */
@@ -165,12 +169,12 @@ select option, select optgroup { background: var(--surface-2); color: var(--text
 .dock-more-popup>button>span:first-child { flex: 1; }
 .dock-more-popup>button[aria-pressed=true] { color: var(--text-primary); background: var(--surface-active); }
 .tool-issue-count { color: var(--warning); font-variant-numeric: tabular-nums; }
-.graph-toolbar { background: var(--surface-1); border: 0; min-height: 34px; overflow: visible; }
+.graph-toolbar { background: var(--surface-chrome); border: 0; min-height: 34px; overflow: visible; }
 .graph-breadcrumb { color: var(--text-secondary); font-weight: 400; }
 .graph-toolbar select { border: 0; background: transparent; color: var(--text-secondary); }
 .rose-button { background: var(--surface-2); color: var(--text-primary); border: 0; }
 .graph-canvas, .graph-canvas .react-flow { background: var(--app-background); }
-.enode, .enode.choice, .enode.gate, .enode.portal, .enode.marker, .enode.fork, .enode.join, .enode.action { background: var(--surface-2); border: 1px solid transparent; border-radius: var(--radius-node); box-shadow: none; }
+.enode, .enode.choice, .enode.gate, .enode.portal, .enode.marker, .enode.fork, .enode.join, .enode.action { background: var(--surface-node); border: 1px solid transparent; border-radius: var(--radius-node); box-shadow: 0 3px 6px #0003; }
 .enode>header, .enode.choice>header, .enode.gate>header, .enode.portal>header, .enode.marker>header, .enode.fork>header, .enode.join>header, .enode.action>header { background: transparent; border: 0; color: var(--text-primary); padding: 12px 14px 4px; min-height: 32px; }
 .enode>header>strong { font-size: 13px; font-weight: 500; }
 .enode>header>span { font-size: 11px; color: var(--text-muted); }
@@ -180,7 +184,7 @@ select option, select optgroup { background: var(--surface-2); color: var(--text
 .enode.is-playing>header { color: var(--success); background: transparent; }
 .enode.has-error { border-color: var(--error); }
 .node-copy { padding: 8px 14px 12px; color: var(--text-primary); font-size: 14px; line-height: 1.6; min-height: 76px; }
-.node-phase-slots { background: transparent; border: 0; padding: 0 8px 8px; gap: 0; }
+.node-phase-slots { background: #202732; border: 0; padding: 0 8px 8px; gap: 0; }
 .node-phase-slots>button { flex-direction: row; gap: 5px; padding: 5px 3px; min-height: 26px; font-size: 11px; color: var(--text-muted); border-radius: 3px; }
 .node-phase-slots>button+button { border: 0; }
 .node-phase-slots button.filled, .node-phase-slots button b { color: var(--text-secondary); background: transparent; font-size: 11px; font-weight: 400; }
@@ -192,7 +196,7 @@ select option, select optgroup { background: var(--surface-2); color: var(--text
 .graph-canvas .react-flow__minimap { background: var(--surface-1); border: 0; box-shadow: none; opacity: .7; }
 .graph-canvas .react-flow__minimap:hover { opacity: 1; }
 /* Diagnostics remain reachable from every workspace without a warning banner. */
-.editor-status { background: var(--surface-1); color: var(--text-muted); border-top: 1px solid var(--divider); }
+.editor-status { background: var(--surface-chrome); color: var(--text-muted); border-top: 1px solid var(--divider); }
 .editor-status .diagnostic-status { height: 100%; padding: 0 10px; border: 0; background: transparent; color: var(--text-secondary); font-size: 11px; }
 .diagnostic-status.has-issues>svg { color: var(--warning); }
 .diagnostic-status.clear>svg { color: var(--success); }
@@ -267,3 +271,69 @@ select option, select optgroup { background: var(--surface-2); color: var(--text
 @media (prefers-reduced-motion:reduce) {
   *, *::before, *::after { animation: none!important; transition: none!important; scroll-behavior: auto!important; }
 }
+
+/* Clear regions: chrome, utility panels, and the working canvas. */
+.editor-app { font-size: 13px; }
+.editor-menubar>button { color: var(--text-secondary); }
+.editor-brand strong span { font-size: 11px; }
+.toolbar-context-label { color: var(--text-muted); font-size: 11px; margin-right: 4px; }
+.main-play-controls button:first-child { width: auto; min-width: 82px; padding-inline: 12px; background: var(--surface-2); color: var(--text-primary); font-size: 12px; }
+.main-play-controls button.playing { background: var(--surface-active); }
+.main-play-controls button:first-child>svg { color: var(--success); }
+.hierarchy-panel>.panel-tabs, .inspector-panel>.panel-tabs { height: 40px; }
+.hierarchy-panel>.panel-tabs>button.active, .inspector-panel>.panel-tabs>button.active { background: transparent; font-weight: 600; }
+.viewport-tabs { height: 40px; background: var(--surface-chrome); }
+.viewport-tabs>button.active { background: var(--surface-1); }
+.viewport-tabs button[hidden] { display: none; }
+.viewport-tabs>.viewport-location { margin-left: 16px; }
+.viewport-commandbar { background: var(--surface-1); padding-block: 5px; }
+.viewport-commandbar .scene-edit-bar button.active { box-shadow: inset 0 -2px var(--accent); }
+.scene-edit-bar select { background: transparent; }
+.tree-controls { padding-top: 6px; }
+.tree-controls>button { opacity: 0; }
+.tree-controls:hover>button, .tree-controls:focus-within>button { opacity: 1; }
+.tree-object>button:first-child { min-height: 30px; padding-left: 28px; font-size: 13px; }
+.tree-object.character>button:first-child { padding-left: 6px; }
+.tree-object.selected { box-shadow: inset 2px 0 var(--accent); }
+.tree-scene { padding-block: 10px; margin-bottom: 0; }
+.tree-scene strong { font-size: 13px; }
+.tree-folder { padding-top: 10px; padding-bottom: 6px; }
+.panel-search { background: var(--surface-input); margin-block: 10px 2px; }
+.panel-search input { min-height: 26px; }
+.subscene-list { background: var(--surface-chrome); border-top: 0; }
+.hierarchy-footer { background: var(--surface-chrome); }
+.inspector-fields>.field { grid-template-columns: 88px minmax(0,1fr); }
+.inspector-fields input, .inspector-fields select { min-height: 30px; }
+.inspector-fields>.field>span { line-height: 1.4; }
+.inspector-section>summary { padding-block: 9px; }
+.inspector-identity strong { font-size: 15px; }
+.transform-vector input { background: var(--surface-input); }
+.dock-tabs { height: 40px; background: var(--surface-heading); padding-inline: 4px; }
+.dock-tabs>button { padding-inline: 14px; font-size: 13px; }
+.dock-tabs>button.active { background: var(--surface-chrome); }
+.dock-more>button { padding-inline: 12px; font-size: 13px; }
+.dock-more>button.active { background: var(--surface-chrome); box-shadow: inset 0 -2px var(--accent); }
+.graph-toolbar { padding-inline: 12px; }
+.graph-navigation { background: var(--surface-chrome); }
+.enode>header>strong { font-weight: 600; }
+.enode>header>span { color: var(--text-muted); }
+.game-ui { width: min(78%, 720px); }
+.game-dialogue { min-height: 94px; padding: 14px 20px 0; }
+.game-dialogue>p { font-size: 16px; min-height: 32px; }
+.game-dialogue-footer { margin-top: 8px; padding-block: 8px; }
+.game-dialogue-footer>span:last-child { display: none; }
+@media(max-width:1400px) {
+ .dock-tabs>button { padding-inline: 11px; font-size: 12px; }
+ .dock-more>button { padding-inline: 10px; font-size: 12px; }
+}
+
+.tree-root-row { display: flex; align-items: center; gap: 0; padding-right: 4px; }
+.tree-root-row>.tree-scene { flex: 1; min-width: 0; }
+.tree-root-row .tree-controls { padding: 0; flex-shrink: 0; }
+.tree-root-row .tree-controls>button { padding: 3px; width: 24px; height: 26px; }
+.tree-root-row:hover .tree-controls>button, .tree-root-row:focus-within .tree-controls>button { opacity: 1; }
+.tree-root-row .tree-scene strong { white-space: normal; text-align: left; line-height: 1.4; }
+.scene-activity { background: var(--surface-chrome); backdrop-filter: none; border: 0; box-shadow: 0 3px 10px #0003; }
+.create-overlay { backdrop-filter: none; }
+
+.viewport-commandbar .scene-edit-bar button.active:not(.transform-tool) { background: transparent; box-shadow: none; color: var(--accent); }
