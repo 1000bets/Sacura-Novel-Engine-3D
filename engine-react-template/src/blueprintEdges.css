@@ -1,0 +1,7 @@
+.blueprint-wire-halo {pointer-events:none;}
+.blueprint-wire .react-flow__edge-path {transition:stroke 120ms ease;}
+.blueprint-wire-label {position:absolute;max-width:180px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:5px;background:var(--bg-panel);font-size:12px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;box-shadow:var(--shadow-soft);}
+.blueprint-wire-legend {position:absolute;top:12px;right:14px;display:flex;gap:14px;pointer-events:none;color:var(--text-muted);font-size:11px;}
+.blueprint-wire-legend span {display:flex;align-items:center;gap:6px;}
+.blueprint-wire-legend svg {width:30px;height:12px;overflow:visible;}
+@media(prefers-reduced-motion:reduce){.blueprint-wire .react-flow__edge-path {transition:none;}}

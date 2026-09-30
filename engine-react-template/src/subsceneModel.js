@@ -1,14 +1,17 @@
+import {storyPorts} from './choiceModel.js';
 import {uid,allBeats} from './model.js';
 import {ensureCameras} from './cameraModel.js';
 import {objectTransform,isObjectInScene,BUILTIN_KINDS,addSceneDecorations,createSceneStagingPoints,ensureSceneStagingPoints} from './sceneEditing.js';
 import {gameCamera} from './sceneEffects.js';
 
 export const LOCATION_TEMPLATES=[
+ {id:'empty',name:'Пустая локация',icon:'Box',detail:'Создайте своё место из примитивов',weather:'Ясно',time:'День',color:'#a99dcb'},
  {id:'living',name:'Гостиная',icon:'Armchair',detail:'Комната, камин, стол и письмо',weather:'Ясно',time:'Закат',color:'#c797ad'},
  {id:'garden',name:'Сад',icon:'Trees',detail:'Дорожка, деревья и скамья с запиской',weather:'Дождь',time:'День',color:'#95b5a3'},
  {id:'station',name:'Станция',icon:'TrainFront',detail:'Платформа, поезд и билет',weather:'Ясно',time:'Рассвет',color:'#b5aecb'},
 ];
 const KIT={
+ empty:[],
  living:[['room-table','Журнальный стол','#a58568'],['room-sofa','Диван','#9e8175'],['letter','Письмо','#f1dfb2','Активный меш'],['door','Дверь в сад','#718c87','Активный меш'],['fireplace','Камин','#8d7c74']],
  garden:[['garden-bench','Скамья','#a49076'],['garden-note','Записка на скамье','#efdfb7','Активный меш']],
  station:[['station-train','Поезд','#638c8c'],['ticket','Билет','#e6d6b5','Активный меш']],
@@ -16,7 +19,7 @@ const KIT={
 export const beatsInScene=(p,id)=>p.chapters.filter(c=>c.subsceneId===id).flatMap(c=>c.beats);
 const ownerOf=(p,id)=>p.chapters.find(c=>c.beats.some(b=>b.id===id))?.subsceneId;
 export function sceneTransitions(p,id){
- const result=[];for(const b of allBeats(p)){const source=ownerOf(p,b.id);for(const edge of b.kind==='choice'?b.choices.map(c=>({choiceId:c.id,label:c.label,to:c.next,condition:c.condition,threshold:c.threshold})):[{to:b.next,label:'После реплики'}]){const target=ownerOf(p,edge.to);if(edge.to&&source!==target&&(source===id||target===id))result.push({...edge,from:b.id,beat:b,source,target});}}
+ const result=[];for(const b of allBeats(p)){const source=ownerOf(p,b.id);for(const edge of storyPorts(b).map(port=>({choiceId:port.id.startsWith('choice:')?port.id.slice(7):undefined,portId:port.id,label:port.label,to:port.next,condition:port.condition}))){const target=ownerOf(p,edge.to);if(edge.to&&source!==target&&(source===id||target===id))result.push({...edge,from:b.id,beat:b,source,target});}}
  return result;
 }
 export function addSceneKit(p,scene){
@@ -28,10 +31,17 @@ export function addSceneKit(p,scene){
  }
  addSceneDecorations(p,scene);ensureSceneStagingPoints(scene,p.objects);
 }
-export function newSceneDraft(p){const t=LOCATION_TEMPLATES[0];return {name:'',location:t.name,kind:t.id,weather:t.weather,time:t.time,description:'',firstText:'Новая история начинается здесь.',characters:p.objects.filter(o=>o.type==='Персонаж'&&!o.subsceneId&&o.active!==false).map(o=>o.id),placement:'separate',choiceId:''};}
+export const LOCATION_PRIMITIVES=[['box','Куб','Box'],['sphere','Сфера','Circle'],['cylinder','Цилиндр','Cylinder']];
+export function addLocationPrimitive(p,scene,shape,index=0){
+ const primitive=LOCATION_PRIMITIVES.find(([id])=>id===shape);if(!primitive)throw new Error('Выберите форму примитива.');
+ const object={id:uid('object'),name:primitive[1],type:'Меш',primitive:shape,color:'#bb99aa',active:true,subsceneId:scene.id,transforms:{[scene.id]:{position:[index*.8,.3,0],rotation:[0,0,0],scale:[1,1,1]}}};
+ p.objects.push(object);return object;
+}
+export function newSceneDraft(p){const t=LOCATION_TEMPLATES[0];return {name:'',location:t.name,kind:t.id,weather:t.weather,time:t.time,description:'',primitives:[],firstText:'Новая история начинается здесь.',characters:p.objects.filter(o=>o.type==='Персонаж'&&!o.subsceneId&&o.active!==false).map(o=>o.id),placement:'separate',choiceId:''};}
 export function createSubscene(p,draft,fromBeatId){
  if(!draft.name?.trim())throw new Error('Укажите название сабсцены.');
  const type=LOCATION_TEMPLATES.find(t=>t.id===draft.kind);if(!type)throw new Error('Выберите шаблон локации.');
+ if((draft.primitives||[]).some(shape=>!LOCATION_PRIMITIVES.some(([id])=>id===shape)))throw new Error('Выберите форму примитива.');
  const scene={id:uid('scene'),entry:uid('line'),sceneId:p.subscenes[0]?.sceneId||'chapter1',name:draft.name.trim(),location:draft.location?.trim()||type.name,kind:type.id,weather:draft.weather,time:draft.time,description:draft.description||'',color:type.color,excludedObjectIds:p.objects.filter(o=>!o.subsceneId&&(o.type!=='Персонаж'||!draft.characters.includes(o.id))).map(o=>o.id)};
  const beat={id:scene.entry,kind:'dialogue',speaker:'Рассказчик',text:draft.firstText.trim()||'Новая история начинается здесь.',next:null,mode:'SEQUENTIAL',bindings:[],batches:{BEFORE:[],ON_START:[],AFTER:[]}};
  if(draft.placement==='after'){
@@ -39,12 +49,12 @@ export function createSubscene(p,draft,fromBeatId){
   if(from.kind==='choice'){const choice=from.choices.find(c=>c.id===draft.choiceId);if(!choice)throw new Error('Выберите ответ, из которого будет переход.');beat.next=choice.next||null;choice.next=beat.id;}
   else {beat.next=from.next||null;from.next=beat.id;}
  }
- p.subscenes.push(scene);p.chapters.push({id:uid('chapter'),subsceneId:scene.id,name:'Первый эпизод',beats:[beat]});addSceneKit(p,scene);ensureCameras(p);return scene;
+ p.subscenes.push(scene);p.chapters.push({id:uid('chapter'),subsceneId:scene.id,name:'Первый эпизод',beats:[beat]});addSceneKit(p,scene);(draft.primitives||[]).forEach((shape,index)=>addLocationPrimitive(p,scene,shape,index));ensureCameras(p);return scene;
 }
 export function setSceneEntry(p,id,entry,reroute=false){
  const scene=p.subscenes.find(s=>s.id===id);if(!scene||!beatsInScene(p,id).some(b=>b.id===entry))throw new Error('Начальная реплика должна принадлежать этой сабсцене.');
  const old=scene.entry;scene.entry=entry;if(!reroute)return;
- for(const b of allBeats(p)){if(ownerOf(p,b.id)===id)continue;if(b.next===old)b.next=entry;for(const c of b.choices||[])if(c.next===old)c.next=entry;}
+ for(const b of allBeats(p)){if(ownerOf(p,b.id)===id)continue;if(b.next===old)b.next=entry;for(const port of ['trueNext','falseNext'])if(b[port]===old)b[port]=entry;for(const c of b.choices||[])if(c.next===old)c.next=entry;}
 }
 export function connectSubscene(p,fromId,choiceId,toSceneId){
  const from=allBeats(p).find(b=>b.id===fromId),to=p.subscenes.find(s=>s.id===toSceneId);if(!from||!to||from.kind==='end')throw new Error('Выберите реплику и сабсцену назначения.');
@@ -72,8 +82,9 @@ export function cloneSubscene(p,sourceId){
  // Global originals must stay excluded even though their local copies use new IDs.
  scene.excludedObjectIds.push(...[...objectIds.keys()].filter(id=>p.objects.find(o=>o.id===id)&&!p.objects.find(o=>o.id===id).subsceneId));
  for(const ch of chapters){ch.id=uid('chapter');ch.subsceneId=id;for(const b of ch.beats){
-  b.id=beatIds.get(b.id);b.next=beatIds.get(b.next)||b.next;if(b.branch)b.branch=choiceIds.get(b.branch);if(b.signal)b.signal=objectIds.get(b.signal)||b.signal;
-  for(const c of b.choices||[]){c.id=choiceIds.get(c.id);c.next=beatIds.get(c.next)||c.next;}
+  b.id=beatIds.get(b.id);b.next=beatIds.get(b.next)||b.next;for(const port of ['trueNext','falseNext'])if(b[port])b[port]=beatIds.get(b[port])||b[port];if(b.branch)b.branch=choiceIds.get(b.branch);if(b.signal)b.signal=objectIds.get(b.signal)||b.signal;
+  for(const c of b.choices||[]){c.id=choiceIds.get(c.id);c.next=beatIds.get(c.next)||c.next;if(c.enabledSource)c.enabledSource=beatIds.get(c.enabledSource)||c.enabledSource;}
+  for(const port of Object.keys(b.inputs||{}))b.inputs[port]=beatIds.get(b.inputs[port])||b.inputs[port];
   const bindingIds=new Map();for(const binding of b.bindings){const oldId=binding.id;binding.id=uid('binding');bindingIds.set(oldId,binding.id);const event=p.events.find(e=>e.id===binding.eventId);binding.actionOverrides||={};
    for(const action of event?.groups.flatMap(g=>g.actions)||[]){const effective={...action,...(event.groups[0]?.actions[0]?.id===action.id?binding.overrides:{}),...binding.actionOverrides[action.id]},patch={};if(objectIds.has(effective.target))patch.target=objectIds.get(effective.target);if(cameraIds.has(effective.cameraId))patch.cameraId=cameraIds.get(effective.cameraId);if(effective.type==='move'&&pointIds.has(effective.value))patch.value=pointIds.get(effective.value);if(Object.keys(patch).length)binding.actionOverrides[action.id]={...binding.actionOverrides[action.id],...patch};}
   }

@@ -1,17 +1,21 @@
+import {createRendererViewport} from './rendererViewport.js';
 import {updateObjectHighlight} from './sceneEffects.js';
 import React, { useEffect, useRef } from "react";
 import * as THREE from "three";
+import {updateCharacterVisual,disposeCharacterVisual} from "./characterVisual.js";
 import {createSceneGizmo,groupObjects,meshGeometry,cloneSceneObject} from './SceneGizmo.js';
 import {BUILTIN_TRANSFORMS,resolvedPosition} from './sceneEditing.js';
 import {createCameraRig} from './CameraRig.js';
 import {createSceneNavigation} from './SceneNavigation.js';
-import {atmosphere,gameCamera,decoratePaper,objectPosition,addCharacterDetails,animatePose} from './sceneEffects.js';
+import {openSceneContext} from './sceneContext.js';
+import {createLightObject,updateLightObject} from './sceneLights.js';
+import {atmosphere,gameCamera,decoratePaper,objectPosition,addCharacterDetails} from './sceneEffects.js';
 
 export default function Scene({
   objects,
   state,
   selected, selectedIds,
-  onSelect,
+  onSelect, onContext,
   onLetter,
   onInteract,
   mode = "scene",
@@ -20,7 +24,7 @@ export default function Scene({
   const host = useRef(),
     api = useRef();
   const callbacks = useRef();
-  callbacks.current = { onSelect, onLetter, onInteract, mode, state,objects,selected,selectedIds,sceneId,kind:"living",editTool,editSpace,snap,onTransform,onTransforms,focusRequest,editing,cameraScene,selectedCameraId,cameraPreviewId,cameraPilotId,onCameraChange,onCameraSelect,showCameras };
+  callbacks.current = { onSelect, onContext, onLetter, onInteract, mode, state,objects,selected,selectedIds,sceneId,kind:"living",editTool,editSpace,snap,onTransform,onTransforms,focusRequest,editing,cameraScene,selectedCameraId,cameraPreviewId,cameraPilotId,onCameraChange,onCameraSelect,showCameras };
   useEffect(() => {
     const element = host.current;
     let renderer;
@@ -43,7 +47,7 @@ export default function Scene({
     scene.fog = new THREE.Fog(0x191c22, 20, 40);
     const camera = new THREE.PerspectiveCamera(58, 1, 0.05, 400);
     camera.position.set(-2.8,1.65,2.8);
-    const controls = createSceneNavigation(camera, renderer.domElement,()=>callbacks.current);
+    const controls = createSceneNavigation(camera, renderer.domElement,()=>({...callbacks.current,onContext:point=>openSceneContext(point,camera,renderer.domElement,pickables,callbacks.current)}));
     controls.target.set(.3,1.02,-1.3);
     camera.lookAt(controls.target);
     const hemi=new THREE.HemisphereLight(0xbfcce7, 0x3d292d, 2);scene.add(hemi);
@@ -179,16 +183,7 @@ export default function Scene({
       }),
     );
     const updateAtmosphere=atmosphere(scene,{kind:'living',renderer,sun:sunlight,hemi});
-    const resize = () => {
-      const { width, height } = element.getBoundingClientRect();
-      if (width < 1 || height < 1) return;
-      renderer.setSize(width, height);
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-    };
-    const ro = new ResizeObserver(resize);
-    ro.observe(element);
-    resize();
+    const viewport=createRendererViewport(renderer,camera,element);
     const gizmo=createSceneGizmo(scene,camera,renderer.domElement,controls,()=>callbacks.current,()=>pickables);
     const cameraRig=createCameraRig(scene,camera,controls,renderer.domElement,()=>callbacks.current);if(cameraApi)cameraApi.current=cameraRig;
     const ray = new THREE.Raycaster(),
@@ -250,13 +245,13 @@ export default function Scene({
 
       const live = callbacks.current.state;
       animTime=updateAtmosphere(live,dt);
-      pickables.forEach(mesh=>{const o=callbacks.current.objects.find(o=>o.id===mesh.userData.id);if(!o){mesh.visible=false;return;}mesh.visible=o.active&&live.visible?.[o.id]!==false;
+      pickables.forEach(mesh=>{const o=callbacks.current.objects.find(o=>o.id===mesh.userData.id);if(!o){disposeCharacterVisual(mesh);mesh.visible=false;return;}mesh.visible=o.active&&live.visible?.[o.id]!==false;
         gizmo.apply(mesh,o,resolvedPosition(o,live,'living'));
+        updateLightObject(mesh,o,callbacks.current.mode==='scene');
         if((o.builtin||o.id)==='door'&&callbacks.current.mode==='game'){mesh.userData.openAngle=THREE.MathUtils.damp(mesh.userData.openAngle||0,live.doors?.[o.id]==='Открыть'?-1.25:0,3,live.paused||live.pausedDoors?.[o.id]?0:dt);mesh.rotation.y+=mesh.userData.openAngle;}
         if(mesh.userData.marker)mesh.userData.marker.visible=live.interactionTarget===o.id||live.highlights?.[o.id];
         updateObjectHighlight(mesh,!!live.highlights?.[o.id],animTime);
-        if(callbacks.current.mode==='scene'&&callbacks.current.editing)animatePose(mesh,null,0,false,true);
-        else animatePose(mesh,live.poses?.[o.id],animTime,!!live.motions?.[o.id]&&!live.motions[o.id].stopped&&!live.motions[o.id].paused&&live.motions[o.id].progress<1,live.paused);
+        updateCharacterVisual(mesh,o,dt,live.poses?.[o.id],!!live.motions?.[o.id]&&!live.motions[o.id].stopped&&!live.motions[o.id].paused&&live.motions[o.id].progress<1,live.paused,callbacks.current.mode==='scene'&&callbacks.current.editing);
       });
       gizmo.update();
       cameraRig.update(dt,gizmo.dragging);
@@ -265,18 +260,20 @@ export default function Scene({
       ring.scale.setScalar(live.interactionTarget?1+Math.sin(animTime*3)*.06:1);
       lamp.intensity=live.lighting==='Выключить'?0:live.lighting==='Холодный свет'?12:35;
       lamp.color.set(live.lighting==='Холодный свет'?'#98beff':'#ffa553');
+      viewport.update();
       renderer.render(scene, camera);
     };
     render();
     return () => {
       cancelAnimationFrame(frame);
-      ro.disconnect();
+      viewport.dispose();
       if(cameraApi?.current===cameraRig)cameraApi.current=null;
       cameraRig.dispose();
       gizmo.dispose();
       controls.dispose();
       renderer.domElement.removeEventListener('pointerdown',pointerDown);
       renderer.domElement.removeEventListener('pointerup',click);
+      pickables.forEach(disposeCharacterVisual);
       scene.traverse((o) => {
         o.geometry?.dispose();
         if (o.material)
@@ -300,7 +297,8 @@ export default function Scene({
     };
     objects.forEach((o, i) => {
       if(o.builtin&&!a.pickables.some(m=>m.userData.id===o.id)){const original=a.pickables.find(m=>m.userData.id===o.builtin);if(original){const copy=cloneSceneObject(original,o.id);a.scene.add(copy);a.characters.set(o.id,copy);a.pickables.push(copy);}}
-      if (o.type === "Персонаж" && !a.characters.has(o.id)) {
+      if(o.type==='Источник света'&&!a.characters.has(o.id)){const group=createLightObject(o);a.scene.add(group);a.characters.set(o.id,group);a.pickables.push(group);}
+      else if (o.type === "Персонаж" && !a.characters.has(o.id)) {
         const group = new THREE.Group();
         const body = new THREE.Mesh(
           new THREE.CapsuleGeometry(0.23, 0.65, 5, 12),

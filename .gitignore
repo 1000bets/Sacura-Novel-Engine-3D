@@ -70,3 +70,7 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+/.agents/
+
+# Local design references
+/design-system/

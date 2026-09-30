@@ -1,9 +1,12 @@
+import {isPureNode,isDataSource,readLogic,choiceEnabled,dataTargets,getInput} from './logicModel.js';
+import {choiceAvailable,evaluateCondition,availabilityOf,storyPorts,ANSWER_VARIABLE} from './choiceModel.js';
 import {createProject,allBeats,makeAction,uid,nextNode,routeTo,resolvedActions,TYPES,validActionTarget,validate as legacyValidate} from './model.js';
 import {extendVisualExamples} from './visualExamples.js';
 import {ensureCreationLibrary} from './authoringModel.js';
 import {ensureSceneEditing,isObjectInScene} from './sceneEditing.js';
 import {ensureCameras} from './cameraModel.js';
 import {ensureAudioSettings} from './audioSettings.js';
+import {enabledCharacterAnimations} from './characterModel.js';
 export {allBeats,makeAction,uid,TYPES};
 export const PHASES=[{id:'BEFORE',label:'До реплики',hint:'Подготовить сцену, затем показать текст',color:'blue'},{id:'ON_START',label:'Во время реплики',hint:'Текст уже виден · постановка продолжается',color:'violet'},{id:'AFTER',label:'После реплики',hint:'Игрок продолжил · завершаем постановку',color:'amber'}];
 export const AUDIO_ASSETS=[
@@ -71,18 +74,30 @@ export function upgradeProject(source){
  const end=allBeats(p).find(b=>b.id==='d6');if(end)end.ending='Дом, в котором ждут';return ensureCameras(ensureSceneEditing(ensureCreationLibrary(extendVisualExamples(p))));
 }
 export function sceneFor(p,beatId){const c=p.chapters.find(c=>c.beats.some(b=>b.id===beatId));return p.subscenes.find(s=>s.id===c?.subsceneId)||p.subscenes[0];}
-export function edgesFor(p,b){if(b.kind==='choice')return b.choices.map(c=>({from:b.id,to:c.next,label:c.label,condition:c.condition,choiceId:c.id}));return b.next?[{from:b.id,to:b.next,label:b.kind==='gate'?'После взаимодействия':'Продолжить'}]:[];}
-export function chooseNext(p,id,choiceId,vars){const b=allBeats(p).find(b=>b.id===id);if(!b)return null;if(b.kind==='choice'){const c=b.choices.find(c=>c.id===choiceId);if(!c||!conditionPass(c,vars))return null;return allBeats(p).find(n=>n.id===c.next)||null;}return allBeats(p).find(n=>n.id===b.next)||null;}
-export function conditionPass(c,vars){return !c.condition||c.condition==='always'||(c.condition==='trust'?Number(vars.trust)>=Number(c.threshold??3):!!vars[c.condition]);}
+export function edgesFor(p,b){return storyPorts(b).filter(port=>port.next).map(port=>({from:b.id,to:port.next,label:port.label,condition:port.condition,choiceId:port.id.startsWith('choice:')?port.id.slice(7):undefined}));}
+export function chooseNext(p,id,choiceId,vars){const b=allBeats(p).find(b=>b.id===id);if(!b)return null;let target=b.next;if(b.kind==='branch')target=(b.inputs?.condition?readLogic(p,b.inputs.condition,vars)===true:b.test?evaluateCondition(b.test,vars):b.condition===true)?b.trueNext:b.falseNext;else if(b.kind==='choice'){const c=b.choices.find(c=>c.id===choiceId);if(!c||!conditionPass(c,vars,p))return null;target=c.next||b.next;}return allBeats(p).find(n=>n.id===target)||null;}
+export function conditionPass(c,vars,p){try{return p&&c.enabledSource?choiceEnabled(p,c,vars):choiceAvailable(c,vars);}catch{return false;}}
+
 export function validateStudio(p){
  const clone=structuredClone(p);allBeats(clone).forEach(b=>{b.mode='SEQUENTIAL';b.bindings.forEach(x=>x.join=x.join==='NONE'?'FLOW_END':x.join);});
- const issues=legacyValidate(clone).filter(i=>!i.id.startsWith('parallel-'));
+ const issues=legacyValidate(clone).filter(i=>!i.id.startsWith('parallel-')).map(i=>i.fix==='fallback'?{...i,level:'warning'}:i);
  for(const scene of p.subscenes||[])for(const c of scene.cameras||[])if(c.mode==='follow'&&!p.objects.some(o=>o.id===c.followTargetId&&o.type==='Персонаж'&&o.active!==false&&isObjectInScene(o,scene)))issues.push({id:`camera-target-${c.id}`,beatId:scene.entry,level:'warning',title:'Камере не за кем следить',detail:`«${c.name}»: выберите доступного персонажа во вкладке «Камеры». Пока используется сохранённый кадр.`});
  for(const b of allBeats(p)){
+  if(isPureNode(b)){
+   if(b.kind==='variable'&&b.variable!==ANSWER_VARIABLE&&!Object.hasOwn(p.variables||{},b.variable))issues.push({id:`logic-variable-${b.id}`,beatId:b.id,level:'error',title:'Переменная не создана',detail:'Введите имя и начальное значение прямо в ноде.'});
+   for(const source of Object.values(b.inputs||{}))if(source&&!allBeats(p).some(n=>n.id===source&&isDataSource(n)))issues.push({id:`logic-input-${b.id}-${source}`,beatId:b.id,level:'error',title:'Источник значения удалён',detail:'Переподключите круглый вход.'});
+   continue;
+  }
+  for(const port of dataTargets(b)){const source=getInput(b,port);if(source&&!allBeats(p).some(n=>n.id===source&&isDataSource(n)))issues.push({id:`logic-source-${b.id}-${port}`,beatId:b.id,level:'error',title:'Источник значения удалён',detail:'Переподключите круглый вход.'});}
+  if(b.kind==='set-variable'&&!Object.hasOwn(p.variables||{},b.variable))issues.push({id:`set-variable-${b.id}`,beatId:b.id,level:'error',title:'Переменная не создана',detail:'Введите имя в ноде переменной.'});
   const location=sceneFor(p,b.id),gateObject=p.objects.find(o=>o.id===b.signal);
   if(b.kind==='gate'&&gateObject&&!isObjectInScene(gateObject,location))issues.push({id:`gate-location-${b.id}`,beatId:b.id,level:'error',title:'Предмет ожидания отсутствует в сабсцене',detail:`«${gateObject.name}» недоступен в «${location.name}». Выберите предмет этой локации: иначе игрок не сможет продолжить.`});
   for(const binding of b.bindings)for(const a of bindingActions(p,binding)){const object=p.objects.find(o=>o.id===a.target);if(object&&!isObjectInScene(object,location))issues.push({id:`action-location-${binding.id}-${a.id}`,beatId:b.id,eventId:binding.eventId,level:['move','pose','visibility','highlight','door'].includes(a.type)?'error':'warning',title:'Цель действия отсутствует в сабсцене',detail:`«${object.name}» недоступен в «${location.name}». Выберите объект этой локации или добавьте персонажа в её состав.`});}
   for(const binding of b.bindings)for(const a of bindingActions(p,binding))if(a.type==='camera'&&a.cameraId&&!sceneFor(p,b.id).cameras?.some(c=>c.id===a.cameraId))issues.push({id:`camera-missing-${b.id}-${binding.id}-${a.id}`,beatId:b.id,eventId:binding.eventId,level:'error',title:'Камера недоступна в этой сабсцене',detail:'Камера удалена или относится к другой локации. Выберите камеру этой сабсцены в действии «Сменить план».'});
+  for(const binding of b.bindings)for(const action of bindingActions(p,binding)){
+   const character=p.objects.find(object=>object.id===action.target&&object.type==='Персонаж');
+   if(action.type==='pose'&&character&&!enabledCharacterAnimations(character).some(clip=>clip.id===action.value))issues.push({id:`action-animation-${binding.id}-${action.id}`,beatId:b.id,eventId:binding.eventId,level:'error',title:'Анимация персонажа недоступна',detail:`«${character.name}»: анимация удалена, отключена или отсутствует в новой модели. Выберите анимацию из его пула.`});
+  }
   for(const phase of PHASES)for(const batch of batchesFor(b,phase.id)){
    const resources=new Map();for(const binding of batch.bindings){for(const a of bindingActions(p,binding)){const domain=TYPES[a.type]?.domain;if(!domain||['sound','pause','resume','stop','duck'].includes(a.type))continue;const key=`${a.target}/${domain}`;const prev=resources.get(key);if(prev&&prev!==binding.id)issues.push({id:`overlap-${b.id}-${batch.id}-${key}`,beatId:b.id,eventId:binding.eventId,batchId:batch.id,phase:phase.id,level:'error',title:'Два события управляют одним ресурсом',detail:`${p.objects.find(o=>o.id===a.target)?.name||a.target} · ${domain}. Две команды пересекаются. Разнесите их по шагам или измените объект.`,fix:'sequence-batch'});if(batch.mode==='PARALLEL'||['NONE','STARTED'].includes(binding.join))resources.set(key,binding.id);}}
   }
@@ -98,7 +113,14 @@ export function validateStudio(p){
    }
    if(Object.keys(binding.actionOverrides||{}).length){const claims=new Set();for(const a of bindingActions(p,binding)){const key=`${a.groupId}/${a.target}/${TYPES[a.type]?.domain}`;if(TYPES[a.type]?.domain&&a.type!=='sound'&&claims.has(key))issues.push({id:`local-${binding.id}-${key}`,beatId:b.id,eventId:binding.eventId,level:'error',title:'Локальные параметры создают конфликт',detail:'Два параллельных действия управляют одним объектом. Сбросьте локальные параметры или выберите другую цель.',fix:'reset-overrides'});claims.add(key);}}
   }
-  if(b.kind==='choice')for(const c of b.choices)if(!c.next)issues.push({id:`missing-choice-${b.id}-${c.id}`,beatId:b.id,level:'error',title:'У ответа нет продолжения',detail:'Откройте карту истории и выберите, куда ведёт этот ответ.'});
+  if(b.kind==='choice'&&!b.choices?.length)issues.push({id:`empty-choice-${b.id}`,beatId:b.id,level:'error',title:'У выбора нет ответов',detail:'Добавьте хотя бы один ответ.'});
+  if(b.kind==='choice')for(const c of b.choices)if(!c.next&&!b.next)issues.push({id:`missing-choice-${b.id}-${c.id}`,beatId:b.id,level:'error',title:'У ответа нет продолжения',detail:'Соедините общий выход «После выбора» или отдельный выход ответа на графе.'});
+  if(b.kind==='branch')for(const [port,target] of [['Да',b.trueNext],['Нет',b.falseNext]])if(!target)issues.push({id:`branch-output-${b.id}-${port}`,beatId:b.id,level:'error',title:`У проверки не подключён выход «${port}»`,detail:'Соедините оба выхода на графе.'});
+  const conditions=[...(b.kind==='branch'?[b.test]:[]),...(b.choices||[]).map(availabilityOf)].filter(Boolean);
+  for(const [index,condition]of conditions.entries()){
+   if(!condition.rules?.length)issues.push({id:`empty-condition-${b.id}-${index}`,beatId:b.id,level:'error',title:'Проверка не настроена',detail:'Добавьте сравнение с переменной.'});
+   for(const [r,rule]of (condition.rules||[]).entries())if(!rule.variable||(rule.variable!==ANSWER_VARIABLE&&!Object.hasOwn(p.variables||{},rule.variable)))issues.push({id:`condition-variable-${b.id}-${index}-${r}`,beatId:b.id,level:'error',title:'В проверке не выбрана переменная',detail:rule.variable||'Выберите переменную для сравнения.'});
+  }
   for(const edge of edgesFor(p,b))if(edge.to&&!allBeats(p).some(n=>n.id===edge.to))issues.push({id:`edge-${b.id}-${edge.to}`,beatId:b.id,level:'error',title:'Переход ведёт в удалённую реплику',detail:edge.to});
  }
  return [...new Map(issues.map(i=>[i.id,i])).values()];

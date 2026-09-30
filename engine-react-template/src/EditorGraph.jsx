@@ -1,3 +1,6 @@
+import {blueprintEdgeTypes} from './BlueprintEdge.jsx';
+import {storyPorts} from './choiceModel.js';
+import {clipboardCommand} from './editorClipboard.js';
 import React, {
   memo,
   useCallback,
@@ -13,7 +16,6 @@ import {
   Handle,
   Position,
   MiniMap,
-  MarkerType,
   applyNodeChanges,
   useReactFlow,
   ReactFlowProvider,
@@ -34,17 +36,10 @@ import "@xyflow/react/dist/style.css";
 import ActionFields from "./ActionFields.jsx";
 
 const color = {
-  dialogue: "#bc899f",
-  choice: "#c2a06c",
-  gate: "#86adb5",
-  merge: "#a398bc",
-  end: "#b98e9e",
-  portal: "#839dbd",
-  event: "#b69bba",
-  action: "#97aba1",
-  marker: "#8d939d",
-  fork: "#b4a4bd",
-  join: "#a5b7a8",
+  dialogue: "var(--text-secondary)", choice: "var(--warning)",
+  gate: "var(--info)", merge: "var(--text-secondary)", end: "var(--warning)",
+  portal: "var(--info)", event: "var(--accent)", action: "var(--success)",
+  marker: "var(--text-muted)", fork: "var(--accent)", join: "var(--success)",
 };
 export function storyGraph(project, selectedId, scope = "chapter") {
   const selected =
@@ -94,36 +89,12 @@ export function storyGraph(project, selectedId, scope = "chapter") {
           label: p.label,
           count: b.bindings.filter((x) => x.hook === p.id).length,
         })),
-        ports:
-          b.kind === "choice"
-            ? b.choices.map((c) => ({
-                id: "choice:" + c.id,
-                label: c.label,
-                condition: c.condition,
-                threshold: c.threshold,
-              }))
-            : b.kind !== "end"
-              ? [{ id: "next", label: "Дальше" }]
-              : [],
+        ports:storyPorts(b),
       },
       width: 252,
       height: b.kind === "choice" ? 135 + b.choices.length * 40 : 190,
     });
-    const outs =
-      b.kind === "choice"
-        ? b.choices.map((c) => ({
-            to: c.next,
-            port: "choice:" + c.id,
-            label:
-              c.condition === "trust"
-                ? `Доверие ≥ ${c.threshold ?? 3}`
-                : c.condition === "letter"
-                  ? "Письмо найдено"
-                  : "",
-          }))
-        : b.next
-          ? [{ to: b.next, port: "next", label: "" }]
-          : [];
+    const outs=storyPorts(b).map(port=>({to:port.next,port:port.id,label:port.condition||port.label}));
     for (const out of outs) {
       if (!out.to) continue;
       const target = allBeats(project).find((x) => x.id === out.to);
@@ -473,7 +444,7 @@ const EditorNode = memo(function EditorNode({ id, data, selected }) {
     >
       <Handle type="target" position={Position.Left} id="in" />
       <header className="node-grab">
-        <Icon name={icon} size={15} />
+        {kind !== "dialogue" && <Icon name={icon} size={15} />}
         <strong>{title}</strong>
         {data.active ? (
           <Icon name="Play" size={12} />
@@ -660,15 +631,17 @@ function GraphCanvas({
   preview,
   positions = {},
   onPositions,
-  onContext,
+  onContext, onClipboard,
   onReady,
 }) {
   const api = useReactFlow(),
     [nodes, setNodes] = useState([]),
     [zoom, setZoom] = useState(1),
+    [showMinimap, setShowMinimap] = useState(false),
     [selectedEdge, setSelectedEdge] = useState(null),
     initKey = useRef(null),
-    container = useRef();
+    container = useRef(),
+    panGesture = useRef(null);
   const graph = useMemo(
     () =>
       mode === "story"
@@ -806,6 +779,7 @@ function GraphCanvas({
   }, [selectedId, mode, graphKey, focus, graph]);
   useEffect(() => {
     onReady?.({
+      clipboard:()=>({nodes:api.getNodes(),graphKey}),
       focus,
       fit: () => api.fitView({ padding: 0.12, maxZoom: 1, duration: 240 }),
       zoomIn: () => api.zoomIn(),
@@ -819,28 +793,21 @@ function GraphCanvas({
   }, [focus, api, graph, onReady, graphKey, onPositions]);
   const edges = graph.edges.map((e) => ({
     ...e,
-    type: "smoothstep",
-    pathOptions: { borderRadius: 6, offset: 10 },
-    markerEnd: {
-      type: MarkerType.ArrowClosed,
-      width: 15,
-      height: 15,
-      color: "#97919f",
-    },
-    style: {
-      stroke: e.id === selectedEdge ? "#d9a8bc" : "#807c8b",
-      strokeWidth: e.id === selectedEdge ? 2 : 1.5,
-    },
-    labelStyle: { fill: "#b8b1bf", fontSize: 11 },
-    labelBgStyle: { fill: "#202127" },
-    labelBgPadding: [6, 3],
-    labelBgBorderRadius: 3,
+    type:'blueprint',
+    data:{...e.data,highlighted:e.id===selectedEdge,showLabel:true},
   }));
   return (
-    <div className="graph-canvas" ref={container}>
+    <div className="graph-canvas" ref={container} tabIndex={0}
+      onCopy={e=>{if(e.target.isContentEditable||e.target.closest('input,textarea,select,[role="textbox"]'))return;e.preventDefault();e.stopPropagation();onClipboard?.('copy',api.getNodes(),graphKey);e.clipboardData?.setData('text/plain','Sacura · ноды');}}
+      onPaste={e=>{if(e.target.isContentEditable||e.target.closest('input,textarea,select,[role="textbox"]'))return;e.preventDefault();e.stopPropagation();onClipboard?.('paste',api.getNodes(),graphKey);}}
+      onKeyDown={e=>{const command=clipboardCommand(e);if(command){e.preventDefault();e.stopPropagation();onClipboard?.(command,api.getNodes(),graphKey);}}}
+      onPointerDownCapture={e => {panGesture.current = {x:e.clientX,y:e.clientY,moved:false};}}
+      onPointerMoveCapture={e => {const pan=panGesture.current;if(pan && e.buttons && Math.hypot(e.clientX-pan.x,e.clientY-pan.y)>5)pan.moved=true;}}
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        edgeTypes={blueprintEdgeTypes}
         nodeTypes={nodeTypes}
         onNodesChange={(changes) =>
           setNodes((ns) => applyNodeChanges(changes, ns))
@@ -854,13 +821,14 @@ function GraphCanvas({
         onNodeClick={(_, n) => {
           if (n.data.kind === "portal") onSelect?.(n.data.beat.id);
           else onSelect?.(mode === "story" ? n.id : n.data);
+          container.current.focus({preventScroll:true});
         }}
         onNodeDoubleClick={(_, n) => onOpen?.(n.data)}
         onEdgeClick={(_, e) => setSelectedEdge(e.id)}
-        onPaneClick={() => setSelectedEdge(null)}
+        onPaneClick={() => {setSelectedEdge(null);container.current.focus({preventScroll:true});}}
         onPaneContextMenu={(e) => {
           e.preventDefault();
-          onContext?.();
+          if (!panGesture.current?.moved) onContext?.({x:e.clientX,y:e.clientY,position:api.screenToFlowPosition({x:e.clientX,y:e.clientY}),graphKey});
         }}
         onConnect={(c) => onConnect?.(c)}
         onReconnect={(e, c) =>
@@ -881,18 +849,18 @@ function GraphCanvas({
         colorMode="dark"
       >
         <Background
-          variant={BackgroundVariant.Lines}
-          gap={24}
-          size={0.5}
-          color="#303139"
+          variant={BackgroundVariant.Dots}
+          gap={28}
+          size={0.7}
+          color="var(--graph-grid)"
         />
-        <MiniMap
+        {showMinimap && <MiniMap
           pannable
           zoomable
-          nodeColor={(n) => color[n.data.kind] || "#917b98"}
-          maskColor="#15161dc4"
+          nodeColor="var(--text-muted)"
+          maskColor="var(--app-background)"
           position="bottom-right"
-        />
+        />}
         <Panel position="bottom-left">
           <div className="graph-navigation">
             <Button
@@ -908,6 +876,7 @@ function GraphCanvas({
               title="Увеличить масштаб"
               onClick={() => api.zoomIn()}
             />
+            <Button icon="Map" title="Миникарта графа" aria-pressed={showMinimap} onClick={() => setShowMinimap(v => !v)} />
             <span />
             <Button
               icon="Focus"

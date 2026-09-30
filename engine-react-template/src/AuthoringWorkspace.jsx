@@ -2,34 +2,227 @@ import React,{useEffect,useRef,useState} from 'react';
 import {Icon,Button} from './StudioParts.jsx';
 import ActionFields from './ActionFields.jsx';
 import {sceneFor} from './studioModel.js';
-import {TYPES,makeAction,uid} from './model.js';
+import {TYPES,uid} from './model.js';
 import {LIBRARY_KEYS,blankAsset,copyAction,copyGroup,eventFromAsset,authoringProblems} from './authoringModel.js';
+import {ACTION_CATEGORIES,ACTION_HINTS,contextualAction,actionUnavailable,describeAction,actionTiming,actionCount} from './authoringPresentation.js';
+import './authoringWorkspace.css';
 
-const kinds={action:['Действия','Действие','MousePointer2','Одна команда: куда пойти, какой звук включить или что изменить.'],group:['Группы','Группа действий','Columns2','Действия в группе запускаются одновременно.'],event:['События','Событие','Layers','Группы выполняются по очереди. Внутри группы действия идут вместе.']};
-export default function AuthoringWorkspace({project,request,mutate,onGraph,onPreview,onPlace,onNotice,beat,hidden}){
- const [kind,setKind]=useState('action'),[draft,setDraft]=useState(null),[search,setSearch]=useState(''),[palette,setPalette]=useState(null),[hook,setHook]=useState('ON_START'),[saved,setSaved]=useState(false),[attempted,setAttempted]=useState(false);
- const drafts=useRef(new Map()),bases=useRef(new Map()),current=useRef({kind,draft}),seen=useRef();current.current={kind,draft};
- const isDirty=(k,d)=>d&&JSON.stringify(d)!==bases.current.get(k+d.id);
- function open(k,asset){const old=current.current;if(isDirty(old.kind,old.draft))drafts.current.set(old.kind+old.draft.id,old.draft);else if(old.draft)drafts.current.delete(old.kind+old.draft.id);setKind(k);if(asset){const key=k+asset.id,canonical=project[LIBRARY_KEYS[k]].find(a=>a.id===asset.id);if(!bases.current.has(key)||!drafts.current.has(key))bases.current.set(key,canonical?JSON.stringify(canonical):null);setDraft(structuredClone(drafts.current.get(key)||canonical||asset));}else setDraft(null);setSaved(false);setAttempted(false);setPalette(null);}
- useEffect(()=>{const {kind:k,draft:d}=current.current;if(!d||isDirty(k,d))return;const canonical=project[LIBRARY_KEYS[k]].find(a=>a.id===d.id);if(canonical){bases.current.set(k+d.id,JSON.stringify(canonical));setDraft(structuredClone(canonical));}else setDraft(null);},[project]);
- useEffect(()=>{if(!request||seen.current===request.token)return;seen.current=request.token;const asset=request.id?project[LIBRARY_KEYS[request.kind]].find(a=>a.id===request.id):request.draft||blankAsset(request.kind,request.type,request.target);open(request.kind,asset);},[request]);
- const patch=v=>{setDraft(d=>({...d,...v}));setSaved(false);};
- const edit=fn=>{setDraft(d=>{const n=structuredClone(d);fn(n);return n;});setSaved(false);};
- const problems=draft?authoringProblems(kind,draft):[];
- const groups=draft?(kind==='event'?draft.groups:kind==='group'?[draft]:[]):[];
- const patchGroup=(id,fn)=>edit(d=>fn(kind==='group'?d:d.groups.find(g=>g.id===id)));
- const save=()=>{setAttempted(true);if(problems.length)return false;const original=project[LIBRARY_KEYS[kind]].find(a=>a.id===draft.id),base=bases.current.get(kind+draft.id);if(original&&base&&JSON.stringify(original)!==base&&isDirty(kind,draft)){onNotice('Шаблон изменён в другом редакторе. Нажмите «Загрузить сохранённое», чтобы не затереть изменения.');return false;}const value=structuredClone(draft);value.name=value.name.trim();mutate(p=>{const list=p[LIBRARY_KEYS[kind]],index=list.findIndex(a=>a.id===value.id);if(index<0)list.push(value);else list[index]=value;});drafts.current.delete(kind+draft.id);bases.current.set(kind+draft.id,JSON.stringify(value));setDraft(value);current.current={kind,draft:value};setSaved(true);onNotice(`${kinds[kind][1]} «${value.name}» сохранено в библиотеку.`);return true;};
- const stored=project[LIBRARY_KEYS[kind]]||[], list=[...stored,...[...drafts.current.entries()].filter(([key,a])=>key.startsWith(kind)&&!stored.some(x=>x.id===a.id)&&a.id!==draft?.id).map(([,a])=>a),...(draft&&!stored.some(a=>a.id===draft.id)?[draft]:[])];
- return <div className="authoring-workspace" hidden={hidden}>
-  <header className="authoring-header"><div><strong>Библиотека действий и событий</strong><small>Создать → настроить → использовать в сцене</small></div><div className="authoring-create">{Object.entries(kinds).map(([k,v])=><Button key={k} icon="Plus" className={kind===k?'primary':''} onClick={()=>open(k,blankAsset(k))}>{v[1]}</Button>)}</div></header>
-  <div className="authoring-body"><aside className="authoring-library"><nav>{Object.entries(kinds).map(([k,v])=><button key={k} className={k===kind?'active':''} onClick={()=>open(k,null)}><Icon name={v[2]} size={14}/>{v[0]}<small>{project[LIBRARY_KEYS[k]]?.length||0}</small></button>)}</nav><label className="authoring-search"><Icon name="Search" size={14}/><input placeholder="Найти в библиотеке…" value={search} onChange={e=>setSearch(e.target.value)}/></label><div className="authoring-items">{list.filter(a=>(a.name||"Черновик").toLowerCase().includes(search.toLowerCase())).map(a=><button key={a.id} className={draft?.id===a.id?'selected':''} onClick={()=>open(kind,a)}><Icon name={kind==='action'?TYPES[a.type]?.icon:kinds[kind][2]} size={16}/><span>{a.name||"Без названия"}{!stored.some(x=>x.id===a.id)&&<em className="draft-tag">Черновик</em>}<small>{kind==='action'?TYPES[a.type]?.label:kind==='group'?`${a.actions.length} действий вместе`:`${a.groups.length} шагов по очереди`}</small></span></button>)}</div><p>Шаблоны действий и групп вставляются как копии. Уже собранные события сохраняют свои настройки.</p></aside>
-  <main className="authoring-main">{!draft?<div className="authoring-welcome"><Icon name={kinds[kind][2]} size={32}/><h2>{kinds[kind][0]}</h2><p>{kinds[kind][3]}</p><Button className="primary" icon="Plus" onClick={()=>open(kind,blankAsset(kind))}>Создать {kinds[kind][1].toLowerCase()}</Button><div className="authoring-explainer"><span>Действие<small>Подойти к окну</small></span><Icon name="ArrowRight"/><span>Группа<small>Идти + говорить</small></span><Icon name="ArrowRight"/><span>Событие<small>Подойти → поговорить → уйти</small></span></div></div>:<>
-   <div className="authoring-title"><span className="authoring-kind"><Icon name={kinds[kind][2]} size={15}/>{kinds[kind][1]}</span><input aria-label="Название в библиотеке" placeholder={kind==='event'?'Например, Алиса находит письмо':kind==='group'?'Например, Реакция на письмо':'Например, Подойти к письму'} value={draft.name} onChange={e=>patch({name:e.target.value})}/><p>{kinds[kind][3]}</p>{kind==='event'&&stored.some(e=>e.id===draft.id)&&<p>Изменения шаблона применятся к его размещениям: {project.chapters.flatMap(c=>c.beats).flatMap(b=>b.bindings).filter(b=>b.eventId===draft.id).length}. Локальные параметры размещений сохраняются.</p>}</div>
-   {kind==='action'?<><div className="action-type-grid">{Object.entries(TYPES).map(([type,t])=><button key={type} className={draft.type===type?'active':''} onClick={()=>{setSaved(false);setDraft(d=>{const target=project.objects.find(o=>o.id===d.target),keep=['move','visibility','highlight','sound','door'].includes(type)||(type==='pose'&&target?.type==='Персонаж');return {...makeAction(type,keep&&target?target.id:undefined),id:d.id,name:d.name,description:d.description};});}}><Icon name={t.icon} size={16}/>{t.label}</button>)}</div><section className="authoring-parameters"><h3><Icon name={TYPES[draft.type]?.icon}/>{TYPES[draft.type]?.label} · параметры</h3><ActionFields sceneId={sceneFor(project,beat?.id).id} project={project} action={draft} onChange={patch}/><ActionPolicy action={draft} onChange={patch}/></section></>:<div className="authoring-composition">{groups.map((g,index)=><React.Fragment key={g.id}>{index>0&&<div className="authoring-then"><Icon name="ArrowDown" size={15}/> Затем · когда предыдущий шаг готов</div>}<section className="authoring-group"><header><b>{String(index+1).padStart(2,'0')}</b>{kind==='event'?<input aria-label={`Название шага ${index+1}`} value={g.name} placeholder="Название шага" onChange={e=>patchGroup(g.id,x=>x.name=e.target.value)}/>:<strong>Действия группы</strong>}<span><Icon name="Columns2" size={14}/>Одновременно</span>{kind==='event'&&<><Button icon="ArrowUp" title="Шаг раньше" disabled={index===0} onClick={()=>edit(d=>{[d.groups[index-1],d.groups[index]]=[d.groups[index],d.groups[index-1]];})}/><Button icon="ArrowDown" title="Шаг позже" disabled={index===groups.length-1} onClick={()=>edit(d=>{[d.groups[index+1],d.groups[index]]=[d.groups[index],d.groups[index+1]];})}/><Button icon="Trash2" title="Удалить шаг" onClick={()=>edit(d=>d.groups=d.groups.filter(x=>x.id!==g.id))}/></>}</header><div className="authoring-parallel">{g.actions.map(a=><article key={a.id}><div className="authoring-action-title"><Icon name={TYPES[a.type]?.icon} size={16}/><strong>{a.name||TYPES[a.type]?.label}</strong><Button icon="X" title="Убрать действие" onClick={()=>patchGroup(g.id,x=>x.actions=x.actions.filter(x=>x.id!==a.id))}/></div><ActionFields sceneId={sceneFor(project,beat?.id).id} project={project} action={a} onChange={v=>patchGroup(g.id,x=>Object.assign(x.actions.find(x=>x.id===a.id),v))}/><ActionPolicy action={a} onChange={v=>patchGroup(g.id,x=>Object.assign(x.actions.find(x=>x.id===a.id),v))}/></article>)}</div><button className="authoring-add" onClick={()=>setPalette(palette===g.id?null:g.id)}><Icon name="Plus" size={16}/>{g.actions.length?'Добавить параллельное действие':'Добавить первое действие'}</button>{palette===g.id&&<div className="authoring-palette"><strong>Из библиотеки</strong><div>{project.actionTemplates.map(a=><button key={a.id} onClick={()=>{patchGroup(g.id,x=>x.actions.push(copyAction(a)));setPalette(null);}}><Icon name={TYPES[a.type]?.icon} size={14}/>{a.name}</button>)}</div><strong>Новое действие в этом шаге</strong><div>{Object.entries(TYPES).map(([type,t])=><button key={type} onClick={()=>{patchGroup(g.id,x=>x.actions.push(makeAction(type)));setPalette(null);}}><Icon name={t.icon} size={14}/>{t.label}</button>)}</div></div>}<footer><Icon name="GitMerge" size={14}/> Закончить движения и озвучку · запустить фон → следующий шаг</footer></section></React.Fragment>)}{kind==='event'&&<><button className="authoring-add next-step" onClick={()=>edit(d=>d.groups.push({id:uid('group'),name:`Шаг ${d.groups.length+1}`,actions:[]}))}><Icon name="Plus"/>Добавить {groups.length?'следующий':'первый'} шаг</button><details className="authoring-group-library"><summary>Вставить готовую группу</summary>{project.groupTemplates.map(g=><button key={g.id} onClick={()=>edit(d=>d.groups.push(copyGroup(g)))}><Icon name="Columns2" size={14}/>{g.name}<small>{g.actions.length} действий</small></button>)}</details><label className="authoring-lifetime">После последнего шага<select value={draft.retention} onChange={e=>patch({retention:e.target.value,...(e.target.value==='HOLD_UNTIL_REPLACED'&&!draft.channel?{channel:`${draft.groups[0]?.actions[0]?.target||'world'}.${draft.groups[0]?.actions[0]?.type||'effect'}`}:{})})}><option value="AUTO_CLOSE_ON_FLOW_END">Завершить событие</option><option value="HOLD_UNTIL_STOPPED">Продолжать до команды «Стоп»</option><option value="HOLD_UNTIL_REPLACED">Продолжать до замены</option></select></label>{draft.retention==='HOLD_UNTIL_REPLACED'&&<label className="authoring-lifetime">Роль для замены<input aria-label="Роль события" value={draft.channel||''} onChange={e=>patch({channel:e.target.value})}/></label>}<label className="authoring-lifetime">Сохранять при переходе<select value={draft.owner||'SubScene'} onChange={e=>patch({owner:e.target.value})}><option value="SubScene">Только эта сабсцена</option><option value="Scene">Между локациями сцены</option><option value="GameSession">В течение игры</option></select></label></>}</div>}
-   {attempted&&problems.length>0&&<div className="authoring-errors" role="alert">{problems.map((p,i)=><p key={i}><Icon name="TriangleAlert" size={15}/>{p}</p>)}</div>}
-   <footer className="authoring-save"><Button icon="Save" className="primary" onClick={save}>{saved?'Сохранено':'Сохранить в библиотеку'}</Button><span>{saved?'Доступно для повторного использования':stored.some(a=>a.id===draft.id)?'Редактирование шаблона':'Черновик · в сценарий ещё не добавлен'}</span>{stored.some(a=>a.id===draft.id)&&<Button icon="RotateCcw" onClick={()=>{const original=stored.find(a=>a.id===draft.id);drafts.current.delete(kind+draft.id);bases.current.set(kind+draft.id,JSON.stringify(original));setDraft(structuredClone(original));setSaved(false);}}>Загрузить сохранённое</Button>}</footer>
-   <section className="authoring-use"><div><strong>{kind==='event'?'Использовать событие':'Собрать событие из этого шаблона'}</strong><small>{kind==='event'?`${beat.id} · ${beat.speaker} · ${beat.text.slice(0,85)}`:'Создаст новый черновик. Вы сможете добавить следующие шаги.'}</small></div>{kind==='event'?<><select aria-label="Когда запустить новое событие" value={hook} onChange={e=>setHook(e.target.value)}><option value="BEFORE">До реплики</option><option value="ON_START">Во время реплики</option><option value="AFTER">После реплики</option></select><Button icon="Plus" onClick={()=>{if(save())onPlace(draft,hook);}}>В реплику</Button><Button icon="Workflow" onClick={()=>{if(save())onGraph(draft.id);}}>Открыть граф</Button></>:<Button icon="Layers" onClick={()=>{if(save())open('event',eventFromAsset(kind,draft));}}>Создать событие</Button>}<Button icon="Play" onClick={()=>{setAttempted(true);if(!problems.length)onPreview(eventFromAsset(kind,draft));}}>Проверить в сцене</Button></section>
-  </>}</main></div>
- </div>;
+const KINDS={
+  event:{plural:'События',label:'Событие',icon:'Layers',hint:'Группы по очереди',create:'Создать событие'},
+  group:{plural:'Группы действий',label:'Группа действий',icon:'Columns2',hint:'Команды одновременно',create:'Создать группу'},
+  action:{plural:'Действия',label:'Действие',icon:'MousePointer2',hint:'Одна команда',create:'Создать действие'},
+};
+const newNames={action:'Новое действие',group:'Новая группа',event:'Новое событие'};
+
+export default function AuthoringWorkspace({project,request,mutate,onGraph,onPreview,onPlace,onNotice,beat,hidden}) {
+  const [kind,setKind]=useState('event'),[draft,setDraft]=useState(null),[search,setSearch]=useState('');
+  const [picker,setPicker]=useState(null),[selected,setSelected]=useState(null),[hook,setHook]=useState('ON_START');
+  const [saved,setSaved]=useState(false),[attempted,setAttempted]=useState(false),[undo,setUndo]=useState(null),[help,setHelp]=useState(false);
+  const drafts=useRef(new Map()),bases=useRef(new Map()),recent=useRef({}),current=useRef({kind,draft}),seen=useRef(),errors=useRef(),title=useRef(),canvas=useRef(),inspector=useRef(),root=useRef();
+  current.current={kind,draft};
+  const scene=sceneFor(project,beat?.id);
+  const isDirty=(k,d)=>d&&JSON.stringify(d)!==(bases.current.has(k+d.id)?bases.current.get(k+d.id):JSON.stringify(project[LIBRARY_KEYS[k]].find(a=>a.id===d.id)));
+  function open(k,asset) {
+    const old=current.current;
+    if(isDirty(old.kind,old.draft))drafts.current.set(old.kind+old.draft.id,old.draft);
+    else if(old.draft)drafts.current.delete(old.kind+old.draft.id);
+    if(old.draft)recent.current[old.kind]=old.draft;
+    setKind(k);
+    if(asset) {
+      const key=k+asset.id,canonical=project[LIBRARY_KEYS[k]].find(a=>a.id===asset.id);
+      if(!bases.current.has(key)||!drafts.current.has(key))bases.current.set(key,canonical?JSON.stringify(canonical):null);
+      setDraft(structuredClone(drafts.current.get(key)||canonical||asset));
+    } else setDraft(null);
+    setSaved(false);setAttempted(false);setPicker(null);setSelected(null);setUndo(null);setHelp(false);
+  }
+  function create(k,type,target) {
+    if(k==='action'&&!type){setPicker({mode:'create',target});return;}
+    const asset=k==='action'?{...contextualAction(type,project,scene,target),name:TYPES[type].label}: {...blankAsset(k),name:newNames[k]};
+    open(k,asset);
+  }
+  useEffect(()=>{
+    const {kind:k,draft:d}=current.current;
+    if(!d||isDirty(k,d))return;
+    const canonical=project[LIBRARY_KEYS[k]].find(a=>a.id===d.id);
+    if(canonical){bases.current.set(k+d.id,JSON.stringify(canonical));setDraft(structuredClone(canonical));}else setDraft(null);
+  },[project]);
+  useEffect(()=>{
+    if(!request||seen.current===request.token)return;
+    seen.current=request.token;
+    if(request.id||request.draft)open(request.kind,request.draft||project[LIBRARY_KEYS[request.kind]].find(a=>a.id===request.id));
+    else create(request.kind,request.type,request.target);
+  },[request]);
+  useEffect(()=>{if(hidden)setPicker(null);},[hidden]);
+  useEffect(()=>{canvas.current?.scrollTo(0,0);root.current?.querySelector('.al-library-item.selected')?.scrollIntoView({block:'nearest'});},[draft?.id]);
+  useEffect(()=>{inspector.current?.scrollTo(0,0);root.current?.querySelector('.al-action-card.selected')?.scrollIntoView({block:'nearest'});},[selected?.actionId,draft?.id]);
+  const patch=v=>{setDraft(d=>({...d,...v}));setSaved(false);};
+  const edit=fn=>{setDraft(d=>{const n=structuredClone(d);fn(n);return n;});setSaved(false);};
+  const groups=draft?(kind==='event'?draft.groups:kind==='group'?[draft]:[]):[];
+  const selectedGroup=groups.find(g=>g.id===selected?.groupId);
+  const selectedAction=kind==='action'?draft:selectedGroup?.actions.find(a=>a.id===selected?.actionId);
+  const patchGroup=(id,fn)=>edit(d=>{const g=kind==='group'?d:d.groups.find(g=>g.id===id);if(g)fn(g);});
+  const patchAction=v=>kind==='action'?patch(v):patchGroup(selected.groupId,g=>Object.assign(g.actions.find(a=>a.id===selected.actionId),v));
+  const problems=draft?authoringProblems(kind,draft):[];
+  const stored=project[LIBRARY_KEYS[kind]]||[];
+  function items(k) {
+    const canonical=project[LIBRARY_KEYS[k]]||[];
+    return [...canonical.map(a=>k===kind&&a.id===draft?.id?draft:drafts.current.get(k+a.id)||a),
+      ...[...drafts.current.entries()].filter(([key,a])=>key.startsWith(k)&&!canonical.some(x=>x.id===a.id)&&!(k===kind&&a.id===draft?.id)).map(([,a])=>a),
+      ...(k===kind&&draft&&!canonical.some(a=>a.id===draft.id)?[draft]:[])];
+  }
+  const list=items(kind).filter(a=>(a.name||'Без названия').toLowerCase().includes(search.toLowerCase()));
+  const dirty=draft&&isDirty(kind,draft);
+  function validate() {
+    setAttempted(true);
+    if(problems.length){requestAnimationFrame(()=>errors.current?.focus());return false;}
+    return true;
+  }
+  function save() {
+    if(!validate())return false;
+    const original=stored.find(a=>a.id===draft.id),base=bases.current.get(kind+draft.id);
+    if(original&&base&&JSON.stringify(original)!==base&&isDirty(kind,draft)) {
+      onNotice('Шаблон изменён в другом редакторе. Загрузите сохранённую версию в меню рядом с названием.');return false;
+    }
+    const value=structuredClone(draft);value.name=value.name.trim();
+    mutate(p=>{const collection=p[LIBRARY_KEYS[kind]],index=collection.findIndex(a=>a.id===value.id);if(index<0)collection.push(value);else collection[index]=value;});
+    drafts.current.delete(kind+draft.id);bases.current.set(kind+draft.id,JSON.stringify(value));
+    setDraft(value);current.current={kind,draft:value};setSaved(true);setUndo(null);
+    onNotice(`Сохранено в библиотеку: ${value.name}`);return true;
+  }
+  function remove(fn,label) {setUndo({draft:structuredClone(draft),label});edit(fn);setSelected(null);}
+  function chooseAction(type,template) {
+    const a=template?copyAction(template):contextualAction(type,project,scene,picker.target);
+    if(picker.mode==='create'){open('action',{...a,name:template?.name||TYPES[type].label});return;}
+    if(picker.mode==='replace') {
+      const old=selectedAction;
+      const replacement={...a,id:old.id,name:old.name===TYPES[old.type]?.label?TYPES[type].label:old.name,description:old.description};
+      if(kind==='action'){setDraft(replacement);setSaved(false);}
+      else patchGroup(selected.groupId,g=>{g.actions=g.actions.map(item=>item.id===old.id?replacement:item);});
+    } else if(picker.mode==='next') {
+      const g={id:uid('group'),name:`Группа ${groups.length+1}`,actions:[a]};
+      edit(d=>d.groups.push(g));setSelected({groupId:g.id,actionId:a.id});
+    } else {patchGroup(picker.groupId,g=>g.actions.push(a));setSelected({groupId:picker.groupId,actionId:a.id});}
+    setPicker(null);
+  }
+  function chooseGroup(g) {edit(d=>d.groups.push(copyGroup(g)));setPicker(null);setSelected(null);}
+  const count=groups.reduce((n,g)=>n+g.actions.length,0);
+  const placements=kind==='event'&&draft?project.chapters.flatMap(c=>c.beats).flatMap(b=>b.bindings||[]).filter(b=>b.eventId===draft.id).length:0;
+  const info=KINDS[kind];
+  return <div ref={root} className="authoring-workspace al-workspace" hidden={hidden}>
+    <header className="al-header">
+      <div className="al-library-title"><Icon name="LibraryBig" size={21}/><h1>Библиотека действий и событий</h1></div>
+      <Button icon="CircleHelp" className="al-help-button" aria-expanded={help} onClick={()=>setHelp(!help)}>Как это устроено</Button>
+    </header>
+    <div className="al-tabs" role="tablist" aria-label="Разделы библиотеки">
+      {Object.entries(KINDS).map(([k,v])=><button role="tab" aria-selected={kind===k} id={`al-tab-${k}`} aria-controls="al-panel" tabIndex={kind===k?0:-1} key={k} className={kind===k?'active':''} onClick={()=>{setSearch('');open(k,recent.current[k]);}} onKeyDown={e=>{
+        const keys=Object.keys(KINDS),i=keys.indexOf(k);let next;
+        if(e.key==='ArrowRight')next=keys[(i+1)%keys.length];if(e.key==='ArrowLeft')next=keys[(i+keys.length-1)%keys.length];if(e.key==='Home')next=keys[0];if(e.key==='End')next=keys.at(-1);
+        if(next){e.preventDefault();setSearch('');open(next,recent.current[next]);document.getElementById(`al-tab-${next}`)?.focus();}
+      }}><Icon name={v.icon} size={19}/><span><strong>{v.plural}</strong><small>{v.hint}</small></span><b>{items(k).length}</b></button>)}
+    </div>
+    {help&&<div className="al-help"><ConceptMap/><Button icon="X" title="Закрыть подсказку" onClick={()=>setHelp(false)}/></div>}
+    <div className="al-body" id="al-panel" role="tabpanel" aria-labelledby={`al-tab-${kind}`}>
+      <aside className="al-library" aria-label={info.plural}>
+        <div className="al-library-tools"><Button icon="Plus" onClick={()=>create(kind)}>{info.create}</Button><label className="al-search"><Icon name="Search" size={16}/><input aria-label={`Найти: ${info.plural}`} placeholder="Поиск в библиотеке" value={search} onChange={e=>setSearch(e.target.value)}/>{search&&<Button icon="X" title="Очистить поиск" onClick={()=>setSearch('')}/>}</label></div>
+        <button className={`al-overview ${!draft?'active':''}`} onClick={()=>open(kind,null)}><Icon name="LayoutGrid" size={15}/>Обзор</button>
+        <div className="al-items">{list.map(a=>{
+          const unsaved=!stored.some(x=>x.id===a.id)||isDirty(kind,a);
+          return <button key={a.id} className={`al-library-item ${draft?.id===a.id?'selected':''}`} aria-current={draft?.id===a.id?'true':undefined} onClick={()=>open(kind,a)}>
+            <span className="al-item-icon"><Icon name={kind==='action'?TYPES[a.type]?.icon:info.icon} size={18}/></span><span><strong>{a.name||'Без названия'}</strong><small>{kind==='action'?TYPES[a.type]?.label:kind==='group'?`${a.actions.length} · одновременно`:`${a.groups.length} · по очереди`}</small>{unsaved&&<em>Черновик</em>}</span>
+          </button>;
+        })}{!list.length&&<div className="al-list-empty"><Icon name={search?'SearchX':info.icon} size={24}/><p>{search?'Ничего не найдено':'Здесь будут ваши '+info.plural.toLowerCase()}</p>{search&&<button onClick={()=>setSearch('')}>Сбросить поиск</button>}</div>}</div>
+        <div className="al-library-foot"><Icon name="BookCopy" size={15}/><span>{kind==='event'?'Соберите один раз, используйте в истории.':'Вставляется в событие как независимая копия.'}</span></div>
+      </aside>
+      {!draft?<main className="al-overview-main"><Welcome kind={kind} onCreate={()=>create(kind)} onKind={k=>{setSearch('');open(k,null);}}/></main>:<div className="al-editor">
+        <header className="al-editor-header">
+          <div className="al-identity"><span className="al-eyebrow"><Icon name={info.icon} size={14}/>{info.label}<span className="al-save-state" role="status">{saved&&!dirty?'Сохранено':dirty?'Черновик':'В библиотеке'}</span></span><label className="al-name"><span className="al-sr-only">Название в библиотеке</span><input ref={title} value={draft.name} placeholder={newNames[kind]} aria-invalid={attempted&&!draft.name.trim()||undefined} onChange={e=>patch({name:e.target.value})}/><Icon name="Pencil" size={14}/></label></div>
+          <div className="al-editor-actions"><Button icon="Play" title="Проверить в 3D-сцене" onClick={()=>{if(validate())onPreview(eventFromAsset(kind,draft));}}>Проверить</Button><Button icon={saved&&!dirty?'Check':'CheckCheck'} className="al-primary" onClick={save}>Сохранить</Button><details className="al-menu"><summary aria-label="Другие действия"><Icon name="Ellipsis"/></summary><div><Button icon="Pencil" onClick={()=>{title.current?.focus();title.current?.select();}}>Переименовать</Button>{stored.some(a=>a.id===draft.id)&&<Button icon="RotateCcw" onClick={()=>{const original=stored.find(a=>a.id===draft.id);setUndo({draft:structuredClone(draft),label:'Загружена сохранённая версия'});drafts.current.delete(kind+draft.id);bases.current.set(kind+draft.id,JSON.stringify(original));setDraft(structuredClone(original));setSaved(false);setSelected(null);}}>Загрузить сохранённое</Button>}{kind==='event'&&<Button icon="Workflow" onClick={()=>{if(save())onGraph(draft.id);}}>Открыть граф</Button>}</div></details></div>
+        </header>
+        {attempted&&problems.length>0&&<div ref={errors} tabIndex={-1} className="al-errors" role="alert"><Icon name="TriangleAlert" size={18}/><div><strong>Осталось поправить</strong>{problems.map((p,i)=><p key={i}>{p}</p>)}</div></div>}
+        {undo&&<div className="al-undo" role="status"><span>{undo.label}</span><Button icon="Undo2" onClick={()=>{setDraft(undo.draft);setSaved(false);setUndo(null);}}>Вернуть</Button><Button icon="X" title="Скрыть уведомление" onClick={()=>setUndo(null)}/></div>}
+        <div className={`al-editor-body ${selectedAction?'has-selection':''}`}>
+          <main ref={canvas} className="al-canvas" aria-label="Сборка">
+            {kind==='action'?<ActionStage action={draft} project={project} scene={scene}/>:<>
+              <div className="al-canvas-heading"><div><h2>{kind==='event'?'Последовательность события':'Одновременный запуск'}</h2><span>{kind==='event'?'Сверху вниз · внутри группы вместе':'Каждая карточка — отдельное действие'}</span></div><span className="al-count">{actionCount(count)}</span></div>
+              {groups.length>0&&<div className="al-endpoint"><Icon name="CirclePlay" size={17}/>{kind==='event'?'Начало события':'Старт группы'}</div>}
+              {groups.map((g,index)=><React.Fragment key={g.id}>
+                {index>0&&<div className="al-connector"><span/><Icon name="ArrowDown" size={16}/><small>Затем</small></div>}
+                <section className="al-group" aria-label={`Группа ${index+1}`}>
+                  <header><span className="al-step-number">{String(index+1).padStart(2,'0')}</span><div className="al-group-name">{kind==='event'?<input aria-label={`Название группы ${index+1}`} value={g.name} placeholder={`Группа ${index+1}`} onChange={e=>patchGroup(g.id,x=>x.name=e.target.value)}/>:<strong>{draft.name||'Группа действий'}</strong>}<small><Icon name="Columns2" size={13}/>Стартуют вместе</small></div>{kind==='event'&&<div className="al-group-tools"><Button icon="ArrowUp" title={`Группа ${index+1}: переместить выше`} disabled={index===0} onClick={()=>edit(d=>{[d.groups[index-1],d.groups[index]]=[d.groups[index],d.groups[index-1]];})}/><Button icon="ArrowDown" title={`Группа ${index+1}: переместить ниже`} disabled={index===groups.length-1} onClick={()=>edit(d=>{[d.groups[index+1],d.groups[index]]=[d.groups[index],d.groups[index+1]];})}/><Button icon="Trash2" title={`Удалить группу ${index+1}`} onClick={()=>remove(d=>{d.groups=d.groups.filter(x=>x.id!==g.id);},'Группа убрана')}/></div>}</header>
+                  <div className="al-parallel"><div className="al-parallel-rail" aria-hidden="true"/>{g.actions.map(a=><ActionCard key={a.id} action={a} project={project} scene={scene} selected={selectedAction?.id===a.id} onSelect={()=>setSelected({groupId:g.id,actionId:a.id})}/>)}<button className="al-add-card" onClick={()=>setPicker({mode:'add',groupId:g.id})}><span><Icon name="Plus" size={21}/></span><strong>{g.actions.length?'Ещё одновременно':'Добавить действие'}</strong><small>{g.actions.length?'В эту же группу':'Выберите, что произойдёт'}</small></button></div>
+                  {g.actions.length>0&&<footer><Icon name="GitMerge" size={14}/>{g.actions.some(a=>a.wait==='COMPLETED'&&TYPES[a.type]?.completion==='FINITE')?'Дождаться завершения действий':'После запуска команд'}{kind==='event'&&<Icon name="ArrowDown" size={13}/>}</footer>}
+                </section>
+              </React.Fragment>)}
+              {kind==='event'&&(groups.length?<><button className="al-next-group" onClick={()=>setPicker({mode:'next'})}><Icon name="Plus" size={18}/>Следующая группа<small>После предыдущей</small></button><div className="al-endpoint end"><Icon name={draft.retention==='AUTO_CLOSE_ON_FLOW_END'?'CircleCheck':'Infinity'} size={17}/>{draft.retention==='AUTO_CLOSE_ON_FLOW_END'?'Конец события':'Фон продолжается'}</div></>:<div className="al-empty-canvas"><MiniStructure kind="event"/><h3>С чего начнётся событие?</h3><p>Добавьте команду. Её группа станет первым шагом.</p><Button icon="Plus" className="al-primary" onClick={()=>setPicker({mode:'next'})}>Добавить первое действие</Button></div>)}
+            </>}
+            <section className="al-use">
+              {kind==='event'?<details><summary><Icon name="MessageSquarePlus" size={18}/><span>Добавить в историю<small>Запустить на выбранной реплике</small></span><Icon name="ChevronDown" size={16}/></summary><div className="al-use-content"><blockquote>{beat?.speaker&&<strong>{beat.speaker}</strong>}{beat?.text||'Выбранная реплика'}</blockquote><label>Когда запустить<select value={hook} onChange={e=>setHook(e.target.value)}><option value="BEFORE">До реплики</option><option value="ON_START">Во время реплики</option><option value="AFTER">После реплики</option></select></label><Button icon="Plus" disabled={!beat} onClick={()=>{if(save())onPlace(draft,hook);}}>Добавить в реплику</Button></div></details>:<div className="al-reuse"><Icon name="Layers" size={22}/><span><strong>Продолжить сборку</strong><small>{kind==='action'?'Поместить команду в группу и добавить следующие шаги':'Использовать эту группу первым шагом события'}</small></span><Button icon="ArrowRight" onClick={()=>{if(save())open('event',eventFromAsset(kind,draft));}}>Собрать событие</Button></div>}
+            </section>
+          </main>
+          <aside ref={inspector} className="al-inspector" aria-label={selectedAction?'Настройки действия':'Настройки сборки'}>
+            {selectedAction?<React.Fragment key={selectedAction.id}>
+              <header><span className="al-eyebrow">{kind==='action'?'Настроить команду':`Группа ${groups.indexOf(selectedGroup)+1} · действие`}</span>{kind!=='action'&&<Button icon="X" title="Закрыть настройки действия" onClick={()=>setSelected(null)}/>}</header>
+              <div className="al-inspector-title"><span className="al-command-icon"><Icon name={TYPES[selectedAction.type]?.icon} size={25}/></span><h2>{TYPES[selectedAction.type]?.label}</h2></div>
+              <button className="al-change-type" onClick={()=>setPicker({mode:'replace',target:selectedAction.target})}>Изменить команду<Icon name="ChevronDown" size={13}/></button>
+              <div className="al-fields"><ActionFields compact sceneId={scene?.id} project={project} action={selectedAction} onChange={patchAction}/></div>
+              <div className="al-timing"><Icon name={TYPES[selectedAction.type]?.completion==='CONTINUOUS'?'Infinity':'GitMerge'} size={16}/><span>{actionTiming(selectedAction)}{selectedAction.type==='music'&&<small>Музыка остаётся в фоне, пока живёт событие.</small>}</span></div>
+              {['music','sound'].includes(selectedAction.type)&&<details className="al-disclosure"><summary>Настройки звука<Icon name="ChevronDown" size={14}/></summary><div>{selectedAction.type==='music'?<><label className="al-check"><input type="checkbox" checked={selectedAction.loop!==false} onChange={e=>patchAction({loop:e.target.checked})}/>Повторять по кругу</label><label className="al-field">Плавный вход, сек<input type="number" min="0" step=".1" value={selectedAction.fade??0} onChange={e=>patchAction({fade:Number(e.target.value)})}/></label></>:<label className="al-check"><input type="checkbox" checked={selectedAction.duck!==false} onChange={e=>patchAction({duck:e.target.checked})}/>Приглушать музыку под голос</label>}</div></details>}
+              {kind!=='action'&&<Button className="al-remove" icon="Trash2" onClick={()=>remove(d=>{const g=kind==='group'?d:d.groups.find(g=>g.id===selected.groupId);g.actions=g.actions.filter(a=>a.id!==selectedAction.id);},'Действие убрано')}>Убрать из группы</Button>}
+            </React.Fragment>:<>
+              <header><span className="al-eyebrow">{kind==='event'?'Событие целиком':'Группа целиком'}</span></header>
+              <MiniStructure kind={kind}/><h2>{kind==='event'?'Один момент истории':'Несколько команд вместе'}</h2><p className="al-inspector-hint">{kind==='event'?'Группы идут по стрелкам. Команды внутри каждой группы стартуют одновременно.':'Соберите команды, которые должны начаться в один момент.'}</p>
+              {count>0&&<div className="al-select-hint"><Icon name="MousePointer2" size={18}/>Нажмите на карточку, чтобы настроить действие.</div>}
+              {kind==='event'&&<details className="al-disclosure" key={draft.id}><summary><Icon name="SlidersHorizontal" size={15}/>Поведение события<Icon name="ChevronDown" size={14}/></summary><div><label className="al-field">После последней группы<select value={draft.retention} onChange={e=>patch({retention:e.target.value,...(e.target.value==='HOLD_UNTIL_REPLACED'&&!draft.channel?{channel:`${draft.groups[0]?.actions[0]?.target||'world'}.${draft.groups[0]?.actions[0]?.type||'effect'}`}:{})})}><option value="AUTO_CLOSE_ON_FLOW_END">Завершить событие</option><option value="HOLD_UNTIL_STOPPED">Продолжать до команды «Стоп»</option><option value="HOLD_UNTIL_REPLACED">Продолжать до замены</option></select></label>{draft.retention==='HOLD_UNTIL_REPLACED'&&<label className="al-field">Роль для замены<input value={draft.channel||''} onChange={e=>patch({channel:e.target.value})}/><small>Новое событие с этой ролью заменит текущее.</small></label>}<label className="al-field">Где может продолжаться<select value={draft.owner||'SubScene'} onChange={e=>patch({owner:e.target.value})}><option value="SubScene">В этой сабсцене</option><option value="Scene">В пределах сцены</option><option value="GameSession">В течение игры</option></select></label></div></details>}
+              {placements>0&&<p className="al-placements"><Icon name="Link" size={14}/>Используется в репликах: {placements}. Сохранение обновит их шаблон.</p>}
+            </>}
+          </aside>
+        </div>
+      </div>}
+    </div>
+    {picker&&!hidden&&<ActionPicker mode={picker.mode} project={project} scene={scene} onClose={()=>setPicker(null)} onAction={chooseAction} onGroup={chooseGroup}/>}
+  </div>;
 }
-function ActionPolicy({action}){return <div className="authoring-policy"><Icon name={action.type==='music'?'Infinity':'GitMerge'} size={13}/> {action.type==='music'?'Музыка запустится и продолжится в фоне.':TYPES[action.type]?.completion==='FINITE'?'Следующий шаг дождётся завершения этого действия.':'Следующий шаг начнётся после применения команды.'}</div>;}
+
+function ActionCard({action,project,scene,selected,onSelect}) {
+  const data=describeAction(action,project,scene);
+  return <button className={`al-action-card ${selected?'selected':''}`} aria-pressed={selected} onClick={onSelect}>
+    <div className="al-card-top"><span className="al-command-icon"><Icon name={TYPES[action.type]?.icon} size={20}/></span><span>{TYPES[action.type]?.label}</span><Icon name={selected?'SlidersHorizontal':'ChevronRight'} size={14}/></div>
+    <strong>{data.subject}</strong><span className="al-card-result">{action.type==='move'&&<Icon name="ArrowRight" size={14}/>} {data.result}</span>
+    <small><Icon name={TYPES[action.type]?.completion==='CONTINUOUS'?'Infinity':TYPES[action.type]?.completion==='FINITE'?'Clock3':'Zap'} size={13}/>{data.detail}</small>
+  </button>;
+}
+
+function ActionStage({action,project,scene}) {
+  const data=describeAction(action,project,scene),moving=action.type==='move';
+  return <div className="al-action-stage"><div className="al-canvas-heading"><div><h2>Одна команда</h2><span>{ACTION_HINTS[action.type]}</span></div></div><div className="al-result-preview"><span className="al-preview-label">РЕЗУЛЬТАТ ДЕЙСТВИЯ</span><div className="al-result-diagram"><div className="al-result-object"><div><Icon name={moving?(project.objects.find(o=>o.id===action.target)?.type==='Персонаж'?'PersonStanding':'Box'):action.target==='world'&&action.type!=='wait'?'Globe2':TYPES[action.type]?.icon} size={36}/></div><strong>{data.subject}</strong></div><div className="al-result-path"><span/><Icon name={moving?'Footprints':'ArrowRight'} size={22}/><span/><Icon name="ChevronRight" size={16}/></div><div className="al-result-destination"><div><Icon name={data.icon} size={36}/></div><strong>{data.result}</strong></div></div><span className="al-result-time"><Icon name={TYPES[action.type]?.completion==='CONTINUOUS'?'Infinity':'Clock3'} size={15}/>{data.detail}</span></div><p className="al-action-caption"><Icon name="SlidersHorizontal" size={16}/>Настройте команду в панели параметров.</p></div>;
+}
+
+function MiniStructure({kind}) {
+  return <div className={`al-mini-structure ${kind}`} aria-hidden="true">{kind==='action'?<span><Icon name="Footprints" size={23}/></span>:kind==='group'?<div><span><Icon name="Footprints" size={18}/></span><span><Icon name="Volume2" size={18}/></span></div>:<><div><span><Icon name="Footprints" size={17}/></span><span><Icon name="Volume2" size={17}/></span></div><Icon name="ArrowRight" size={16}/><div><span><Icon name="Video" size={17}/></span></div></>}</div>;
+}
+function ConceptMap({onKind}) {
+  return <div className="al-concepts">{['action','group','event'].map((k,i)=><React.Fragment key={k}>{i>0&&<Icon name="ArrowRight" size={18}/>}<button disabled={!onKind} onClick={()=>onKind?.(k)}><MiniStructure kind={k}/><strong>{KINDS[k].label}</strong><small>{KINDS[k].hint}</small></button></React.Fragment>)}</div>;
+}
+function Welcome({kind,onCreate,onKind}) {
+  const [demo,setDemo]=useState(0);
+  useEffect(()=>{if(!demo)return;const timer=setTimeout(()=>setDemo(n=>n===3?0:n+1),1400);return()=>clearTimeout(timer);},[demo]);
+  return <div className="al-welcome"><span className="al-eyebrow">ОТ КОМАНДЫ К ИСТОРИИ</span><h2>{kind==='event'?'Что произойдёт в вашей сцене?':kind==='group'?'В один момент. Вместе.':'Одно действие — один результат.'}</h2><p>{kind==='event'?'Соберите событие из простых команд. Используйте его в любой реплике.':kind==='group'?'Объедините движение, звук и другие команды в одну группу.':'Переместить героя, включить музыку или изменить свет.'}</p><ConceptMap onKind={onKind}/><div className="al-demo"><header><span><Icon name="Layers" size={18}/><strong>Алиса подходит к окну</strong><small>Пример события</small></span><button onClick={()=>setDemo(demo?0:1)} aria-label={demo?'Остановить пример':'Показать порядок запуска'}><Icon name={demo?'Square':'Play'} size={15}/>{demo?'Стоп':'Как запустится'}</button></header><div className="al-demo-flow"><div className={`al-demo-group ${demo===1?'playing':''}`}><div><b>01</b><strong>Подойти к окну</strong><small>Вместе</small></div><div className="al-demo-commands"><span><Icon name="Footprints" size={22}/><strong>Алиса идёт</strong><small>К окну · 2 сек</small></span><span><Icon name="Volume2" size={22}/><strong>Звучат шаги</strong><small>Пока идёт</small></span></div></div><div className="al-demo-arrow"><Icon name="ArrowRight" size={22}/><span>Затем</span></div><div className={`al-demo-group single ${demo===2?'playing':''}`}><div><b>02</b><strong>Показать эмоцию</strong></div><div className="al-demo-commands"><span><Icon name="Video" size={22}/><strong>Крупный план</strong><small>Камера на Алису</small></span></div></div></div><footer aria-live="polite">{demo===1?<><Icon name="Columns2" size={15}/>Движение и звук начинаются вместе</>:demo===2?<><Icon name="ArrowRight" size={15}/>Теперь камера: первая группа завершена</>:demo===3?<><Icon name="Check" size={15}/>Событие завершено</>:<><Icon name="MousePointer2" size={15}/>Команда → вместе в группе → по очереди в событии</>}</footer></div><div className="al-welcome-action"><Button icon="Plus" className="al-primary" onClick={onCreate}>{KINDS[kind].create}</Button><span>{kind==='event'?'Начните с одного действия':kind==='group'?'Выберите команды для общего старта':'Выберите, что должно измениться'}</span></div></div>;
+}
+
+function ActionPicker({mode,project,scene,onClose,onAction,onGroup}) {
+  const dialog=useRef(),[category,setCategory]=useState('staging'),[query,setQuery]=useState('');
+  const [source,setSource]=useState('commands');
+  useEffect(()=>{const node=dialog.current;node.showModal();node.querySelector('input')?.focus();return()=>node.close();},[]);
+  const matches=(text)=>text.toLowerCase().includes(query.toLowerCase());
+  const types=query?Object.keys(TYPES).filter(t=>matches(TYPES[t].label+' '+ACTION_HINTS[t])):ACTION_CATEGORIES.find(c=>c.id===category).types;
+  const templates=project.actionTemplates.filter(a=>matches(a.name)),groups=project.groupTemplates.filter(g=>matches(g.name));
+  const title=mode==='replace'?'Что должно произойти?':mode==='next'?'Что произойдёт следующим?':'Добавить действие';
+  return <dialog ref={dialog} className="al-picker" aria-labelledby="al-picker-title" onKeyDown={e=>e.stopPropagation()} onCancel={e=>{e.preventDefault();onClose();}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+    <div className="al-picker-content"><header><div><span className="al-eyebrow">{mode==='next'?'НОВАЯ ГРУППА · СЛЕДУЮЩИЙ ШАГ':'ОДНА КАРТОЧКА · ОДНА КОМАНДА'}</span><h2 id="al-picker-title">{title}</h2></div><Button icon="X" title="Закрыть выбор действия" onClick={onClose}/></header><label className="al-picker-search"><Icon name="Search" size={19}/><input autoFocus aria-label="Поиск команд и шаблонов" placeholder="Например, музыка или переместить" value={query} onChange={e=>setQuery(e.target.value)}/></label>
+      <div className="al-picker-sources"><button className={source==='commands'?'active':''} aria-pressed={source==='commands'} onClick={()=>setSource('commands')}>Команды</button>{mode!=='replace'&&<button className={source==='templates'?'active':''} aria-pressed={source==='templates'} onClick={()=>setSource('templates')}>Мои действия <small>{project.actionTemplates.length}</small></button>}{mode==='next'&&<button className={source==='groups'?'active':''} aria-pressed={source==='groups'} onClick={()=>setSource('groups')}>Готовые группы <small>{project.groupTemplates.length}</small></button>}</div>
+      <div className={`al-picker-body ${source!=='commands'?'templates':''}`}>
+        {source==='commands'?<><nav aria-label="Категории команд">{ACTION_CATEGORIES.map(c=><button key={c.id} aria-pressed={category===c.id&&!query} className={category===c.id&&!query?'active':''} onClick={()=>{setCategory(c.id);setQuery('');}}><Icon name={c.icon} size={18}/>{c.label}</button>)}</nav><div className="al-command-list">{types.map(type=>{const unavailable=actionUnavailable(type,project,scene);return <button key={type} disabled={!!unavailable} onClick={()=>onAction(type)}><span className="al-command-icon"><Icon name={TYPES[type].icon} size={23}/></span><span><strong>{TYPES[type].label}</strong><small>{unavailable||ACTION_HINTS[type]}</small></span><Icon name="Plus" size={16}/></button>;})}{!types.length&&<p className="al-picker-empty">Команда не найдена. Попробуйте «звук» или «свет».</p>}</div></>:<div className="al-command-list">{(source==='templates'?templates:groups).map(a=><button key={a.id} onClick={()=>source==='templates'?onAction(a.type,a):onGroup(a)}><span className="al-command-icon"><Icon name={source==='groups'?'Columns2':TYPES[a.type]?.icon} size={22}/></span><span><strong>{a.name}</strong><small>{source==='groups'?`${actionCount(a.actions.length)} одновременно`:TYPES[a.type]?.label}</small></span><Icon name="Plus" size={16}/></button>)}{!(source==='templates'?templates:groups).length&&<p className="al-picker-empty">{query?'Ничего не найдено. Измените запрос.':'Здесь появятся сохранённые шаблоны. Начните с команды.'}</p>}</div>}
+      </div><footer><Icon name={mode==='next'?'ArrowDown':'BookCopy'} size={15}/>{mode==='next'?'Новая группа запустится после предыдущей.':source==='templates'?'Вставится копия. Исходный шаблон сохранится.':'Параметры настроите после добавления.'}<button onClick={onClose}>Отмена <kbd>Esc</kbd></button></footer>
+    </div>
+  </dialog>;
+}

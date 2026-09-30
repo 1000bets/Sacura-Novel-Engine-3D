@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {createSceneNavigation} from '../src/SceneNavigation.js';
+import {openSceneContext} from '../src/sceneContext.js';
 import {cloneSceneObject,groupObjects} from '../src/SceneGizmo.js';
 import {DECORATION_CATALOG} from '../src/sceneDecorations.js';
 import {upgradeProject} from '../src/studioModel.js';
@@ -80,4 +81,27 @@ test('moving and duplicating compound props keeps child geometry and attached li
   assert.deepEqual(mesh.getWorldPosition(new THREE.Vector3()).toArray(),[6,1,3]);assert.deepEqual(light.getWorldPosition(new THREE.Vector3()).toArray(),[6,2,3]);
   const copy=cloneSceneObject(prop,'lamp-copy');assert.equal(copy.children[1].isPointLight,true);assert.equal(copy.children[1].intensity,7);
   assert.notEqual(copy.children[0].material,mesh.material);assert.notEqual(copy.children[0].geometry,mesh.geometry);
+});
+
+
+test('right click opens a scene menu; drag, flight, cancellation and playback do not',()=>{
+ const {canvas,nav,live}=setup(),requests=[];live.onContext=point=>requests.push(point);
+ send(canvas,'pointerdown',{button:2});send(canvas,'contextmenu',{button:2});assert.equal(requests.length,0);
+ send(canvas,'pointerup',{button:2});assert.deepEqual(requests,[{x:100,y:100}]);
+ send(canvas,'pointerdown',{button:2});send(canvas,'pointermove',{button:2,clientX:120});send(canvas,'pointermove',{button:2,clientX:100});send(canvas,'pointerup',{button:2});assert.equal(requests.length,1);
+ send(canvas,'pointerdown',{button:2});send(canvas.ownerDocument.defaultView,'keydown',{code:'KeyW'});nav.tick(.1);send(canvas,'pointerup',{button:2});assert.equal(requests.length,1);
+ send(canvas,'pointerdown',{button:2});send(canvas,'pointercancel',{button:2});assert.equal(requests.length,1);
+ live.editing=false;send(canvas,'pointerdown',{button:2});send(canvas,'pointerup',{button:2});assert.equal(requests.length,1);
+ live.mode='game';send(canvas,'pointerdown',{button:2});send(canvas,'pointerup',{button:2});assert.equal(requests.length,1);nav.dispose();
+});
+
+
+test('scene context targets the visible clicked prop and preserves an existing multi-selection',()=>{
+ const camera=new THREE.PerspectiveCamera(58,4/3,.05,100);camera.position.set(0,0,5);camera.lookAt(0,0,0);camera.updateMatrixWorld();
+ const mesh=new THREE.Mesh(new THREE.BoxGeometry(),new THREE.MeshBasicMaterial());mesh.userData.id='prop';mesh.updateMatrixWorld();
+ const canvas={getBoundingClientRect:()=>({left:0,top:0,width:800,height:600})},selected=[],opened=[],point={x:400,y:300};
+ const live={selectedIds:['other'],onSelect:id=>selected.push(id),onContext:p=>opened.push(p)};
+ openSceneContext(point,camera,canvas,[mesh],live);assert.deepEqual(selected,['prop']);assert.deepEqual(opened,[point]);
+ live.selectedIds=['other','prop'];openSceneContext(point,camera,canvas,[mesh],live);assert.equal(selected.length,1);
+ mesh.visible=false;live.selectedIds=[];openSceneContext(point,camera,canvas,[mesh],live);assert.equal(selected.length,1);assert.equal(opened.length,3);
 });

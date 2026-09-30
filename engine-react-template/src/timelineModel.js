@@ -1,9 +1,12 @@
+import {isPureNode} from './logicModel.js';
+import {storyPorts,availabilityOf,conditionSummary,ANSWER_VARIABLE,variableName} from './choiceModel.js';
 // The story has no authored duration. This is an ordered flow of subscene
 // fragments, not a seconds-based ruler. Contract only unambiguous linear runs:
 // merging an entire scene would invent paths between unrelated entrances/exits.
-export const timelineVariableName = id => ({trust:'Доверие',letter:'Письмо найдено'}[id] || id);
+export const timelineVariableName = variableName;
 export const timelineVariableValue = value => value === undefined ? 'не задано' : typeof value === 'boolean' ? (value ? 'да' : 'нет') : String(value);
 export function timelineCondition(choice) {
+  if(choice.availability)return conditionSummary(choice.availability);
   if (!choice.condition || choice.condition === 'always') return 'Без условия';
   if (choice.condition === 'trust') return `Доверие ≥ ${choice.threshold ?? 3}`;
   return `${timelineVariableName(choice.condition)} = да`;
@@ -12,6 +15,7 @@ export function timelineCondition(choice) {
 export function buildTimelineModel(project) {
   const scenes = project.subscenes || [], beats = [], sceneByBeat = new Map();
   for (const chapter of project.chapters || []) for (const beat of chapter.beats || []) {
+    if(isPureNode(beat))continue;
     beats.push(beat);
     sceneByBeat.set(beat.id, scenes.find(scene => scene.id === chapter.subsceneId) || scenes[0]);
   }
@@ -19,20 +23,18 @@ export function buildTimelineModel(project) {
   const outgoing = new Map(), incoming = new Map(), rawEdges = [];
   for (const beat of beats) {
     // An explicit ending stays terminal, even in a malformed imported project.
-    const choices = beat.kind === 'end' ? [] : beat.kind === 'choice' ? (beat.choices || []) : beat.next ? [{next:beat.next}] : [];
-    const edges = choices.map((choice, index) => ({
-      id:`route:${JSON.stringify([beat.id, beat.kind === 'choice' ? choice.id ?? index : null])}`,
-      from:beat.id, to:choice.next || null,
-      choiceId:beat.kind === 'choice' ? choice.id : undefined,
-      label:beat.kind === 'choice' ? choice.label || 'Ответ без названия' : 'Продолжить',
-      condition:choice.condition || 'always', threshold:choice.threshold,
-      conditionLabel:timelineCondition(choice),
-    }));
+    const ports=storyPorts(beat).filter(port=>(beat.kind==='choice'||beat.kind==='branch'||port.next)&&(!port.common||port.next));
+    const edges=ports.map((port,index)=>{
+      const choice=beat.choices?.find(c=>'choice:'+c.id===port.id);
+      return {id:`route:${JSON.stringify([beat.id,port.id])}`,from:beat.id,to:port.next||null,choiceId:choice?.id,
+       label:beat.kind==='choice'||beat.kind==='branch'?port.label:'Продолжить',condition:choice?.condition||'always',threshold:choice?.threshold,
+       conditionLabel:choice?timelineCondition(choice):beat.kind==='branch'?conditionSummary(beat.test):'Без условия'};
+    });
     outgoing.set(beat.id, edges);
     rawEdges.push(...edges);
     for (const edge of edges) if (beatById.has(edge.to)) incoming.set(edge.to, [...(incoming.get(edge.to) || []), edge]);
   }
-  const regular = beat => beat && !['choice', 'end'].includes(beat.kind);
+  const regular = beat => beat && !['choice', 'end','branch'].includes(beat.kind);
   const canJoin = edge => {
     if (!edge) return false;
     const from = beatById.get(edge.from), to = beatById.get(edge.to), scene = sceneByBeat.get(edge.from);
@@ -43,7 +45,7 @@ export function buildTimelineModel(project) {
   const addNode = first => {
     if (beatToNode[first.id]) return;
     const scene = sceneByBeat.get(first.id), members = [first];
-    const id = `${first.kind === 'choice' ? 'choice' : first.kind === 'end' ? 'ending' : 'scene'}:${first.id}`;
+    const id = `${['choice','branch'].includes(first.kind) ? 'choice' : first.kind === 'end' ? 'ending' : 'scene'}:${first.id}`;
     beatToNode[first.id] = id;
     let last = first;
     while (regular(last)) {
@@ -53,11 +55,11 @@ export function buildTimelineModel(project) {
       internalEdges.add(edge.id); members.push(last); beatToNode[last.id] = id;
     }
     nodes.push({
-      id, kind:first.kind === 'choice' ? 'choice' : first.kind === 'end' ? 'ending' : 'subscene',
+      id, kind:['choice','branch'].includes(first.kind) ? 'choice' : first.kind === 'end' ? 'ending' : 'subscene',
       sceneId:scene?.id, sceneName:scene?.name || 'Без сабсцены', color:scene?.color || '#bd94a9',
       location:scene?.location || '', entryBeatId:first.id, beatIds:members.map(beat => beat.id),
-      text:first.text || '', title:first.kind === 'end' ? first.ending || 'Концовка без названия' : scene?.name || 'Без сабсцены',
-      choices:first.kind === 'choice' ? (first.choices || []).map(choice => ({...choice, conditionLabel:timelineCondition(choice)})) : [],
+      text:first.kind==='branch'?conditionSummary(first.test):first.text || '', title:first.kind === 'end' ? first.ending || 'Концовка без названия' : first.kind==='branch'?'Проверка':scene?.name || 'Без сабсцены',
+      choices:first.kind === 'choice' ? (first.choices || []).map(choice => ({...choice, conditionLabel:timelineCondition(choice)})) : first.kind==='branch'?storyPorts(first).map(port=>({id:port.id,label:port.label,next:port.next,conditionLabel:conditionSummary(first.test)})):[],
       isSceneEntry:first.id === scene?.entry,
       openEnd:regular(last) && !(outgoing.get(last.id)?.length),
       emptyChoice:first.kind === 'choice' && !first.choices?.length,
@@ -118,7 +120,7 @@ export function buildTimelineModel(project) {
   }
   const variableIds = new Set(Object.keys(project.variables || {})), dependencies = [];
   for (const node of nodes) if (node.kind === 'choice') {
-    for (const variableId of new Set(node.choices.map(choice => choice.condition).filter(condition => condition && condition !== 'always'))) {
+    for (const variableId of new Set([...(beats.find(beat=>beat.id===node.entryBeatId)?.test?.rules||[]).map(rule=>rule.variable),...node.choices.flatMap(choice=>(availabilityOf(choice)?.rules||[]).map(rule=>rule.variable))].filter(Boolean))) {
       variableIds.add(variableId);
       dependencies.push({id:`variable:${JSON.stringify([variableId,node.id])}`,variableId,target:node.id,beatId:node.entryBeatId});
     }
@@ -126,7 +128,7 @@ export function buildTimelineModel(project) {
   return {
     nodes, edges, beatToNode, entryNodeId, dependencies,
     variables:[...variableIds].map(id => ({id,name:timelineVariableName(id),value:project.variables?.[id],
-      missing:!Object.hasOwn(project.variables || {}, id),usedBy:dependencies.filter(edge => edge.variableId === id).map(edge => edge.target)})),
+      missing:id!==ANSWER_VARIABLE&&!Object.hasOwn(project.variables || {}, id),usedBy:dependencies.filter(edge => edge.variableId === id).map(edge => edge.target)})),
     counts:{scenes:scenes.length,beats:beats.length,choices:nodes.filter(node => node.kind === 'choice').length,
       endings:nodes.filter(node => node.kind === 'ending').length,returns:edges.filter(edge => edge.isReturn).length},
   };

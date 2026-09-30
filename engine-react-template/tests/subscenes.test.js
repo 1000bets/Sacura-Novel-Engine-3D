@@ -6,6 +6,21 @@ import {isObjectInScene,objectTransform,setObjectTransform,sceneStagingPoints,st
 import {DECORATION_CATALOG} from '../src/sceneDecorations.js';
 import {PreviewRuntime} from '../src/runtime.js';
 
+test('empty locations keep only chosen cast and authored primitives through reload and duplication',()=>{
+ const p=upgradeProject(),scene=createSubscene(p,{...newSceneDraft(p),name:'Своя комната',kind:'empty',characters:['alice'],primitives:['box','sphere','cylinder']});
+ const visible=p.objects.filter(o=>isObjectInScene(o,scene));
+ assert.deepEqual(visible.filter(o=>o.type==='Персонаж').map(o=>o.id),['alice']);
+ const props=visible.filter(o=>o.type!=='Персонаж');assert.deepEqual(props.map(o=>o.primitive),['box','sphere','cylinder']);
+ assert.ok(props.every(o=>o.subsceneId===scene.id&&!o.builtin));
+ assert.equal(scene.cameras.length,1);assert.deepEqual(sceneStagingPoints(scene,p.objects)[0].position,[0,0,0]);
+ assert.deepEqual(upgradeProject(JSON.parse(JSON.stringify(p))),p);
+ const copy=cloneSubscene(p,scene.id),copies=p.objects.filter(o=>o.subsceneId===copy.id);
+ assert.equal(copy.kind,'empty');assert.equal(copies.length,3);assert.ok(copies.every(o=>!props.some(original=>original.id===o.id)));
+ changeSceneLocation(p,scene.id,'living');changeSceneLocation(p,scene.id,'empty');
+ assert.deepEqual(p.objects.filter(o=>isObjectInScene(o,scene)&&o.type!=='Персонаж').map(o=>o.id),props.map(o=>o.id));
+ const before=structuredClone(p);assert.throws(()=>createSubscene(p,{...newSceneDraft(p),name:'Ошибка',primitives:['unknown']}));assert.deepEqual(p,before);
+});
+
 test('all location templates create independent props, a camera, a first line and the chosen cast',()=>{
  const p=upgradeProject(),before=structuredClone(p.chapters),created=[];
  for(const kind of ['living','garden','station']){

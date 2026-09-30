@@ -163,13 +163,13 @@ export default function GlobalTimeline({project,currentSceneId,currentBeatId,run
   let returnIndex = 0;
   const edges = model.edges.map(edge => {
     const highlighted = edge.id === selectedEdge || (selected && [edge.source,edge.target].includes(selected));
-    const stroke = highlighted?'#efbfd5':edge.isReturn?'#c4a77c':edge.crossScene?'#b99aca':'#847989';
+    const stroke = highlighted?'var(--accent)':edge.isReturn?'var(--warning)':edge.crossScene?'var(--info)':'var(--graph-connection)';
     const label = edge.isReturn ? `Возврат${edge.choiceId?' · '+edge.label:''}` : edge.crossScene ? 'Другая сабсцена' : undefined;
     return {id:edge.id,source:edge.source,target:edge.target,sourceHandle:edge.choiceId,
       type:edge.isReturn?'return':'smoothstep',data:{laneY:edge.isReturn?storyTop-45-(returnIndex++)*34:0},label,
       markerEnd:{type:MarkerType.ArrowClosed,color:stroke,width:16,height:16},
       style:{stroke,strokeWidth:highlighted?2.7:1.7,strokeDasharray:edge.isReturn?'7 5':undefined},
-      labelStyle:{fill:'#d6cbd7',fontSize:11},labelBgStyle:{fill:'#292630'},
+      labelStyle:{fill:'var(--text-secondary)',fontSize:11},labelBgStyle:{fill:'var(--bg-app)'},
       pathOptions:{borderRadius:14,offset:28},interactionWidth:22};
   });
   if (variable) {
@@ -179,9 +179,9 @@ export default function GlobalTimeline({project,currentSceneId,currentBeatId,run
     nodes.push({id,type:'variable',position,measured:measurements[id],data:{variable,value:currentValues[variable.id]},style:{width:250}});
     for (const dependency of model.dependencies.filter(item => item.variableId === variableId)) edges.push({
       id:dependency.id,source:id,target:dependency.target,type:'bezier',
-      style:{stroke:'#a19bc8',strokeDasharray:'4 5',strokeWidth:1.7},
-      markerEnd:{type:MarkerType.ArrowClosed,color:'#a19bc8'},label:'условие',
-      labelStyle:{fill:'#c3bede',fontSize:11},labelBgStyle:{fill:'#292630'},
+      style:{stroke:'var(--info)',strokeDasharray:'4 5',strokeWidth:1.7},
+      markerEnd:{type:MarkerType.ArrowClosed,color:'var(--info)'},label:'условие',
+      labelStyle:{fill:'var(--text-secondary)',fontSize:11},labelBgStyle:{fill:'var(--bg-app)'},
     });
   }
   const firstInScene = sceneId => model.nodes.find(node => node.sceneId === sceneId && node.isSceneEntry) || model.nodes.find(node => node.sceneId === sceneId);
@@ -193,10 +193,12 @@ export default function GlobalTimeline({project,currentSceneId,currentBeatId,run
       <Button icon="Maximize" onClick={() => flow.current?.fitView(FIT_ALL)}>Вся история</Button>
       <Button icon="LayoutGrid" disabled={!onLayoutChange || !Object.keys(savedPositions).length} title="Вернуть автоматическое расположение всех узлов. Ctrl+Z отменяет сброс." onClick={restoreAutoLayout}>Автораскладка</Button>
     </div></header>
-    <div className="global-timeline-direction"><span>НАЧАЛО</span><i/><Icon name="ArrowRight" size={19}/><span>ХОД ИСТОРИИ</span><small>Порядок переходов; время зависит от чтения и выборов игрока</small></div>
+    <div className="global-timeline-direction" title="Порядок переходов; время зависит от чтения и выборов игрока"><span>НАЧАЛО</span><i/><Icon name="ArrowRight" size={19}/><span>ХОД ИСТОРИИ</span><small>Порядок переходов; время зависит от чтения и выборов игрока</small></div>
     <nav className="global-timeline-scenes" aria-label="Сабсцены на таймлайне">{(project.subscenes || []).map(scene => <button key={scene.id} className={scene.id === (activeNode?.sceneId || currentSceneId)?'active':''} title="Показать начало сабсцены на таймлайне. Двойной щелчок — открыть сцену." onClick={() => {const node = firstInScene(scene.id);if (node) {selectNode(node.id);focusNode(node.id);}}} onDoubleClick={() => onOpenScene?.(scene.id)}><i style={{background:scene.color || '#bd94a9'}}/>{scene.name}</button>)}</nav>
     <div className="global-timeline-variables"><strong><Icon name="Variable" size={16}/>Глобальные переменные</strong>{model.variables.map(item => <button key={item.id} className={`${variableId === item.id?'active ':''}${item.missing?'missing':''}`} title={`${item.id} · ${item.usedBy.length} выборов. Нажмите, чтобы показать связи условий.`} onClick={() => setVariableId(current => current === item.id?null:item.id)}><span>{item.name}</span><b>{timelineVariableValue(currentValues[item.id])}</b><small>{item.usedBy.length}</small></button>)}{!model.variables.length && <span>Переменные ещё не созданы</span>}{onOpenVariables && <Button icon="SlidersHorizontal" title="Редактировать глобальные переменные" onClick={onOpenVariables}/>}</div>
     <div className="global-timeline-canvas"><ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
+      panOnDrag={[0, 1, 2]} panOnScroll zoomOnScroll={false} zoomActivationKeyCode="Control" selectionOnDrag={false}
+      onPaneContextMenu={event => event.preventDefault()}
       nodesDraggable={true} nodeDragThreshold={4} nodesConnectable={false} edgesReconnectable={false} minZoom={MIN_ZOOM} maxZoom={1.65}
       onInit={instance => {flow.current=instance;}}
       onNodesChange={onNodesChange}
@@ -207,10 +209,10 @@ export default function GlobalTimeline({project,currentSceneId,currentBeatId,run
       onPaneClick={() => {setSelected(null);setSelectedEdge(null);}}
       proOptions={{hideAttribution:true}}>
       <InitialTimelineViewport nodeId={activeId || model.entryNodeId}/>
-      <Background color="#3b3441" gap={24}/><Controls showInteractive={false} fitViewOptions={FIT_ALL}/><MiniMap nodeColor={node => node.data.node?.kind === 'ending'?'#cbb080':node.data.node?.kind === 'choice'?'#909dc4':node.data.node?.color || '#ac9cbb'} maskColor="rgba(28,26,33,.77)" pannable zoomable/>
+      <Background color="var(--graph-grid)" gap={28} size={0.7}/><Controls showInteractive={false} fitViewOptions={FIT_ALL}/><MiniMap nodeColor={node => node.data.node?.kind === 'ending'?'var(--warning)':node.data.node?.kind === 'choice'?'var(--info)':node.data.node?.color || 'var(--graph-connection)'} maskColor="var(--bg-app)" pannable zoomable/>
     </ReactFlow>
     {!model.nodes.length && <div className="global-timeline-empty">Добавьте сабсцену и первую реплику — здесь появится история.</div>}
-    <div className="global-timeline-legend"><span><i/>Сабсцена</span><span><i className="choice"/>Выбор / условие</span><span><i className="ending"/>Концовка</span><span className="return">↶ Возврат</span><small>Потяните карточку · двойной щелчок — сценарий · Ctrl+Z — отмена</small></div></div>
+    <div className="global-timeline-legend"><span><i/>Сабсцена</span><span><i className="choice"/>Выбор / условие</span><span><i className="ending"/>Концовка</span><span className="return">↶ Возврат</span><small>ПКМ — панорама · Ctrl + колесо — масштаб · двойной щелчок — сценарий</small></div></div>
     <footer className="global-timeline-details">{shownEdge?<>
       <div><strong><Icon name={shownEdge.isReturn?'Undo2':'ArrowRight'}/>Переход{shownEdge.isReturn?' с возвращением':''}</strong><span>{model.nodes.find(node => node.id === shownEdge.source)?.sceneName} → {model.nodes.find(node => node.id === shownEdge.target)?.sceneName}</span></div>
       <p>{shownEdge.label}<small>{shownEdge.conditionLabel} · {shownEdge.from} → {shownEdge.to || 'продолжение не задано'}</small></p>

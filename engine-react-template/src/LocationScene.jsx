@@ -1,25 +1,29 @@
+import {createRendererViewport} from './rendererViewport.js';
 import {updateObjectHighlight} from './sceneEffects.js';
 import React, { useEffect, useRef } from "react";
 import * as THREE from "three";
+import {updateCharacterVisual,disposeCharacterVisual} from "./characterVisual.js";
 import {createCameraRig} from './CameraRig.js';
 import {createSceneNavigation} from './SceneNavigation.js';
+import {openSceneContext} from './sceneContext.js';
+import {createLightObject,updateLightObject} from './sceneLights.js';
 import {createSceneGizmo,groupObjects,meshGeometry,cloneSceneObject} from './SceneGizmo.js';
 import {BUILTIN_TRANSFORMS,resolvedPosition} from './sceneEditing.js';
 import Scene from "./Scene.jsx";
-import {atmosphere,gameCamera,decoratePaper,objectPosition,addCharacterDetails,animatePose} from './sceneEffects.js';
+import {atmosphere,gameCamera,decoratePaper,objectPosition,addCharacterDetails} from './sceneEffects.js';
 
 function Exterior({
   kind,
   objects,
   state,
-  onSelect,
+  onSelect, onContext,
   onInteract,
   mode = "scene",
   showGrid = true, selected, selectedIds, sceneId, editTool, editSpace, snap, onTransform, onTransforms, focusRequest, editing=true, cameraScene, selectedCameraId, cameraPreviewId, cameraPilotId, onCameraChange, onCameraSelect, cameraApi, showCameras=true,
 }) {
   const host = useRef(),
     live = useRef();
-  live.current = { state, onSelect, onInteract, mode, showGrid,objects,selected,selectedIds,sceneId,kind,editTool,editSpace,snap,onTransform,onTransforms,focusRequest,editing,cameraScene,selectedCameraId,cameraPreviewId,cameraPilotId,onCameraChange,onCameraSelect,showCameras };
+  live.current = { state, onSelect, onContext, onInteract, mode, showGrid,objects,selected,selectedIds,sceneId,kind,editTool,editSpace,snap,onTransform,onTransforms,focusRequest,editing,cameraScene,selectedCameraId,cameraPreviewId,cameraPilotId,onCameraChange,onCameraSelect,showCameras };
   useEffect(() => {
     let renderer;
     try {
@@ -36,7 +40,7 @@ function Exterior({
     const scene = new THREE.Scene(),
       camera = new THREE.PerspectiveCamera(58, 1, 0.05, 400);
     camera.position.set(...gameCamera(kind,{})[0]);
-    const controls = createSceneNavigation(camera, renderer.domElement,()=>live.current);
+    const controls = createSceneNavigation(camera, renderer.domElement,()=>({...live.current,onContext:point=>openSceneContext(point,camera,renderer.domElement,picks,live.current)}));
     controls.target.set(...gameCamera(kind,{})[1]);camera.lookAt(controls.target);
     const hemi=new THREE.HemisphereLight(0xc5d7ea, 0x253831, 2);scene.add(hemi);
     const sun = new THREE.DirectionalLight(0xffd5ac, 2);
@@ -85,7 +89,7 @@ function Exterior({
       picks.push(groupObjects(scene,scene.children.slice(benchStart),"garden-bench",BUILTIN_TRANSFORMS["garden-bench"]));
       decoratePaper(box(0.4, 0.018, 0.25, 2, 0.77, 0.4, "#efdfb7", "garden-note"),'Записка · осмотреть');
       prop('garden-fence',()=>box(3, 0.6, 0.2, -2, 0.3, -3, "#6e8272"));
-    } else {
+    } else if (kind === 'station') {
       prop('station-platform',()=>box(70, 0.2, 35, 0, -0.1, 0, "#687575"));
       prop('station-tracks',()=>{
       for (const z of [-1.6, -2.4]) box(10, 0.07, 0.08, 0, 0.06, z, "#b7b6ab");
@@ -138,7 +142,7 @@ function Exterior({
           ),
       )
       .forEach((o) =>
-        (()=>{const mesh=box(0.5, 0.5, 0.5, 0, 0.25, 1, o.color || "#a3969f", o.id);mesh.geometry.dispose();mesh.geometry=meshGeometry(o.primitive);mesh.userData.primitive=o.primitive||"box";return mesh;})(),
+        (()=>{if(o.type==='Источник света'){const group=createLightObject(o);scene.add(group);picks.push(group);return group;}const mesh=box(0.5, 0.5, 0.5, 0, 0.25, 1, o.color || "#a3969f", o.id);mesh.geometry.dispose();mesh.geometry=meshGeometry(o.primitive);mesh.userData.primitive=o.primitive||"box";return mesh;})(),
       );
     const grid = new THREE.GridHelper(20, 20, 0x344d4d, 0x293b3d);
     grid.position.y = -0.25;
@@ -164,14 +168,7 @@ function Exterior({
       }),
     );
     const updateAtmosphere=atmosphere(scene,{kind,renderer,sun,hemi});
-    const ro = new ResizeObserver(() => {
-      const { width, height } = element.getBoundingClientRect();
-      if (width < 1 || height < 1) return;
-      renderer.setSize(width, height);
-      camera.aspect = width / Math.max(height, 1);
-      camera.updateProjectionMatrix();
-    });
-    ro.observe(element);
+    const viewport=createRendererViewport(renderer,camera,element);
     const gizmo=createSceneGizmo(scene,camera,renderer.domElement,controls,()=>live.current,()=>picks);
     const cameraRig=createCameraRig(scene,camera,controls,renderer.domElement,()=>live.current);if(cameraApi)cameraApi.current=cameraRig;
     let down;
@@ -217,32 +214,34 @@ function Exterior({
       picks.forEach((mesh) => {
         const o = objects.find((o) => o.id === mesh.userData.id);
         if (!o) {
-          mesh.visible = false;
+          disposeCharacterVisual(mesh);mesh.visible = false;
           return;
         }
         mesh.visible = o.active && state.visible?.[o.id] !== false;
         if(mesh.userData.marker)mesh.userData.marker.visible=state.interactionTarget===o.id||state.highlights?.[o.id];
         gizmo.apply(mesh,o,resolvedPosition(o,state,kind));
+        updateLightObject(mesh,o,live.current.mode==='scene');
         updateObjectHighlight(mesh,state.interactionTarget===o.id||!!state.highlights?.[o.id],animTime);
-        if(mode==='scene'&&live.current.editing)animatePose(mesh,null,0,false,true);
-        else animatePose(mesh,state.poses?.[o.id],animTime,!!state.motions?.[o.id]&&!state.motions[o.id].stopped&&!state.motions[o.id].paused&&state.motions[o.id].progress<1,state.paused);
+        updateCharacterVisual(mesh,o,dt,state.poses?.[o.id],!!state.motions?.[o.id]&&!state.motions[o.id].stopped&&!state.motions[o.id].paused&&state.motions[o.id].progress<1,state.paused,mode==='scene'&&live.current.editing);
 
       });
       gizmo.update();
       cameraRig.update(dt,gizmo.dragging);
       controls.tick(dt);
+      viewport.update();
       renderer.render(scene, camera);
     };
     render();
     return () => {
       cancelAnimationFrame(frame);
-      ro.disconnect();
+      viewport.dispose();
       if(cameraApi?.current===cameraRig)cameraApi.current=null;
       cameraRig.dispose();
       gizmo.dispose();
       controls.dispose();
       renderer.domElement.removeEventListener('pointerdown',press);
       renderer.domElement.removeEventListener('pointerup',click);
+      picks.forEach(disposeCharacterVisual);
       scene.traverse((o) => {
         o.geometry?.dispose();
         if(Array.isArray(o.material))o.material.forEach(material=>material.dispose());else o.material?.dispose();
@@ -256,7 +255,7 @@ function Exterior({
       ref={host}
       className="scene-canvas"
       aria-label={
-        (kind === "garden" ? "3D сад" : "3D станция") + '. ЛКМ — выбор; Alt + ЛКМ — вращение; средняя кнопка — панорама; ПКМ + WASD/QE — полёт; колесо — приближение; F — фокус.'
+        (kind === "garden" ? "3D сад" : kind === "empty" ? "3D пустая локация" : "3D станция") + '. ЛКМ — выбор; Alt + ЛКМ — вращение; средняя кнопка — панорама; ПКМ + WASD/QE — полёт; колесо — приближение; F — фокус.'
       }
     />
   );

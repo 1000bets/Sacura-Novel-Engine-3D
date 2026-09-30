@@ -9,7 +9,7 @@ export function createSceneNavigation(camera, canvas, getLive) {
   const host = canvas.closest?.('.scene-viewport');
   const win = canvas.ownerDocument?.defaultView || globalThis.window;
   const keys = new Set(), forward = new THREE.Vector3(), right = new THREE.Vector3();
-  let gesture = null, pointerId, previousX=0, previousY=0, ignoreUntil=0;
+  let gesture = null, pointerId, previousX=0, previousY=0, ignoreUntil=0, startX=0, startY=0, moved=false;
   const clock = () => globalThis.performance?.now() || Date.now();
   const navigation = {
     target, enabled:true, minPolarAngle:0, maxPolarAngle:Math.PI,
@@ -26,7 +26,7 @@ export function createSceneNavigation(camera, canvas, getLive) {
         .addScaledVector(right,Number(keys.has('KeyD'))-Number(keys.has('KeyA')));
       direction.y+=Number(keys.has('KeyE'))-Number(keys.has('KeyQ'));
       const speed=navigation.flySpeed*(keys.has('ShiftLeft')||keys.has('ShiftRight')?3:1);
-      if(direction.lengthSq()){direction.normalize().multiplyScalar(speed*Math.min(dt,.1));camera.position.add(direction);target.add(direction);}
+      if(direction.lengthSq()){moved=true;direction.normalize().multiplyScalar(speed*Math.min(dt,.1));camera.position.add(direction);target.add(direction);}
     },
     dispose(){
       stop();
@@ -45,7 +45,7 @@ export function createSceneNavigation(camera, canvas, getLive) {
     if(getLive().mode!=='scene'||!navigation.enabled)return;
     const requested=e.button===2?'fly':e.button===1?'pan':e.button===0&&e.altKey?'orbit':null;
     if(!requested)return;
-    consume(e);gesture=requested;pointerId=e.pointerId;previousX=e.clientX;previousY=e.clientY;
+    consume(e);gesture=requested;pointerId=e.pointerId;previousX=e.clientX;previousY=e.clientY;startX=e.clientX;startY=e.clientY;moved=false;
     if(e.shiftKey)keys.add('ShiftLeft');
     if(host){host.dataset.navigating='true';host.focus?.({preventScroll:true});}
     canvas.style.cursor=gesture==='pan'?'grabbing':'move';canvas.setPointerCapture?.(pointerId);
@@ -53,6 +53,7 @@ export function createSceneNavigation(camera, canvas, getLive) {
   const move=e=>{
     if(!gesture||e.pointerId!==pointerId)return;
     consume(e);
+    if(Math.hypot(e.clientX-startX,e.clientY-startY)>5)moved=true;
     const dx=e.clientX-previousX,dy=e.clientY-previousY;previousX=e.clientX;previousY=e.clientY;
     if(!navigation.enabled||getLive().mode!=='scene'){stop();return;}
     if(gesture==='orbit'){
@@ -71,7 +72,7 @@ export function createSceneNavigation(camera, canvas, getLive) {
       camera.quaternion.setFromEuler(rotation);camera.getWorldDirection(forward);target.copy(camera.position).addScaledVector(forward,distance);
     }
   };
-  const up=e=>{if(gesture&&e.pointerId===pointerId){consume(e);stop();}};
+  const up=e=>{if(gesture&&e.pointerId===pointerId){const open=e.type==='pointerup'&&gesture==='fly'&&!moved&&Math.hypot(e.clientX-startX,e.clientY-startY)<=5;consume(e);stop();if(open&&getLive().mode==='scene'&&getLive().editing!==false)getLive().onContext?.({x:e.clientX,y:e.clientY});}};
   const wheel=e=>{
     if(getLive().mode!=='scene'||!navigation.enabled)return;
     consume(e);
@@ -81,7 +82,7 @@ export function createSceneNavigation(camera, canvas, getLive) {
     const next=THREE.MathUtils.clamp(distance*Math.exp(THREE.MathUtils.clamp(delta,-300,300)*.0015),navigation.minDistance,navigation.maxDistance);
     camera.position.copy(target).add(offset.multiplyScalar(next/distance));
   };
-  const keydown=e=>{if(gesture==='fly'&&FLY_KEYS.has(e.code)){keys.add(e.code);consume(e);}};
+  const keydown=e=>{if(gesture==='fly'&&FLY_KEYS.has(e.code)){keys.add(e.code);if(!e.code.startsWith('Shift'))moved=true;consume(e);}};
   const keyup=e=>{if(gesture==='fly'&&FLY_KEYS.has(e.code)){keys.delete(e.code);consume(e);}};
   const context=e=>{if(getLive().mode==='scene')e.preventDefault();};
   const listeners=[['pointerdown',down,true],['pointermove',move,true],['pointerup',up,true],['pointercancel',up,true],['lostpointercapture',stop,true],['wheel',wheel,{capture:true,passive:false}],['contextmenu',context,true]];
