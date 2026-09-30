@@ -3208,8 +3208,6 @@ select option,select optgroup { background:var(--graphite-700); color:var(--ivor
  .editor-workspace.focus-hierarchy>.hierarchy-panel,.editor-workspace.focus-inspector>.inspector-panel { display:flex; width:100%; max-width:100%; }
 }
 
-.location-editor-entry{display:flex;flex-wrap:wrap;align-items:center;gap:16px;padding:18px;margin:16px 0;border:1px solid var(--border,#393642);border-radius:6px;background:var(--panel,#22212b)}
-.location-editor-entry>div:first-child{flex:1;min-width:220px}.location-editor-entry h3{display:flex;align-items:center;gap:8px;margin:0 0 8px}.location-editor-entry p{margin:0;color:var(--muted,#aaa6b5);font-size:12px;line-height:1.6}.location-primitive-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;width:100%}.location-primitive-actions>strong{font-size:12px;margin-right:8px}
 
 .character-workspace{height:100%;display:flex;flex-direction:column;min-height:0;background:var(--bg-app)}
 .character-workspace>header{display:flex;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--panel)}
@@ -3227,3 +3225,16 @@ select option,select optgroup { background:var(--graphite-700); color:var(--ivor
 .character-animation-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:14px;margin-top:16px}.character-animation-card{display:flex;flex-direction:column;gap:14px;min-width:0;padding:18px;background:var(--panel);border:1px solid var(--line);border-radius:8px}.character-animation-card.previewing{border-color:var(--accent)}.character-animation-card-heading{display:flex;align-items:center;gap:12px}.character-animation-card-heading h4{margin:0;font-size:14px;overflow-wrap:anywhere}.character-animation-card-heading small{display:block;margin-top:5px;font-size:11px;color:var(--muted)}.character-animation-symbol{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:48px;height:48px;border-radius:8px;color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
 .character-animation-description{font-size:12px;line-height:1.65;margin:0;flex:1;overflow-wrap:anywhere}.character-animation-enabled,.character-animation-settings label{display:flex;align-items:center;gap:6px}.character-animation-settings{display:flex;align-items:center;gap:16px;flex-wrap:wrap;color:var(--muted)}.character-animation-settings input[type=number]{width:64px}.character-animation-card-actions{display:flex;flex-wrap:wrap;gap:6px;border-top:1px solid var(--line);padding-top:12px}.character-animation-card-actions button{font-size:11px;padding:7px 9px}.character-animation-edit{display:flex;flex-direction:column;gap:10px}.character-animation-edit label{display:flex;flex-direction:column;gap:6px}.character-animation-edit textarea{min-height:90px;resize:vertical}.character-workspace .character-animation-create{padding:18px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}.character-animation-empty{padding:24px;border:1px dashed var(--line);border-radius:8px;color:var(--muted);font-size:12px;line-height:1.6}
 @media(max-width:700px){.character-workspace-body{grid-template-columns:170px minmax(0,1fr)}.character-workspace-body>main{padding:12px}.character-preview-canvas{height:220px}}
+
+/* Names are edited in place, retaining the heading's typography. */
+.subscene-title-group { flex:1; min-width:0; }
+.subscene-title-group>small { display:block; }
+.subscene-workspace .subscene-inline-title,
+.subscene-workspace input.subscene-inline-title { display:flex; align-items:center; justify-content:flex-start; gap:8px; width:100%; min-width:0; margin:0; padding:2px 0; border:0; border-radius:2px; background:transparent; color:inherit; font:inherit; letter-spacing:inherit; line-height:inherit; text-align:left; }
+.subscene-inline-title>span { overflow-wrap:anywhere; }
+.subscene-inline-title>svg { flex-shrink:0; color:var(--muted); opacity:.6; }
+.subscene-inline-title:hover:not(:disabled)>svg { color:var(--accent); opacity:1; }
+.subscene-workspace .subscene-inline-title:focus-visible,
+.subscene-workspace input.subscene-inline-title:focus { outline:1px solid var(--accent); outline-offset:3px; }
+
+.subscene-workspace button.subscene-inline-title:hover:not(:disabled) { background:transparent; color:inherit; }

@@ -1,3 +1,4 @@
+import {clipboardCommand} from './editorClipboard.js';
 import React, {
   memo,
   useCallback,
@@ -653,7 +654,7 @@ function GraphCanvas({
   preview,
   positions = {},
   onPositions,
-  onContext,
+  onContext, onClipboard,
   onReady,
 }) {
   const api = useReactFlow(),
@@ -801,6 +802,7 @@ function GraphCanvas({
   }, [selectedId, mode, graphKey, focus, graph]);
   useEffect(() => {
     onReady?.({
+      clipboard:()=>({nodes:api.getNodes(),graphKey}),
       focus,
       fit: () => api.fitView({ padding: 0.12, maxZoom: 1, duration: 240 }),
       zoomIn: () => api.zoomIn(),
@@ -832,7 +834,10 @@ function GraphCanvas({
     labelBgBorderRadius: 3,
   }));
   return (
-    <div className="graph-canvas" ref={container}
+    <div className="graph-canvas" ref={container} tabIndex={0}
+      onCopy={e=>{if(e.target.isContentEditable||e.target.closest('input,textarea,select,[role="textbox"]'))return;e.preventDefault();e.stopPropagation();onClipboard?.('copy',api.getNodes(),graphKey);e.clipboardData?.setData('text/plain','Sacura · ноды');}}
+      onPaste={e=>{if(e.target.isContentEditable||e.target.closest('input,textarea,select,[role="textbox"]'))return;e.preventDefault();e.stopPropagation();onClipboard?.('paste',api.getNodes(),graphKey);}}
+      onKeyDown={e=>{const command=clipboardCommand(e);if(command){e.preventDefault();e.stopPropagation();onClipboard?.(command,api.getNodes(),graphKey);}}}
       onPointerDownCapture={e => {panGesture.current = {x:e.clientX,y:e.clientY,moved:false};}}
       onPointerMoveCapture={e => {const pan=panGesture.current;if(pan && e.buttons && Math.hypot(e.clientX-pan.x,e.clientY-pan.y)>5)pan.moved=true;}}
     >
@@ -852,13 +857,14 @@ function GraphCanvas({
         onNodeClick={(_, n) => {
           if (n.data.kind === "portal") onSelect?.(n.data.beat.id);
           else onSelect?.(mode === "story" ? n.id : n.data);
+          container.current.focus({preventScroll:true});
         }}
         onNodeDoubleClick={(_, n) => onOpen?.(n.data)}
         onEdgeClick={(_, e) => setSelectedEdge(e.id)}
-        onPaneClick={() => setSelectedEdge(null)}
+        onPaneClick={() => {setSelectedEdge(null);container.current.focus({preventScroll:true});}}
         onPaneContextMenu={(e) => {
           e.preventDefault();
-          if (!panGesture.current?.moved) onContext?.();
+          if (!panGesture.current?.moved) onContext?.({x:e.clientX,y:e.clientY,position:api.screenToFlowPosition({x:e.clientX,y:e.clientY}),graphKey});
         }}
         onConnect={(c) => onConnect?.(c)}
         onReconnect={(e, c) =>

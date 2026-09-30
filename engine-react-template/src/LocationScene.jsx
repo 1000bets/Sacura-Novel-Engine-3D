@@ -5,6 +5,8 @@ import * as THREE from "three";
 import {updateCharacterVisual,disposeCharacterVisual} from "./characterVisual.js";
 import {createCameraRig} from './CameraRig.js';
 import {createSceneNavigation} from './SceneNavigation.js';
+import {openSceneContext} from './sceneContext.js';
+import {createLightObject,updateLightObject} from './sceneLights.js';
 import {createSceneGizmo,groupObjects,meshGeometry,cloneSceneObject} from './SceneGizmo.js';
 import {BUILTIN_TRANSFORMS,resolvedPosition} from './sceneEditing.js';
 import Scene from "./Scene.jsx";
@@ -14,14 +16,14 @@ function Exterior({
   kind,
   objects,
   state,
-  onSelect,
+  onSelect, onContext,
   onInteract,
   mode = "scene",
   showGrid = true, selected, selectedIds, sceneId, editTool, editSpace, snap, onTransform, onTransforms, focusRequest, editing=true, cameraScene, selectedCameraId, cameraPreviewId, cameraPilotId, onCameraChange, onCameraSelect, cameraApi, showCameras=true,
 }) {
   const host = useRef(),
     live = useRef();
-  live.current = { state, onSelect, onInteract, mode, showGrid,objects,selected,selectedIds,sceneId,kind,editTool,editSpace,snap,onTransform,onTransforms,focusRequest,editing,cameraScene,selectedCameraId,cameraPreviewId,cameraPilotId,onCameraChange,onCameraSelect,showCameras };
+  live.current = { state, onSelect, onContext, onInteract, mode, showGrid,objects,selected,selectedIds,sceneId,kind,editTool,editSpace,snap,onTransform,onTransforms,focusRequest,editing,cameraScene,selectedCameraId,cameraPreviewId,cameraPilotId,onCameraChange,onCameraSelect,showCameras };
   useEffect(() => {
     let renderer;
     try {
@@ -38,7 +40,7 @@ function Exterior({
     const scene = new THREE.Scene(),
       camera = new THREE.PerspectiveCamera(58, 1, 0.05, 400);
     camera.position.set(...gameCamera(kind,{})[0]);
-    const controls = createSceneNavigation(camera, renderer.domElement,()=>live.current);
+    const controls = createSceneNavigation(camera, renderer.domElement,()=>({...live.current,onContext:point=>openSceneContext(point,camera,renderer.domElement,picks,live.current)}));
     controls.target.set(...gameCamera(kind,{})[1]);camera.lookAt(controls.target);
     const hemi=new THREE.HemisphereLight(0xc5d7ea, 0x253831, 2);scene.add(hemi);
     const sun = new THREE.DirectionalLight(0xffd5ac, 2);
@@ -140,7 +142,7 @@ function Exterior({
           ),
       )
       .forEach((o) =>
-        (()=>{const mesh=box(0.5, 0.5, 0.5, 0, 0.25, 1, o.color || "#a3969f", o.id);mesh.geometry.dispose();mesh.geometry=meshGeometry(o.primitive);mesh.userData.primitive=o.primitive||"box";return mesh;})(),
+        (()=>{if(o.type==='Источник света'){const group=createLightObject(o);scene.add(group);picks.push(group);return group;}const mesh=box(0.5, 0.5, 0.5, 0, 0.25, 1, o.color || "#a3969f", o.id);mesh.geometry.dispose();mesh.geometry=meshGeometry(o.primitive);mesh.userData.primitive=o.primitive||"box";return mesh;})(),
       );
     const grid = new THREE.GridHelper(20, 20, 0x344d4d, 0x293b3d);
     grid.position.y = -0.25;
@@ -218,6 +220,7 @@ function Exterior({
         mesh.visible = o.active && state.visible?.[o.id] !== false;
         if(mesh.userData.marker)mesh.userData.marker.visible=state.interactionTarget===o.id||state.highlights?.[o.id];
         gizmo.apply(mesh,o,resolvedPosition(o,state,kind));
+        updateLightObject(mesh,o,live.current.mode==='scene');
         updateObjectHighlight(mesh,state.interactionTarget===o.id||!!state.highlights?.[o.id],animTime);
         updateCharacterVisual(mesh,o,dt,state.poses?.[o.id],!!state.motions?.[o.id]&&!state.motions[o.id].stopped&&!state.motions[o.id].paused&&state.motions[o.id].progress<1,state.paused,mode==='scene'&&live.current.editing);
 

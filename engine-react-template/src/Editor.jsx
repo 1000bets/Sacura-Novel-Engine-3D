@@ -1,3 +1,5 @@
+import {copySceneObjects,pasteSceneObjects,cloneStoryNodes,clipboardCommand} from './editorClipboard.js';
+import {copyAction,copyGroup} from './authoringModel.js';
 import {playbackStartId,deleteStoryNode} from './storyEditing.js';
 import {applyConnections,connectionError} from './storyConnections.js';
 import {InfoView, FloatingWindow} from './EditorHelp.jsx';
@@ -47,6 +49,7 @@ import {
 } from "./StudioParts.jsx";
 import LocationScene from "./LocationScene.jsx";
 import EditorGraph from "./EditorGraph.jsx";
+import EditorContextMenu from "./EditorContextMenu.jsx";
 import ActionFields from "./ActionFields.jsx";
 import FailureLab from "./FailureLab.jsx";
 import SubsceneWorkspace from './SubsceneWorkspace.jsx';
@@ -299,6 +302,7 @@ function DockTools({ dock, event, issueCount, onSelect }) {
 }
 
 export default function Editor() {
+  const clipboard=useRef(null);
   const seed = useRef();
   if (!seed.current) {
     try {
@@ -336,6 +340,8 @@ export default function Editor() {
     [historyOpen, setHistoryOpen] = useState(false),
     [compactPanel,setCompactPanel]=useState('workspace'),
     [picker, setPicker] = useState(null),
+    [contextMenu,setContextMenu]=useState(null),
+    [contextNodeId,setContextNodeId]=useState(null),
     [menu, setMenu] = useState(null),
     [menuAnchor, setMenuAnchor] = useState({left: 100, top: 40}),
     [projectDialog,setProjectDialog]=useState(null),
@@ -774,7 +780,8 @@ export default function Editor() {
     setProject(history.at(-1));
     setHistory((h) => h.slice(0, -1));
   };
-  const addBeat = (kind) => {
+  const addBeat = (kind,placement) => {
+    if(rt.running)return;
     const id = uid("line");
     mutate((p) => {
       const c = p.chapters.find((c) => c.id === chapter.id),
@@ -782,7 +789,7 @@ export default function Editor() {
         b = {
           id,
           kind,
-          speaker: kind === "dialogue" ? "Алиса" : "Рассказчик",
+          speaker: "Рассказчик",
           text:
             kind === "choice"
               ? "Что вы решите?"
@@ -831,6 +838,7 @@ export default function Editor() {
       } else if (beat.kind !== "end") c.beats[index].next = id;
       c.beats.splice(index + 1, 0, b);
     });
+    if(placement){placeContextNode(id,placement);setContextNodeId(id);}
     setSelectedBeat(id);
     setSelection({ kind: "beat", id });
     setPicker(null);
@@ -890,6 +898,32 @@ export default function Editor() {
   useEffect(()=>{setCameraPilotId(null);setCameraPreviewId(null);setFocusRequest(0);},[displayScene.id]);
   const transformObject=(id,value)=>{if(rt.running)return;mutate(p=>setObjectTransform(p,id,scene.id,value));};
   const transformObjects=changes=>{if(rt.running)return;mutate(p=>{for(const {id,value}of changes)setObjectTransform(p,id,scene.id,value);});};
+  const objectClipboard=command=>{
+    if(rt.running)return;
+    if(command==='copy'){if(!selectedObjects.length)return;clipboard.current={kind:'objects',items:copySceneObjects(selectedObjects,scene),step:0};setNotice('Объекты скопированы. Ctrl+V — вставить.');}
+    else if(clipboard.current?.kind==='objects'){const copies=pasteSceneObjects(clipboard.current.items,scene,++clipboard.current.step);mutate(p=>p.objects.push(...copies));setSelection({kind:'object',id:copies.at(-1).id,ids:copies.map(o=>o.id)});setFocusRequest({nonce:uid('focus')});setNotice('Объекты вставлены. Ctrl+Z — отменить.');}
+  };
+  const graphClipboard=(command,graphNodes,graphKey)=>{
+    if(rt.running)return;
+    if(command==='copy'){
+      const chosen=graphNodes.filter(n=>n.selected),ids=chosen.map(n=>n.id);
+      if(graphKey.startsWith('flow:')||graphKey.startsWith('story:')){const items=nodes.filter(b=>ids.includes(b.id));if(!items.length)return;clipboard.current={kind:'beats',items:structuredClone(items),positions:Object.fromEntries(chosen.map(n=>[n.id,n.position])),step:0};}
+      else if(graphKey.startsWith('event:')&&event){const groups=event.groups.filter(g=>ids.includes(g.id)),actions=event.groups.flatMap(g=>g.actions).filter(a=>ids.includes(a.id)&&!groups.some(g=>g.actions.some(x=>x.id===a.id)));if(!groups.length&&!actions.length)return;clipboard.current={kind:'actions',groups:structuredClone(groups),actions:structuredClone(actions),positions:Object.fromEntries(chosen.map(n=>[n.id,n.position])),step:0};}
+      else return;
+      setNotice('Ноды скопированы. Ctrl+V — вставить.');return;
+    }
+    const data=clipboard.current;if(!data)return;
+    if(data.kind==='beats'&&(graphKey.startsWith('flow:')||graphKey.startsWith('story:'))){
+      const copies=cloneStoryNodes(data.items),step=++data.step,positions={...layout.positions[graphKey]};
+      copies.forEach((copy,i)=>{const origin=data.positions[data.items[i].id]||{x:0,y:0};positions[copy.id]={x:origin.x+60*step,y:origin.y+60*step};});
+      mutate(p=>{const chapter=p.chapters.find(c=>c.subsceneId===scene.id)||p.chapters.find(c=>c.beats.some(b=>b.id===beat.id));chapter.beats.push(...copies);});setPositions(graphKey,positions);setContextNodeId(copies.at(-1).id);selectBeat(copies.at(-1).id);setNotice('Ноды вставлены. Связи между копиями сохранены. Ctrl+Z — отменить.');
+    }else if(data.kind==='actions'&&graphKey.startsWith('event:')&&event){
+      if(binding){setNotice('Откройте исходный шаблон события, чтобы вставить ноды в его состав.');return;}
+      const groups=data.groups.map(copyGroup),actions=data.actions.map(copyAction);
+      mutate(p=>{const ev=p.events.find(e=>e.id===event.id);ev.groups.push(...groups);if(actions.length){if(!ev.groups.length)ev.groups.push({id:uid('group'),name:'Основное действие',actions:[]});ev.groups.at(-1).actions.push(...actions);}});
+      const copied=[...groups,...actions],positions={...layout.positions[graphKey]},step=++data.step;copied.forEach((n,i)=>{const source=[...data.groups,...data.actions][i],origin=data.positions?.[source.id]||{x:100,y:100+80*i};positions[n.id]={x:origin.x+60*step,y:origin.y+60*step};});setPositions(graphKey,positions);setSelection({kind:actions.length?'action':'group',id:copied.at(-1).id});setNotice('Ноды вставлены. Ctrl+Z — отменить.');
+    }
+  };
   const duplicateObjects=()=>{
     if(rt.running)return;const copies=selectedObjects.map(object=>{const copy=structuredClone(object);copy.id=uid('object');copy.name=object.name+' · копия';copy.subsceneId=scene.id;copy.builtin=object.builtin||(['letter','door','fireplace','garden-note','ticket'].includes(object.id)?object.id:undefined);const value=objectTransform(object,scene.id,scene.kind);value.position[0]+=.65;copy.transforms={[scene.id]:value};return copy;});
     mutate(p=>p.objects.push(...copies));setSelection({kind:'object',id:copies.at(-1)?.id,ids:copies.map(object=>object.id)});setFocusRequest({nonce:uid('focus')});
@@ -907,14 +941,15 @@ export default function Editor() {
       p.objects.push({
         id,
         type,
-        name: type === "Персонаж" ? "Новый персонаж" : type === "Меш" ? (LOCATION_PRIMITIVES.find(([id])=>id===primitive)?.[1]||"Новый объект") : "Интерактивный предмет",
+        name: type === "Источник света" ? "Источник освещения" : type === "Персонаж" ? "Новый персонаж" : type === "Меш" ? (LOCATION_PRIMITIVES.find(([id])=>id===primitive)?.[1]||"Новый объект") : "Интерактивный предмет",
         color: "#bb99aa",
         position: "стол",
         active: true,
         subsceneId: scene.id,
         interaction: "Осмотреть",
         primitive,
-        transforms:{[scene.id]:{position:[0,type==="Персонаж"?0:.3,1],rotation:[0,0,0],scale:[1,1,1]}},
+        ...(type==='Источник света'?{light:{intensity:35,distance:10,decay:2},color:'#fff0d0'}:{}),
+        transforms:{[scene.id]:{position:[0,type==="Персонаж"?0:type==='Источник света'?2:.3,1],rotation:[0,0,0],scale:[1,1,1]}},
       }),
     );
     setSelection({ kind: "object", id });
@@ -1006,12 +1041,14 @@ export default function Editor() {
   };
   useEffect(() => {
     const listener = (e) => {
+      const command=clipboardCommand(e);
+      if(command&&!e.target.closest?.('.react-flow')&&!contextMenu&&!picker&&!projectDialog&&!detailEditor&&!menu&&!running&&mode==='scene'&&(selection.kind==='object'||e.target.closest?.('.scene-viewport,.hierarchy'))){e.preventDefault();objectClipboard(command);return;}
       const tool = ({KeyQ:'select',KeyW:'translate',KeyE:'rotate',KeyR:'scale'})[e.code];
       if (
         tool && !e.defaultPrevented && !e.repeat &&
         !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey &&
         mode === 'scene' && !running && !cameraPilotId &&
-        !picker && !projectDialog && !detailEditor && !menu &&
+        !contextMenu && !picker && !projectDialog && !detailEditor && !menu &&
         !e.target.isContentEditable &&
         !e.target.closest?.('input, textarea, select, [role="textbox"], [role="dialog"], .react-flow, .scene-viewport[data-navigating="true"]')
       ) {
@@ -1024,7 +1061,7 @@ export default function Editor() {
         e.key === 'Delete' && !e.defaultPrevented && !e.repeat &&
         !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey &&
         mode === 'scene' && !running && selection.kind === 'object' && objectSelectionIds.length &&
-        !picker && !projectDialog && !detailEditor &&
+        !contextMenu && !picker && !projectDialog && !detailEditor &&
         !e.target.isContentEditable &&
         !e.target.closest?.('input, textarea, select, [role="textbox"], [role="dialog"], .react-flow')
       ) {
@@ -1033,6 +1070,7 @@ export default function Editor() {
         return;
       }
       if (e.key === "Escape") {
+        if(contextMenu){e.preventDefault();setContextMenu(null);return;}
         setCompactPanel('workspace');
         setPicker(null);
         setMenu(null);
@@ -1056,9 +1094,15 @@ export default function Editor() {
         }
       }
     };
-    window.addEventListener("keydown", listener);
-    return () => window.removeEventListener("keydown", listener);
-  }, [history,project,projectDialog,mode,running,selection,picker,detailEditor,cameraPilotId,menu,displayScene]);
+    const nativeClipboard=e=>{
+      if(e.defaultPrevented||running||mode!=='scene'||contextMenu||picker||projectDialog||detailEditor||menu||e.target.isContentEditable||e.target.closest?.('input,textarea,select,[role="textbox"],[role="dialog"],.react-flow'))return;
+      if(selection.kind!=='object'&&!e.target.closest?.('.scene-viewport,.hierarchy'))return;
+      e.preventDefault();objectClipboard(e.type==='copy'?'copy':'paste');
+      if(e.type==='copy')e.clipboardData?.setData('text/plain','Sacura · объекты сцены');
+    };
+    window.addEventListener("keydown", listener);window.addEventListener('copy',nativeClipboard);window.addEventListener('paste',nativeClipboard);
+    return () => {window.removeEventListener("keydown", listener);window.removeEventListener('copy',nativeClipboard);window.removeEventListener('paste',nativeClipboard);};
+  }, [history,project,projectDialog,mode,running,selection,picker,detailEditor,cameraPilotId,menu,displayScene,contextMenu]);
 
   const renderInspector = () => {
     if(selection.kind==='camera'){
@@ -1173,7 +1217,7 @@ export default function Editor() {
           <div className="inspector-identity">
             <span className="identity-icon" style={{ color: o.color }}>
               <Icon
-                name={o.type === "Персонаж" ? "PersonStanding" : "Box"}
+                name={o.type === "Персонаж" ? "PersonStanding" : o.type==='Источник света'?'Lightbulb':"Box"}
                 size={28}
               />
             </span>
@@ -1215,8 +1259,8 @@ export default function Editor() {
                 onChange={(subsceneId) => patch({ subsceneId })}
               />
             </Field>
-            {!o.builtin&&!['letter','door','fireplace','garden-note','ticket'].includes(o.id)&&o.type!=='Персонаж'&&<Field label="Форма"><Select value={o.primitive||'box'} options={[["box","Куб"],["sphere","Сфера"],["cylinder","Цилиндр"]]} onChange={primitive=>patch({primitive})}/></Field>}
-            <Field label="Цвет в макете">
+            {!o.builtin&&!['letter','door','fireplace','garden-note','ticket'].includes(o.id)&&o.type!=='Персонаж'&&o.type!=='Источник света'&&<Field label="Форма"><Select value={o.primitive||'box'} options={[["box","Куб"],["sphere","Сфера"],["cylinder","Цилиндр"]]} onChange={primitive=>patch({primitive})}/></Field>}
+            <Field label={o.type==='Источник света'?'Цвет света':'Цвет в макете'}>
               <input
                 type="color"
                 value={o.color || "#b99cac"}
@@ -1224,6 +1268,7 @@ export default function Editor() {
               />
             </Field>
           </Fold>
+          {o.type==='Источник света'&&<Fold title="Освещение" icon="Lightbulb"><Field label="Интенсивность"><input type="number" min="0" step="1" disabled={running} value={o.light?.intensity??35} onChange={e=>patch({light:{...o.light,intensity:Math.max(0,Number(e.target.value))}})}/></Field><Field label="Дальность, м"><input type="number" min="0" step="0.5" disabled={running} value={o.light?.distance??10} onChange={e=>patch({light:{...o.light,distance:Math.max(0,Number(e.target.value))}})}/></Field><p className="resource-note">Точечный источник светит во все стороны. Дальность 0 — без ограничения.</p></Fold>}
           {o.type === "Активный меш" && (
             <Fold title="Взаимодействие" icon="MousePointer2">
               <Field label="Действие игрока">
@@ -1513,7 +1558,7 @@ export default function Editor() {
                 ? "Выбор игрока"
                 : beat.kind === "gate"
                   ? "Ожидание игрока"
-                  : "Реплика " + beat.id}
+                  : (beat.text?.trim() ? "Реплика · " + beat.text.trim().split(/\s+/).slice(0,3).join(" ") + (beat.text.trim().split(/\s+/).length>3 ? "…" : "") : "Пустая реплика")}
             </strong>
             <small>{chapter.name}</small>
           </div>
@@ -1997,6 +2042,38 @@ export default function Editor() {
     );
   };
 
+  const editClipboard=command=>{if(selection.kind==='object')objectClipboard(command);else {const api=graphApi.current?.clipboard?.();if(api)graphClipboard(command,api.nodes,api.graphKey);}setMenu(null);};
+  const closeContextMenu=useCallback(()=>setContextMenu(null),[]);
+  useEffect(()=>{setContextMenu(null);},[dock,mode,displayScene.id,running]);
+  const placeContextNode=(id,placement)=>setLayout(l=>({...l,positions:{...l.positions,[placement.graphKey]:{...l.positions[placement.graphKey],[id]:placement.position}}}));
+  const addContextAction=type=>{
+    if(rt.running||!event||binding)return;
+    const action=makeAction(type);
+    mutate(p=>{const ev=p.events.find(e=>e.id===event.id);if(!ev.groups.length)ev.groups.push({id:uid('group'),name:'Основное действие',actions:[]});ev.groups.at(-1).actions.push(action);});
+    placeContextNode(action.id,contextMenu);setSelection({kind:'action',id:action.id});
+  };
+  const contextItems=()=>{
+    if(contextMenu?.kind==='scene')return [
+      {label:'Персонаж',icon:'PersonStanding',group:'Добавить объект',action:()=>addObject('Персонаж')},
+      {label:'Интерактивный предмет',icon:'MousePointer2',group:'Добавить объект',action:()=>addObject('Активный меш')},
+      {label:'Объект',icon:'Box',group:'Добавить объект',children:LOCATION_PRIMITIVES.map(([shape,label,icon])=>({label,icon,action:()=>addObject('Меш',shape)}))},
+      {label:'Источник освещения',icon:'Lightbulb',group:'Добавить объект',action:()=>addObject('Источник света')},
+      {label:'Камера из текущего вида',icon:'Video',group:'Добавить объект',action:()=>createCamera()},
+      {label:'Приблизить выделение',icon:'Focus',group:'Выделение',shortcut:'F',disabled:!objectSelectionIds.length,action:()=>setFocusRequest({nonce:uid('focus')})},
+      {label:'Дублировать выделение',icon:'Copy',group:'Выделение',disabled:!objectSelectionIds.length,action:duplicateObjects},
+      {label:'Удалить выделение',icon:'Trash2',group:'Выделение',shortcut:'Del',disabled:!objectSelectionIds.length,action:deleteObjects},
+      {label:showGrid?'Скрыть сетку':'Показать сетку',icon:'Grid2X2',group:'Вид',action:()=>setShowGrid(v=>!v)},
+      {label:showCameras?'Скрыть камеры':'Показать камеры',icon:'Video',group:'Вид',action:()=>setShowCameras(v=>!v)},
+    ];
+    if(contextMenu?.kind==='event')return binding?[
+      {label:'Редактировать исходный шаблон',icon:'Layers',group:'Состав нод задаётся в шаблоне',action:()=>setEventContext({eventId:event.id})}
+    ]:Object.entries(TYPES).map(([type,t])=>({label:t.label,icon:t.icon,group:'Добавить ноду действия',action:()=>addContextAction(type)}));
+    return [
+      ...[['dialogue','MessageSquare','Реплика'],['choice','GitFork','Выбор игрока'],['gate','MousePointerClick','Ждать взаимодействие'],['merge','Merge','Схождение веток'],['end','Flag','Концовка']].map(([kind,icon,label])=>({label,icon,group:'Добавить ноду',action:()=>addBeat(kind,contextMenu)})),
+      {label:'Добавить событие к выбранной реплике…',icon:'Layers',group:'События',action:()=>setPicker({kind:'event',phase:phase==='ALL'?'ON_START':phase})},
+    ];
+  };
+
   const renderGraph = graphMode => (<EditorGraph
                   project={project}
                   mode={graphMode}
@@ -2022,16 +2099,9 @@ export default function Editor() {
                   positions={layout.positions}
                   onPositions={setPositions}
                   onReady={graphMode === dock ? onGraphReady : undefined}
-                  onContext={() =>
-                    setPicker({
-                      kind:
-                        graphMode === "story"
-                          ? "beat"
-                          : graphMode === "event"
-                            ? "action"
-                            : "event",
-                    })
-                  }
+                  onClipboard={graphClipboard}
+                  onContext={point=>{if(!rt.running)setContextMenu({...point,kind:graphMode});}}
+
                 />);
   const renderHistory = () => (<div className="history-window-content"><input aria-label="Поиск реплик" placeholder="Найти реплику…" value={historyQuery} onChange={e=>setHistoryQuery(e.target.value)}/>{project.subscenes.map((s) => (
                 <details key={s.id} open={!!historyQuery || (layout.treeOpen?.['history:'+s.id]??s.id===scene.id)}>
@@ -2336,6 +2406,7 @@ export default function Editor() {
                 mode={mode}
                 showGrid={showGrid}
                 onSelect={selectObject}
+                onContext={point=>{if(!rt.running)setContextMenu({...point,kind:'scene'});}}
                 onInteract={interact}
               />
               <GameDialogue
@@ -2526,9 +2597,10 @@ export default function Editor() {
                   onPreview={()=>audition(event.id)}
                 />
               ) : ["story", "timeline", "staging"].includes(dock) ? (
-                <StoryFlow project={project} issues={issues} selectedId={beat.id} selectionId={selection.id} preview={preview}
+                <StoryFlow onClipboard={graphClipboard} contextNodeId={contextNodeId} project={project} issues={issues} selectedId={beat.id} selectionId={selection.id} preview={preview}
                   onSelect={graphSelect} onOpen={openGraph} onBatch={changeBatch} onConnect={connect} onDeleteNode={deleteFlowNode}
                   onScene={id=>openSubscenes('edit',id)}
+                  onContext={point=>{if(!rt.running)setContextMenu({...point,kind:'story'});}}
                   onAdd={(id,hook)=>{setSelectedBeat(id);setSelection({kind:'beat',id});setPicker({kind:'event',phase:hook});}}
                   positions={layout.positions['flow:all']||{}} onPositions={positions=>setPositions('flow:all',positions)} onReady={onGraphReady}/>
               ) : dock === 'event' ? renderGraph('event') : dock === 'cameras' ? <CameraWorkspace scene={displayScene} objects={objects} state={world} selected={selection.kind==='camera'?selection.id:null} onSelect={selectCamera} onCreate={()=>createCamera()} onFollow={followCharacter} onChange={changeCamera} onDefault={id=>mutate(p=>p.subscenes.find(s=>s.id===scene.id).defaultCameraId=id)} onDelete={deleteCamera} onPilot={pilotCamera} onView={viewCamera} onCapture={captureCamera} piloting={cameraPilotId} running={running} onEdit={editScene}/> : dock === 'subscenes' ? <SubsceneWorkspace project={project} scene={displayScene} beat={nodes.find(b=>b.id===subsceneDraft?.fromBeatId)||beat} request={subsceneRequest} draft={subsceneDraft} onDraftChange={setSubsceneDraft} running={running}
@@ -2715,7 +2787,7 @@ export default function Editor() {
               <button disabled={projectFileBusy} onClick={restorePreviousProject}><Icon name="History"/>Восстановить предыдущий проект</button>
             </>
           ) : menu === "Правка" ? (
-            <><button onClick={resetLayout}><Icon name="PanelsTopLeft"/>Восстановить раскладку</button><button
+            <><button disabled={running} onClick={()=>editClipboard('copy')}><Icon name="Copy"/>Копировать <kbd>Ctrl C</kbd></button><button disabled={running||!clipboard.current} onClick={()=>editClipboard('paste')}><Icon name="ClipboardPaste"/>Вставить <kbd>Ctrl V</kbd></button><button onClick={resetLayout}><Icon name="PanelsTopLeft"/>Восстановить раскладку</button><button
               disabled={!history.length}
               onClick={() => {
                 undo();
@@ -2786,6 +2858,7 @@ export default function Editor() {
           )}
         </div>
       )}
+      {contextMenu&&<EditorContextMenu x={contextMenu.x} y={contextMenu.y} title={contextMenu.kind==='scene'?'Сцена':'Добавить ноду'} items={contextItems()} onClose={closeContextMenu}/>}
       {picker && (
         <div
           className="create-overlay"
@@ -2863,7 +2936,7 @@ export default function Editor() {
               </>
             ) : picker.kind === "object" ? (
               <div className="create-options">
-                {[['Персонаж','box','PersonStanding','Персонаж','Участвует в диалогах и постановке'],['Активный меш','box','MousePointer2','Интерактивный предмет','Клик игрока запускает продолжение'],['Меш','box','Box','Куб','Декорация · размеры меняются мышью'],['Меш','sphere','Circle','Сфера','Простой объёмный объект'],['Меш','cylinder','Cylinder','Цилиндр','Колонна, ваза или временный объект']].map(([type,shape,icon,name,hint])=><button key={name} onClick={()=>addObject(type,shape)}><Icon name={icon} size={23}/><span><strong>{name}</strong><small>{hint}</small></span></button>)}
+                {[['Персонаж','box','PersonStanding','Персонаж','Участвует в диалогах и постановке'],['Активный меш','box','MousePointer2','Интерактивный предмет','Клик игрока запускает продолжение'],['Меш','box','Box','Куб','Декорация · размеры меняются мышью'],['Меш','sphere','Circle','Сфера','Простой объёмный объект'],['Меш','cylinder','Cylinder','Цилиндр','Колонна, ваза или временный объект'],['Источник света','box','Lightbulb','Источник освещения','Точечный свет с настройкой цвета и интенсивности']].map(([type,shape,icon,name,hint])=><button key={name} onClick={()=>addObject(type,shape)}><Icon name={icon} size={23}/><span><strong>{name}</strong><small>{hint}</small></span></button>)}
               </div>
             ) : picker.kind === "event" ? (
               <>

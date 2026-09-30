@@ -1,3 +1,4 @@
+import {clipboardCommand} from './editorClipboard.js';
 import React,{memo,useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {ReactFlow,ReactFlowProvider,Handle,Position,Background,Controls,MiniMap,MarkerType,useReactFlow,useUpdateNodeInternals,useNodesInitialized,useStore,applyNodeChanges} from '@xyflow/react';
 import {Icon,Button} from './StudioParts.jsx';
@@ -36,8 +37,8 @@ const Moment=memo(function Moment({data,selected}){
 });
 const Missing=({data})=><article className="story-moment missing"><Handle type="target" position={Position.Left} id="in"/><strong>{data.title}</strong><p>{data.text}</p></article>;
 const nodeTypes={moment:Moment,missing:Missing};
-function Canvas({project,selectedId,selectionId,preview,issues=[],onSelect,onOpen,onAdd,onBatch,onConnect,onDeleteNode,onScene,positions,onPositions,onReady}){
- const api=useReactFlow(),initialized=useNodesInitialized(),container=useRef(null),didFocus=useRef(false),lastSelected=useRef(selectedId);
+function Canvas({onClipboard,contextNodeId,project,selectedId,selectionId,preview,issues=[],onSelect,onOpen,onAdd,onBatch,onConnect,onDeleteNode,onScene,onContext,positions,onPositions,onReady}){
+ const api=useReactFlow(),initialized=useNodesInitialized(),container=useRef(null),didFocus=useRef(false),lastSelected=useRef(selectedId),panGesture=useRef(null),placedNode=useRef(null);
  // React Flow registers a newly created node after the selection changes.
  // Observe that registration so a failed early focus is retried after measurement.
  const targetNode=useStore(state=>state.nodeLookup.get(selectedId));
@@ -53,11 +54,12 @@ function Canvas({project,selectedId,selectionId,preview,issues=[],onSelect,onOpe
  },[api,selectedId]);
  useEffect(()=>{
   if(!initialized || !targetNode)return;
+  if(contextNodeId===selectedId&&placedNode.current!==contextNodeId){placedNode.current=contextNodeId;didFocus.current=true;lastSelected.current=selectedId;return;}
   if((!didFocus.current || lastSelected.current!==selectedId) && focus()){
    didFocus.current=true;
    lastSelected.current=selectedId;
   }
- },[initialized,selectedId,targetNode,focus]);
+ },[initialized,selectedId,targetNode,focus,contextNodeId]);
  const arrange=useCallback(()=>{
   const arranged=arrangeStoryFlow(api.getNodes(),model.edges);
   onPositions(Object.fromEntries(arranged.map(n=>[n.id,n.position])));
@@ -67,7 +69,7 @@ function Canvas({project,selectedId,selectionId,preview,issues=[],onSelect,onOpe
  useEffect(()=>{if(!initialized)return;const signature=model.nodes.map(n=>n.id).join('|');if(measuredSignature.current===signature)return;measuredSignature.current=signature;
   if(!Object.keys(positions||{}).length){const arranged=arrangeStoryFlow(api.getNodes(),model.edges);onPositions(Object.fromEntries(arranged.map(n=>[n.id,n.position])));}
  },[initialized,model,positions,api,onPositions]);
- useEffect(()=>{onReady?.({focus,arrange,fit:()=>api.fitView({padding:.12,minZoom:.02,maxZoom:.8,duration:250})});},[focus,arrange,api,onReady]);
+ useEffect(()=>{onReady?.({clipboard:()=>({nodes:api.getNodes(),graphKey:'flow:all'}),focus,arrange,fit:()=>api.fitView({padding:.12,minZoom:.02,maxZoom:.8,duration:250})});},[focus,arrange,api,onReady]);
  const connect=c=>onConnect(c);
  const [transfer,setTransfer]=useState(null),[hint,setHint]=useState('');
  const readPin=element=>{
@@ -92,7 +94,9 @@ function Canvas({project,selectedId,selectionId,preview,issues=[],onSelect,onOpe
  },[transfer?.pin,model.edges,project,onConnect]);
  return <div className="story-flow" ref={container} tabIndex={0}
   onClickCapture={e=>{if(readPin(e.target)){e.stopPropagation();}}}
+  onPointerMoveCapture={e=>{const pan=panGesture.current;if(pan&&e.buttons&&Math.hypot(e.clientX-pan.x,e.clientY-pan.y)>5)pan.moved=true;}}
   onPointerDownCapture={e=>{
+   panGesture.current={x:e.clientX,y:e.clientY,moved:false};
    const pin=readPin(e.target);if(!pin || e.button!==0 || (!e.altKey&&!e.ctrlKey))return;
    e.preventDefault();e.stopPropagation();container.current.focus();
    const wires=pinConnections(model.edges,pin);
@@ -100,7 +104,10 @@ function Canvas({project,selectedId,selectionId,preview,issues=[],onSelect,onOpe
    else if(wires.length)setTransfer({pin,startX:e.clientX,startY:e.clientY,x:e.clientX,y:e.clientY});
    else setHint('У этого пина нет связей для переноса. Тяните без Ctrl, чтобы создать связь.');
   }}
+  onCopy={e=>{if(e.target.isContentEditable||e.target.closest('input,textarea,select,[role="textbox"]'))return;e.preventDefault();e.stopPropagation();onClipboard?.('copy',api.getNodes(),'flow:all');e.clipboardData?.setData('text/plain','Sacura · ноды');}}
+  onPaste={e=>{if(e.target.isContentEditable||e.target.closest('input,textarea,select,[role="textbox"]'))return;e.preventDefault();e.stopPropagation();onClipboard?.('paste',api.getNodes(),'flow:all');}}
   onKeyDown={e=>{
+   const command=clipboardCommand(e);if(command){e.preventDefault();e.stopPropagation();onClipboard?.(command,api.getNodes(),'flow:all');return;}
    if(!['Delete','Backspace'].includes(e.key)||e.repeat||e.target.closest('input,textarea,select,[contenteditable="true"]'))return;
    if(edgeId){e.preventDefault();e.stopPropagation();removeEdges(model.edges.filter(edge=>edge.id===edgeId));}
    else if(e.key==='Delete'&&selectionId===selectedId){e.preventDefault();e.stopPropagation();onDeleteNode?.(selectedId);}
@@ -108,7 +115,8 @@ function Canvas({project,selectedId,selectionId,preview,issues=[],onSelect,onOpe
   data-help-title="Связи потока истории" data-help="Тяните от выхода справа ко входу слева. Один выход задаёт одно продолжение; во вход могут приходить несколько веток. Alt + щелчок по пину — разорвать его связи. Ctrl + перетаскивание — перенести связи на другой пин того же типа. Выберите ноду или провод и нажмите Delete для удаления. Ctrl + Z — отмена. ПКМ — панорама, колесо — масштаб.">
   <ReactFlow nodes={nodes} edges={model.edges.map(e=>({...e,type:'smoothstep',markerEnd:{type:MarkerType.ArrowClosed},style:{stroke:e.id===edgeId?'var(--accent)':e.data.crossScene?'var(--info)':'var(--graph-edge)'},labelStyle:{fill:'var(--text-secondary)',fontSize:11},labelBgStyle:{fill:'var(--panel)'}}))} nodeTypes={nodeTypes}
    onNodesChange={changes=>setNodes(ns=>applyNodeChanges(changes,ns))} onNodeDragStop={(_,n)=>onPositions({...positions,[n.id]:n.position})}
-   onNodeClick={(e,n)=>{setEdgeId(null);if(n.data.beat)onSelect(n.id);if(!e.target.closest('input,textarea,select,button,[contenteditable="true"]'))container.current.focus({preventScroll:true});}} onConnect={connect} onReconnect={(edge,c)=>onConnect({changes:[{source:edge.source,sourceHandle:edge.sourceHandle,target:null},c]})} isValidConnection={c=>!connectionError(project,[c])} onEdgeClick={(_,e)=>{setEdgeId(e.id);container.current.focus();}} onPaneClick={()=>setEdgeId(null)}
+   onNodeClick={(e,n)=>{setEdgeId(null);if(n.data.beat)onSelect(n.id);if(!e.target.closest('input,textarea,select,button,[contenteditable="true"]'))container.current.focus({preventScroll:true});}} onConnect={connect} onReconnect={(edge,c)=>onConnect({changes:[{source:edge.source,sourceHandle:edge.sourceHandle,target:null},c]})} isValidConnection={c=>!connectionError(project,[c])} onEdgeClick={(_,e)=>{setEdgeId(e.id);container.current.focus();}} onPaneClick={()=>{setEdgeId(null);container.current.focus({preventScroll:true});}}
+   onPaneContextMenu={e=>{e.preventDefault();if(!panGesture.current?.moved)onContext?.({x:e.clientX,y:e.clientY,position:api.screenToFlowPosition({x:e.clientX,y:e.clientY}),graphKey:'flow:all'});}}
    deleteKeyCode={null} minZoom={.02} maxZoom={1.5} panOnScroll={false} panOnDrag={[1,2]} selectionOnDrag zoomOnScroll reconnectRadius={18} connectionRadius={28} connectOnClick={false} zoomActivationKeyCode="Control" colorMode="dark">
    <Background gap={28} size={.7}/><Controls showInteractive={false}/>{minimap&&<MiniMap pannable zoomable/>}
   </ReactFlow>
