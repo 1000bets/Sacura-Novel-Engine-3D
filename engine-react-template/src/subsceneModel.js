@@ -1,3 +1,4 @@
+import {storyPorts} from './choiceModel.js';
 import {uid,allBeats} from './model.js';
 import {ensureCameras} from './cameraModel.js';
 import {objectTransform,isObjectInScene,BUILTIN_KINDS,addSceneDecorations,createSceneStagingPoints,ensureSceneStagingPoints} from './sceneEditing.js';
@@ -18,7 +19,7 @@ const KIT={
 export const beatsInScene=(p,id)=>p.chapters.filter(c=>c.subsceneId===id).flatMap(c=>c.beats);
 const ownerOf=(p,id)=>p.chapters.find(c=>c.beats.some(b=>b.id===id))?.subsceneId;
 export function sceneTransitions(p,id){
- const result=[];for(const b of allBeats(p)){const source=ownerOf(p,b.id);for(const edge of b.kind==='choice'?b.choices.map(c=>({choiceId:c.id,label:c.label,to:c.next,condition:c.condition,threshold:c.threshold})):[{to:b.next,label:'После реплики'}]){const target=ownerOf(p,edge.to);if(edge.to&&source!==target&&(source===id||target===id))result.push({...edge,from:b.id,beat:b,source,target});}}
+ const result=[];for(const b of allBeats(p)){const source=ownerOf(p,b.id);for(const edge of storyPorts(b).map(port=>({choiceId:port.id.startsWith('choice:')?port.id.slice(7):undefined,portId:port.id,label:port.label,to:port.next,condition:port.condition}))){const target=ownerOf(p,edge.to);if(edge.to&&source!==target&&(source===id||target===id))result.push({...edge,from:b.id,beat:b,source,target});}}
  return result;
 }
 export function addSceneKit(p,scene){
@@ -53,7 +54,7 @@ export function createSubscene(p,draft,fromBeatId){
 export function setSceneEntry(p,id,entry,reroute=false){
  const scene=p.subscenes.find(s=>s.id===id);if(!scene||!beatsInScene(p,id).some(b=>b.id===entry))throw new Error('Начальная реплика должна принадлежать этой сабсцене.');
  const old=scene.entry;scene.entry=entry;if(!reroute)return;
- for(const b of allBeats(p)){if(ownerOf(p,b.id)===id)continue;if(b.next===old)b.next=entry;for(const c of b.choices||[])if(c.next===old)c.next=entry;}
+ for(const b of allBeats(p)){if(ownerOf(p,b.id)===id)continue;if(b.next===old)b.next=entry;for(const port of ['trueNext','falseNext'])if(b[port]===old)b[port]=entry;for(const c of b.choices||[])if(c.next===old)c.next=entry;}
 }
 export function connectSubscene(p,fromId,choiceId,toSceneId){
  const from=allBeats(p).find(b=>b.id===fromId),to=p.subscenes.find(s=>s.id===toSceneId);if(!from||!to||from.kind==='end')throw new Error('Выберите реплику и сабсцену назначения.');
@@ -81,8 +82,9 @@ export function cloneSubscene(p,sourceId){
  // Global originals must stay excluded even though their local copies use new IDs.
  scene.excludedObjectIds.push(...[...objectIds.keys()].filter(id=>p.objects.find(o=>o.id===id)&&!p.objects.find(o=>o.id===id).subsceneId));
  for(const ch of chapters){ch.id=uid('chapter');ch.subsceneId=id;for(const b of ch.beats){
-  b.id=beatIds.get(b.id);b.next=beatIds.get(b.next)||b.next;if(b.branch)b.branch=choiceIds.get(b.branch);if(b.signal)b.signal=objectIds.get(b.signal)||b.signal;
-  for(const c of b.choices||[]){c.id=choiceIds.get(c.id);c.next=beatIds.get(c.next)||c.next;}
+  b.id=beatIds.get(b.id);b.next=beatIds.get(b.next)||b.next;for(const port of ['trueNext','falseNext'])if(b[port])b[port]=beatIds.get(b[port])||b[port];if(b.branch)b.branch=choiceIds.get(b.branch);if(b.signal)b.signal=objectIds.get(b.signal)||b.signal;
+  for(const c of b.choices||[]){c.id=choiceIds.get(c.id);c.next=beatIds.get(c.next)||c.next;if(c.enabledSource)c.enabledSource=beatIds.get(c.enabledSource)||c.enabledSource;}
+  for(const port of Object.keys(b.inputs||{}))b.inputs[port]=beatIds.get(b.inputs[port])||b.inputs[port];
   const bindingIds=new Map();for(const binding of b.bindings){const oldId=binding.id;binding.id=uid('binding');bindingIds.set(oldId,binding.id);const event=p.events.find(e=>e.id===binding.eventId);binding.actionOverrides||={};
    for(const action of event?.groups.flatMap(g=>g.actions)||[]){const effective={...action,...(event.groups[0]?.actions[0]?.id===action.id?binding.overrides:{}),...binding.actionOverrides[action.id]},patch={};if(objectIds.has(effective.target))patch.target=objectIds.get(effective.target);if(cameraIds.has(effective.cameraId))patch.cameraId=cameraIds.get(effective.cameraId);if(effective.type==='move'&&pointIds.has(effective.value))patch.value=pointIds.get(effective.value);if(Object.keys(patch).length)binding.actionOverrides[action.id]={...binding.actionOverrides[action.id],...patch};}
   }

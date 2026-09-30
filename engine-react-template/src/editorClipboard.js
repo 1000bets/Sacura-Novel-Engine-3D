@@ -11,7 +11,9 @@ export function cloneStoryNodes(snapshot){
  const ids=new Map(snapshot.map(beat=>[beat.id,uid('beat')]));
  return snapshot.map(source=>{const beat=structuredClone(source),bindings=new Map((beat.bindings||[]).map(b=>[b.id,uid('bind')]));beat.id=ids.get(source.id);
  if('next'in beat)beat.next=ids.get(beat.next)||null;
- for(const choice of beat.choices||[]){choice.id=uid('choice');choice.next=ids.get(choice.next)||null;}
+ for(const port of ['trueNext','falseNext'])if(port in beat)beat[port]=ids.get(beat[port])||null;
+ for(const choice of beat.choices||[]){choice.id=uid('choice');choice.next=ids.get(choice.next)||null;choice.enabledSource=ids.get(choice.enabledSource)||null;}
+ for(const port of Object.keys(beat.inputs||{}))beat.inputs[port]=ids.get(beat.inputs[port])||null;
  for(const binding of beat.bindings||[])binding.id=bindings.get(binding.id);
  for(const batches of Object.values(beat.batches||{}))for(const batch of batches){batch.id=uid('batch');batch.bindingIds=batch.bindingIds.map(id=>bindings.get(id)).filter(Boolean);}
  return beat;});

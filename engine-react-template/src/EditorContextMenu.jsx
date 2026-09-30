@@ -6,7 +6,7 @@ import './editorContextMenu.css';
 export default function EditorContextMenu({x,y,title,items,onClose}){
  const ref=useRef(),[query,setQuery]=useState(''),[submenu,setSubmenu]=useState(null),[submenuPosition,setSubmenuPosition]=useState({}),subRef=useRef(),[position,setPosition]=useState({left:x,top:y});
  const searched=items.flatMap(item=>item.children?[item,...item.children.map(child=>({...child,group:item.label}))]:[item]);
- const visible=(query?searched.filter(item=>!item.children):items).filter(item=>(item.label+' '+(item.group||'')).toLowerCase().includes(query.toLowerCase()));
+ const visible=(query?searched.filter(item=>!item.children):items).filter(item=>(item.label+' '+(item.group||'')+' '+(item.searchText||'')).toLowerCase().includes(query.trim().toLowerCase()));
  useLayoutEffect(()=>{const box=ref.current.getBoundingClientRect();setPosition({left:Math.max(8,Math.min(x,window.innerWidth-box.width-8)),top:Math.max(8,Math.min(y,window.innerHeight-box.height-8))});},[x,y,query,items.length]);
  const openSubmenu=(item,trigger,focus=false)=>{const rect=trigger.getBoundingClientRect();setSubmenu({item,trigger,focus,top:rect.top});};
  useLayoutEffect(()=>{if(!submenu||!subRef.current)return;const box=subRef.current.getBoundingClientRect(),parent=ref.current.getBoundingClientRect();setSubmenuPosition({left:parent.right+box.width+8<=window.innerWidth?parent.right+3:Math.max(8,parent.left-box.width-3),top:Math.max(8,Math.min(submenu.top,window.innerHeight-box.height-8))});if(submenu.focus)subRef.current.querySelector('button')?.focus();},[submenu,position]);

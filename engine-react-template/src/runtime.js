@@ -1,3 +1,6 @@
+import {variableValue,runtimeVariableType} from './variableModel.js';
+import {isPureNode,readLogic} from './logicModel.js';
+import {choiceValue,ANSWER_VARIABLE,typedValue} from './choiceModel.js';
 import {
   allBeats,
   batchesFor,
@@ -81,8 +84,8 @@ export class PreviewRuntime {
     const routes=p=>JSON.stringify({
       scenes:p.subscenes.map(s=>[s.id,s.entry]),
       chapters:p.chapters.map(c=>[c.id,c.subsceneId,c.beats.map(b=>[
-        b.id,b.kind,b.next||null,b.signal||null,
-        (b.choices||[]).map(choice=>[choice.id,choice.next||null,choice.condition,choice.threshold]),
+        b.id,b.kind,b.inputs,b.variable,b.value,b.operator,b.a,b.b,b.valueType,b.condition,b.next||null,b.signal||null,b.trueNext,b.falseNext,b.test,b.resultVariable,
+        (b.choices||[]).map(choice=>[choice.id,choice.next||null,choice.condition,choice.threshold,choice.availability,choice.enabledSource,choice.result]),
       ])]),
     });
     if(routes(project)===routes(this.project))return false;
@@ -106,7 +109,7 @@ export class PreviewRuntime {
       states: {},
       effects: {},
       instances: {},
-      variables: { ...project.variables },
+      variables: { ...project.variables },choiceResult:null,
       history: [],
       activity: [],audition:false,
       world: { positions: {}, poses: {}, visible: {} },
@@ -165,7 +168,8 @@ export class PreviewRuntime {
     this.snapshot.ready = false;
     this.emit();
   }
-  async enter(id, token) {
+  async enter(id, token, automaticDepth=0) {
+    if(automaticDepth>100)throw new Error("Проверки образовали бесконечный цикл. Подключите выход к реплике или концовке.");
     this.assert(token);
     const b = allBeats(this.project).find((b) => b.id === id);
     if (!b) throw new Error("Реплика назначения удалена");
@@ -229,6 +233,14 @@ export class PreviewRuntime {
     );
     if (errors.length) throw new Error(`Реплика «${id}»: `+errors.map((i) => i.title).join(" · "));
     await this.phase(b, "BEFORE", token);
+    if(isPureNode(b))throw new Error('Эта нода вычисляет значение. Запустите реплику или If.');
+    if(b.kind==='branch'||b.kind==='set-variable'){
+      await this.phase(b,'ON_START',token);await this.phase(b,'AFTER',token);this.assert(token);
+      if(b.kind==='set-variable')this.snapshot.variables[b.variable]=variableValue(this.project,b.variable,b.inputs?.value?readLogic(this.project,b.inputs.value,this.snapshot.variables):b.value);
+      const next=chooseNext(this.project,b.id,null,this.snapshot.variables);
+      if(!next)throw new Error('У проверки не подключён выбранный выход. Соедините «Да» и «Нет» на графе.');
+      await this.enter(next.id,token,automaticDepth+1);return;
+    }
     this.snapshot.world.dialogue={
       key:token+':'+this.snapshot.history.length,beatId:id,index:dialogueIndex,kind:b.kind,
       speakerId:this.project.objects.find(o=>o.type==='Персонаж'&&o.name===b.speaker&&isObjectInScene(o,scene))?.id||null,
@@ -483,6 +495,7 @@ export class PreviewRuntime {
         }
         break;
       case "variable": {
+        if(a.operation){const value=typedValue(a.value,(this.project.variableTypes?.[a.target]?runtimeVariableType(this.project,a.target):a.valueType)||typeof this.snapshot.variables[a.target]);this.snapshot.variables[a.target]=a.operation==='add'?Number(this.snapshot.variables[a.target]||0)+Number(value):value;if(this.project.variableTypes?.[a.target])this.snapshot.variables[a.target]=variableValue(this.project,a.target,this.snapshot.variables[a.target]);break;}
         const v = String(a.value);
         this.snapshot.variables[a.target] = v.startsWith("+")
           ? Number(this.snapshot.variables[a.target] || 0) + Number(v)
@@ -491,6 +504,7 @@ export class PreviewRuntime {
             : v === "false"
               ? false
               : v;
+        if(this.project.variableTypes?.[a.target])this.snapshot.variables[a.target]=variableValue(this.project,a.target,this.snapshot.variables[a.target]);
         break;
       }
       case "visibility":
@@ -531,6 +545,11 @@ export class PreviewRuntime {
       const item=this.project.objects.find(o=>o.id===b.signal);
       if ((item?.builtin||item?.id) === "letter") this.snapshot.variables.letter = true;
     }
+    let selectedChoice;
+    if(b.kind==='choice'){
+      selectedChoice=b.choices?.find(c=>c.id===choiceId);
+      if(!selectedChoice||!conditionPass(selectedChoice,this.snapshot.variables,this.project))return;
+    }
     const next = chooseNext(
       this.project,
       b.id,
@@ -543,6 +562,15 @@ export class PreviewRuntime {
         ? `Переход из реплики «${b.id}» ведёт в недоступную реплику «${b.next}». Переподключите выход «Дальше».`
         : `У реплики «${b.id}» не подключён выход «Дальше». Соедините его со следующей репликой или выберите тип «Концовка».`));
       return;
+    }
+    if(selectedChoice){
+      if(selectedChoice.result?.type==='none'){this.snapshot.choiceResult=null;delete this.snapshot.variables[ANSWER_VARIABLE];}
+      else {
+      const value=choiceValue(selectedChoice);
+      this.snapshot.choiceResult={beatId:b.id,choiceId:selectedChoice.id,type:selectedChoice.result?.type||'string',value};
+      this.snapshot.variables[ANSWER_VARIABLE]=value;
+      if(b.resultVariable?.trim())this.snapshot.variables[b.resultVariable.trim()]=this.project.variableTypes?.[b.resultVariable.trim()]?variableValue(this.project,b.resultVariable.trim(),value):value;
+      }
     }
     this.snapshot.ready = false;
     this.emit();

@@ -1,3 +1,4 @@
+import {choiceAvailable,availabilityOf} from './choiceModel.js';
 import {SIDECHAIN} from './audioSettings.js';
 export const uid = (prefix='id') => `${prefix}-${globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)}`;
 export const TYPES = {
@@ -13,7 +14,7 @@ export const TYPES = {
  time:{label:'Изменить время суток',icon:'Sun',domain:'Время суток',completion:'INSTANT'},
  sound:{label:'Проиграть звук',icon:'Volume2',domain:'Звук',completion:'FINITE'},
  wait:{label:'Пауза / ожидание',icon:'Hourglass',domain:null,completion:'FINITE'},
- variable:{label:'Изменить условие',icon:'SlidersHorizontal',domain:null,completion:'INSTANT'},
+ variable:{label:'Изменить переменную',icon:'SlidersHorizontal',domain:null,completion:'INSTANT'},
  visibility:{label:'Показать объект',icon:'Box',domain:'Видимость',completion:'INSTANT'},
  lighting:{label:'Настроить свет',icon:'Lamp',domain:'Освещение',completion:'INSTANT'},
  particles:{label:'Частицы в воздухе',icon:'Sparkles',domain:'Частицы',completion:'INSTANT'},
@@ -127,7 +128,7 @@ export function validate(p){
     if(b.mode==='PARALLEL'||['NONE','STARTED'].includes(binding.join))claims.set(key,binding.id);
    }
   }
-  if(b.kind==='choice'&&!b.choices.some(c=>c.condition==='always'))add(`choice-${b.id}`,'Игрок может остаться без ответа','У каждого ответа есть условие. Добавьте вариант, доступный всегда.',b.id,null,'fallback');
+  if(b.kind==='choice'&&!b.choices.some(c=>!availabilityOf(c)))add(`choice-${b.id}`,'Игрок может остаться без ответа','У каждого ответа есть условие. Добавьте вариант, доступный всегда.',b.id,null,'fallback');
   if(b.kind==='choice')for(const c of b.choices){if(c.next&&!allBeats(p).some(n=>n.id===c.next))add(`edge-${c.id}`,'Ответ ведёт в удалённый блок','Выберите существующий блок или общий путь.',b.id,null,'edge');}
   if(b.kind==='gate'&&!p.objects.some(o=>o.id===b.signal&&o.active&&o.type==='Активный меш'))add(`gate-${b.id}`,'Игрок не может выполнить ожидание','Объект для взаимодействия удалён, выключен или не является активным мешем.',b.id,null,'gate');
   for(const binding of b.bindings)for(const a of resolvedActions(p,binding)){if(!validActionTarget(p,a))add(`binding-target-${binding.id}`,a.type==='variable'?'Переменная не найдена':'В размещении выбран удалённый объект','Измените локальную цель события.',b.id,binding.eventId,'binding-target');}
@@ -169,7 +170,7 @@ export function fixIssue(p,issue){
  if(issue.fix==='reset-overrides')beat.bindings.filter(b=>b.eventId===issue.eventId).forEach(b=>b.overrides={});
  return n;
 }
-export function available(choice,vars){return choice.condition==='always'||(choice.condition==='trust'?vars.trust>=Number(choice.threshold||0):!!vars[choice.condition]);}
+export function available(choice,vars){return choiceAvailable(choice,vars);}
 export function nextNode(p,beatId,route={},choiceId){
  const list=allBeats(p),current=list.find(b=>b.id===beatId);if(!current)return null;
  const choice=current.choices?.find(c=>c.id===choiceId);if(choice?.next)return list.find(b=>b.id===choice.next)||null;

@@ -1,3 +1,5 @@
+import {blueprintEdgeTypes} from './BlueprintEdge.jsx';
+import {storyPorts} from './choiceModel.js';
 import {clipboardCommand} from './editorClipboard.js';
 import React, {
   memo,
@@ -14,7 +16,6 @@ import {
   Handle,
   Position,
   MiniMap,
-  MarkerType,
   applyNodeChanges,
   useReactFlow,
   ReactFlowProvider,
@@ -88,36 +89,12 @@ export function storyGraph(project, selectedId, scope = "chapter") {
           label: p.label,
           count: b.bindings.filter((x) => x.hook === p.id).length,
         })),
-        ports:
-          b.kind === "choice"
-            ? b.choices.map((c) => ({
-                id: "choice:" + c.id,
-                label: c.label,
-                condition: c.condition,
-                threshold: c.threshold,
-              }))
-            : b.kind !== "end"
-              ? [{ id: "next", label: "Дальше" }]
-              : [],
+        ports:storyPorts(b),
       },
       width: 252,
       height: b.kind === "choice" ? 135 + b.choices.length * 40 : 190,
     });
-    const outs =
-      b.kind === "choice"
-        ? b.choices.map((c) => ({
-            to: c.next,
-            port: "choice:" + c.id,
-            label:
-              c.condition === "trust"
-                ? `Доверие ≥ ${c.threshold ?? 3}`
-                : c.condition === "letter"
-                  ? "Письмо найдено"
-                  : "",
-          }))
-        : b.next
-          ? [{ to: b.next, port: "next", label: "" }]
-          : [];
+    const outs=storyPorts(b).map(port=>({to:port.next,port:port.id,label:port.condition||port.label}));
     for (const out of outs) {
       if (!out.to) continue;
       const target = allBeats(project).find((x) => x.id === out.to);
@@ -816,22 +793,8 @@ function GraphCanvas({
   }, [focus, api, graph, onReady, graphKey, onPositions]);
   const edges = graph.edges.map((e) => ({
     ...e,
-    type: "smoothstep",
-    pathOptions: { borderRadius: 6, offset: 10 },
-    markerEnd: {
-      type: MarkerType.ArrowClosed,
-      width: 15,
-      height: 15,
-      color: "var(--graph-connection)",
-    },
-    style: {
-      stroke: e.id === selectedEdge ? "var(--accent)" : "var(--graph-edge)",
-      strokeWidth: e.id === selectedEdge ? 2 : 1.25,
-    },
-    labelStyle: { fill: "var(--text-secondary)", fontSize: 11 },
-    labelBgStyle: { fill: "var(--bg-app)" },
-    labelBgPadding: [6, 3],
-    labelBgBorderRadius: 3,
+    type:'blueprint',
+    data:{...e.data,highlighted:e.id===selectedEdge,showLabel:true},
   }));
   return (
     <div className="graph-canvas" ref={container} tabIndex={0}
@@ -844,6 +807,7 @@ function GraphCanvas({
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        edgeTypes={blueprintEdgeTypes}
         nodeTypes={nodeTypes}
         onNodesChange={(changes) =>
           setNodes((ns) => applyNodeChanges(changes, ns))

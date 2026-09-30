@@ -1,3 +1,5 @@
+import {typedValue,variableName} from './choiceModel.js';
+import {ValueField} from './ChoiceInspector.jsx';
 import React from "react";
 import {characterAnimationOptions} from './characterModel.js';
 import { AUDIO_ASSETS, TYPES } from "./studioModel.js";
@@ -141,29 +143,12 @@ export default function ActionFields({
       {["pause", "resume", "stop", "duck"].includes(type) && (
         <div className="action-target-note">Музыка · основной фон</div>
       )}
-      {type === "variable" && (
-        <>
-          {field(
-            "Переменная",
-            select("target", Object.keys(project.variables)),
-          )}
-          {field(
-            a.target === "letter" ? "Значение" : "Изменение",
-            a.target === "letter" ? (
-              select("value", ["true", "false"])
-            ) : (
-              <input
-                value={a.value}
-                placeholder="+1"
-                onChange={(e) => onChange({ value: e.target.value })}
-              />
-            ),
-          )}
-          <small className="resource-note">
-            +1 прибавляет; число без знака задаёт значение.
-          </small>
-        </>
-      )}
+      {type==='variable'&&(()=>{const valueType=a.valueType||typeof project.variables[a.target],operation=a.operation||(String(a.value).startsWith('+')?'add':'set');return <>
+       {field('Переменная',<select value={a.target} onChange={e=>{const target=e.target.value,valueType=typeof project.variables[target];onChange({target,valueType,operation:'set',value:typedValue('',valueType)});}}>{Object.keys(project.variables).map(id=><option key={id} value={id}>{variableName(id)}</option>)}</select>)}
+       {valueType==='number'&&field('Операция',<select aria-label="Операция с переменной" value={operation} onChange={e=>onChange({operation:e.target.value,valueType,value:typedValue(a.value,valueType)})}><option value="set">Задать значение</option><option value="add">Прибавить</option></select>)}
+       {field(operation==='add'&&valueType==='number'?'Прибавить число':'Значение',<ValueField label="Значение переменной" type={valueType} value={typedValue(a.value,valueType)} onChange={value=>onChange({value,valueType,operation:valueType==='number'?operation:'set'})}/>)}
+       <small className="resource-note">Используйте эту переменную в проверках и условиях ответов.</small>
+      </>;})()}
       {type === "wait" && (
         <>
           {field(

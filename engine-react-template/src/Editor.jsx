@@ -1,6 +1,10 @@
+import {beatPreview} from './storyLabels.js';
+import {editVariable} from './variableModel.js';
+import {isPureNode,migrateLogicGraph,compareSymbols,variablePalette,initializeVariableNode} from './logicModel.js';
+import {newChoice,ANSWER_VARIABLE,typedValue} from './choiceModel.js';
 import {copySceneObjects,pasteSceneObjects,cloneStoryNodes,clipboardCommand} from './editorClipboard.js';
 import {copyAction,copyGroup} from './authoringModel.js';
-import {playbackStartId,deleteStoryNode} from './storyEditing.js';
+import {playbackStartId,deleteStoryNode,insertStoryNode} from './storyEditing.js';
 import {applyConnections,connectionError} from './storyConnections.js';
 import {InfoView, FloatingWindow} from './EditorHelp.jsx';
 import './editorHelp.css';
@@ -160,6 +164,7 @@ function ResizeBar({ axis, onMove, onReset, label }) {
 }
 
 function GameDialogue({
+  project,
   beat,
   preview,
   running,
@@ -197,10 +202,10 @@ function GameDialogue({
           {beat.choices?.map((c) => (
             <button
               key={c.id}
-              disabled={!ready || !conditionPass(c, variables)}
+              disabled={!ready || !conditionPass(c, variables,project)}
               onClick={() => running && onAdvance(c.id)}
             >
-              {!conditionPass(c, variables) && (
+              {!conditionPass(c, variables,project) && (
                 <Icon name="LockKeyhole" size={13} />
               )}
               <span>{c.label}</span>
@@ -306,9 +311,9 @@ export default function Editor() {
   const seed = useRef();
   if (!seed.current) {
     try {
-      seed.current = { project: loadProject() };
+      seed.current = { project: migrateLogicGraph(loadProject()) };
     } catch (e) {
-      seed.current = { project: upgradeProject(), error: e.message };
+      seed.current = { project: migrateLogicGraph(upgradeProject()), error: e.message };
     }
   }
   const [project, setProject] = useState(seed.current.project),
@@ -341,6 +346,7 @@ export default function Editor() {
     [compactPanel,setCompactPanel]=useState('workspace'),
     [picker, setPicker] = useState(null),
     [contextMenu,setContextMenu]=useState(null),
+    [inspectedVariable,setInspectedVariable]=useState(null),
     [contextNodeId,setContextNodeId]=useState(null),
     [menu, setMenu] = useState(null),
     [menuAnchor, setMenuAnchor] = useState({left: 100, top: 40}),
@@ -713,7 +719,7 @@ export default function Editor() {
     setQuery('');setFocusRequest(0);setMenu(null);setPreview(null);setFollow(true);
     setLayout(l=>({...l,positions:{},treeOpen:{}}));
     projectFile.current=handle;seed.current.error=null;
-    setProject(next);setSelectedBeat(entry);setSelection({kind:'beat',id:entry});
+    setProject(migrateLogicGraph(next));setSelectedBeat(entry);setSelection({kind:'beat',id:entry});
   };
   const runFileOperation = async action => {
     if(fileOperation.current)return;
@@ -784,9 +790,7 @@ export default function Editor() {
     if(rt.running)return;
     const id = uid("line");
     mutate((p) => {
-      const c = p.chapters.find((c) => c.id === chapter.id),
-        index = c.beats.findIndex((b) => b.id === beat.id),
-        b = {
+      const b = {
           id,
           kind,
           speaker: "Рассказчик",
@@ -798,30 +802,17 @@ export default function Editor() {
                 : kind === "end"
                   ? "Конец истории."
                   : "Новая реплика",
-          next:
-            beat.kind === "choice"
-              ? beat.choices.find(
-                  (c) => c.id === (picker?.choiceId || beat.choices[0]?.id),
-                )?.next
-              : beat.next,
+          next: null,
           bindings: [],
           batches: { BEFORE: [], ON_START: [], AFTER: [] },
         };
-      if (kind === "choice")
-        b.choices = [
-          {
-            id: uid("choice"),
-            label: "Остаться",
-            condition: "always",
-            next: b.next || null,
-          },
-          {
-            id: uid("choice"),
-            label: "Выйти в сад",
-            condition: "always",
-            next: "garden-entry",
-          },
-        ];
+      if(kind==='choice'){b.choiceMode='value';b.choices=[newChoice(uid('choice'),'Ответ 1'),newChoice(uid('choice'),'Ответ 2')];}
+      if(kind==='branch'){b.text='If · Если';b.next=null;b.condition=false;b.trueNext=null;b.falseNext=null;}
+      if(kind==='variable'){let index=1;while(Object.hasOwn(p.variables,'Переменная '+index))index++;initializeVariableNode(p,b,placement?.variable||'Переменная '+index);}
+      if(kind==='literal'){b.valueType='number';b.value=0;}
+      if(kind==='compare'){b.operator=placement?.operator||'eq';b.valueType='number';b.a=0;b.b=0;}
+      if(kind==='set-variable')initializeVariableNode(p,b,placement?.variable||Object.keys(p.variables).find(id=>id!==ANSWER_VARIABLE)||'Переменная 1');
+      if(isPureNode(b)||['branch','set-variable'].includes(kind))b.next=null;
       if (kind === "gate") {
         b.signal = objects.find(o=>o.type==='Активный меш'&&o.active!==false)?.id || 'letter';
         b.timeout = 30;
@@ -830,15 +821,9 @@ export default function Editor() {
         b.next = null;
         b.ending = "Новая концовка";
       }
-      if (beat.kind === "choice") {
-        const answer = c.beats[index].choices.find(
-          (c) => c.id === (picker?.choiceId || beat.choices[0]?.id),
-        );
-        if (answer) answer.next = id;
-      } else if (beat.kind !== "end") c.beats[index].next = id;
-      c.beats.splice(index + 1, 0, b);
+      insertStoryNode(p,chapter.id,beat.id,b);
     });
-    if(placement){placeContextNode(id,placement);setContextNodeId(id);}
+    if(placement?.position){placeContextNode(id,placement);setContextNodeId(id);}
     setSelectedBeat(id);
     setSelection({ kind: "beat", id });
     setPicker(null);
@@ -1105,6 +1090,8 @@ export default function Editor() {
   }, [history,project,projectDialog,mode,running,selection,picker,detailEditor,cameraPilotId,menu,displayScene,contextMenu]);
 
   const renderInspector = () => {
+    if(isPureNode(beat)||['branch','set-variable'].includes(beat.kind))return <><div className="inspector-identity"><strong>{beat.kind==='branch'?'If · Если':beat.kind==='variable'?'Переменная':beat.kind==='set-variable'?'Задать переменную':'Логика · '+(compareSymbols[beat.operator]||beat.kind)}</strong></div><p className="choice-note">Переменные редактируются в боковой панели «Мой Blueprint». Двойной щелчок по Get / Set открывает свойства переменной. Круглые пины передают значения, стрелки задают ход истории.</p><Button icon="Focus" onClick={()=>graphApi.current?.focus(beat.id)}>Показать ноду</Button></>;
+
     if(selection.kind==='camera'){
       const c=displayScene.cameras?.find(c=>c.id===selection.id);
       if(c)return <><div className="inspector-identity"><Icon name="Video" size={25}/><div><strong>{c.name}</strong><small>{displayScene.location}</small></div></div><Fold title="Кадр" icon="ScanLine"><p>{c.mode==='follow'?'Следует за персонажем: '+(objects.find(o=>o.id===c.followTargetId)?.name||'цель недоступна'):'Фиксированная камера'}</p><p>Угол обзора {c.fov}°</p><Button icon="Settings2" onClick={openCameras}>Открыть настройки камеры</Button><Button icon="Eye" onClick={()=>viewCamera(c.id)}>Посмотреть через камеру</Button></Fold></>;
@@ -1558,13 +1545,13 @@ export default function Editor() {
                 ? "Выбор игрока"
                 : beat.kind === "gate"
                   ? "Ожидание игрока"
-                  : (beat.text?.trim() ? "Реплика · " + beat.text.trim().split(/\s+/).slice(0,3).join(" ") + (beat.text.trim().split(/\s+/).length>3 ? "…" : "") : "Пустая реплика")}
+                  : beat.kind==='branch'?'Проверка' : (beat.text?.trim() ? "Реплика · " + beat.text.trim().split(/\s+/).slice(0,3).join(" ") + (beat.text.trim().split(/\s+/).length>3 ? "…" : "") : "Пустая реплика")}
             </strong>
             <small>{chapter.name}</small>
           </div>
           <span className="subtle">{beat.bindings.length} событий</span>
         </div>
-        <Fold title="Диалог" icon="MessageSquare">
+        {beat.kind!=='branch'&&<Fold title="Диалог" icon="MessageSquare">
           <Field label="Говорит">
             <Select
               value={beat.speaker}
@@ -1589,7 +1576,7 @@ export default function Editor() {
               value={beat.kind}
               options={[
                 ["dialogue", "Реплика"],
-                ["choice", "Выбор"],
+                ["choice", "Выбор"],["branch","If · Если"],
                 ["gate", "Взаимодействие"],
                 ["merge", "Схождение"],
                 ["end", "Концовка"],
@@ -1602,16 +1589,17 @@ export default function Editor() {
                     : {}),
                   ...(kind === "choice" && !beat.choices
                     ? {
-                        choices: [
+                        choiceMode:'value',choices: [
                           {
                             id: uid("choice"),
                             label: "Продолжить",
                             condition: "always",
-                            next: beat.next || null,
+                            next: null, result:{type:'string',value:'Продолжить'},availability:null,
                           },
                         ],
                       }
                     : {}),
+                  ...(kind === "branch"?{test:beat.test||{mode:'all',rules:[{variable:ANSWER_VARIABLE,operator:'eq',type:'string',value:''}]},trueNext:beat.trueNext||null,falseNext:beat.falseNext||null}:{}),
                   ...(kind === "gate"
                     ? {
                         signal: beat.signal || "letter",
@@ -1623,7 +1611,7 @@ export default function Editor() {
             />
           </Field>
         </Fold>
-        <Fold title="Постановка реплики" icon="Clapperboard">
+        }<Fold title="Постановка реплики" icon="Clapperboard">
           {PHASES.map((p) => (
             <button
               className="phase-inspector-row"
@@ -1650,96 +1638,8 @@ export default function Editor() {
           </Button>
         </Fold>
         {beat.kind === "choice" ? (
-          <Fold title="Ответы и условия" icon="GitFork">
-            {beat.choices.map((c, i) => (
-              <div className="answer-fields" key={c.id}>
-                <label className="answer-number">
-                  {i + 1}
-                  <input
-                    value={c.label}
-                    onChange={(e) =>
-                      patchBeat({
-                        choices: beat.choices.map((x) =>
-                          x.id === c.id ? { ...x, label: e.target.value } : x,
-                        ),
-                      })
-                    }
-                  />
-                </label>
-                <Select
-                  value={c.condition}
-                  options={[
-                    ["always", "Всегда"],
-                    ["trust", "Если достаточно доверия"],
-                    ["letter", "Если найдено письмо"],
-                  ]}
-                  onChange={(condition) =>
-                    patchBeat({
-                      choices: beat.choices.map((x) =>
-                        x.id === c.id ? { ...x, condition } : x,
-                      ),
-                    })
-                  }
-                />
-                {c.condition === "trust" && (
-                  <input
-                    aria-label="Порог доверия"
-                    type="number"
-                    value={c.threshold ?? 3}
-                    onChange={(e) =>
-                      patchBeat({
-                        choices: beat.choices.map((x) =>
-                          x.id === c.id
-                            ? { ...x, threshold: Number(e.target.value) }
-                            : x,
-                        ),
-                      })
-                    }
-                  />
-                )}
-                <Select
-                  value={c.next || ""}
-                  options={[
-                    ["", "Выберите продолжение"],
-                    ...nodes.map((n) => [
-                      n.id,
-                      sceneFor(project, n.id).location +
-                        " / " +
-                        n.id +
-                        " · " +
-                        n.text.slice(0, 24),
-                    ]),
-                  ]}
-                  onChange={(next) =>
-                    patchBeat({
-                      choices: beat.choices.map((x) =>
-                        x.id === c.id ? { ...x, next } : x,
-                      ),
-                    })
-                  }
-                />
-              </div>
-            ))}
-            <Button
-              icon="Plus"
-              onClick={() =>
-                patchBeat({
-                  choices: [
-                    ...beat.choices,
-                    {
-                      id: uid("choice"),
-                      label: "Новый ответ",
-                      condition: "always",
-                      next: "garden-entry",
-                    },
-                  ],
-                })
-              }
-            >
-              Добавить ответ
-            </Button>
-          </Fold>
-        ) : beat.kind === "gate" ? (
+          <Fold title="Ответы игрока" icon="GitFork"><p>Текст ответа, результат и вход доступности редактируются прямо в ноде выбора. Подключите результат сравнения к круглому входу ответа.</p><Button icon="Focus" onClick={()=>graphApi.current?.focus(beat.id)}>К ноде выбора</Button></Fold>
+        ) : beat.kind==='branch' ? null : beat.kind === "gate" ? (
           <Fold title="Ждать взаимодействие" icon="MousePointerClick">
             <Field label="Объект">
               <Select
@@ -1759,19 +1659,15 @@ export default function Editor() {
             </Field>
           </Fold>
         ) : null}
-        {!["choice", "end"].includes(beat.kind) && (
+        {!["choice", "branch", "end"].includes(beat.kind) && (
           <Fold title="Продолжение" icon="Route">
             <Select
               value={beat.next || ""}
               options={[
                 ["", "Выход не подключён"],
-                ...nodes.map((n) => [
+                ...nodes.filter(n=>!isPureNode(n)).map((n) => [
                   n.id,
-                  sceneFor(project, n.id).location +
-                    " / " +
-                    n.id +
-                    " · " +
-                    n.text.slice(0, 30),
+                  sceneFor(project, n.id).name + ' · ' + beatPreview(n,6),
                 ]),
               ]}
               onChange={(next) => patchBeat({ next: next || null })}
@@ -2053,6 +1949,7 @@ export default function Editor() {
     placeContextNode(action.id,contextMenu);setSelection({kind:'action',id:action.id});
   };
   const contextItems=()=>{
+    if(contextMenu?.kind==='variable-drop')return [['variable','Получить · Get'],...(contextMenu.variable===ANSWER_VARIABLE?[]:[['set-variable','Задать · Set']])].map(([kind,label])=>({label,icon:'Database',action:()=>addBeat(kind,contextMenu)}));
     if(contextMenu?.kind==='scene')return [
       {label:'Персонаж',icon:'PersonStanding',group:'Добавить объект',action:()=>addObject('Персонаж')},
       {label:'Интерактивный предмет',icon:'MousePointer2',group:'Добавить объект',action:()=>addObject('Активный меш')},
@@ -2069,7 +1966,10 @@ export default function Editor() {
       {label:'Редактировать исходный шаблон',icon:'Layers',group:'Состав нод задаётся в шаблоне',action:()=>setEventContext({eventId:event.id})}
     ]:Object.entries(TYPES).map(([type,t])=>({label:t.label,icon:t.icon,group:'Добавить ноду действия',action:()=>addContextAction(type)}));
     return [
-      ...[['dialogue','MessageSquare','Реплика'],['choice','GitFork','Выбор игрока'],['gate','MousePointerClick','Ждать взаимодействие'],['merge','Merge','Схождение веток'],['end','Flag','Концовка']].map(([kind,icon,label])=>({label,icon,group:'Добавить ноду',action:()=>addBeat(kind,contextMenu)})),
+      {label:'Переменные проекта',icon:'Database',children:variablePalette(project).map(item=>({...item,icon:item.kind==='variable'?'Database':'Pencil',action:()=>addBeat(item.kind,{...contextMenu,variable:item.variable})}))},
+      {label:'Сравнения',icon:'Binary',children:['eq','ne','gte','lte','gt','lt'].map(operator=>({label:compareSymbols[operator]+' · '+({eq:'Равно',ne:'Не равно',gte:'Больше или равно',lte:'Меньше или равно',gt:'Больше',lt:'Меньше'})[operator],icon:'Binary',action:()=>addBeat('compare',{...contextMenu,operator})}))},
+      ...[['variable','Database','Переменная · получить'],['set-variable','Database','Переменная · задать'],['literal','Binary','Значение'],['and','Binary','И · оба условия'],['or','Binary','ИЛИ · любое условие']].map(([kind,icon,label])=>({label,icon,group:'Значения и переменные',action:()=>addBeat(kind,contextMenu)})),
+      ...[['dialogue','MessageSquare','Реплика'],['choice','GitFork','Выбор игрока'],['branch','GitFork','If · Если'],['gate','MousePointerClick','Ждать взаимодействие'],['merge','Merge','Схождение веток'],['end','Flag','Концовка']].map(([kind,icon,label])=>({label,icon,group:'Добавить ноду',action:()=>addBeat(kind,contextMenu)})),
       {label:'Добавить событие к выбранной реплике…',icon:'Layers',group:'События',action:()=>setPicker({kind:'event',phase:phase==='ALL'?'ON_START':phase})},
     ];
   };
@@ -2409,7 +2309,7 @@ export default function Editor() {
                 onContext={point=>{if(!rt.running)setContextMenu({...point,kind:'scene'});}}
                 onInteract={interact}
               />
-              <GameDialogue
+              <GameDialogue project={running?rt.project:project}
                 beat={playBeat}
                 preview={preview}
                 running={running}
@@ -2534,8 +2434,8 @@ export default function Editor() {
                 <Button
                   className="rose-button"
                   icon="Plus"
-                  onClick={() =>
-                    setPicker({
+                  onClick={e =>
+                    dock === 'story' ? setContextMenu({kind:'story',x:e.currentTarget.getBoundingClientRect().left,y:e.currentTarget.getBoundingClientRect().bottom+4}) : setPicker({
                       kind:
                         dock !== "event"
                           ? "beat"
@@ -2553,7 +2453,7 @@ export default function Editor() {
                   }
                 >
                   {dock !== "event"
-                    ? "Реплика"
+                    ? "Нода"
                     : dock === "event"
                       ? "Действие"
                       : "Событие"}
@@ -2597,7 +2497,7 @@ export default function Editor() {
                   onPreview={()=>audition(event.id)}
                 />
               ) : ["story", "timeline", "staging"].includes(dock) ? (
-                <StoryFlow onClipboard={graphClipboard} contextNodeId={contextNodeId} project={project} issues={issues} selectedId={beat.id} selectionId={selection.id} preview={preview}
+                <StoryFlow running={running} onVariableEdit={(id,patch)=>{if(rt.running)return 'Остановите игру, чтобы редактировать переменные.';const issue=editVariable(structuredClone(project),id,patch);if(!issue)mutate(p=>editVariable(p,id,patch));return issue;}} onVariableAdd={(variable,kind,point)=>{if(!rt.running)addBeat(kind,{...point,variable});}} onInspectVariable={setInspectedVariable} selectedVariable={inspectedVariable} onVariableDrop={point=>{if(rt.running)return;if(point.get||point.set)addBeat(point.set&&point.variable!==ANSWER_VARIABLE?'set-variable':'variable',point);else setContextMenu({...point,kind:'variable-drop'});}} onLogicChange={(id,patch)=>{if(!rt.running)mutate(p=>Object.assign(allBeats(p).find(n=>n.id===id),patch));}} onVariable={(id,name,type,value)=>{if(!rt.running)mutate(p=>{const node=allBeats(p).find(n=>n.id===id);node.valueType=type;node.variable=name.trim();if(node.variable&&node.variable!==ANSWER_VARIABLE)p.variables[node.variable]=typedValue(value,type);});}} onChoice={(id,choiceId,patch)=>{if(!rt.running)mutate(p=>{const b=allBeats(p).find(n=>n.id===id);if(!choiceId)b.choices.push(newChoice(uid('choice'),patch.label));else if(!patch)b.choices=b.choices.filter(c=>c.id!==choiceId);else Object.assign(b.choices.find(c=>c.id===choiceId),patch);});}} onClipboard={graphClipboard} contextNodeId={contextNodeId} project={project} issues={issues} selectedId={beat.id} selectionId={selection.id} preview={preview}
                   onSelect={graphSelect} onOpen={openGraph} onBatch={changeBatch} onConnect={connect} onDeleteNode={deleteFlowNode}
                   onScene={id=>openSubscenes('edit',id)}
                   onContext={point=>{if(!rt.running)setContextMenu({...point,kind:'story'});}}
@@ -2710,33 +2610,7 @@ export default function Editor() {
             ) : (
               renderInspector()
             )}
-            <Fold
-              title="Переменные для проверки"
-              icon="SlidersHorizontal"
-              open={false}
-            >
-              <Field label="Доверие Алисы">
-                <input
-                  type="number"
-                  value={variables.trust}
-                  disabled={running}
-                  onChange={(e) =>
-                    mutate((p) => (p.variables.trust = Number(e.target.value)))
-                  }
-                />
-              </Field>
-              <label className="check">
-                <input
-                  type="checkbox"
-                  disabled={running}
-                  checked={!!variables.letter}
-                  onChange={(e) =>
-                    mutate((p) => (p.variables.letter = e.target.checked))
-                  }
-                />
-                Письмо найдено
-              </label>
-            </Fold>
+
           </div>
           {running && (
             <div className="inspector-play-note">
@@ -2759,7 +2633,7 @@ export default function Editor() {
         <div className="flex-space" />
         <span>
           Выделено:{" "}
-          {selection.kind === "object" ? inspectedObject?.name : beat.id}
+          {selection.kind === "object" ? inspectedObject?.name : beatPreview(beat)}
         </span>
 
       </footer>
@@ -2871,7 +2745,7 @@ export default function Editor() {
               <Icon name="Plus" size={16} />
               <strong>
                 {picker.kind === "beat"
-                  ? "Добавить в сценарий"
+                  ? "Добавить ноду"
                   : picker.kind === "event"
                     ? "Добавить событие"
                     : picker.kind === "object"
@@ -2913,7 +2787,7 @@ export default function Editor() {
                       "choice",
                       "GitFork",
                       "Выбор игрока",
-                      "Разные ответы ведут к разным продолжениям",
+                      "Ответы возвращают значения для дальнейшей логики",
                     ],
                     [
                       "gate",
@@ -2921,9 +2795,13 @@ export default function Editor() {
                       "Ждать взаимодействие",
                       "Продолжить после действия игрока",
                     ],
+                    ["branch", "GitFork", "If · Если", "Подключите условие и пути «Да» / «Нет»"],
+                    ["variable", "Database", "Переменная", "Создать или прочитать значение прямо в графе"],
+                    ["set-variable", "Database", "Задать переменную", "Изменить значение по ходу истории"],
+                    ...Object.entries(compareSymbols).map(([operator,label])=>["compare:"+operator,"Binary",label,"Сравнить два значения"]),
                     ["end", "Flag", "Концовка", "Завершить этот путь истории"],
                   ].map(([kind, icon, title, desc]) => (
-                    <button key={kind} onClick={() => addBeat(kind)}>
+                    <button key={kind} onClick={() => kind.startsWith("compare:")?addBeat("compare",{operator:kind.split(":")[1]}):addBeat(kind)}>
                       <Icon name={icon} size={22} />
                       <span>
                         <strong>{title}</strong>

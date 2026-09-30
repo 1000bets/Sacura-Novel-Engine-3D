@@ -1,6 +1,12 @@
+import {blueprintEdgeTypes} from './BlueprintEdge.jsx';
+import StoryDestination from './StoryDestination.jsx';
+import NodeAnswer from './NodeAnswer.jsx';
+import BlueprintVariables from './BlueprintVariables.jsx';
+import LogicNode from './LogicNode.jsx';
+import {isPureNode} from './logicModel.js';
 import {clipboardCommand} from './editorClipboard.js';
 import React,{memo,useCallback,useEffect,useMemo,useRef,useState} from 'react';
-import {ReactFlow,ReactFlowProvider,Handle,Position,Background,Controls,MiniMap,MarkerType,useReactFlow,useUpdateNodeInternals,useNodesInitialized,useStore,applyNodeChanges} from '@xyflow/react';
+import {ReactFlow,ReactFlowProvider,Handle,Position,Background,Controls,MiniMap,ConnectionLineType,useReactFlow,useUpdateNodeInternals,useNodesInitialized,useStore,applyNodeChanges} from '@xyflow/react';
 import {Icon,Button} from './StudioParts.jsx';
 import {buildStoryFlow,arrangeStoryFlow} from './storyFlowModel.js';
 import './storyFlow.css';
@@ -22,9 +28,10 @@ const Moment=memo(function Moment({data,selected}){
    </button>)}
   </div>)}
  </div>;
+ if(isPureNode(beat)||['branch','set-variable'].includes(beat.kind))return <LogicNode data={data} selected={selected}/>;
  return <article className={'story-moment'+(selected?' selected':'')+(data.preview?.phase!=='EDIT'&&data.preview?.beatId===beat.id?' playing':'')}>
   <Handle type="target" position={Position.Left} id="in" style={{top:40}} title="Вход: соедините с выходом другой реплики. Alt + щелчок — разорвать; Ctrl + перетаскивание — перенести входящие связи."/>
-  <header className="moment-grab"><Icon name={data.entry?'MapPin':beat.kind==='choice'?'GitFork':beat.kind==='end'?'Flag':'MessageSquare'} size={15}/><span>{scene?.name || 'Без сабсцены'}</span><small>{beat.id}</small></header>
+  <header className="moment-grab"><Icon name={data.entry?'MapPin':beat.kind==='choice'?'GitFork':beat.kind==='end'?'Flag':'MessageSquare'} size={15}/><span>{scene?.name || 'Без сабсцены'}</span><small>{({choice:'Выбор',end:'Концовка',gate:'Взаимодействие',merge:'Схождение'})[beat.kind]||'Реплика'}</small></header>
   {data.issue&&<div className="moment-issue"><Icon name="TriangleAlert" size={12}/>{data.issue.title}</div>}
   {data.entry&&<button className="moment-environment nodrag" title="Изменить начальное окружение сабсцены" onClick={()=>data.onScene(scene.id)}><Icon name="CloudSun" size={13}/>Начало · {scene.weather} · {scene.time}<Icon name="Settings2" size={12}/></button>}
   {events(phases[0])}
@@ -32,20 +39,22 @@ const Moment=memo(function Moment({data,selected}){
   {events(phases[1])}
   <div className="moment-input"><Icon name={beat.kind==='choice'?'GitFork':beat.kind==='gate'?'MousePointerClick':'MousePointer2'} size={12}/>{beat.kind==='end'?'Завершение истории':beat.kind==='choice'?'Игрок выбирает ответ':beat.kind==='gate'?'Ожидание взаимодействия':'Игрок нажимает «Дальше»'}</div>
   {events(phases[2])}
-  <footer>{ports.map(port=><div className={'moment-route'+(!port.next?' disconnected':'')} key={port.id}><span>{port.label}<small>{[port.condition,port.next?'→ '+port.next:'Выход не подключён'].filter(Boolean).join(' · ')}</small></span><Handle type="source" position={Position.Right} id={port.id} title={`${port.label}: тяните к входу реплики. Alt + щелчок — разорвать; Ctrl + перетаскивание — перенести выход.`}/></div>)}{beat.kind==='end'&&<strong><Icon name="Flag" size={13}/>{beat.ending || 'Конец'}</strong>}</footer>
+  {beat.kind==='choice'&&<div className="node-answers nodrag">{beat.choices.map((c,i)=><NodeAnswer key={c.id} choice={c} index={i} beatId={beat.id} data={data} available={data.project.chapters.some(ch=>ch.beats.some(b=>b.id===c.next))} onChange={patch=>data.onChoice(beat.id,c.id,patch)} onRemove={()=>data.onChoice(beat.id,c.id,null)} onDisconnect={()=>data.onConnect({source:beat.id,sourceHandle:'choice:'+c.id,target:null})}/>)}<Button icon="Plus" onClick={()=>data.onChoice(beat.id,null,{label:'Новый ответ'})}>Добавить ответ</Button></div>}
+  <footer>{ports.filter(port=>beat.kind!=="choice"||port.common).map(port=><div className={'moment-route story-route'+(!port.next?' disconnected':'')} key={port.id}><span className="story-route-label">{port.label}</span><StoryDestination data={data} source={beat.id} port={port.id} target={port.next}/><Handle type="source" position={Position.Right} id={port.id} title={port.label+' · соединить с входом ноды'}/></div>)}{beat.kind==='end'&&<strong><Icon name="Flag" size={13}/>{beat.ending || 'Конец'}</strong>}</footer>
  </article>;
 });
-const Missing=({data})=><article className="story-moment missing"><Handle type="target" position={Position.Left} id="in"/><strong>{data.title}</strong><p>{data.text}</p></article>;
+const Missing=({data})=><article className="story-moment missing"><Handle type="target" position={Position.Left} id="in"/><strong>{data.title}</strong><p>Целевая нода удалена</p><button className="nodrag" onClick={e=>{e.stopPropagation();data.onRemove();}}><Icon name="Unplug" size={14}/>Убрать переход</button></article>;
 const nodeTypes={moment:Moment,missing:Missing};
-function Canvas({onClipboard,contextNodeId,project,selectedId,selectionId,preview,issues=[],onSelect,onOpen,onAdd,onBatch,onConnect,onDeleteNode,onScene,onContext,positions,onPositions,onReady}){
+const NO_ISSUES=[];
+function Canvas({running=false,onVariableEdit,onVariableAdd,onInspectVariable,selectedVariable,onVariableDrop,onLogicChange,onVariable,onChoice,onClipboard,contextNodeId,project,selectedId,selectionId,preview,issues=NO_ISSUES,onSelect,onOpen,onAdd,onBatch,onConnect,onDeleteNode,onScene,onContext,positions,onPositions,onReady}){
  const api=useReactFlow(),initialized=useNodesInitialized(),container=useRef(null),didFocus=useRef(false),lastSelected=useRef(selectedId),panGesture=useRef(null),placedNode=useRef(null);
  // React Flow registers a newly created node after the selection changes.
  // Observe that registration so a failed early focus is retried after measurement.
  const targetNode=useStore(state=>state.nodeLookup.get(selectedId));
  const model=useMemo(()=>buildStoryFlow(project),[project]);
  const layout=useMemo(()=>arrangeStoryFlow(model.nodes,model.edges),[model]);
- const [nodes,setNodes]=useState([]),[minimap,setMinimap]=useState(false),[edgeId,setEdgeId]=useState(null);
- useEffect(()=>setNodes(previous=>layout.map(n=>({...n,position:previous.find(p=>p.id===n.id)?.dragging?previous.find(p=>p.id===n.id).position:positions?.[n.id]||n.position,dragging:previous.find(p=>p.id===n.id)?.dragging,measured:previous.find(p=>p.id===n.id)?.measured,style:{width:n.width},dragHandle:'.moment-grab',selected:n.id===selectedId,data:{...n.data,issue:issues.find(i=>i.beatId===n.id),selectionId,preview,onSelect,onOpen,onAdd,onBatch,onScene}}))),[layout,positions,selectedId,selectionId,preview,issues,onSelect,onOpen,onAdd,onBatch,onScene]);
+ const [nodes,setNodes]=useState([]),[minimap,setMinimap]=useState(false),[edgeId,setEdgeId]=useState(null),[missingId,setMissingId]=useState(null),[trace,setTrace]=useState(null);
+ useEffect(()=>setNodes(previous=>layout.map(n=>({...n,height:undefined,position:previous.find(p=>p.id===n.id)?.dragging?previous.find(p=>p.id===n.id).position:positions?.[n.id]||n.position,dragging:previous.find(p=>p.id===n.id)?.dragging,measured:previous.find(p=>p.id===n.id)?.measured,style:{width:n.width},dragHandle:'.moment-grab',selected:n.id===selectedId,data:{...n.data,onTrace:setTrace,onReveal:id=>{onSelect(id);api.fitView({nodes:[{id}],padding:.3,maxZoom:.8,duration:200});},onRemove:()=>onConnect({changes:model.edges.filter(e=>e.target===n.id).map(e=>({source:e.source,sourceHandle:e.sourceHandle,target:null}))}),issue:issues.find(i=>i.beatId===n.id),selectionId,preview,onSelect,onOpen,onAdd,onBatch,onScene,onLogicChange,onVariable,onChoice,onInspectVariable,onConnect,project,variables:project.variables}}))),[layout,positions,selectedId,selectionId,preview,issues,onSelect,onOpen,onAdd,onBatch,onScene,onLogicChange,onVariable,onChoice,onInspectVariable,onConnect,project]);
  const focus=useCallback((id=selectedId)=>{
   const node=api.getNode(id);if(!node?.measured?.width || !node?.measured?.height)return false;
   const zoom=.8;
@@ -70,13 +79,14 @@ function Canvas({onClipboard,contextNodeId,project,selectedId,selectionId,previe
   if(!Object.keys(positions||{}).length){const arranged=arrangeStoryFlow(api.getNodes(),model.edges);onPositions(Object.fromEntries(arranged.map(n=>[n.id,n.position])));}
  },[initialized,model,positions,api,onPositions]);
  useEffect(()=>{onReady?.({clipboard:()=>({nodes:api.getNodes(),graphKey:'flow:all'}),focus,arrange,fit:()=>api.fitView({padding:.12,minZoom:.02,maxZoom:.8,duration:250})});},[focus,arrange,api,onReady]);
+ const displayedNodes=useMemo(()=>nodes.map(n=>({...n,className:trace&&model.edges.some(e=>e.id===trace&&(e.source===n.id||e.target===n.id))?'story-traced-node':''})),[nodes,trace,model.edges]);
  const connect=c=>onConnect(c);
  const [transfer,setTransfer]=useState(null),[hint,setHint]=useState('');
  const readPin=element=>{
   const handle=element?.closest?.('.react-flow__handle');
   return handle?{node:handle.dataset.nodeid,handle:handle.dataset.handleid,type:handle.classList.contains('source')?'source':'target'}:null;
  };
- const removeEdges=edges=>{if(edges.length)onConnect({changes:edges.map(e=>({source:e.source,sourceHandle:e.sourceHandle,target:null}))});setEdgeId(null);};
+ const removeEdges=edges=>{if(edges.length)onConnect({changes:edges.map(e=>({source:e.source,sourceHandle:e.sourceHandle,target:e.data?.valueWire?e.target:null,targetHandle:e.targetHandle,disconnect:e.data?.valueWire}))});setEdgeId(null);};
  useEffect(()=>{
   if(!transfer)return;
   const move=e=>setTransfer(t=>t?{...t,x:e.clientX,y:e.clientY}:null);
@@ -92,7 +102,9 @@ function Canvas({onClipboard,contextNodeId,project,selectedId,selectionId,previe
   window.addEventListener('pointermove',move);window.addEventListener('pointerup',finish);window.addEventListener('pointercancel',abort);window.addEventListener('blur',abort);window.addEventListener('keydown',cancel,true);
   return ()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',finish);window.removeEventListener('pointercancel',abort);window.removeEventListener('blur',abort);window.removeEventListener('keydown',cancel,true);};
  },[transfer?.pin,model.edges,project,onConnect]);
- return <div className="story-flow" ref={container} tabIndex={0}
+ return <div className="story-blueprint"><BlueprintVariables project={project} preview={preview} disabled={running} onEdit={onVariableEdit} onAddNode={(variable,kind)=>onVariableAdd(variable,kind,{position:api.screenToFlowPosition({x:container.current.getBoundingClientRect().left+80,y:container.current.getBoundingClientRect().top+80}),graphKey:'flow:all'})} onInspect={onInspectVariable} selectedVariable={selectedVariable}/><div className="story-flow" ref={container} tabIndex={0}
+  onDragOver={e=>{if(e.dataTransfer.types.includes('application/sacura-variable')){e.preventDefault();e.dataTransfer.dropEffect='copy';}}}
+  onDrop={e=>{const variable=e.dataTransfer.getData('application/sacura-variable');if(!variable)return;e.preventDefault();e.stopPropagation();onVariableDrop?.({variable,x:e.clientX,y:e.clientY,position:api.screenToFlowPosition({x:e.clientX,y:e.clientY}),graphKey:'flow:all',get:e.ctrlKey||e.metaKey,set:e.altKey});}}
   onClickCapture={e=>{if(readPin(e.target)){e.stopPropagation();}}}
   onPointerMoveCapture={e=>{const pan=panGesture.current;if(pan&&e.buttons&&Math.hypot(e.clientX-pan.x,e.clientY-pan.y)>5)pan.moved=true;}}
   onPointerDownCapture={e=>{
@@ -110,19 +122,21 @@ function Canvas({onClipboard,contextNodeId,project,selectedId,selectionId,previe
    const command=clipboardCommand(e);if(command){e.preventDefault();e.stopPropagation();onClipboard?.(command,api.getNodes(),'flow:all');return;}
    if(!['Delete','Backspace'].includes(e.key)||e.repeat||e.target.closest('input,textarea,select,[contenteditable="true"]'))return;
    if(edgeId){e.preventDefault();e.stopPropagation();removeEdges(model.edges.filter(edge=>edge.id===edgeId));}
+   else if(missingId){e.preventDefault();e.stopPropagation();removeEdges(model.edges.filter(edge=>edge.target===missingId));setMissingId(null);}
    else if(e.key==='Delete'&&selectionId===selectedId){e.preventDefault();e.stopPropagation();onDeleteNode?.(selectedId);}
   }}
   data-help-title="Связи потока истории" data-help="Тяните от выхода справа ко входу слева. Один выход задаёт одно продолжение; во вход могут приходить несколько веток. Alt + щелчок по пину — разорвать его связи. Ctrl + перетаскивание — перенести связи на другой пин того же типа. Выберите ноду или провод и нажмите Delete для удаления. Ctrl + Z — отмена. ПКМ — панорама, колесо — масштаб.">
-  <ReactFlow nodes={nodes} edges={model.edges.map(e=>({...e,type:'smoothstep',markerEnd:{type:MarkerType.ArrowClosed},style:{stroke:e.id===edgeId?'var(--accent)':e.data.crossScene?'var(--info)':'var(--graph-edge)'},labelStyle:{fill:'var(--text-secondary)',fontSize:11},labelBgStyle:{fill:'var(--panel)'}}))} nodeTypes={nodeTypes}
+  <ReactFlow nodes={displayedNodes} edges={model.edges.map(e=>({...e,type:'blueprint',data:{...e.data,highlighted:e.id===edgeId||e.id===trace}}))} edgeTypes={blueprintEdgeTypes} nodeTypes={nodeTypes} connectionLineType={ConnectionLineType.Bezier} connectionLineStyle={{stroke:'var(--accent)',strokeWidth:2,strokeDasharray:'5 5'}}
    onNodesChange={changes=>setNodes(ns=>applyNodeChanges(changes,ns))} onNodeDragStop={(_,n)=>onPositions({...positions,[n.id]:n.position})}
-   onNodeClick={(e,n)=>{setEdgeId(null);if(n.data.beat)onSelect(n.id);if(!e.target.closest('input,textarea,select,button,[contenteditable="true"]'))container.current.focus({preventScroll:true});}} onConnect={connect} onReconnect={(edge,c)=>onConnect({changes:[{source:edge.source,sourceHandle:edge.sourceHandle,target:null},c]})} isValidConnection={c=>!connectionError(project,[c])} onEdgeClick={(_,e)=>{setEdgeId(e.id);container.current.focus();}} onPaneClick={()=>{setEdgeId(null);container.current.focus({preventScroll:true});}}
+   onNodeClick={(e,n)=>{setEdgeId(null);setMissingId(n.type==='missing'?n.id:null);if(n.data.beat)onSelect(n.id);if(!e.target.closest('input,textarea,select,button,[contenteditable="true"]'))container.current.focus({preventScroll:true});}} onConnect={connect} onReconnect={(edge,c)=>onConnect({changes:[{source:edge.source,sourceHandle:edge.sourceHandle,target:edge.data?.valueWire?edge.target:null,targetHandle:edge.targetHandle,disconnect:edge.data?.valueWire},c]})} isValidConnection={c=>!connectionError(project,[c])} onEdgeMouseEnter={(_,e)=>setTrace(e.id)} onEdgeMouseLeave={()=>setTrace(null)} onEdgeClick={(_,e)=>{setMissingId(null);setEdgeId(e.id);container.current.focus();}} onPaneClick={()=>{setMissingId(null);setEdgeId(null);container.current.focus({preventScroll:true});}}
    onPaneContextMenu={e=>{e.preventDefault();if(!panGesture.current?.moved)onContext?.({x:e.clientX,y:e.clientY,position:api.screenToFlowPosition({x:e.clientX,y:e.clientY}),graphKey:'flow:all'});}}
    deleteKeyCode={null} minZoom={.02} maxZoom={1.5} panOnScroll={false} panOnDrag={[1,2]} selectionOnDrag zoomOnScroll reconnectRadius={18} connectionRadius={28} connectOnClick={false} zoomActivationKeyCode="Control" colorMode="dark">
    <Background gap={28} size={.7}/><Controls showInteractive={false}/>{minimap&&<MiniMap pannable zoomable/>}
   </ReactFlow>
+  <div className="blueprint-wire-legend" aria-hidden="true"><span><svg viewBox="0 0 30 12"><path d="M 0 6 H 27 M 22 2 L 28 6 L 22 10" fill="none" stroke="currentColor" strokeWidth="2"/></svg>Переход</span><span><svg viewBox="0 0 30 12"><path d="M 2 6 H 28" stroke="var(--info)" strokeWidth="2" strokeDasharray="3 4"/><circle cx="2" cy="6" r="2" fill="var(--info)"/><circle cx="28" cy="6" r="2" fill="var(--info)"/></svg>Значение</span></div>
   {transfer&&<svg className="story-wire-transfer"><path d={`M ${transfer.startX-container.current.getBoundingClientRect().left} ${transfer.startY-container.current.getBoundingClientRect().top} L ${transfer.x-container.current.getBoundingClientRect().left} ${transfer.y-container.current.getBoundingClientRect().top}`}/></svg>}
-  <div className="story-wire-help" role="status">{transfer?'Отпустите на другом пине того же типа · Esc — отмена':hint||'Пин → пин: соединить · Alt + щелчок: разорвать · Ctrl + перетаскивание: перенести'}</div>
-  <div className="story-flow-navigation"><Button icon="Focus" title="Показать выбранную реплику" onClick={()=>focus()}/><Button icon="Scan" title="Весь поток истории" onClick={()=>api.fitView({padding:.12,minZoom:.02,maxZoom:.8})}/><Button icon="Map" title="Миникарта истории" aria-pressed={minimap} onClick={()=>setMinimap(v=>!v)}/>{edgeId&&<Button icon="Unplug" onClick={()=>{const e=model.edges.find(e=>e.id===edgeId);if(e)onConnect({source:e.source,sourceHandle:e.sourceHandle,target:null});setEdgeId(null);}}>Убрать переход</Button>}</div>
- </div>;
+  {(transfer||hint)&&<div className="story-wire-help" role="status">{transfer?'Отпустите на другом пине того же типа · Esc — отмена':hint||'Пин → пин: соединить · Alt + щелчок: разорвать · Ctrl + перетаскивание: перенести'}</div>}
+  <div className="story-flow-navigation"><Button icon="Focus" title="Показать выбранную реплику" onClick={()=>focus()}/><Button icon="Scan" title="Весь поток истории" onClick={()=>api.fitView({padding:.12,minZoom:.02,maxZoom:.8})}/><Button icon="Map" title="Миникарта истории" aria-pressed={minimap} onClick={()=>setMinimap(v=>!v)}/>{edgeId&&<Button icon="Unplug" onClick={()=>{const e=model.edges.find(e=>e.id===edgeId);if(e)onConnect({source:e.source,sourceHandle:e.sourceHandle,target:e.data?.valueWire?e.target:null,targetHandle:e.targetHandle,disconnect:e.data?.valueWire});setEdgeId(null);}}>Убрать переход</Button>}</div>
+ </div></div>;
 }
 export default function StoryFlow(props){return <ReactFlowProvider><Canvas {...props}/></ReactFlowProvider>;}
