@@ -75,6 +75,20 @@ export class PreviewRuntime {
     if(this.project)this.project.audioSettings={...this.project.audioSettings,sidechain};
     this.audio.setSidechain?.(sidechain);
   }
+  invalidateStoryPreview(project) {
+    if(!this.running || this.snapshot.audition)return false;
+    // Playback owns a snapshot. Never show a newer route beside an older run.
+    const routes=p=>JSON.stringify({
+      scenes:p.subscenes.map(s=>[s.id,s.entry]),
+      chapters:p.chapters.map(c=>[c.id,c.subsceneId,c.beats.map(b=>[
+        b.id,b.kind,b.next||null,b.signal||null,
+        (b.choices||[]).map(choice=>[choice.id,choice.next||null,choice.condition,choice.threshold]),
+      ])]),
+    });
+    if(routes(project)===routes(this.project))return false;
+    this.stop();
+    return true;
+  }
   async start(project, beatId) {
     this.audio.unlock?.().catch(()=>{});
     this.stop();
@@ -213,7 +227,7 @@ export class PreviewRuntime {
     const errors = validateStudio(this.project).filter(
       (i) => i.beatId === id && i.level === "error",
     );
-    if (errors.length) throw new Error(errors.map((i) => i.title).join(" · "));
+    if (errors.length) throw new Error(`Реплика «${id}»: `+errors.map((i) => i.title).join(" · "));
     await this.phase(b, "BEFORE", token);
     this.snapshot.world.dialogue={
       key:token+':'+this.snapshot.history.length,beatId:id,index:dialogueIndex,kind:b.kind,
@@ -524,6 +538,12 @@ export class PreviewRuntime {
       this.snapshot.variables,
     );
     if (b.kind === "choice" && !next) return;
+    if (!next && b.kind !== 'end') {
+      this.handle(new Error(b.next
+        ? `Переход из реплики «${b.id}» ведёт в недоступную реплику «${b.next}». Переподключите выход «Дальше».`
+        : `У реплики «${b.id}» не подключён выход «Дальше». Соедините его со следующей репликой или выберите тип «Концовка».`));
+      return;
+    }
     this.snapshot.ready = false;
     this.emit();
     try {

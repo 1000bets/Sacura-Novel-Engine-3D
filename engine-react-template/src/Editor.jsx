@@ -1,3 +1,7 @@
+import {playbackStartId,deleteStoryNode} from './storyEditing.js';
+import {applyConnections,connectionError} from './storyConnections.js';
+import {InfoView, FloatingWindow} from './EditorHelp.jsx';
+import './editorHelp.css';
 import ThemePicker from './ThemePicker.jsx';
 import {normalizeSidechain} from './audioSettings.js';
 import React, {
@@ -57,7 +61,7 @@ import {newCamera,cleanCamera,cameraFromView,cameraPose,resolveCamera} from './c
 import {objectTransform,setObjectTransform,isObjectInScene,sceneStagingPoints} from './sceneEditing.js';
 import HierarchyTree from './HierarchyTree.jsx';
 import EditorSelect from './EditorSelect.jsx';
-import GlobalTimeline from './GlobalTimeline.jsx';
+import StoryFlow from './StoryFlow.jsx';
 
 const PROJECT_KEY = "sacura-studio-v2",
   LAYOUT_KEY = "sacura-workspace-v3";
@@ -247,16 +251,16 @@ function GameDialogue({
 
 // Keep everyday workspaces visible; secondary tools remain one click away.
 const dockTools = [
-  ["story", "Сценарий"], ["timeline", "Таймлайн"], ["subscenes", "Сабсцены"],
-  ["cameras", "Камеры"], ["staging", "Постановка"], ["event", "Событие"],
+  ["story", "Поток истории"], ["subscenes", "Сабсцены"],
+  ["cameras", "Камеры"], ["active", "Звук и окружение"], ["event", "Событие"],
   ["create", "Создание"], ["assets", "Проект"], ["sound", "Звук"],
-  ["samples", "Эффекты"], ["active", "Активные"], ["issues", "Проблемы"],
+  ["samples", "Эффекты"], ["issues", "Проблемы"],
 ];
 function DockTools({ dock, event, issueCount, onSelect }) {
   const [open, setOpen] = useState(false);
   const [opensUp, setOpensUp] = useState(false);
   const popup = useRef(null), trigger = useRef(null);
-  const secondary = dockTools.slice(5);
+  const secondary = dockTools.slice(4);
   const current = secondary.find(([id]) => id === dock);
   useEffect(() => {
     if (!open) return;
@@ -272,7 +276,7 @@ function DockTools({ dock, event, issueCount, onSelect }) {
     };
   }, [open]);
   return <>
-    {dockTools.slice(0, 5).map(([id, label]) => <button key={id}
+    {dockTools.slice(0, 4).map(([id, label]) => <button key={id}
       aria-pressed={dock === id} className={dock === id ? "active" : ""}
       onClick={() => onSelect(id)}>{label}</button>)}
     <div className={"dock-more" + (opensUp ? " opens-up" : "")} ref={popup} onBlur={e => {
@@ -325,7 +329,9 @@ export default function Editor() {
     [preview, setPreview] = useState(null),
     [follow, setFollow] = useState(true),
     [query, setQuery] = useState(""),
-    [treeTab, setTreeTab] = useState("hierarchy"),
+    [historyQuery, setHistoryQuery] = useState(""),
+    [floatingDock, setFloatingDock] = useState(false),
+    [historyOpen, setHistoryOpen] = useState(false),
     [compactPanel,setCompactPanel]=useState('workspace'),
     [picker, setPicker] = useState(null),
     [menu, setMenu] = useState(null),
@@ -378,6 +384,9 @@ export default function Editor() {
     playScene = sceneFor(playProject, playBeat.id),
     displayScene = running ? playScene : scene;
   useEffect(()=>setCompactPanel('workspace'),[dock,displayScene.id]);
+  useEffect(()=>{
+    if(rt.invalidateStoryPreview(project))setNotice('Маршрут истории изменён. Предпросмотр остановлен — нажмите «Запуск» или «С реплики», чтобы проверить новые связи.');
+  },[project,rt]);
   const world = useMemo(
     () =>
       running
@@ -489,10 +498,11 @@ export default function Editor() {
   }, []);
   const openStaging = useCallback((id, ph = "ALL") => {
     setSelectedBeat(id);
-    setDock("staging");
+    setDock("story");
     setPhase(ph);
     setDetailEditor(false);
     setSelection({ kind: "beat", id });
+    graphApi.current?.focus(id);
   }, []);
   const openGraph = useCallback(
     (data) => {
@@ -509,8 +519,9 @@ export default function Editor() {
         setEventContext({
           eventId: data.event.id,
           bindingId: data.binding.id,
-          beatId: beat.id,
+          beatId: data.flowBeatId || beat.id,
         });
+        if(data.flowBeatId)setSelectedBeat(data.flowBeatId);
         setDock("event");
         setSelection({ kind: "event", id: data.event.id });
         return;
@@ -523,6 +534,7 @@ export default function Editor() {
   );
   const graphSelect = useCallback(
     (value) => {
+      if (value?.flowBeatId) setSelectedBeat(value.flowBeatId);
       if (typeof value === "string") {
         selectBeat(value);
         return;
@@ -536,7 +548,7 @@ export default function Editor() {
         setEventContext({
           eventId: value.event.id,
           bindingId: value.binding.id,
-          beatId: beat.id,
+          beatId: value.flowBeatId || beat.id,
         });
       } else if (value.groupId)
         setSelection({ kind: "group", id: value.groupId });
@@ -544,21 +556,24 @@ export default function Editor() {
     [selectBeat, beat.id],
   );
   const changeBatch = useCallback(
-    (batchId, command, value) => {
+    (batchId, command, value, ownerId = beat.id) => {
+      const owner = nodes.find(b=>b.id===ownerId) || beat;
       const phaseId = PHASES.find((ph) =>
-        beat.batches?.[ph.id]?.some((b) => b.id === batchId),
+        owner.batches?.[ph.id]?.some((b) => b.id === batchId),
       )?.id;
       if (!phaseId) return;
       if (command === "select") {
+        setSelectedBeat(ownerId);
         setSelection({ kind: "batch", id: batchId });
         return;
       }
       if (command === "add") {
+        setSelectedBeat(ownerId);
         setPicker({ kind: "event", batchId, phase: phaseId });
         return;
       }
       mutate((p) => {
-        const b = allBeats(p).find((b) => b.id === beat.id),
+        const b = allBeats(p).find((b) => b.id === ownerId),
           list = b.batches[phaseId],
           index = list.findIndex((g) => g.id === batchId),
           batch = list[index];
@@ -580,7 +595,7 @@ export default function Editor() {
         }
       });
     },
-    [beat, mutate],
+    [beat, nodes, mutate],
   );
   const patchAction = useCallback(
     (id, values) =>
@@ -603,29 +618,13 @@ export default function Editor() {
   );
   const connect = useCallback(
     (c) => {
-      const target = c.target?.startsWith("portal:")
-        ? c.target.slice(7)
-        : c.target;
-      if (c.source === target) {
-        setNotice("Узел не может продолжаться сам в себя.");
-        return;
-      }
-      mutate((p) => {
-        const b = allBeats(p).find((b) => b.id === c.source);
-        if (!b) return;
-        if (c.sourceHandle?.startsWith("choice:")) {
-          const choice = b.choices.find(
-            (x) => x.id === c.sourceHandle.slice(7),
-          );
-          if (choice) choice.next = target || null;
-        } else b.next = target || null;
-      });
-      setNotice(
-        "Связь изменена. " +
-          (running ? "Будет использована в следующем запуске." : ""),
-      );
+      const changes=(c.changes || [c]).map(change=>({...change,sourceHandle:change.sourceHandle||'next',target:change.target?.replace(/^(portal:|missing:)/,'')||null}));
+      const error=connectionError(project,changes);
+      if(error){setNotice(error);return;}
+      mutate(p=>applyConnections(p,changes));
+      setNotice("Связь изменена.");
     },
-    [mutate, running],
+    [mutate, running, project],
   );
   const patchBeat = (values) =>
     mutate((p) =>
@@ -634,13 +633,23 @@ export default function Editor() {
         values,
       ),
     );
-  const start = () => {
+  const deleteFlowNode = id => {
+    if(rt.running){setNotice('Остановите предпросмотр, чтобы удалить реплику.');return;}
+    const result=deleteStoryNode(structuredClone(project),id);
+    if(result.error){setNotice(result.error);return;}
+    mutate(p=>deleteStoryNode(p,id));
+    setSelectedBeat(result.nextId);setSelection({kind:'beat',id:result.nextId});
+    setNotice('Реплика и её связи удалены. Ctrl + Z — отменить.');
+  };
+  const start = (fromSelection=false) => {
+    const startId=playbackStartId(project,beat.id,fromSelection);
+    if(!startId){setNotice('Укажите начальную реплику во вкладке «Сабсцены».');return;}
     setCameraPreviewId(null);setCameraPilotId(null);
     soundDesk.unlock().catch(()=>{});
     setFollow(true);
     setMode("game");
     setShowDialogue(true);
-    rt.start(project, beat.id);
+    rt.start(project, startId);
   };
   const audition=(eventId)=>{setCameraPreviewId(null);setCameraPilotId(null);soundDesk.unlock().catch(()=>{});setMode('game');setFollow(false);rt.previewEvent(project,eventId,beat.id);};
   const editSample=(eventId)=>{setEventContext({eventId});setSelection({kind:'event',id:eventId});setDock('event');setDetailEditor(false);};
@@ -825,12 +834,12 @@ export default function Editor() {
       ),
     );
     setPicker(null);
-    setDock("staging");
+    setDock("story");
     setNotice("Событие добавлено в постановку реплики.");
   };
   const openAuthoring=(kind='event',options={})=>{setAuthorRequest({kind,...options,token:uid('request')});setDock('create');setMaximized('graph');setDetailEditor(false);setEventContext(null);setPicker(null);setMenu(null);};
   const createEvent = () => openAuthoring('event');
-  const editScene=()=>{if(rt.running){if(rt.snapshot.beatId)setSelectedBeat(rt.snapshot.beatId);rt.stop();}setCameraPilotId(null);setCameraPreviewId(null);setMode('scene');setMaximized(null);setTreeTab('hierarchy');setCompactPanel('workspace');};
+  const editScene=()=>{if(rt.running){if(rt.snapshot.beatId)setSelectedBeat(rt.snapshot.beatId);rt.stop();}setCameraPilotId(null);setCameraPreviewId(null);setMode('scene');setMaximized(null);setCompactPanel('workspace');};
   const openSubscenes=(mode='edit',id=displayScene.id)=>{
     if(rt.running)rt.stop();const target=project.subscenes.find(s=>s.id===id);
     if(target&&mode!=='create'){setSelectedBeat(target.entry);setSelection({kind:'scene',id});}
@@ -862,7 +871,7 @@ export default function Editor() {
   };
   const followCharacter=()=>{const target=objects.find(o=>o.id===selection.id&&o.type==='Персонаж')||objects.find(o=>o.type==='Персонаж'&&o.active);if(target)createCamera(target);};
   const captureCamera=id=>{const c=scene.cameras?.find(c=>c.id===id),view=cameraApi.current?.capture();if(c&&view){changeCamera(id,cameraFromView(c,view,world,objects,scene.kind));setCameraPilotId(null);setNotice('Ракурс сохранён.');}};
-  const pilotCamera=id=>{editScene();setCameraPilotId(id);setSelection({kind:'camera',id});setDock('cameras');};
+  const pilotCamera=id=>{setFloatingDock(false);editScene();setCameraPilotId(id);setSelection({kind:'camera',id});setDock('cameras');};
   const viewCamera=id=>{setCameraPilotId(null);setCameraPreviewId(id);setMode('game');};
   const deleteCamera=id=>{if(rt.running)return;mutate(p=>{const sc=p.subscenes.find(s=>s.id===scene.id);sc.cameras=sc.cameras.filter(c=>c.id!==id);if(sc.defaultCameraId===id)sc.defaultCameraId=sc.cameras[0]?.id||null;});if(cameraPilotId===id)setCameraPilotId(null);if(cameraPreviewId===id)setCameraPreviewId(null);setSelection({kind:'scene',id:scene.id});setNotice('Камера удалена. Ctrl+Z — отменить.');};
   useEffect(()=>{setCameraPilotId(null);setCameraPreviewId(null);setFocusRequest(0);},[displayScene.id]);
@@ -922,7 +931,7 @@ export default function Editor() {
         e.id,
       );
     });
-    setDock("staging");
+    setDock("story");
     setNotice("Звук назначен реплике " + beat.id);
   };
   const fix = (i) => {
@@ -953,6 +962,8 @@ export default function Editor() {
       ),
     }));
   const resetLayout = () => {
+    setFloatingDock(false);
+    setHistoryOpen(false);
     setLayout((l) => ({
       ...l,
       left: 210,
@@ -1533,7 +1544,7 @@ export default function Editor() {
             </button>
           ))}
           <Button icon="Workflow" onClick={() => openStaging(beat.id)}>
-            Открыть всю постановку
+            Показать реплику в потоке
           </Button>
         </Fold>
         {beat.kind === "choice" ? (
@@ -1651,7 +1662,7 @@ export default function Editor() {
             <Select
               value={beat.next || ""}
               options={[
-                ["", "Конец / выход по выбору"],
+                ["", "Выход не подключён"],
                 ...nodes.map((n) => [
                   n.id,
                   sceneFor(project, n.id).location +
@@ -1814,11 +1825,12 @@ export default function Editor() {
           },
         };
     return (
-      <div className="active-table">
+      <div className="active-table" data-help-title="Звук и окружение" data-help="Здесь показано, что звучит и какие эффекты действуют сейчас. Начальные погоду и освещение задайте в сабсцене, изменения по ходу истории — в постановке.">
+        <div className="workspace-guide"><h2>Звук и окружение</h2><p>Музыка, озвучка и состояние мира в выбранной сабсцене. Во время запуска здесь можно приостановить или завершить эффект.</p><div><Button icon="Music2" onClick={()=>setDock('sound')}>Звуковые файлы и озвучка</Button><Button icon="CloudSun" onClick={()=>openSubscenes()}>Начальное окружение</Button><Button icon="Clapperboard" onClick={()=>openStaging(beat.id)}>Изменения в сценарии</Button></div><p>{running?'Управление ниже действует на текущий предпросмотр.':'Предпросмотр остановлен. Ниже — начальные состояния сабсцены; для проверки нажмите «Запуск».'}</p></div>
         <div className="table-header">
           <span>Событие / эффект</span>
           <span>Состояние</span>
-          <span>Граница жизни</span>
+          <span>Где действует</span>
           <span>Управление</span>
         </div>
         {Object.entries(effects).map(([key, e]) => (
@@ -1838,11 +1850,11 @@ export default function Editor() {
               <small>{e.origin}</small>
             </span>
             <span className={"effect-status " + e.status}>
-              {e.status === "paused"
+              {!running ? "Задано в сабсцене" : e.status === "paused"
                 ? "На паузе"
                 : e.status === "stopped"
                   ? "Завершено"
-                  : "Удерживается"}
+                  : "Действует"}
             </span>
             <span>
               {{
@@ -1852,25 +1864,6 @@ export default function Editor() {
               }[e.owner] || e.owner}
             </span>
             <div>
-              {['weather','time'].includes(key) && (
-                <Select
-                  value={e.name}
-                  options={
-                    key === "weather"
-                      ? ["Ясно", "Дождь", "Гроза", "Туман", "Снег"]
-                      : ["Рассвет", "День", "Закат", "Ночь"]
-                  }
-                  onChange={(value) =>
-                    running
-                      ? rt.controlEffect(key, "set", value)
-                      : mutate(
-                          (p) =>
-                            (p.subscenes.find((s) => s.id === scene.id)[key] =
-                              value),
-                        )
-                  }
-                />
-              )}
               <Button
                 disabled={!running}
                 title={e.status === "paused" ? "Продолжить" : "Пауза"}
@@ -1947,160 +1940,44 @@ export default function Editor() {
     );
   };
 
-  return (
-    <div
-      className="editor-app"
-      ref={root}
-      style={{
-        "--left": layout.left + "px",
-        "--right": layout.right + "px",
-        "--scene-height": layout.height + "px",
-      }}
-    >
-      <header className="editor-menubar">
-        <div className="editor-brand">
-          <Icon name="Flower2" size={23} />
-          <strong>
-            Sacura<span>Novel Studio</span>
-          </strong>
-        </div>
-        {["Файл", "Правка", "Создать", "Панели"].map((m) => (
-          <button
-            className={menu === m ? "active" : ""}
-            key={m}
-            aria-expanded={menu === m}
-            onClick={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              setMenuAnchor({left: Math.max(8, Math.min(rect.left, window.innerWidth - 250)), top: rect.bottom + 4});
-              setMenu(menu === m ? null : m);
-            }}
-          >
-            {m}
-          </button>
-        ))}
-        <div className="flex-space" />
-        <span className="project-title" title={project.title}>
-          <Icon name="FolderOpen" size={14} />
-          {project.title}
-        </span>
-        <button
-          title="Сохранить проект · Ctrl+S"
-          disabled={projectFileBusy}
-          onClick={saveProject}
-        >
-          <Icon name={saveError ? "TriangleAlert" : "CloudCheck"} size={15} />
-        </button>
-        <div className="main-play-controls">
-          <Button
-            className={running ? "playing" : ""}
-            icon={running ? "Square" : "Play"}
-            title={
-              running
-                ? "Остановить предпросмотр"
-                : "Запустить с выбранной реплики"
-            }
-            onClick={() => (running ? rt.stop() : start())}
-          >{running ? "Стоп" : "Запуск"}</Button>
-          <Button
-            icon="Pause"
-            title="Пауза / продолжить"
-            className={preview?.paused ? "active" : ""}
-            disabled={!running || preview.phase === "FINISHED"}
-            onClick={() => rt.togglePause()}
-          />
-          <Button
-            icon="StepForward"
-            title="Следующая реплика"
-            disabled={
-              !running ||
-              !preview.ready ||
-              preview.paused ||
-              ["choice", "gate"].includes(playBeat.kind)
-            }
-            onClick={() => rt.advance()}
-          />
-        </div>
-        <div className="toolbar-layout">
-          <span className="play-label" hidden={!running}>
-            {running
-              ? preview.paused
-                ? "На паузе"
-                : "Предпросмотр"
-              : "Редактирование"}
-          </span>
-          <Button
-            icon="PanelsTopLeft"
-            title="Восстановить раскладку"
-            onClick={resetLayout}
-          />
-          <Select
-            aria-label="Раскладка редактора"
-            value={maximized || "balanced"}
-            onChange={(v) => setMaximized(v === "balanced" ? null : v)}
-            options={[
-              ["balanced", "Постановка"],
-              ["graph", "Сценарий"],
-              ["scene", "Только сцена"],
-              ["hierarchy", "Только иерархия"],
-              ["inspector", "Только инспектор"],
-            ]}
-          />
-        </div>
-        <ThemePicker onOpen={() => setMenu(null)} />
-      </header>
-      <div className={'editor-workspace compact-'+compactPanel+(layout.hiddenHierarchy?' hierarchy-hidden':'')+(layout.hiddenInspector?' inspector-hidden':'')+(['scene','graph'].includes(maximized)?' focus-center':maximized==='hierarchy'?' focus-hierarchy':maximized==='inspector'?' focus-inspector':'')}>
-        <nav className="compact-panel-tabs" aria-label="Панели редактора">
-          {[['hierarchy','ListTree','Объекты сцены'],['workspace','PanelsTopLeft','Рабочая область'],['inspector','Settings2','Свойства']].map(([id,icon,label])=><button key={id} aria-pressed={compactPanel===id} onClick={()=>{if(['hierarchy','inspector'].includes(maximized))setMaximized(null);setCompactPanel(id);}}><Icon name={icon} size={13}/>{label}</button>)}
-        </nav>
-        <aside className="hierarchy-panel">
-          <button className="panel-restore" aria-label="Показать иерархию" title="Показать иерархию" onClick={()=>setLayout(l=>({...l,hiddenHierarchy:false}))}><Icon name="PanelLeftOpen" size={18}/><span>Иерархия</span></button>
-          <div className="panel-tabs">
-            <button
-              className={treeTab === "hierarchy" ? "active" : ""}
-              onClick={() => {setTreeTab("hierarchy");setCompactPanel("hierarchy");}}
-            >
-              Иерархия
-            </button>
-            <button
-              className={treeTab === "story" ? "active" : ""}
-              onClick={() => setTreeTab("story")}
-            >
-              История
-            </button>
-            <div className="flex-space" />
-            <Button
-              icon="Plus"
-              title="Создать объект"
-              onClick={() => setPicker({ kind: "object" })}
-            />
-            <Button icon={maximized==='hierarchy'?'Minimize2':'Maximize2'} title={maximized==='hierarchy'?'Восстановить иерархию':'Развернуть иерархию'} onClick={()=>setMaximized(v=>v==='hierarchy'?null:'hierarchy')}/>
-            <Button icon="PanelLeftClose" title="Свернуть иерархию" onClick={()=>{setMaximized(null);setLayout(l=>({...l,hiddenHierarchy:true}));setCompactPanel('workspace');}}/>
-          </div>
-          <div className="panel-search">
-            <Icon name="Search" size={13} />
-            <input
-              aria-label={treeTab === "story" ? "Поиск реплик" : "Поиск объектов"}
-              placeholder={
-                treeTab === "story" ? "Найти реплику…" : "Найти объект…"
-              }
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </div>
-          <div className="hierarchy-tree">
-            {treeTab === "hierarchy" ? (
-              <HierarchyTree scene={displayScene} objects={objects} points={sceneStagingPoints(displayScene,objects)} query={query} selected={selection.id} selectedIds={objectSelectionIds}
-                expanded={layout.treeOpen||{}} onExpanded={treeOpen=>setLayout(l=>({...l,treeOpen}))}
-                onSelectObject={(id,options)=>{if(!running){setMode('scene');setCameraPilotId(null);setCameraPreviewId(null);}selectObject(id,options);}}
-                onFrameObject={id=>{editScene();setSelection({kind:'object',id});setFocusRequest({nonce:uid('focus')});}}
-                onVisibility={id=>mutate(p=>{const o=p.objects.find(o=>o.id===id);o.active=o.active===false;})}
-                onPoint={point=>{editScene();if(point.objectId)setSelection({kind:'object',id:point.objectId});setFocusRequest({nonce:uid('focus'),position:point.position,objectId:point.objectId});}}
-                onSelectCamera={selectCamera} onCameras={openCameras} showCameras={showCameras} onShowCameras={()=>setShowCameras(v=>!v)}
-                showDialogue={showDialogue} onShowDialogue={()=>setShowDialogue(v=>!v)} onStory={()=>{setDock('story');setDetailEditor(false);setMaximized(null);}}
-                onAudio={()=>{setDock('active');setDetailEditor(false);setMaximized(null);}}/>
-            ) : (
-              project.subscenes.map((s) => (
-                <details key={s.id} open={!!query || (layout.treeOpen?.['history:'+s.id]??s.id===scene.id)}>
+  const renderGraph = graphMode => (<EditorGraph
+                  project={project}
+                  mode={graphMode}
+                  selectedId={beat.id}
+                  eventId={eventContext?.eventId}
+                  binding={binding}
+                  phase={phase}
+                  scope={layout.scope}
+                  selectionId={selection.id}
+                  onBatch={changeBatch}
+                  onSelect={graphSelect}
+                  onOpen={openGraph}
+                  onEdit={(data) => {
+                    setSelection({ kind: "action", id: data.action.id });
+                    setDetailEditor(true);
+                    setMaximized("graph");
+                  }}
+                  onPhase={openStaging}
+                  onPatchAction={patchAction}
+                  onConnect={connect}
+                  issues={issues}
+                  preview={preview}
+                  positions={layout.positions}
+                  onPositions={setPositions}
+                  onReady={graphMode === dock ? onGraphReady : undefined}
+                  onContext={() =>
+                    setPicker({
+                      kind:
+                        graphMode === "story"
+                          ? "beat"
+                          : graphMode === "event"
+                            ? "action"
+                            : "event",
+                    })
+                  }
+                />);
+  const renderHistory = () => (<div className="history-window-content"><input aria-label="Поиск реплик" placeholder="Найти реплику…" value={historyQuery} onChange={e=>setHistoryQuery(e.target.value)}/>{project.subscenes.map((s) => (
+                <details key={s.id} open={!!historyQuery || (layout.treeOpen?.['history:'+s.id]??s.id===scene.id)}>
                   <summary onClick={e=>{e.preventDefault();setLayout(l=>({...l,treeOpen:{...l.treeOpen,['history:'+s.id]:!(l.treeOpen?.['history:'+s.id]??s.id===scene.id)}}));}}>
                     <Icon name="ChevronRight" size={12} />
                     <Icon name="PanelsTopLeft" size={14} />
@@ -2109,7 +1986,7 @@ export default function Editor() {
                   {project.chapters
                     .filter((c) => c.subsceneId === s.id)
                     .map((c) => (
-                      <details key={c.id} open={!!query || (layout.treeOpen?.['chapter:'+c.id]??c.id===chapter.id)}>
+                      <details key={c.id} open={!!historyQuery || (layout.treeOpen?.['chapter:'+c.id]??c.id===chapter.id)}>
                         <summary onClick={e=>{e.preventDefault();setLayout(l=>({...l,treeOpen:{...l.treeOpen,['chapter:'+c.id]:!(l.treeOpen?.['chapter:'+c.id]??c.id===chapter.id)}}));}}>
                           <Icon name="ChevronRight" size={11} />
                           {c.name}
@@ -2119,7 +1996,7 @@ export default function Editor() {
                           .filter((b) =>
                             (b.text + b.id)
                               .toLowerCase()
-                              .includes(query.toLowerCase()),
+                              .includes(historyQuery.toLowerCase()),
                           )
                           .map((b) => (
                             <button
@@ -2154,8 +2031,134 @@ export default function Editor() {
                       </details>
                     ))}
                 </details>
-              ))
-            )}
+              ))}</div>);
+  return (
+    <div
+      className="editor-app"
+      ref={root}
+      style={{
+        "--left": layout.left + "px",
+        "--right": layout.right + "px",
+        "--scene-height": layout.height + "px",
+      }}
+    >
+      <header className="editor-menubar">
+        <div className="editor-brand">
+          <Icon name="Flower2" size={23} />
+          <strong>
+            Sacura<span>Novel Studio</span>
+          </strong>
+        </div>
+        {["Файл", "Правка", "Создать", "Окна"].map((m) => (
+          <button
+            className={menu === m ? "active" : ""}
+            key={m}
+            aria-expanded={menu === m}
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setMenuAnchor({left: Math.max(8, Math.min(rect.left, window.innerWidth - 250)), top: rect.bottom + 4});
+              setMenu(menu === m ? null : m);
+            }}
+          >
+            {m}
+          </button>
+        ))}
+        <div className="flex-space" />
+        <span className="project-title" title={project.title}>
+          <Icon name="FolderOpen" size={14} />
+          {project.title}
+        </span>
+        <div className="main-play-controls">
+          <Button
+            className={running ? "playing" : ""}
+            icon={running ? "Square" : "Play"}
+            title={
+              running
+                ? "Остановить предпросмотр"
+                : "Запустить с начала текущей сабсцены"
+            }
+            onClick={() => (running ? rt.stop() : start())}
+          >{running ? "Стоп" : "Запуск"}</Button>
+          <Button icon="Play" title="Проверить историю с выделенной реплики" disabled={running} onClick={()=>start(true)}>С реплики</Button>
+          <Button
+            icon="Pause"
+            title="Пауза / продолжить"
+            className={preview?.paused ? "active" : ""}
+            disabled={!running || preview.phase === "FINISHED"}
+            onClick={() => rt.togglePause()}
+          />
+          <Button
+            icon="StepForward"
+            title="Следующая реплика"
+            disabled={
+              !running ||
+              !preview.ready ||
+              preview.paused ||
+              ["choice", "gate"].includes(playBeat.kind)
+            }
+            onClick={() => rt.advance()}
+          />
+        </div>
+        <div className="toolbar-layout">
+          <span className="play-label" hidden={!running}>
+            {running
+              ? preview.paused
+                ? "На паузе"
+                : "Предпросмотр"
+              : "Редактирование"}
+          </span>
+          <Select
+            aria-label="Раскладка редактора"
+            value={maximized || "balanced"}
+            onChange={(v) => setMaximized(v === "balanced" ? null : v)}
+            options={[
+              ["balanced", "Сцена и редактор"],
+              ["graph", "Рабочая область"],
+              ["scene", "Только сцена"],
+              ["hierarchy", "Только иерархия"],
+              ["inspector", "Только инспектор"],
+            ]}
+          />
+        </div>
+        <ThemePicker onOpen={() => setMenu(null)} />
+      </header>
+      <div className={'editor-workspace compact-'+compactPanel+(layout.hiddenHierarchy?' hierarchy-hidden':'')+(layout.hiddenInspector?' inspector-hidden':'')+(['scene','graph'].includes(maximized)?' focus-center':maximized==='hierarchy'?' focus-hierarchy':maximized==='inspector'?' focus-inspector':'')}>
+        <nav className="compact-panel-tabs" aria-label="Панели редактора">
+          {[['hierarchy','ListTree','Объекты сцены'],['workspace','PanelsTopLeft','Рабочая область'],['inspector','Settings2','Свойства']].map(([id,icon,label])=><button key={id} aria-pressed={compactPanel===id} onClick={()=>{if(['hierarchy','inspector'].includes(maximized))setMaximized(null);setCompactPanel(id);}}><Icon name={icon} size={13}/>{label}</button>)}
+        </nav>
+        <aside className="hierarchy-panel">
+          <button className="panel-restore" aria-label="Показать иерархию" title="Показать иерархию" onClick={()=>setLayout(l=>({...l,hiddenHierarchy:false}))}><Icon name="PanelLeftOpen" size={18}/><span>Иерархия</span></button>
+          <div className="panel-tabs">
+            <button className="active">Иерархия</button>
+            <div className="flex-space" />
+            <Button
+              icon="Plus"
+              title="Создать объект"
+              onClick={() => setPicker({ kind: "object" })}
+            />
+            <Button icon={maximized==='hierarchy'?'Minimize2':'Maximize2'} title={maximized==='hierarchy'?'Восстановить иерархию':'Развернуть иерархию'} onClick={()=>setMaximized(v=>v==='hierarchy'?null:'hierarchy')}/>
+            <Button icon="PanelLeftClose" title="Свернуть иерархию" onClick={()=>{setMaximized(null);setLayout(l=>({...l,hiddenHierarchy:true}));setCompactPanel('workspace');}}/>
+          </div>
+          <div className="panel-search">
+            <Icon name="Search" size={13} />
+            <input
+              aria-label="Поиск объектов"
+              placeholder="Найти объект…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
+          <div className="hierarchy-tree">
+              <HierarchyTree scene={displayScene} objects={objects} points={sceneStagingPoints(displayScene,objects)} query={query} selected={selection.id} selectedIds={objectSelectionIds}
+                expanded={layout.treeOpen||{}} onExpanded={treeOpen=>setLayout(l=>({...l,treeOpen}))}
+                onSelectObject={(id,options)=>{if(!running){setMode('scene');setCameraPilotId(null);setCameraPreviewId(null);}selectObject(id,options);}}
+                onFrameObject={id=>{editScene();setSelection({kind:'object',id});setFocusRequest({nonce:uid('focus')});}}
+                onVisibility={id=>mutate(p=>{const o=p.objects.find(o=>o.id===id);o.active=o.active===false;})}
+                onPoint={point=>{editScene();if(point.objectId)setSelection({kind:'object',id:point.objectId});setFocusRequest({nonce:uid('focus'),position:point.position,objectId:point.objectId});}}
+                onSelectCamera={selectCamera} onCameras={openCameras} showCameras={showCameras} onShowCameras={()=>setShowCameras(v=>!v)}
+                showDialogue={showDialogue} onShowDialogue={()=>setShowDialogue(v=>!v)} onStory={()=>{setDock('story');setDetailEditor(false);setMaximized(null);}}
+                onAudio={()=>{setDock('active');setDetailEditor(false);setMaximized(null);}}/>
+
           </div>
           <div className="hierarchy-footer">
             <Icon name="Layers" size={13} />
@@ -2163,40 +2166,7 @@ export default function Editor() {
             <span />
             {nodes.length} блоков
           </div>
-          <div className="subscene-list">
-            <div className="compact-heading">
-              Сабсцены
-              <Button
-                icon="Plus"
-                title="Создать сабсцену"
-                onClick={() => openSubscenes('create')}
-              />
-            </div>
-            {project.subscenes.map((s) => (
-              <button
-                className={scene.id === s.id ? "active" : ""}
-                key={s.id}
-                onClick={() => openSubscenes('edit',s.id)}
-              >
-                <Icon
-                  name={
-                    s.kind === "living"
-                      ? "Armchair"
-                      : s.kind === "garden"
-                        ? "Trees"
-                        : "TramFront"
-                  }
-                  size={16}
-                />
-                <span title={s.location}>{s.name}</span>
-                <small>
-                  {project.chapters
-                    .filter((c) => c.subsceneId === s.id)
-                    .reduce((n, c) => n + c.beats.length, 0)}
-                </small>
-              </button>
-            ))}
-          </div>
+          <InfoView />
         </aside>
         <ResizeBar
           axis="x"
@@ -2278,21 +2248,6 @@ export default function Editor() {
               </div>}
               {cameraPilotId&&mode==='scene'&&<div className="camera-pilot-bar"><Icon name="Video"/><span>Настройка: {displayScene.cameras?.find(c=>c.id===cameraPilotId)?.name}<small>Обзор мышью · правая кнопка — сдвиг · колесо — приближение</small></span><Button icon="Check" onClick={()=>captureCamera(cameraPilotId)}>Сохранить ракурс</Button><Button icon="X" title="Вернуться без сохранения" onClick={()=>setCameraPilotId(null)}/></div>}
               {mode==='game'&&<div className="camera-view-badge"><Icon name={resolveCamera(displayScene,world,objects,cameraPreviewId).mode==='follow'?'UserRoundCheck':'Video'} size={14}/>{resolveCamera(displayScene,world,objects,cameraPreviewId).name}{cameraPreviewId&&<button onClick={()=>setCameraPreviewId(null)}>По сценарию <Icon name="X" size={12}/></button>}</div>}
-              <div className="viewport-state">
-                <span>
-                  <Icon
-                    name={
-                      world.weather === "Гроза" ? "CloudLightning" : "CloudRain"
-                    }
-                    size={13}
-                  />
-                  <select aria-label="Погода в превью" value={world.weather||'Ясно'} onChange={e=>running?rt.controlEffect('weather','set',e.target.value):mutate(p=>p.subscenes.find(s=>s.id===scene.id).weather=e.target.value)}>{['Ясно','Дождь','Гроза','Туман','Снег'].map(w=><option key={w}>{w}</option>)}</select>
-                </span>
-                <span>
-                  <Icon name="Moon" size={13} />
-                  <select aria-label="Время суток в превью" value={world.time||'День'} onChange={e=>running?rt.controlEffect('time','set',e.target.value):mutate(p=>p.subscenes.find(s=>s.id===scene.id).time=e.target.value)}>{['Рассвет','День','Закат','Ночь'].map(t=><option key={t}>{t}</option>)}</select>
-                </span>
-              </div>
               <details className="viewport-help"><summary title="Управление сценой" aria-label="Управление сценой"><Icon name="CircleHelp" size={15}/></summary><div>Q / W / E / R — инструменты<br/>Shift + щелчок — мультивыбор<br/>Alt + ЛКМ — орбита · СКМ — панорама<br/>ПКМ + WASD / QE — полёт<br/>F — выделение в кадр</div></details>
             </div>
             <div
@@ -2397,11 +2352,12 @@ export default function Editor() {
               setLayout((l) => ({ ...l, height: defaultSceneHeight() }))
             }
           />
-          <section className="graph-dock">
+          <FloatingWindow active={floatingDock} title="Рабочая область" onClose={()=>setFloatingDock(false)}><section className="graph-dock">
             <div className="panel-tabs dock-tabs">
-              <DockTools dock={dock} event={event} issueCount={issues.length} onSelect={id => {
+              <DockTools dock={["story","timeline","staging"].includes(dock)?"story":dock} event={event} issueCount={issues.length} onSelect={id => {
                 setDock(id);
-                if (["create", "timeline"].includes(id)) setMaximized("graph");
+                if (id === "create") setMaximized("graph");
+                else setMaximized(null);
                 setDetailEditor(false);
               }} />
               <div className="flex-space" />
@@ -2413,60 +2369,16 @@ export default function Editor() {
                 }
               />
             </div>
-            {["story", "staging", "event"].includes(dock) && !detailEditor && (
+            {["story", "timeline", "staging", "event"].includes(dock) && !detailEditor && (
               <div className="graph-toolbar">
-                <button
-                  className="graph-back"
-                  title="Вернуться в сценарий"
-                  disabled={dock === "story"}
-                  onClick={() =>
-                    setDock(dock === "event" ? "staging" : "story")
-                  }
-                >
-                  <Icon name="ArrowLeft" size={13} />
-                </button>
-                <span className="graph-breadcrumb">
-                  {dock === "story"
-                    ? chapter.name
-                    : dock === "staging"
-                      ? `${beat.id} · ${beat.speaker}`
-                      : event?.name}
-                </span>
-                {dock === "story" ? (
-                  <Select
-                    aria-label="Область графа"
-                    value={layout.scope}
-                    options={[
-                      ["chapter", "Эпизод"],
-                      ["nearby", "Ближайшие связи"],
-                      ["scene", "Сабсцена"],
-                      ["all", "Вся история"],
-                    ]}
-                    onChange={(scope) => setLayout((l) => ({ ...l, scope }))}
-                  />
-                ) : dock === "staging" ? (
-                  <Select
-                    aria-label="Фаза постановки"
-                    value={phase}
-                    options={[
-                      ["ALL", "Вся постановка"],
-                      ...PHASES.map((p) => [p.id, p.label]),
-                    ]}
-                    onChange={setPhase}
-                  />
-                ) : (
-                  <span className="context-label">
-                    {binding ? "Размещение · " + contextBeat.id : "Шаблон"}
-                  </span>
-                )}
+                {dock==='event'?<><Button icon="ArrowLeft" title="Вернуться в поток истории" onClick={()=>setDock('story')}/><span className="graph-breadcrumb">{event?.name}</span></>:<><Icon name="Route" size={15}/><span className="flow-toolbar-context">{project.subscenes.length} сабсцены · {nodes.length} реплик · единый поток</span><Button icon="Focus" onClick={()=>graphApi.current?.focus(beat.id)}>К реплике</Button><Button icon="Scan" onClick={()=>graphApi.current?.fit()}>Вся история</Button></>}
                 <div className="flex-space" />
-                <details className="viewport-help graph-help"><summary title="Навигация по графу" aria-label="Навигация по графу"><Icon name="CircleHelp" size={15}/></summary><div>ПКМ — панорама<br/>Ctrl + колесо — масштаб<br/>ЛКМ — выбор и перемещение узла<br/>Двойной щелчок — открыть узел</div></details>
-                {dock === "story" && beat.kind === "choice" && (
+                <details className="viewport-help graph-help"><summary title="Навигация по графу" aria-label="Навигация по графу"><Icon name="CircleHelp" size={15}/></summary><div>ПКМ — панорама<br/>Колесо — масштаб<br/>Пин → пин — соединить<br/>Alt + щелчок по пину — разорвать связи<br/>Ctrl + перетаскивание пина — перенести связи<br/>Выбрать провод + Delete — разорвать<br/>ЛКМ — выбор и перемещение узла<br/>Двойной щелчок — открыть узел</div></details>
+                {dock !== "event" && beat.kind === "choice" && (
                   <Button
                     icon="GitFork"
                     onClick={() => {
-                      setLayout((l) => ({ ...l, scope: "nearby" }));
-                      setMaximized("graph");
+                      graphApi.current?.focus(beat.id);
                     }}
                   >
                     Обзор развилки
@@ -2495,7 +2407,7 @@ export default function Editor() {
                   onClick={() =>
                     setPicker({
                       kind:
-                        dock === "story"
+                        dock !== "event"
                           ? "beat"
                           : dock === "event"
                             ? "action"
@@ -2510,8 +2422,8 @@ export default function Editor() {
                     })
                   }
                 >
-                  {dock === "story"
-                    ? "Блок"
+                  {dock !== "event"
+                    ? "Реплика"
                     : dock === "event"
                       ? "Действие"
                       : "Событие"}
@@ -2541,7 +2453,7 @@ export default function Editor() {
               <AuthoringWorkspace hidden={dock!=='create'} project={project} request={authorRequest} mutate={mutate} beat={beat} onNotice={setNotice}
                 onGraph={id=>{setEventContext({eventId:id});setSelection({kind:'event',id});setDock('event');}}
                 onPreview={draft=>{setCameraPreviewId(null);setCameraPilotId(null);const test=structuredClone(project);const i=test.events.findIndex(e=>e.id===draft.id);if(i<0)test.events.push(draft);else test.events[i]=draft;soundDesk.unlock();rt.stop();setMode('game');setMaximized(null);setFollow(false);rt.previewEvent(test,draft.id,beat.id);}}
-                onPlace={(draft,hook)=>{mutate(p=>addToBatch(p,beat.id,hook,null,draft.id));setPhase(hook);setDock('staging');setMaximized(null);setNotice('Добавлено: '+draft.name+' · '+PHASES.find(x=>x.id===hook).label);}}/>
+                onPlace={(draft,hook)=>{mutate(p=>addToBatch(p,beat.id,hook,null,draft.id));setPhase(hook);setDock('story');setMaximized(null);setNotice('Добавлено: '+draft.name+' · '+PHASES.find(x=>x.id===hook).label);}}/>
               {dock==='create'?null:detailEditor && event ? (
                 <EventEditor
                   project={project}
@@ -2554,44 +2466,13 @@ export default function Editor() {
                   onAdd={addEvent}
                   onPreview={()=>audition(event.id)}
                 />
-              ) : ["story", "staging", "event"].includes(dock) ? (
-                <EditorGraph
-                  project={project}
-                  mode={dock}
-                  selectedId={beat.id}
-                  eventId={eventContext?.eventId}
-                  binding={binding}
-                  phase={phase}
-                  scope={layout.scope}
-                  selectionId={selection.id}
-                  onBatch={changeBatch}
-                  onSelect={graphSelect}
-                  onOpen={openGraph}
-                  onEdit={(data) => {
-                    setSelection({ kind: "action", id: data.action.id });
-                    setDetailEditor(true);
-                    setMaximized("graph");
-                  }}
-                  onPhase={openStaging}
-                  onPatchAction={patchAction}
-                  onConnect={connect}
-                  issues={issues}
-                  preview={preview}
-                  positions={layout.positions}
-                  onPositions={setPositions}
-                  onReady={onGraphReady}
-                  onContext={() =>
-                    setPicker({
-                      kind:
-                        dock === "story"
-                          ? "beat"
-                          : dock === "event"
-                            ? "action"
-                            : "event",
-                    })
-                  }
-                />
-              ) : dock === 'timeline' ? <GlobalTimeline project={project} currentSceneId={displayScene.id} currentBeatId={running?preview.beatId:beat.id} running={running} variables={variables} onOpenScene={id=>openSubscenes('edit',id)} onOpenBeat={openSubsceneBeat} onLayoutChange={positions=>mutate(p=>{p.editor={...p.editor,timelinePositions:positions};})}/> : dock === 'cameras' ? <CameraWorkspace scene={displayScene} objects={objects} state={world} selected={selection.kind==='camera'?selection.id:null} onSelect={selectCamera} onCreate={()=>createCamera()} onFollow={followCharacter} onChange={changeCamera} onDefault={id=>mutate(p=>p.subscenes.find(s=>s.id===scene.id).defaultCameraId=id)} onDelete={deleteCamera} onPilot={pilotCamera} onView={viewCamera} onCapture={captureCamera} piloting={cameraPilotId} running={running} onEdit={editScene}/> : dock === 'subscenes' ? <SubsceneWorkspace project={project} scene={displayScene} beat={nodes.find(b=>b.id===subsceneDraft?.fromBeatId)||beat} request={subsceneRequest} draft={subsceneDraft} onDraftChange={setSubsceneDraft} running={running}
+              ) : ["story", "timeline", "staging"].includes(dock) ? (
+                <StoryFlow project={project} issues={issues} selectedId={beat.id} selectionId={selection.id} preview={preview}
+                  onSelect={graphSelect} onOpen={openGraph} onBatch={changeBatch} onConnect={connect} onDeleteNode={deleteFlowNode}
+                  onScene={id=>openSubscenes('edit',id)}
+                  onAdd={(id,hook)=>{setSelectedBeat(id);setSelection({kind:'beat',id});setPicker({kind:'event',phase:hook});}}
+                  positions={layout.positions['flow:all']||{}} onPositions={positions=>setPositions('flow:all',positions)} onReady={onGraphReady}/>
+              ) : dock === 'event' ? renderGraph('event') : dock === 'cameras' ? <CameraWorkspace scene={displayScene} objects={objects} state={world} selected={selection.kind==='camera'?selection.id:null} onSelect={selectCamera} onCreate={()=>createCamera()} onFollow={followCharacter} onChange={changeCamera} onDefault={id=>mutate(p=>p.subscenes.find(s=>s.id===scene.id).defaultCameraId=id)} onDelete={deleteCamera} onPilot={pilotCamera} onView={viewCamera} onCapture={captureCamera} piloting={cameraPilotId} running={running} onEdit={editScene}/> : dock === 'subscenes' ? <SubsceneWorkspace project={project} scene={displayScene} beat={nodes.find(b=>b.id===subsceneDraft?.fromBeatId)||beat} request={subsceneRequest} draft={subsceneDraft} onDraftChange={setSubsceneDraft} running={running}
                 onStop={()=>rt.stop()} onSelect={id=>openSubscenes('edit',id)} onCreate={draft=>saveNewSubscene(draft)} onDuplicate={id=>saveNewSubscene(null,id)}
                 onPatch={patch=>editSubscene(p=>Object.assign(p.subscenes.find(s=>s.id===scene.id),patch))}
                 onKind={kind=>editSubscene(p=>changeSceneLocation(p,scene.id,kind))} onEntry={(id,reroute)=>editSubscene(p=>setSceneEntry(p,scene.id,id,reroute))}
@@ -2624,7 +2505,7 @@ export default function Editor() {
                       <button
                         onClick={() => {
                           selectBeat(i.beatId);
-                          setDock("staging");
+                          setDock("story");
                         }}
                       >
                         <strong>{i.title}</strong>
@@ -2646,7 +2527,7 @@ export default function Editor() {
                 </div>
               )}
             </div>
-          </section>
+          </section></FloatingWindow>
         </section>
         <ResizeBar
           axis="x"
@@ -2744,6 +2625,7 @@ export default function Editor() {
         </span>
 
       </footer>
+      {historyOpen && <FloatingWindow active title="История" onClose={()=>setHistoryOpen(false)}>{renderHistory()}</FloatingWindow>}
       {menu && (
         <div
           className="editor-menu"
@@ -2767,7 +2649,7 @@ export default function Editor() {
               <button disabled={projectFileBusy} onClick={restorePreviousProject}><Icon name="History"/>Восстановить предыдущий проект</button>
             </>
           ) : menu === "Правка" ? (
-            <button
+            <><button onClick={resetLayout}><Icon name="PanelsTopLeft"/>Восстановить раскладку</button><button
               disabled={!history.length}
               onClick={() => {
                 undo();
@@ -2776,7 +2658,7 @@ export default function Editor() {
             >
               <Icon name="Undo2" />
               Отменить <kbd>Ctrl Z</kbd>
-            </button>
+            </button></>
           ) : menu === "Создать" ? (
             <>
               <button onClick={()=>openSubscenes('create')}><Icon name="PanelsTopLeft"/>Сабсцена</button>
@@ -2814,11 +2696,8 @@ export default function Editor() {
             <>
               <button onClick={()=>{setMaximized(null);setLayout(l=>({...l,hiddenHierarchy:hierarchyVisible}));setCompactPanel(hierarchyVisible?'workspace':'hierarchy');setMenu(null);}}><Icon name="PanelLeft"/>{hierarchyVisible?'Свернуть':'Показать'} иерархию</button>
               <button onClick={()=>{setMaximized(null);setLayout(l=>({...l,hiddenInspector:inspectorVisible}));setCompactPanel(inspectorVisible?'workspace':'inspector');setMenu(null);}}><Icon name="PanelRight"/>{inspectorVisible?'Свернуть':'Показать'} инспектор</button>
-              <button onClick={()=>{setDock('timeline');setDetailEditor(false);setMaximized('graph');setMenu(null);}}><Icon name="Route"/>Общий таймлайн</button>
-              <button onClick={resetLayout}>
-                <Icon name="PanelsTopLeft" />
-                Восстановить раскладку
-              </button>
+              <button onClick={()=>{setHistoryOpen(true);setMenu(null);}}><Icon name="BookOpen"/>История · отдельное окно</button>
+              {dockTools.map(([id,label])=><button key={id} disabled={id==='event'&&!event} onClick={()=>{setDock(id);setDetailEditor(false);setMaximized(null);setFloatingDock(true);setMenu(null);}}><Icon name="AppWindow"/>{label}</button>)}
               <button
                 onClick={() => {
                   setMaximized("scene");
@@ -2952,7 +2831,7 @@ export default function Editor() {
                             ),
                           );
                           setPicker(null);
-                          setDock("staging");
+                          setDock("story");
                           setPhase(chosenPhase);
                         }}
                       >
