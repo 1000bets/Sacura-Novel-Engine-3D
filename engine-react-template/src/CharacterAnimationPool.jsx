@@ -1,5 +1,6 @@
 import React,{useState} from 'react';
-import {Button,Icon} from './StudioParts.jsx';
+import {Button} from './StudioParts.jsx';
+import AnimationThumbnail from './AnimationThumbnail.jsx';
 import {BUILTIN_CHARACTER_ANIMATIONS} from './characterModel.js';
 import {uid} from './model.js';
 
@@ -20,7 +21,8 @@ export default function CharacterAnimationPool({character,pool,enabled,patch,onU
   <div className="character-animation-cards">{pool.map(clip=>{
    const available=enabled.some(item=>item.id===clip.id),custom=character.extraAnimations?.some(item=>item.id===clip.id),isEditing=editing===clip.id;
    return <article key={clip.id} className={'character-animation-card'+(current===clip.id?' previewing':'')}>
-    <div className="character-animation-card-heading"><span className="character-animation-symbol"><Icon name={clip.icon||'Clapperboard'} size={26}/></span><div><h4>{clip.name}</h4><small>{clip.basePose?`Вариант движения «${clip.basePose}»`:character.model?'Из файла модели':'Готовое движение'}{clip.duration?` · ${clip.duration.toFixed(2)} сек`:''}</small></div></div>
+    <AnimationThumbnail character={character} clip={clip}/>
+    <div className="character-animation-card-heading"><div><h4>{clip.name}</h4><small>{clip.basePose?`Вариант движения «${clip.basePose}»`:character.model?'Из файла модели':'Готовое движение'}{clip.duration?` · ${clip.duration.toFixed(2)} сек`:''}</small></div></div>
     <p className="character-animation-description">{clip.description||'Описание движения ещё не заполнено. Посмотрите анимацию и добавьте, что делает персонаж.'}</p>
     {isEditing&&<div className="character-animation-edit"><label>Название<input aria-label={'Название анимации '+clip.name} value={clip.name} onChange={event=>details(clip.id,{name:event.target.value})}/></label><label>Суть анимации<textarea aria-label={'Описание анимации '+clip.name} value={clip.description||''} placeholder="Например: машет правой рукой, приветствуя собеседника" onChange={event=>details(clip.id,{description:event.target.value})}/></label><Button icon="Check" onClick={()=>setEditing(null)}>Готово</Button></div>}
     <label className="character-animation-enabled"><input type="checkbox" checked={available} onChange={event=>patch({enabledAnimations:event.target.checked?[...enabled.map(item=>item.id),clip.id]:enabled.filter(item=>item.id!==clip.id).map(item=>item.id)})}/>Доступна в сценарии</label>

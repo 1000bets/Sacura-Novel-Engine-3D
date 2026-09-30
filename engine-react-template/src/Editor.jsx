@@ -2683,7 +2683,7 @@ export default function Editor() {
           Диагностика · {issues.length}
         </button>
         <span className="status-divider" />
-        <span>{saveError || notice || "Сохранено на этом компьютере"}</span>
+        <span data-help-title="Хранение проекта" data-help="Автосохранение хранит последний проект в локальном хранилище этого браузера. Чтобы получить отдельный файл на диске, выберите «Файл → Сохранить проект» (Ctrl+S). Загрузить файл можно через «Файл → Открыть проект».">{saveError || notice || "Автосохранение в браузере · файл: Ctrl+S"}</span>
         <div className="flex-space" />
         <span>
           Выделено:{" "}

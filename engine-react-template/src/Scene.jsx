@@ -1,3 +1,4 @@
+import {createRendererViewport} from './rendererViewport.js';
 import {updateObjectHighlight} from './sceneEffects.js';
 import React, { useEffect, useRef } from "react";
 import * as THREE from "three";
@@ -180,16 +181,7 @@ export default function Scene({
       }),
     );
     const updateAtmosphere=atmosphere(scene,{kind:'living',renderer,sun:sunlight,hemi});
-    const resize = () => {
-      const { width, height } = element.getBoundingClientRect();
-      if (width < 1 || height < 1) return;
-      renderer.setSize(width, height);
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-    };
-    const ro = new ResizeObserver(resize);
-    ro.observe(element);
-    resize();
+    const viewport=createRendererViewport(renderer,camera,element);
     const gizmo=createSceneGizmo(scene,camera,renderer.domElement,controls,()=>callbacks.current,()=>pickables);
     const cameraRig=createCameraRig(scene,camera,controls,renderer.domElement,()=>callbacks.current);if(cameraApi)cameraApi.current=cameraRig;
     const ray = new THREE.Raycaster(),
@@ -265,12 +257,13 @@ export default function Scene({
       ring.scale.setScalar(live.interactionTarget?1+Math.sin(animTime*3)*.06:1);
       lamp.intensity=live.lighting==='Выключить'?0:live.lighting==='Холодный свет'?12:35;
       lamp.color.set(live.lighting==='Холодный свет'?'#98beff':'#ffa553');
+      viewport.update();
       renderer.render(scene, camera);
     };
     render();
     return () => {
       cancelAnimationFrame(frame);
-      ro.disconnect();
+      viewport.dispose();
       if(cameraApi?.current===cameraRig)cameraApi.current=null;
       cameraRig.dispose();
       gizmo.dispose();

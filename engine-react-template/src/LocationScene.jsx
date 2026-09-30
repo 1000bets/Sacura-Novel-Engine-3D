@@ -1,3 +1,4 @@
+import {createRendererViewport} from './rendererViewport.js';
 import {updateObjectHighlight} from './sceneEffects.js';
 import React, { useEffect, useRef } from "react";
 import * as THREE from "three";
@@ -165,14 +166,7 @@ function Exterior({
       }),
     );
     const updateAtmosphere=atmosphere(scene,{kind,renderer,sun,hemi});
-    const ro = new ResizeObserver(() => {
-      const { width, height } = element.getBoundingClientRect();
-      if (width < 1 || height < 1) return;
-      renderer.setSize(width, height);
-      camera.aspect = width / Math.max(height, 1);
-      camera.updateProjectionMatrix();
-    });
-    ro.observe(element);
+    const viewport=createRendererViewport(renderer,camera,element);
     const gizmo=createSceneGizmo(scene,camera,renderer.domElement,controls,()=>live.current,()=>picks);
     const cameraRig=createCameraRig(scene,camera,controls,renderer.domElement,()=>live.current);if(cameraApi)cameraApi.current=cameraRig;
     let down;
@@ -231,12 +225,13 @@ function Exterior({
       gizmo.update();
       cameraRig.update(dt,gizmo.dragging);
       controls.tick(dt);
+      viewport.update();
       renderer.render(scene, camera);
     };
     render();
     return () => {
       cancelAnimationFrame(frame);
-      ro.disconnect();
+      viewport.dispose();
       if(cameraApi?.current===cameraRig)cameraApi.current=null;
       cameraRig.dispose();
       gizmo.dispose();
