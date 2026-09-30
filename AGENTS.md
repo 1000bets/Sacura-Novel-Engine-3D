@@ -163,7 +163,7 @@ Do not duplicate the same library in both. If Editor needs a capability that Eng
 
 | Dependency | Role | Integration |
 |------------|------|-------------|
-| Qt 6 | Engine runtime UI and application windows | `Root/Engine/ThirdParty/Qt.cmake`; public via `Sakura::EngineQtThirdParty`. Local SDK: `Root/Engine/ThirdParty/Qt/`; hints: SAKURA_QT_ROOT / Qt6_DIR. |
+| Qt 6 | Engine runtime UI and application windows | `Root/Engine/ThirdParty/Qt.cmake`; public via `Sakura::EngineQtThirdParty`. FetchContent downloads Qt Base v6.8.3 into `Root/Engine/ThirdParty/Qt/Source/`; bootstrap builds and installs shared Qt per configuration under `${CMAKE_BINARY_DIR}/Qt/`. |
 | SimpleMath / DirectXMath | Transforms, math | Vendored under `Root/Engine/ThirdParty/SimpleMath` |
 | SDL3 | Window, input, events | FetchContent (`Root/Engine/ThirdParty/CMakeLists.txt`) |
 | DiligentCore | RHI | FetchContent → `Root/Engine/ThirdParty/DiligentCore/` |
@@ -185,6 +185,12 @@ Do not duplicate the same library in both. If Editor needs a capability that Eng
 | ImGuizmo | Editor transform manipulator | FetchContent → `Root/Editor/ThirdParty/ImGuizmo/`; target `Sakura::ImGuizmo`, using DiligentTools' bundled ImGui |
 
 Fetched Diligent/PhysX/asset/`_src`, Editor ImGuizmo and local `Engine/ThirdParty/Qt/` trees are gitignored. Do not copy their `.cpp`/`.h` around the project by hand.
+
+- The primary dependency workflow is downloading pinned sources and building them through CMake. Qt follows this rule by default (`SAKURA_BUILD_QT_FROM_SOURCE=ON`); do not make a separately installed Qt SDK, aqtinstall, or vcpkg a prerequisite for the standard presets.
+- On Windows, the root CMake configuration enables `core.longpaths=true` through process-scoped `GIT_CONFIG_COUNT` / `GIT_CONFIG_KEY_*` / `GIT_CONFIG_VALUE_*`, preserving inherited entries. All child Git dependency downloads and submodule checkouts inherit it. Do not change global Git configuration or Windows registry settings for dependency downloads. This handles Git paths, not arbitrary path limits in other build tools.
+- Qt does not support inclusion through `add_subdirectory`. Download the official Qt Base source archive with FetchContent and verify its pinned SHA256, configure/build/install it separately during the initial Engine dependency configuration, then load its installed package with `find_package(Qt6)`. Update `SAKURA_QT_VERSION` and `SAKURA_QT_SOURCE_SHA256` together. On Windows, `BuildQt.ps1` initializes the Visual Studio x64 environment and uses Ninja. Qt tests/examples are disabled; bundled third-party libraries avoid additional package-manager requirements.
+- Qt source version, archive SHA256, configuration, compiler and bootstrap script identify the cached installation. Debug and Release have separate build/install directories; changed build identities use fresh Qt build directories to avoid stale feature/MOC caches. A single success stamp identifies the active installed build and is written only after installation succeeds. Runtime deployment uses imported Qt library/plugin targets, never hardcoded SDK-relative plugin paths.
+- External Qt SDKs are an explicit opt-out only: `SAKURA_BUILD_QT_FROM_SOURCE=OFF` with `SAKURA_QT_ROOT` / `Qt6_DIR`. Default source builds must not silently reuse a neighboring project's SDK or stale Qt package cache paths.
 
 Pinned version cache vars: `SAKURA_SDL3_GIT_TAG`, `SAKURA_DILIGENT_*_GIT_TAG`, `SAKURA_PHYSX_GIT_TAG`, `SAKURA_FASTGLTF_GIT_TAG`, `SAKURA_OZZ_GIT_TAG`, `SAKURA_NLOHMANN_JSON_GIT_TAG`, `SAKURA_STB_GIT_TAG`, `SAKURA_UFBX_GIT_TAG`, `SAKURA_IMGUIZMO_GIT_TAG`, `SAKURA_PYBIND11_GIT_TAG`. Bump deliberately (keep Diligent modules on the same version).
 
@@ -293,7 +299,7 @@ Python @register_class / field()
 - Prefer complete names over short ones.
 - Debug logging messages in English via `PrintString`.
 - Dominant build configuration: **Debug**.
-- CMake presets (Windows/MSVC): `CMakePresets.json` (`windows-msvc-debug` / `windows-msvc-release` / `windows-msvc-debug-engine-only`). Machine paths via `CMakeUserPresets.json` (see `.example`) using `SAKURA_QT_ROOT` / `SAKURA_PYTHON_ROOT`. Editor optional: `-DSAKURA_BUILD_EDITOR=OFF`. Tests: `ctest --preset windows-msvc-debug` (excludes label `probe`).
+- CMake 3.25+ presets (Windows/MSVC): `CMakePresets.json` (`windows-msvc-debug` / `windows-msvc-release` / `windows-msvc-debug-engine-only`), with source-built Qt enabled. Machine Python paths via `CMakeUserPresets.json` (see `.example`) using `SAKURA_PYTHON_ROOT`; Qt SDK paths apply only to the explicit external mode. Editor optional: `-DSAKURA_BUILD_EDITOR=OFF`. Tests: `ctest --preset windows-msvc-debug` (excludes label `probe`).
 
 ## Architecture follow-up and rendering roadmap
 
