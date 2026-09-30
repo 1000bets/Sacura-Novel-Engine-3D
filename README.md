@@ -8,7 +8,10 @@
 
 На Windows нужны CMake 3.25+, Visual Studio 2022 с компонентами Desktop development with C++ и C++ CMake tools for Windows (включая Ninja), Windows SDK, Python 3 x64 и Git. Отдельно устанавливать Qt не нужно. Из корня:
 
-```sh
+CMake автоматически передаёт `core.longpaths=true` своим дочерним процессам Git, включая скачивание подмодулей зависимостей. Глобальные настройки Git и Windows не меняются, права администратора не нужны. Это устраняет ограничение Git при загрузке длинных путей вроде тестовых файлов SPIRV-Cross; ограничения других программ эта настройка не снимает. Если предыдущая конфигурация остановилась на `Filename too long`, повторите команду конфигурации ниже.
+
+```powershell
+Set-Location -LiteralPath 'M:\Sacura-Novel-Engine-Test\Sacura-Novel-Engine-3D'
 cmake --preset windows-msvc-debug
 cmake --build --preset windows-msvc-debug --target SakuraEditor --parallel 4
 ```
