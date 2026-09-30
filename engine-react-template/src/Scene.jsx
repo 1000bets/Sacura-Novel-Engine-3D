@@ -1,11 +1,12 @@
 import {updateObjectHighlight} from './sceneEffects.js';
 import React, { useEffect, useRef } from "react";
 import * as THREE from "three";
+import {updateCharacterVisual,disposeCharacterVisual} from "./characterVisual.js";
 import {createSceneGizmo,groupObjects,meshGeometry,cloneSceneObject} from './SceneGizmo.js';
 import {BUILTIN_TRANSFORMS,resolvedPosition} from './sceneEditing.js';
 import {createCameraRig} from './CameraRig.js';
 import {createSceneNavigation} from './SceneNavigation.js';
-import {atmosphere,gameCamera,decoratePaper,objectPosition,addCharacterDetails,animatePose} from './sceneEffects.js';
+import {atmosphere,gameCamera,decoratePaper,objectPosition,addCharacterDetails} from './sceneEffects.js';
 
 export default function Scene({
   objects,
@@ -250,13 +251,12 @@ export default function Scene({
 
       const live = callbacks.current.state;
       animTime=updateAtmosphere(live,dt);
-      pickables.forEach(mesh=>{const o=callbacks.current.objects.find(o=>o.id===mesh.userData.id);if(!o){mesh.visible=false;return;}mesh.visible=o.active&&live.visible?.[o.id]!==false;
+      pickables.forEach(mesh=>{const o=callbacks.current.objects.find(o=>o.id===mesh.userData.id);if(!o){disposeCharacterVisual(mesh);mesh.visible=false;return;}mesh.visible=o.active&&live.visible?.[o.id]!==false;
         gizmo.apply(mesh,o,resolvedPosition(o,live,'living'));
         if((o.builtin||o.id)==='door'&&callbacks.current.mode==='game'){mesh.userData.openAngle=THREE.MathUtils.damp(mesh.userData.openAngle||0,live.doors?.[o.id]==='Открыть'?-1.25:0,3,live.paused||live.pausedDoors?.[o.id]?0:dt);mesh.rotation.y+=mesh.userData.openAngle;}
         if(mesh.userData.marker)mesh.userData.marker.visible=live.interactionTarget===o.id||live.highlights?.[o.id];
         updateObjectHighlight(mesh,!!live.highlights?.[o.id],animTime);
-        if(callbacks.current.mode==='scene'&&callbacks.current.editing)animatePose(mesh,null,0,false,true);
-        else animatePose(mesh,live.poses?.[o.id],animTime,!!live.motions?.[o.id]&&!live.motions[o.id].stopped&&!live.motions[o.id].paused&&live.motions[o.id].progress<1,live.paused);
+        updateCharacterVisual(mesh,o,dt,live.poses?.[o.id],!!live.motions?.[o.id]&&!live.motions[o.id].stopped&&!live.motions[o.id].paused&&live.motions[o.id].progress<1,live.paused,callbacks.current.mode==='scene'&&callbacks.current.editing);
       });
       gizmo.update();
       cameraRig.update(dt,gizmo.dragging);
@@ -277,6 +277,7 @@ export default function Scene({
       controls.dispose();
       renderer.domElement.removeEventListener('pointerdown',pointerDown);
       renderer.domElement.removeEventListener('pointerup',click);
+      pickables.forEach(disposeCharacterVisual);
       scene.traverse((o) => {
         o.geometry?.dispose();
         if (o.material)

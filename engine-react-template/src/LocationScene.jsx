@@ -1,12 +1,13 @@
 import {updateObjectHighlight} from './sceneEffects.js';
 import React, { useEffect, useRef } from "react";
 import * as THREE from "three";
+import {updateCharacterVisual,disposeCharacterVisual} from "./characterVisual.js";
 import {createCameraRig} from './CameraRig.js';
 import {createSceneNavigation} from './SceneNavigation.js';
 import {createSceneGizmo,groupObjects,meshGeometry,cloneSceneObject} from './SceneGizmo.js';
 import {BUILTIN_TRANSFORMS,resolvedPosition} from './sceneEditing.js';
 import Scene from "./Scene.jsx";
-import {atmosphere,gameCamera,decoratePaper,objectPosition,addCharacterDetails,animatePose} from './sceneEffects.js';
+import {atmosphere,gameCamera,decoratePaper,objectPosition,addCharacterDetails} from './sceneEffects.js';
 
 function Exterior({
   kind,
@@ -217,15 +218,14 @@ function Exterior({
       picks.forEach((mesh) => {
         const o = objects.find((o) => o.id === mesh.userData.id);
         if (!o) {
-          mesh.visible = false;
+          disposeCharacterVisual(mesh);mesh.visible = false;
           return;
         }
         mesh.visible = o.active && state.visible?.[o.id] !== false;
         if(mesh.userData.marker)mesh.userData.marker.visible=state.interactionTarget===o.id||state.highlights?.[o.id];
         gizmo.apply(mesh,o,resolvedPosition(o,state,kind));
         updateObjectHighlight(mesh,state.interactionTarget===o.id||!!state.highlights?.[o.id],animTime);
-        if(mode==='scene'&&live.current.editing)animatePose(mesh,null,0,false,true);
-        else animatePose(mesh,state.poses?.[o.id],animTime,!!state.motions?.[o.id]&&!state.motions[o.id].stopped&&!state.motions[o.id].paused&&state.motions[o.id].progress<1,state.paused);
+        updateCharacterVisual(mesh,o,dt,state.poses?.[o.id],!!state.motions?.[o.id]&&!state.motions[o.id].stopped&&!state.motions[o.id].paused&&state.motions[o.id].progress<1,state.paused,mode==='scene'&&live.current.editing);
 
       });
       gizmo.update();
@@ -243,6 +243,7 @@ function Exterior({
       controls.dispose();
       renderer.domElement.removeEventListener('pointerdown',press);
       renderer.domElement.removeEventListener('pointerup',click);
+      picks.forEach(disposeCharacterVisual);
       scene.traverse((o) => {
         o.geometry?.dispose();
         if(Array.isArray(o.material))o.material.forEach(material=>material.dispose());else o.material?.dispose();

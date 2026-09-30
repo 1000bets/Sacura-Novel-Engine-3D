@@ -1,7 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {Icon, Button} from './StudioParts.jsx';
 
-const fallback={title:'Подсказки',body:'Наведите курсор на кнопку, поле или рабочую область. Здесь появится описание. При работе с клавиатурой подсказка следует за фокусом.'};
+const fallback={title:'Подсказки',body:'Нажмите на кнопку, поле или рабочую область — здесь появится описание выбранного элемента. Наведение курсора не меняет подсказку.'};
 const descriptions={
  'Файл':'Создать, открыть или сохранить проект. Ctrl+S сохраняет текущий проект; Ctrl+Shift+S — сохранить под новым именем.',
  'Правка':'Отмените последнее изменение (Ctrl+Z) или восстановите расположение панелей редактора.',
@@ -35,8 +35,8 @@ export function InfoView(){
    const next=descriptions[name]?{title:name,body:descriptions[name]}:help?{title:name||help.dataset.helpTitle||'Подсказка',body:help.dataset.help}:area?{title:name||area[1],body:control?.getAttribute('title')||area[2]}:name?{title:name,body:control?.disabled?'Сейчас недоступно. Остановите предпросмотр или выберите подходящий элемент.':control?.getAttribute('title')||'Дополнительная справка для этого элемента пока не задана.'}:fallback;
    setInfo(old=>old.title===next.title&&old.body===next.body?old:next);
   };
-  document.addEventListener('pointerover',update);document.addEventListener('focusin',update);
-  return()=>{document.removeEventListener('pointerover',update);document.removeEventListener('focusin',update);};
+  document.addEventListener('click',update,true);
+  return()=>{document.removeEventListener('click',update,true);};
  },[]);
  return <section className={'info-view'+(collapsed?' collapsed':'')} aria-label="Контекстная справка"><button className="info-heading" aria-expanded={!collapsed} onClick={()=>setCollapsed(v=>!v)}><Icon name="Info" size={15}/>Подсказки<Icon name={collapsed?'ChevronUp':'ChevronDown'} size={13}/></button>{!collapsed&&<div><strong>{info.title}</strong><p>{info.body}</p></div>}</section>;
 }

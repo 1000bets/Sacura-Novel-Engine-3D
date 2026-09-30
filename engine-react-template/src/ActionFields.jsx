@@ -1,4 +1,5 @@
 import React from "react";
+import {characterAnimationOptions} from './characterModel.js';
 import { AUDIO_ASSETS, TYPES } from "./studioModel.js";
 import {sceneStagingPoints,stagingPointOptions,isObjectInScene} from './sceneEditing.js';
 
@@ -65,14 +66,8 @@ export default function ActionFields({
         field("К точке", select("value", pointOptions))}
       {type === "pose" &&
         field(
-          "Поза",
-          select("value", [
-            "стоит",
-            "улыбка",
-            "задумчивость",
-            "танец",
-            "грусть",
-          ]),
+          "Анимация персонажа",
+          select("value", [["","Выберите анимацию"],...characterAnimationOptions(target,a.value)]),
         )}
       {type === "camera" && <>
         {field("Камера",select("cameraId",[["","План по умолчанию"],...(a.cameraId&&!project.subscenes.some(s=>s.cameras?.some(c=>c.id===a.cameraId))?[[a.cameraId,"Камера удалена · выберите другую"]]:[]),...project.subscenes.flatMap(s=>(s.cameras||[]).map(c=>[c.id,`${s.location} · ${c.name}${c.mode==='follow'?' · слежение':''}`]))]))}

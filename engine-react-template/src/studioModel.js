@@ -4,6 +4,7 @@ import {ensureCreationLibrary} from './authoringModel.js';
 import {ensureSceneEditing,isObjectInScene} from './sceneEditing.js';
 import {ensureCameras} from './cameraModel.js';
 import {ensureAudioSettings} from './audioSettings.js';
+import {enabledCharacterAnimations} from './characterModel.js';
 export {allBeats,makeAction,uid,TYPES};
 export const PHASES=[{id:'BEFORE',label:'До реплики',hint:'Подготовить сцену, затем показать текст',color:'blue'},{id:'ON_START',label:'Во время реплики',hint:'Текст уже виден · постановка продолжается',color:'violet'},{id:'AFTER',label:'После реплики',hint:'Игрок продолжил · завершаем постановку',color:'amber'}];
 export const AUDIO_ASSETS=[
@@ -83,6 +84,10 @@ export function validateStudio(p){
   if(b.kind==='gate'&&gateObject&&!isObjectInScene(gateObject,location))issues.push({id:`gate-location-${b.id}`,beatId:b.id,level:'error',title:'Предмет ожидания отсутствует в сабсцене',detail:`«${gateObject.name}» недоступен в «${location.name}». Выберите предмет этой локации: иначе игрок не сможет продолжить.`});
   for(const binding of b.bindings)for(const a of bindingActions(p,binding)){const object=p.objects.find(o=>o.id===a.target);if(object&&!isObjectInScene(object,location))issues.push({id:`action-location-${binding.id}-${a.id}`,beatId:b.id,eventId:binding.eventId,level:['move','pose','visibility','highlight','door'].includes(a.type)?'error':'warning',title:'Цель действия отсутствует в сабсцене',detail:`«${object.name}» недоступен в «${location.name}». Выберите объект этой локации или добавьте персонажа в её состав.`});}
   for(const binding of b.bindings)for(const a of bindingActions(p,binding))if(a.type==='camera'&&a.cameraId&&!sceneFor(p,b.id).cameras?.some(c=>c.id===a.cameraId))issues.push({id:`camera-missing-${b.id}-${binding.id}-${a.id}`,beatId:b.id,eventId:binding.eventId,level:'error',title:'Камера недоступна в этой сабсцене',detail:'Камера удалена или относится к другой локации. Выберите камеру этой сабсцены в действии «Сменить план».'});
+  for(const binding of b.bindings)for(const action of bindingActions(p,binding)){
+   const character=p.objects.find(object=>object.id===action.target&&object.type==='Персонаж');
+   if(action.type==='pose'&&character&&!enabledCharacterAnimations(character).some(clip=>clip.id===action.value))issues.push({id:`action-animation-${binding.id}-${action.id}`,beatId:b.id,eventId:binding.eventId,level:'error',title:'Анимация персонажа недоступна',detail:`«${character.name}»: анимация удалена, отключена или отсутствует в новой модели. Выберите анимацию из его пула.`});
+  }
   for(const phase of PHASES)for(const batch of batchesFor(b,phase.id)){
    const resources=new Map();for(const binding of batch.bindings){for(const a of bindingActions(p,binding)){const domain=TYPES[a.type]?.domain;if(!domain||['sound','pause','resume','stop','duck'].includes(a.type))continue;const key=`${a.target}/${domain}`;const prev=resources.get(key);if(prev&&prev!==binding.id)issues.push({id:`overlap-${b.id}-${batch.id}-${key}`,beatId:b.id,eventId:binding.eventId,batchId:batch.id,phase:phase.id,level:'error',title:'Два события управляют одним ресурсом',detail:`${p.objects.find(o=>o.id===a.target)?.name||a.target} · ${domain}. Две команды пересекаются. Разнесите их по шагам или измените объект.`,fix:'sequence-batch'});if(batch.mode==='PARALLEL'||['NONE','STARTED'].includes(binding.join))resources.set(key,binding.id);}}
   }

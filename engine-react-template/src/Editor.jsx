@@ -50,6 +50,8 @@ import EditorGraph from "./EditorGraph.jsx";
 import ActionFields from "./ActionFields.jsx";
 import FailureLab from "./FailureLab.jsx";
 import SubsceneWorkspace from './SubsceneWorkspace.jsx';
+import CharacterWorkspace from './CharacterWorkspace.jsx';
+import {createCharacter,setCharacterInScene} from './characterModel.js';
 import {createSubscene,cloneSubscene,setSceneEntry,connectSubscene,changeSceneLocation,newSceneDraft,LOCATION_PRIMITIVES} from './subsceneModel.js';
 import EventPlayground from './EventPlayground.jsx';
 import AuthoringWorkspace from './AuthoringWorkspace.jsx';
@@ -251,7 +253,7 @@ function GameDialogue({
 
 // Keep everyday workspaces visible; secondary tools remain one click away.
 const dockTools = [
-  ["story", "Поток истории"], ["subscenes", "Сабсцены"],
+  ["story", "Поток истории"], ["subscenes", "Сабсцены"], ["characters", "Персонажи"],
   ["cameras", "Камеры"], ["active", "Звук и окружение"], ["event", "Событие"],
   ["create", "Создание"], ["assets", "Проект"], ["sound", "Звук"],
   ["samples", "Эффекты"], ["issues", "Проблемы"],
@@ -260,7 +262,7 @@ function DockTools({ dock, event, issueCount, onSelect }) {
   const [open, setOpen] = useState(false);
   const [opensUp, setOpensUp] = useState(false);
   const popup = useRef(null), trigger = useRef(null);
-  const secondary = dockTools.slice(4);
+  const secondary = dockTools.slice(5);
   const current = secondary.find(([id]) => id === dock);
   useEffect(() => {
     if (!open) return;
@@ -276,7 +278,7 @@ function DockTools({ dock, event, issueCount, onSelect }) {
     };
   }, [open]);
   return <>
-    {dockTools.slice(0, 4).map(([id, label]) => <button key={id}
+    {dockTools.slice(0, 5).map(([id, label]) => <button key={id}
       aria-pressed={dock === id} className={dock === id ? "active" : ""}
       onClick={() => onSelect(id)}>{label}</button>)}
     <div className={"dock-more" + (opensUp ? " opens-up" : "")} ref={popup} onBlur={e => {
@@ -662,11 +664,11 @@ export default function Editor() {
     setMaximized(null);
   };
   useEffect(()=>{
-    if(mode==='scene'&&!running&&selection.kind==='object'){
+    if(mode==='scene'&&!running&&selection.kind==='object'&&dock!=='characters'){
       setLayout(current=>current.hiddenInspector?{...current,hiddenInspector:false}:current);
       setCompactPanel('inspector');
     }
-  },[selection.kind,selection.id,mode,running]);
+  },[selection.kind,selection.id,mode,running,dock]);
   const interact = (id) => {
     if(mode==='game'&&running&&preview.phase==='WAITING_INPUT'){rt.advance();return;}
     const o = objects.find((o) => o.id === id);
@@ -918,6 +920,23 @@ export default function Editor() {
     setSelection({ kind: "object", id });
     setFocusRequest({nonce:uid('focus')});
     setPicker(null);
+    if(type==='Персонаж'){setDock('characters');setCompactPanel('workspace');}
+  };
+  const patchCharacter=(id,patch)=>{
+    if(rt.running)return;
+    if('model' in patch||'extraAnimations' in patch){
+      const next=structuredClone(project),character=next.objects.find(object=>object.id===id&&object.type==='Персонаж');
+      if(!character)throw new Error('Персонаж удалён.');Object.assign(character,patch);
+      try{localStorage.setItem(PROJECT_KEY,JSON.stringify(next));}catch{throw new Error('Не хватает места для модели в автосохранении. Уменьшите GLB или удалите неиспользуемые модели.');}
+    }
+    mutate(p=>{const character=p.objects.find(object=>object.id===id&&object.type==='Персонаж');if(character)Object.assign(character,patch);});
+  };
+  const duplicateCharacter=id=>{
+    if(rt.running)return;const original=project.objects.find(object=>object.id===id&&object.type==='Персонаж');if(!original)return;
+    const copy={...structuredClone(original),id:uid('character'),name:original.name+' · копия'};
+    const next=structuredClone(project);next.objects.push(copy);for(const sc of next.subscenes)if(sc.excludedObjectIds?.includes(id))sc.excludedObjectIds.push(copy.id);
+    try{localStorage.setItem(PROJECT_KEY,JSON.stringify(next));}catch{setNotice('Не хватает места для копии модели в автосохранении.');return;}
+    mutate(p=>Object.assign(p,next));setSelection({kind:'object',id:copy.id});setCompactPanel('workspace');
   };
   const attachSound = (asset, cfg) => {
     const e = newEvent(
@@ -1172,6 +1191,7 @@ export default function Editor() {
               title="Объект активен"
             />
           </div>
+          {o.type==='Персонаж'&&<Button icon="Users" onClick={()=>{setDock('characters');setCompactPanel('workspace');}}>Модель и анимации персонажа</Button>}
           <TransformInspector object={o} scene={scene} disabled={running} onChange={value=>transformObject(o.id,value)}
             onReset={()=>mutate(p=>{const x=p.objects.find(x=>x.id===o.id);if(x.transforms)delete x.transforms[scene.id];})}
             onFocus={()=>{editScene();setFocusRequest({nonce:uid('focus')});}} onDuplicate={()=>duplicateObject(o)} onDelete={()=>deleteObject(o.id)}/>
@@ -2396,6 +2416,7 @@ export default function Editor() {
                 setDock(id);
                 if (id === "create") setMaximized("graph");
                 else setMaximized(null);
+                if(id==='characters'){if(rt.running)rt.stop();setMode('scene');setCompactPanel('workspace');}
                 setDetailEditor(false);
               }} />
               <div className="flex-space" />
@@ -2517,7 +2538,14 @@ export default function Editor() {
                 onConnect={(from,choice,to)=>{editSubscene(p=>connectSubscene(p,from,choice,to));setNotice('Переход сохранён. Он виден на карте и работает при запуске.');}}
                 onDisconnect={(from,choice,to)=>{editSubscene(p=>{const b=allBeats(p).find(b=>b.id===from),edge=choice?b?.choices.find(c=>c.id===choice):b;if(edge?.next===to)edge.next=null;});setNotice('Переход убран. Ctrl+Z — вернуть.');}}
                 onOpenBeat={openSubsceneBeat} onScene={editScene} onPrimitive={shape=>addObject("Меш",shape)} onCameras={openCameras} onCreateRequest={()=>openSubscenes('create')}
-                onCancel={()=>setSubsceneRequest({mode:'edit',token:uid('request')})}/> : dock === 'samples' ? <EventPlayground project={project} preview={preview} scene={displayScene} onPreview={audition} onEdit={editSample} onAdd={id=>{mutate(p=>addToBatch(p,beat.id,'ON_START',null,id));setNotice('Событие добавлено: во время реплики '+beat.id);}}/> : dock === "assets" ? (
+                onCancel={()=>setSubsceneRequest({mode:'edit',token:uid('request')})}/> : dock === 'samples' ? <EventPlayground project={project} preview={preview} scene={displayScene} onPreview={audition} onEdit={editSample} onAdd={id=>{mutate(p=>addToBatch(p,beat.id,'ON_START',null,id));setNotice('Событие добавлено: во время реплики '+beat.id);}}/> : dock === "characters" ? <CharacterWorkspace project={project} scene={displayScene} selected={selection.kind==="object"?selection.id:null} running={running} onStop={()=>rt.stop()}
+                onSelect={id=>{setSelection({kind:"object",id});setCompactPanel("workspace");}}
+                onCreate={name=>{const next=structuredClone(project),character=createCharacter(next,scene.id,name);mutate(p=>Object.assign(p,next));setSelection({kind:"object",id:character.id});setMode("scene");setCompactPanel("workspace");}}
+                onPatch={patchCharacter} onPresence={(id,sceneId,present)=>editSubscene(p=>setCharacterInScene(p,id,sceneId,present))}
+                onTransform={(id,sceneId,value)=>editSubscene(p=>setObjectTransform(p,id,sceneId,value))}
+                onReset={(id,sceneId)=>editSubscene(p=>{const character=p.objects.find(object=>object.id===id);if(character?.transforms)delete character.transforms[sceneId];})}
+                onPlace={(id,sceneId)=>{openSubscenes("edit",sceneId);editScene();setSelection({kind:"object",id});setFocusRequest({nonce:uid("focus")});}}
+                onDuplicate={duplicateCharacter} onDelete={id=>{if(!rt.running)deleteObject(id);}}/> : dock === "assets" ? (
                 renderAssets()
               ) : dock === "sound" ? (
                 <SoundWorkspace project={project} onAttach={attachSound} onSidechainChange={sidechain=>mutate(p=>{p.audioSettings={...p.audioSettings,sidechain};})} />

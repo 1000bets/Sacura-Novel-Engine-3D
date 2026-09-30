@@ -49,7 +49,7 @@ export function createSceneGizmo(scene,camera,canvas,orbit,getLive,getMeshes){
    }else if(control.object)control.detach();
    for(const [item,outline]of outlines)if(!editing||!meshes.includes(item)){scene.remove(outline);outline.geometry.dispose();outline.material.dispose();outlines.delete(item);}
    if(editing)for(const item of meshes){if(!outlines.has(item)){const outline=new THREE.BoxHelper(item,0xc69ab0);scene.add(outline);outlines.set(item,outline);}outlines.get(item).setFromObject(item);}
-   if(editing&&live.focusRequest&&live.focusRequest!==lastFocus){
+   if(live.mode==='scene'&&live.focusRequest&&live.focusRequest!==lastFocus){
     const request=live.focusRequest,focusMeshes=request.objectId?getMeshes().filter(m=>m.userData.id===request.objectId&&m.visible):Array.isArray(request.position)?[]:meshes;
     if(focusMeshes.length||Array.isArray(request.position)){
      const bounds=focusMeshes.length?focusMeshes.reduce((box,item)=>box.expandByObject(item),new THREE.Box3()):null;
