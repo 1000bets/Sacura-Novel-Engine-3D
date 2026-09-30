@@ -78,7 +78,7 @@ function Canvas({running=false,onVariableEdit,onVariableAdd,onInspectVariable,se
  useEffect(()=>{if(!initialized)return;const signature=model.nodes.map(n=>n.id).join('|');if(measuredSignature.current===signature)return;measuredSignature.current=signature;
   if(!Object.keys(positions||{}).length){const arranged=arrangeStoryFlow(api.getNodes(),model.edges);onPositions(Object.fromEntries(arranged.map(n=>[n.id,n.position])));}
  },[initialized,model,positions,api,onPositions]);
- useEffect(()=>{onReady?.({clipboard:()=>({nodes:api.getNodes(),graphKey:'flow:all'}),focus,arrange,fit:()=>api.fitView({padding:.12,minZoom:.02,maxZoom:.8,duration:250})});},[focus,arrange,api,onReady]);
+ useEffect(()=>{onReady?.({clipboard:()=>({nodes:api.getNodes(),graphKey:'flow:all'}),focus,arrange,addVariableNode:(variable,kind)=>onVariableAdd(variable,kind,{position:api.screenToFlowPosition({x:container.current.getBoundingClientRect().left+80,y:container.current.getBoundingClientRect().top+80}),graphKey:'flow:all'}),fit:()=>api.fitView({padding:.12,minZoom:.02,maxZoom:.8,duration:250})});},[focus,arrange,api,onReady,onVariableAdd]);
  const displayedNodes=useMemo(()=>nodes.map(n=>({...n,className:trace&&model.edges.some(e=>e.id===trace&&(e.source===n.id||e.target===n.id))?'story-traced-node':''})),[nodes,trace,model.edges]);
  const connect=c=>onConnect(c);
  const [transfer,setTransfer]=useState(null),[hint,setHint]=useState('');

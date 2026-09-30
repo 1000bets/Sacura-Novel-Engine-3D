@@ -1,5 +1,6 @@
 import {beatPreview} from './storyLabels.js';
 import {editVariable} from './variableModel.js';
+import VariableInspector from './VariableInspector.jsx';
 import {isPureNode,migrateLogicGraph,compareSymbols,variablePalette,initializeVariableNode} from './logicModel.js';
 import {newChoice,ANSWER_VARIABLE,typedValue} from './choiceModel.js';
 import {copySceneObjects,pasteSceneObjects,cloneStoryNodes,clipboardCommand} from './editorClipboard.js';
@@ -346,7 +347,6 @@ export default function Editor() {
     [compactPanel,setCompactPanel]=useState('workspace'),
     [picker, setPicker] = useState(null),
     [contextMenu,setContextMenu]=useState(null),
-    [inspectedVariable,setInspectedVariable]=useState(null),
     [contextNodeId,setContextNodeId]=useState(null),
     [menu, setMenu] = useState(null),
     [menuAnchor, setMenuAnchor] = useState({left: 100, top: 40}),
@@ -1089,8 +1089,29 @@ export default function Editor() {
     return () => {window.removeEventListener("keydown", listener);window.removeEventListener('copy',nativeClipboard);window.removeEventListener('paste',nativeClipboard);};
   }, [history,project,projectDialog,mode,running,selection,picker,detailEditor,cameraPilotId,menu,displayScene,contextMenu]);
 
+  const updateVariable = (id,patch) => {
+    if(rt.running)return 'Остановите игру, чтобы редактировать переменные.';
+    const issue=editVariable(structuredClone(project),id,patch);
+    if(!issue){
+      mutate(p=>editVariable(p,id,patch));
+      if(selection.kind==='variable'&&selection.id===id){
+        if(patch.remove)setSelection({kind:'beat',id:beat.id});
+        else if(patch.name)setSelection({kind:'variable',id:patch.name.trim()});
+      }
+    }
+    return issue;
+  };
+  const inspectVariable = id => {
+    if(!id)return;
+    setSelection({kind:'variable',id});
+    setLayout(current=>({...current,hiddenInspector:false}));
+    setCompactPanel('inspector');
+    setMaximized(current=>current==='graph'||current==='hierarchy'||current==='scene'?null:current);
+  };
+  const inspectedVariable=selection.kind==='variable'?selection.id:selection.kind==='beat'&&['variable','set-variable'].includes(beat.kind)?beat.variable:null;
   const renderInspector = () => {
-    if(isPureNode(beat)||['branch','set-variable'].includes(beat.kind))return <><div className="inspector-identity"><strong>{beat.kind==='branch'?'If · Если':beat.kind==='variable'?'Переменная':beat.kind==='set-variable'?'Задать переменную':'Логика · '+(compareSymbols[beat.operator]||beat.kind)}</strong></div><p className="choice-note">Переменные редактируются в боковой панели «Мой Blueprint». Двойной щелчок по Get / Set открывает свойства переменной. Круглые пины передают значения, стрелки задают ход истории.</p><Button icon="Focus" onClick={()=>graphApi.current?.focus(beat.id)}>Показать ноду</Button></>;
+    if(inspectedVariable&&(inspectedVariable===ANSWER_VARIABLE||Object.hasOwn(project.variables,inspectedVariable)))return <><VariableInspector key={inspectedVariable} variable={inspectedVariable} project={project} preview={preview} disabled={running} onEdit={updateVariable} onAddNode={(variable,kind)=>graphApi.current?.addVariableNode?.(variable,kind)}/>{selection.kind==='beat'&&<Button icon="Focus" onClick={()=>graphApi.current?.focus(beat.id)}>Показать ноду</Button>}</>;
+    if(isPureNode(beat)||['branch','set-variable'].includes(beat.kind))return <><div className="inspector-identity"><strong>{beat.kind==='branch'?'If · Если':beat.kind==='variable'?'Переменная':beat.kind==='set-variable'?'Задать переменную':'Логика · '+(compareSymbols[beat.operator]||beat.kind)}</strong></div><p className="choice-note">Выберите переменную в «Мой Blueprint» или её ноду Get / Set, чтобы открыть свойства в инспекторе. Круглые пины передают значения, стрелки задают ход истории.</p><Button icon="Focus" onClick={()=>graphApi.current?.focus(beat.id)}>Показать ноду</Button></>;
 
     if(selection.kind==='camera'){
       const c=displayScene.cameras?.find(c=>c.id===selection.id);
@@ -2497,7 +2518,7 @@ export default function Editor() {
                   onPreview={()=>audition(event.id)}
                 />
               ) : ["story", "timeline", "staging"].includes(dock) ? (
-                <StoryFlow running={running} onVariableEdit={(id,patch)=>{if(rt.running)return 'Остановите игру, чтобы редактировать переменные.';const issue=editVariable(structuredClone(project),id,patch);if(!issue)mutate(p=>editVariable(p,id,patch));return issue;}} onVariableAdd={(variable,kind,point)=>{if(!rt.running)addBeat(kind,{...point,variable});}} onInspectVariable={setInspectedVariable} selectedVariable={inspectedVariable} onVariableDrop={point=>{if(rt.running)return;if(point.get||point.set)addBeat(point.set&&point.variable!==ANSWER_VARIABLE?'set-variable':'variable',point);else setContextMenu({...point,kind:'variable-drop'});}} onLogicChange={(id,patch)=>{if(!rt.running)mutate(p=>Object.assign(allBeats(p).find(n=>n.id===id),patch));}} onVariable={(id,name,type,value)=>{if(!rt.running)mutate(p=>{const node=allBeats(p).find(n=>n.id===id);node.valueType=type;node.variable=name.trim();if(node.variable&&node.variable!==ANSWER_VARIABLE)p.variables[node.variable]=typedValue(value,type);});}} onChoice={(id,choiceId,patch)=>{if(!rt.running)mutate(p=>{const b=allBeats(p).find(n=>n.id===id);if(!choiceId)b.choices.push(newChoice(uid('choice'),patch.label));else if(!patch)b.choices=b.choices.filter(c=>c.id!==choiceId);else Object.assign(b.choices.find(c=>c.id===choiceId),patch);});}} onClipboard={graphClipboard} contextNodeId={contextNodeId} project={project} issues={issues} selectedId={beat.id} selectionId={selection.id} preview={preview}
+                <StoryFlow running={running} onVariableEdit={updateVariable} onVariableAdd={(variable,kind,point)=>{if(!rt.running)addBeat(kind,{...point,variable});}} onInspectVariable={inspectVariable} selectedVariable={inspectedVariable} onVariableDrop={point=>{if(rt.running)return;if(point.get||point.set)addBeat(point.set&&point.variable!==ANSWER_VARIABLE?'set-variable':'variable',point);else setContextMenu({...point,kind:'variable-drop'});}} onLogicChange={(id,patch)=>{if(!rt.running)mutate(p=>Object.assign(allBeats(p).find(n=>n.id===id),patch));}} onVariable={(id,name,type,value)=>{if(!rt.running)mutate(p=>{const node=allBeats(p).find(n=>n.id===id);node.valueType=type;node.variable=name.trim();if(node.variable&&node.variable!==ANSWER_VARIABLE)p.variables[node.variable]=typedValue(value,type);});}} onChoice={(id,choiceId,patch)=>{if(!rt.running)mutate(p=>{const b=allBeats(p).find(n=>n.id===id);if(!choiceId)b.choices.push(newChoice(uid('choice'),patch.label));else if(!patch)b.choices=b.choices.filter(c=>c.id!==choiceId);else Object.assign(b.choices.find(c=>c.id===choiceId),patch);});}} onClipboard={graphClipboard} contextNodeId={contextNodeId} project={project} issues={issues} selectedId={beat.id} selectionId={selection.id} preview={preview}
                   onSelect={graphSelect} onOpen={openGraph} onBatch={changeBatch} onConnect={connect} onDeleteNode={deleteFlowNode}
                   onScene={id=>openSubscenes('edit',id)}
                   onContext={point=>{if(!rt.running)setContextMenu({...point,kind:'story'});}}
