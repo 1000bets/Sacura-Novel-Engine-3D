@@ -50,7 +50,7 @@ import EditorGraph from "./EditorGraph.jsx";
 import ActionFields from "./ActionFields.jsx";
 import FailureLab from "./FailureLab.jsx";
 import SubsceneWorkspace from './SubsceneWorkspace.jsx';
-import {createSubscene,cloneSubscene,setSceneEntry,connectSubscene,changeSceneLocation,newSceneDraft} from './subsceneModel.js';
+import {createSubscene,cloneSubscene,setSceneEntry,connectSubscene,changeSceneLocation,newSceneDraft,LOCATION_PRIMITIVES} from './subsceneModel.js';
 import EventPlayground from './EventPlayground.jsx';
 import AuthoringWorkspace from './AuthoringWorkspace.jsx';
 import TransformInspector from './TransformInspector.jsx';
@@ -656,6 +656,17 @@ export default function Editor() {
   const selectObject = (id,options={}) => {
     if (!inspectorPinned) setSelection(current=>selectSceneObject(current,id,!!options.additive,objects));
   };
+  const openObjectTransform = () => {
+    setLayout(current=>({...current,hiddenInspector:false}));
+    setCompactPanel('inspector');
+    setMaximized(null);
+  };
+  useEffect(()=>{
+    if(mode==='scene'&&!running&&selection.kind==='object'){
+      setLayout(current=>current.hiddenInspector?{...current,hiddenInspector:false}:current);
+      setCompactPanel('inspector');
+    }
+  },[selection.kind,selection.id,mode,running]);
   const interact = (id) => {
     if(mode==='game'&&running&&preview.phase==='WAITING_INPUT'){rt.advance();return;}
     const o = objects.find((o) => o.id === id);
@@ -851,9 +862,9 @@ export default function Editor() {
     if(rt.running)return 'Остановите воспроизведение перед созданием сабсцены.';
     try{
       const next=structuredClone(project),created=copyId?cloneSubscene(next,copyId):createSubscene(next,draft,draft.fromBeatId||beat.id);
-      mutate(p=>Object.assign(p,next));setSelectedBeat(created.entry);setSelection({kind:'scene',id:created.id});setMode('game');
+      mutate(p=>Object.assign(p,next));setSelectedBeat(created.entry);setSelection({kind:'scene',id:created.id});setMode('scene');setCompactPanel('workspace');
       setCameraPilotId(null);setCameraPreviewId(null);setMaximized(null);setSubsceneRequest({mode:'edit',token:uid('request')});
-      setNotice(copyId?'Копия создана: сценарий, объекты и камеры независимы. Шаблоны событий общие.':'Сабсцена создана. Настройте её здесь или откройте сценарий.');return null;
+      setNotice(copyId?'Копия создана: сценарий, объекты и камеры независимы. Шаблоны событий общие.':'Локация создана. Добавляйте примитивы и расставляйте объекты в 3D-редакторе.');return null;
     }catch(e){setNotice(e.message);return e.message;}
   };
   const openSubsceneBeat=id=>{if(rt.running)rt.stop();setCameraPilotId(null);setCameraPreviewId(null);selectBeat(id);setDock('story');setMaximized(null);};
@@ -894,7 +905,7 @@ export default function Editor() {
       p.objects.push({
         id,
         type,
-        name: type === "Персонаж" ? "Новый персонаж" : "Новый объект",
+        name: type === "Персонаж" ? "Новый персонаж" : type === "Меш" ? (LOCATION_PRIMITIVES.find(([id])=>id===primitive)?.[1]||"Новый объект") : "Интерактивный предмет",
         color: "#bb99aa",
         position: "стол",
         active: true,
@@ -976,6 +987,32 @@ export default function Editor() {
   };
   useEffect(() => {
     const listener = (e) => {
+      const tool = ({KeyQ:'select',KeyW:'translate',KeyE:'rotate',KeyR:'scale'})[e.code];
+      if (
+        tool && !e.defaultPrevented && !e.repeat &&
+        !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey &&
+        mode === 'scene' && !running && !cameraPilotId &&
+        !picker && !projectDialog && !detailEditor && !menu &&
+        !e.target.isContentEditable &&
+        !e.target.closest?.('input, textarea, select, [role="textbox"], [role="dialog"], .react-flow, .scene-viewport[data-navigating="true"]')
+      ) {
+        if(selection.kind==='camera'&&(tool==='scale'||(tool==='rotate'&&displayScene.cameras?.find(c=>c.id===selection.id)?.mode==='follow')))return;
+        e.preventDefault();
+        setEditTool(tool);
+        return;
+      }
+      if (
+        e.key === 'Delete' && !e.defaultPrevented && !e.repeat &&
+        !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey &&
+        mode === 'scene' && !running && selection.kind === 'object' && objectSelectionIds.length &&
+        !picker && !projectDialog && !detailEditor &&
+        !e.target.isContentEditable &&
+        !e.target.closest?.('input, textarea, select, [role="textbox"], [role="dialog"], .react-flow')
+      ) {
+        e.preventDefault();
+        deleteObjects();
+        return;
+      }
       if (e.key === "Escape") {
         setCompactPanel('workspace');
         setPicker(null);
@@ -1002,7 +1039,7 @@ export default function Editor() {
     };
     window.addEventListener("keydown", listener);
     return () => window.removeEventListener("keydown", listener);
-  }, [history,project,projectDialog]);
+  }, [history,project,projectDialog,mode,running,selection,picker,detailEditor,cameraPilotId,menu,displayScene]);
 
   const renderInspector = () => {
     if(selection.kind==='camera'){
@@ -2187,13 +2224,13 @@ export default function Editor() {
           <section className="viewport-panel">
             <div className="panel-tabs viewport-tabs">
               <button
-                aria-label="Редактор сцены"
+                aria-label="Редактор локации"
                 aria-pressed={mode === "scene"}
                 className={mode === "scene" ? "active" : ""}
                 onClick={editScene}
               >
                 <Icon name="Box" size={14} />
-                Сцена
+                Локация
               </button>
               <button
                 aria-pressed={mode === "game"}
@@ -2238,8 +2275,9 @@ export default function Editor() {
             </div>
             <div className="viewport-commandbar" aria-label="Инструменты сцены">
               {mode==='scene'&&!cameraPilotId&&<div className="scene-edit-bar">
-                <button className="scene-edit-add" onClick={()=>setPicker({kind:'object'})}><Icon name="Plus" size={14}/>Объект</button>
-                {[['select','MousePointer2','Выбор','Q'],['translate','Move','Сдвиг','W'],['rotate','Rotate3D','Поворот','E'],['scale','Scaling','Масштаб','R']].map(([tool,icon,label,key])=><button key={tool} disabled={running||(selection.kind==='camera'&&(tool==='scale'||(tool==='rotate'&&displayScene.cameras?.find(c=>c.id===selection.id)?.mode==='follow')))} title={label+' · '+key} aria-pressed={editTool===tool} className={'transform-tool '+(editTool===tool?'active':'')} onClick={()=>setEditTool(tool)}><Icon name={icon} size={14}/><span className="tool-label">{label}</span></button>)}
+                <button className="scene-edit-add" onClick={()=>setPicker({kind:'object'})}><Icon name="Plus" size={14}/>Добавить объект / примитив</button>
+                {[['select','MousePointer2','Выбор','Q'],['translate','Move','Сдвиг','W'],['rotate','Rotate3D','Поворот','E'],['scale','Scaling','Масштаб','R']].map(([tool,icon,label,key])=><button key={tool} disabled={running||(selection.kind==='camera'&&(tool==='scale'||(tool==='rotate'&&displayScene.cameras?.find(c=>c.id===selection.id)?.mode==='follow')))} title={label+' · '+key} aria-pressed={editTool===tool} className={'transform-tool '+(editTool===tool?'active':'')} onClick={()=>setEditTool(tool)}><Icon name={icon} size={14}/><span className="tool-label">{label} · {key}</span></button>)}
+                <Button icon="Settings2" disabled={selection.kind!=='object'} title="Позиция, вращение и масштаб выбранного объекта" onClick={openObjectTransform}>Трансформация</Button>
                 <button title="Привязка: 0,25 м / 15° / 0,1×" aria-pressed={snap} className={snap?'active':''} onClick={()=>setSnap(v=>!v)}><Icon name="Magnet" size={14}/></button>
                 <select aria-label="Оси трансформации" value={editSpace} onChange={e=>setEditSpace(e.target.value)}><option value="world">Мир</option><option value="local">Объект</option></select>
                 <Button icon="Video" title="Показать камеры в 3D" aria-pressed={showCameras} className={showCameras?"active":""} onClick={()=>setShowCameras(v=>!v)}/>
@@ -2248,14 +2286,14 @@ export default function Editor() {
               </div>}
               {cameraPilotId&&mode==='scene'&&<div className="camera-pilot-bar"><Icon name="Video"/><span>Настройка: {displayScene.cameras?.find(c=>c.id===cameraPilotId)?.name}<small>Обзор мышью · правая кнопка — сдвиг · колесо — приближение</small></span><Button icon="Check" onClick={()=>captureCamera(cameraPilotId)}>Сохранить ракурс</Button><Button icon="X" title="Вернуться без сохранения" onClick={()=>setCameraPilotId(null)}/></div>}
               {mode==='game'&&<div className="camera-view-badge"><Icon name={resolveCamera(displayScene,world,objects,cameraPreviewId).mode==='follow'?'UserRoundCheck':'Video'} size={14}/>{resolveCamera(displayScene,world,objects,cameraPreviewId).name}{cameraPreviewId&&<button onClick={()=>setCameraPreviewId(null)}>По сценарию <Icon name="X" size={12}/></button>}</div>}
-              <details className="viewport-help"><summary title="Управление сценой" aria-label="Управление сценой"><Icon name="CircleHelp" size={15}/></summary><div>Q / W / E / R — инструменты<br/>Shift + щелчок — мультивыбор<br/>Alt + ЛКМ — орбита · СКМ — панорама<br/>ПКМ + WASD / QE — полёт<br/>F — выделение в кадр</div></details>
+              <details className="viewport-help"><summary title="Управление сценой" aria-label="Управление сценой"><Icon name="CircleHelp" size={15}/></summary><div>W — перемещение · E — вращение<br/>R — масштаб · Q — выбор<br/>Работают и в русской раскладке<br/>Shift + щелчок — мультивыбор<br/>Alt + ЛКМ — орбита · СКМ — панорама<br/>ПКМ + WASD / QE — полёт<br/>F — выделение в кадр<br/>Delete — удалить выделенные объекты<br/>Ctrl+Z — вернуть удалённые объекты</div></details>
             </div>
             <div
               className="scene-viewport"
               tabIndex={0}
               onKeyDown={(e) => {
                 if(e.currentTarget.dataset.navigating==='true')return;
-                if(mode==='scene'&&!running&&!['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)&&!e.target.isContentEditable){const key=e.key.toLowerCase(),tools={q:'select',w:'translate',e:'rotate',r:'scale'};if(tools[key]){e.preventDefault();setEditTool(tools[key]);}if(key==='f'){e.preventDefault();setFocusRequest({nonce:uid('focus')});}}
+                if(mode==='scene'&&!running&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!e.shiftKey&&!['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)&&!e.target.isContentEditable&&e.code==='KeyF'){e.preventDefault();setFocusRequest({nonce:uid('focus')});}
                 if (
                   mode === "game" &&
                   [" ", "Enter"].includes(e.key) &&
@@ -2478,7 +2516,7 @@ export default function Editor() {
                 onKind={kind=>editSubscene(p=>changeSceneLocation(p,scene.id,kind))} onEntry={(id,reroute)=>editSubscene(p=>setSceneEntry(p,scene.id,id,reroute))}
                 onConnect={(from,choice,to)=>{editSubscene(p=>connectSubscene(p,from,choice,to));setNotice('Переход сохранён. Он виден на карте и работает при запуске.');}}
                 onDisconnect={(from,choice,to)=>{editSubscene(p=>{const b=allBeats(p).find(b=>b.id===from),edge=choice?b?.choices.find(c=>c.id===choice):b;if(edge?.next===to)edge.next=null;});setNotice('Переход убран. Ctrl+Z — вернуть.');}}
-                onOpenBeat={openSubsceneBeat} onScene={editScene} onCameras={openCameras} onCreateRequest={()=>openSubscenes('create')}
+                onOpenBeat={openSubsceneBeat} onScene={editScene} onPrimitive={shape=>addObject("Меш",shape)} onCameras={openCameras} onCreateRequest={()=>openSubscenes('create')}
                 onCancel={()=>setSubsceneRequest({mode:'edit',token:uid('request')})}/> : dock === 'samples' ? <EventPlayground project={project} preview={preview} scene={displayScene} onPreview={audition} onEdit={editSample} onAdd={id=>{mutate(p=>addToBatch(p,beat.id,'ON_START',null,id));setNotice('Событие добавлено: во время реплики '+beat.id);}}/> : dock === "assets" ? (
                 renderAssets()
               ) : dock === "sound" ? (

@@ -4,11 +4,13 @@ import {objectTransform,isObjectInScene,BUILTIN_KINDS,addSceneDecorations,create
 import {gameCamera} from './sceneEffects.js';
 
 export const LOCATION_TEMPLATES=[
+ {id:'empty',name:'Пустая локация',icon:'Box',detail:'Создайте своё место из примитивов',weather:'Ясно',time:'День',color:'#a99dcb'},
  {id:'living',name:'Гостиная',icon:'Armchair',detail:'Комната, камин, стол и письмо',weather:'Ясно',time:'Закат',color:'#c797ad'},
  {id:'garden',name:'Сад',icon:'Trees',detail:'Дорожка, деревья и скамья с запиской',weather:'Дождь',time:'День',color:'#95b5a3'},
  {id:'station',name:'Станция',icon:'TrainFront',detail:'Платформа, поезд и билет',weather:'Ясно',time:'Рассвет',color:'#b5aecb'},
 ];
 const KIT={
+ empty:[],
  living:[['room-table','Журнальный стол','#a58568'],['room-sofa','Диван','#9e8175'],['letter','Письмо','#f1dfb2','Активный меш'],['door','Дверь в сад','#718c87','Активный меш'],['fireplace','Камин','#8d7c74']],
  garden:[['garden-bench','Скамья','#a49076'],['garden-note','Записка на скамье','#efdfb7','Активный меш']],
  station:[['station-train','Поезд','#638c8c'],['ticket','Билет','#e6d6b5','Активный меш']],
@@ -28,10 +30,17 @@ export function addSceneKit(p,scene){
  }
  addSceneDecorations(p,scene);ensureSceneStagingPoints(scene,p.objects);
 }
-export function newSceneDraft(p){const t=LOCATION_TEMPLATES[0];return {name:'',location:t.name,kind:t.id,weather:t.weather,time:t.time,description:'',firstText:'Новая история начинается здесь.',characters:p.objects.filter(o=>o.type==='Персонаж'&&!o.subsceneId&&o.active!==false).map(o=>o.id),placement:'separate',choiceId:''};}
+export const LOCATION_PRIMITIVES=[['box','Куб','Box'],['sphere','Сфера','Circle'],['cylinder','Цилиндр','Cylinder']];
+export function addLocationPrimitive(p,scene,shape,index=0){
+ const primitive=LOCATION_PRIMITIVES.find(([id])=>id===shape);if(!primitive)throw new Error('Выберите форму примитива.');
+ const object={id:uid('object'),name:primitive[1],type:'Меш',primitive:shape,color:'#bb99aa',active:true,subsceneId:scene.id,transforms:{[scene.id]:{position:[index*.8,.3,0],rotation:[0,0,0],scale:[1,1,1]}}};
+ p.objects.push(object);return object;
+}
+export function newSceneDraft(p){const t=LOCATION_TEMPLATES[0];return {name:'',location:t.name,kind:t.id,weather:t.weather,time:t.time,description:'',primitives:[],firstText:'Новая история начинается здесь.',characters:p.objects.filter(o=>o.type==='Персонаж'&&!o.subsceneId&&o.active!==false).map(o=>o.id),placement:'separate',choiceId:''};}
 export function createSubscene(p,draft,fromBeatId){
  if(!draft.name?.trim())throw new Error('Укажите название сабсцены.');
  const type=LOCATION_TEMPLATES.find(t=>t.id===draft.kind);if(!type)throw new Error('Выберите шаблон локации.');
+ if((draft.primitives||[]).some(shape=>!LOCATION_PRIMITIVES.some(([id])=>id===shape)))throw new Error('Выберите форму примитива.');
  const scene={id:uid('scene'),entry:uid('line'),sceneId:p.subscenes[0]?.sceneId||'chapter1',name:draft.name.trim(),location:draft.location?.trim()||type.name,kind:type.id,weather:draft.weather,time:draft.time,description:draft.description||'',color:type.color,excludedObjectIds:p.objects.filter(o=>!o.subsceneId&&(o.type!=='Персонаж'||!draft.characters.includes(o.id))).map(o=>o.id)};
  const beat={id:scene.entry,kind:'dialogue',speaker:'Рассказчик',text:draft.firstText.trim()||'Новая история начинается здесь.',next:null,mode:'SEQUENTIAL',bindings:[],batches:{BEFORE:[],ON_START:[],AFTER:[]}};
  if(draft.placement==='after'){
@@ -39,7 +48,7 @@ export function createSubscene(p,draft,fromBeatId){
   if(from.kind==='choice'){const choice=from.choices.find(c=>c.id===draft.choiceId);if(!choice)throw new Error('Выберите ответ, из которого будет переход.');beat.next=choice.next||null;choice.next=beat.id;}
   else {beat.next=from.next||null;from.next=beat.id;}
  }
- p.subscenes.push(scene);p.chapters.push({id:uid('chapter'),subsceneId:scene.id,name:'Первый эпизод',beats:[beat]});addSceneKit(p,scene);ensureCameras(p);return scene;
+ p.subscenes.push(scene);p.chapters.push({id:uid('chapter'),subsceneId:scene.id,name:'Первый эпизод',beats:[beat]});addSceneKit(p,scene);(draft.primitives||[]).forEach((shape,index)=>addLocationPrimitive(p,scene,shape,index));ensureCameras(p);return scene;
 }
 export function setSceneEntry(p,id,entry,reroute=false){
  const scene=p.subscenes.find(s=>s.id===id);if(!scene||!beatsInScene(p,id).some(b=>b.id===entry))throw new Error('Начальная реплика должна принадлежать этой сабсцене.');

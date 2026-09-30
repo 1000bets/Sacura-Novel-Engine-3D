@@ -3207,3 +3207,6 @@ select option,select optgroup { background:var(--graphite-700); color:var(--ivor
  .scene-selector { max-width:175px; min-width:100px; }
  .editor-workspace.focus-hierarchy>.hierarchy-panel,.editor-workspace.focus-inspector>.inspector-panel { display:flex; width:100%; max-width:100%; }
 }
+
+.location-editor-entry{display:flex;flex-wrap:wrap;align-items:center;gap:16px;padding:18px;margin:16px 0;border:1px solid var(--border,#393642);border-radius:6px;background:var(--panel,#22212b)}
+.location-editor-entry>div:first-child{flex:1;min-width:220px}.location-editor-entry h3{display:flex;align-items:center;gap:8px;margin:0 0 8px}.location-editor-entry p{margin:0;color:var(--muted,#aaa6b5);font-size:12px;line-height:1.6}.location-primitive-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;width:100%}.location-primitive-actions>strong{font-size:12px;margin-right:8px}

@@ -85,7 +85,7 @@ function Exterior({
       picks.push(groupObjects(scene,scene.children.slice(benchStart),"garden-bench",BUILTIN_TRANSFORMS["garden-bench"]));
       decoratePaper(box(0.4, 0.018, 0.25, 2, 0.77, 0.4, "#efdfb7", "garden-note"),'Записка · осмотреть');
       prop('garden-fence',()=>box(3, 0.6, 0.2, -2, 0.3, -3, "#6e8272"));
-    } else {
+    } else if (kind === 'station') {
       prop('station-platform',()=>box(70, 0.2, 35, 0, -0.1, 0, "#687575"));
       prop('station-tracks',()=>{
       for (const z of [-1.6, -2.4]) box(10, 0.07, 0.08, 0, 0.06, z, "#b7b6ab");
@@ -256,7 +256,7 @@ function Exterior({
       ref={host}
       className="scene-canvas"
       aria-label={
-        (kind === "garden" ? "3D сад" : "3D станция") + '. ЛКМ — выбор; Alt + ЛКМ — вращение; средняя кнопка — панорама; ПКМ + WASD/QE — полёт; колесо — приближение; F — фокус.'
+        (kind === "garden" ? "3D сад" : kind === "empty" ? "3D пустая локация" : "3D станция") + '. ЛКМ — выбор; Alt + ЛКМ — вращение; средняя кнопка — панорама; ПКМ + WASD/QE — полёт; колесо — приближение; F — фокус.'
       }
     />
   );

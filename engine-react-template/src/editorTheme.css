@@ -259,7 +259,7 @@ select option, select optgroup { background: var(--surface-2); color: var(--text
   .dock-tabs>button, .dock-more>button { padding-inline: 8px; }
 }
 @container (max-width:900px) {
-  .scene-edit-bar .tool-label { display: none; }
+  .scene-edit-bar .tool-label { display: inline; }
   .viewport-commandbar .scene-edit-bar button { min-width: 28px; }
 }
 @media (prefers-reduced-motion:reduce) {

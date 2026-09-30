@@ -10,13 +10,14 @@ export const ANCHORS={
 export const BUILTIN_TRANSFORMS={...DECORATION_TRANSFORMS,letter:[-.35,.782,1.55],door:[3.05,1.13,-3.08],fireplace:[-3.1,0,-2.6],'room-table':[-.25,0,1.7],'room-sofa':[2.8,0,.6],'garden-bench':[2,0,.5],'station-train':[0,0,-2],'garden-note':[2,.77,.4],ticket:[1.4,.83,1.2]};
 export const BUILTIN_KINDS={...DECORATION_KINDS,letter:'living',door:'living',fireplace:'living','room-table':'living','room-sofa':'living','garden-bench':'garden','garden-note':'garden','station-train':'station',ticket:'station'};
 const STAGING_TEMPLATES={
+ empty:[['origin','Центр локации','центр']],
  living:[['fireplace','У камина','камин','fireplace'],['window','У окна','окно','room-window'],['table','У стола','стол','room-table'],['sofa','У дивана','диван','room-sofa'],['entrance','У двери в сад','вход','door']],
  garden:[['path','На садовой дорожке','камин','garden-path'],['tree','У старого дерева','окно','garden-tree-2'],['bench','У скамьи','стол','garden-bench'],['note','У записки на скамье','диван','garden-note'],['entrance','У входа в сад','вход','garden-fence']],
  station:[['platform','На платформе','камин','station-platform'],['train','У вагона','окно','station-train'],['ticket','У билета','стол','ticket'],['luggage','У багажа','диван','station-luggage'],['entrance','У входа на станцию','вход','station-canopy']],
 };
 export function createSceneStagingPoints(scene,objects=[]){
  return (STAGING_TEMPLATES[scene.kind]||STAGING_TEMPLATES.living).map(([key,label,alias,builtin])=>{
-  const object=objects.find(o=>isObjectInScene(o,scene)&&(o.builtin||o.id)===builtin),position=[...(ANCHORS[scene.kind]||ANCHORS.living)[alias]];
+  const object=objects.find(o=>isObjectInScene(o,scene)&&(o.builtin||o.id)===builtin),position=[...((ANCHORS[scene.kind]||ANCHORS.living)[alias]||[0,0,0])];
   return {id:`${scene.id}:point:${key}`,key,label,aliases:[alias],position,...(object?{objectId:object.id,objectOrigin:[...(BUILTIN_TRANSFORMS[object.builtin||object.id]||objectTransform(object,scene.id,scene.kind).position)]}:{} )};
  });
 }
