@@ -71,3 +71,6 @@ vcpkg_installed/
 Testing/
 .cache/
 /.agents/
+
+# Local design references
+/design-system/
