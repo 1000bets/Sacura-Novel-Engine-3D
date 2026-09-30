@@ -6,25 +6,28 @@
 
 ## Сборка
 
-Нужны CMake 3.20+, C++17 компилятор, Python 3 (для Diligent), Git и **Qt 6** (модули Core, Gui, Widgets) как зависимость Engine. Из корня:
+На Windows нужны CMake 3.25+, Visual Studio 2022 с компонентами Desktop development with C++ и C++ CMake tools for Windows (включая Ninja), Windows SDK, Python 3 x64 и Git. Отдельно устанавливать Qt не нужно. Из корня:
 
 ```sh
-# Пример: локальный Qt (aqt) в Root/Engine/ThirdParty/Qt/<ver>/<arch>
-cmake -S . -B build
-cmake --build build --config Debug --target SakuraEditor
+cmake --preset windows-msvc-debug
+cmake --build --preset windows-msvc-debug --target SakuraEditor --parallel 4
 ```
 
-После сборки staged layout: `build/Stage/Bin/SakuraEditor.exe` + `build/Stage/Engine/{Content,Shaders,Config}`.
+Первая конфигурация скачивает исходники Qt Base v6.8.3, собирает shared-библиотеки и инструменты Qt с Ninja и устанавливает их внутри `build/windows-msvc-debug/Qt/`. Это занимает время уже на шаге `cmake --preset`. Последующие конфигурации используют готовую сборку; при изменении версии Qt или скрипта его подготовки сборка обновляется. Исходники лежат в `Root/Engine/ThirdParty/Qt/Source/` и исключены из Git. Число параллельных задач Qt регулируется параметром `-DSAKURA_QT_BUILD_JOBS=4`. Тесты и примеры самого Qt отключены.
+
+После сборки staged layout: `build/windows-msvc-debug/Stage/Bin/SakuraEditor.exe` + `build/windows-msvc-debug/Stage/Engine/{Content,Shaders,Config}`. Qt DLL и плагины копируются автоматически.
 
 Открытие проекта:
 
 ```sh
-build/Stage/Bin/SakuraEditor.exe --project "M:/path/to/MyGame/MyGame.project"
+build/windows-msvc-debug/Stage/Bin/SakuraEditor.exe --project "M:/path/to/MyGame/MyGame.project"
 ```
 
 Без `--project` открывается Project Browser (New / Open / Recent).
 
-Зависимости подтягиваются из `Root/Engine/ThirdParty` или `Root/Editor/ThirdParty` (у владельца модуля), не из общей Root-папки. Qt ищется через `find_package(Qt6)`; можно задать `Qt6_DIR`, `CMAKE_PREFIX_PATH` или `SAKURA_QT_ROOT`.
+Основной подход для сторонних библиотек — скачивание закреплённых исходников и сборка через CMake. Зависимости находятся в `Root/Engine/ThirdParty` или `Root/Editor/ThirdParty` (у владельца модуля), не в общей Root-папке. Qt собирается отдельно перед `find_package(Qt6)`, поскольку подключение его исходников через `add_subdirectory` не поддерживается. vcpkg и aqtinstall не требуются.
+
+Чтобы явно использовать внешний Qt SDK, конфигурируйте отдельный каталог с `-DSAKURA_BUILD_QT_FROM_SOURCE=OFF` и задайте `Qt6_DIR` или `SAKURA_QT_ROOT`. В основном режиме эти пути не выбирают внешний SDK. Для Release используйте пресет `windows-msvc-release`: Qt собирается для него отдельно. На Linux необходимы Ninja и системные зависимости платформы Qt; Linux-путь не проверялся.
 
 ## Структура
 
