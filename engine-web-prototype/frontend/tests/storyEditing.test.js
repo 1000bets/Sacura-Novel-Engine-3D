@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {playbackStartId,deleteStoryNode} from '../src/storyEditing.js';
+import {playbackStartId,deleteStoryNode,changeStoryNodeKind,selectedStoryNodeIds} from '../src/storyEditing.js';
 import {upgradeProject,allBeats} from '../src/studioModel.js';
 import {PreviewRuntime} from '../src/runtime.js';
 
@@ -114,4 +114,29 @@ test('only an explicit ending finishes; a missing continuation reports its sourc
  await runtime.advance();
  assert.equal(runtime.snapshot.phase,'FINISHED');
  runtime.stop();
+});
+
+
+test('dialogue can switch to If and back without adding demo variables or losing text',()=>{
+ const p=upgradeProject(),node=allBeats(p)[0],snapshot=structuredClone(node);
+ changeStoryNodeKind(node,'branch');
+ assert.equal(node.condition,false);assert.equal(node.test,undefined);
+ node.inputs={condition:'bool-get'};
+ changeStoryNodeKind(node,'dialogue');
+ assert.equal(node.kind,'dialogue');assert.equal(node.text,snapshot.text);
+ assert.equal(node.speaker,snapshot.speaker);assert.equal(node.next,snapshot.next);
+ assert.equal(node.inputs,undefined);
+ changeStoryNodeKind(node,'choice');assert.equal(node.choices.length,1);
+ changeStoryNodeKind(node,'end');assert.equal(node.next,null);
+});
+
+test('Delete targets canvas selection including a Bool getter selected by rectangle',()=>{
+ const p=upgradeProject(),chapter=p.chapters[0],previous=chapter.beats[0].id;
+ chapter.beats.push({id:'bool-get',kind:'variable',variable:'flag',text:'',bindings:[]});
+ const canvas=[{id:previous,selected:false,data:{beat:chapter.beats[0]}},{id:'bool-get',selected:true,data:{beat:chapter.beats.at(-1)}}];
+ assert.deepEqual(selectedStoryNodeIds(canvas),['bool-get']);
+ for(const id of selectedStoryNodeIds(canvas))assert.equal(deleteStoryNode(p,id).error,undefined);
+ assert.ok(allBeats(p).some(node=>node.id===previous));
+ assert.ok(!allBeats(p).some(node=>node.id==='bool-get'));
+ assert.deepEqual(selectedStoryNodeIds(canvas.map(node=>({...node,selected:false}))),[]);
 });

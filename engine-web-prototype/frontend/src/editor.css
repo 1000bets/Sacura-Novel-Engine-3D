@@ -3242,3 +3242,29 @@ select option,select optgroup { background:var(--graphite-700); color:var(--ivor
 .inline-event-editor label{display:flex;flex-direction:column;gap:5px;margin:8px 0}.inline-event-group{border:1px solid var(--border,#4a4e54);padding:8px;margin:12px 0}.inline-event-action{padding:6px;border-bottom:1px solid #444}.action-coordinates{display:flex;gap:5px}.action-coordinates label{min-width:0;flex:1}.action-coordinates input{width:100%;min-width:0}
 
 .inline-event-editor input,.inline-event-editor textarea,.inline-event-editor select{width:100%;min-width:0}.moment-event>span>[role="button"]{margin-left:auto;padding:3px;cursor:pointer}.moment-event>span>[role="button"]:hover{color:var(--danger,#efaaaa)}.subscene-workspace header>.button{cursor:pointer;white-space:nowrap;padding:7px 10px;border:1px solid var(--line);border-radius:4px}.inline-event-action>details{margin:8px 0}
+
+.speaker-create { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 5px; }
+.speaker-create .field { width: 100%; }
+.inspector .scene-selector { max-width: 100%; width: 100%; }
+
+.camera-inspector { min-width: 0; }
+.camera-inspector fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.camera-inspector .camera-lens-grid { display: grid; grid-template-columns: minmax(0,1fr); gap: 16px; }
+.camera-inspector .camera-range { display: block; }
+.camera-inspector .camera-range input { width: 100%; }
+.camera-inspector .camera-range small { display: block; color: var(--muted); font-size: 11px; line-height: 1.5; margin-top: 5px; }
+.camera-inspector .camera-shot-actions { display: grid; grid-template-columns: minmax(0,1fr); margin: 0; }
+.camera-inspector .camera-shot-actions button { justify-content: flex-start; white-space: normal; text-align: left; }
+.camera-inspector .camera-vector { margin-bottom: 12px; font-size: 12px; }
+.camera-inspector .camera-vector>div { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; margin-top: 7px; }
+.camera-inspector .camera-vector label { min-width: 0; }
+.camera-inspector .camera-vector b { display: block; margin-bottom: 3px; font-size: 11px; }
+.camera-inspector .camera-vector input { width: 100%; min-width: 0; }
+.camera-inspector .camera-step-note { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.camera-list-note { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 12px 15px; }
+.camera-component-list { overflow: auto; padding: 0 15px 15px; display: grid; grid-template-columns: repeat(auto-fill,minmax(210px,1fr)); gap: 8px; align-content: start; }
+.camera-component-list>button { text-align: left; padding: 12px; border: 1px solid var(--line); justify-content: flex-start; }
+.camera-component-list>button>span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.camera-component-list strong { display: block; font-size: 12px; }
+.camera-component-list small { display: block; color: var(--muted); margin-top: 5px; font-size: 11px; }
+.camera-component-list>button.active { border-color: var(--accent); background: var(--line); }

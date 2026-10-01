@@ -2,12 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {allBeats,upgradeProject,validateStudio} from '../src/studioModel.js';
 import {readProject} from '../src/projectFiles.js';
+import {migrateLogicGraph} from '../src/logicModel.js';
 import {createStandardProject,listLocalProjects,rememberLocalProject,BACKUP_KEY,backupProject,copyProjectAs,createEmptyProject,createProjectTemplate,parseProjectFile,projectFilename,projectFromTemplate,readTemplates,storeTemplate,writeProjectFile} from '../src/projectLifecycle.js';
 
 const storage=()=>{const data=new Map();return {getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v)};};
 
 test('new project has standard event library and an empty story after saving and migration',()=>{
   const project=createEmptyProject('С нуля');
+  assert.deepEqual(project.variables,{});
+  assert.deepEqual(migrateLogicGraph(readProject(JSON.stringify(project))).variables,{});
   assert.equal(project.title,'С нуля');assert.equal(project.subscenes.length,1);
   assert.equal(project.objects.length,0);assert.equal(project.events.length,5);assert.equal(project.standardEventsVersion,1);
   assert.equal(project.actionTemplates.length,0);assert.equal(project.groupTemplates.length,0);

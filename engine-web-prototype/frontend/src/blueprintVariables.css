@@ -44,3 +44,5 @@
 .variable-set .moment-grab {background:color-mix(in srgb,var(--variable-color,var(--info)) 15%,var(--panel));}
 .variable-set .logic-body {gap:8px;}
 .story-flow .variable-get .react-flow__handle.data-pin,.story-flow .variable-set .react-flow__handle.data-pin {background:var(--variable-color,var(--info))!important;}
+
+.bp-variables-empty { margin: 12px; font-size: 12px; line-height: 1.5; color: var(--muted); }

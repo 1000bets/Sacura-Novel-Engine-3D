@@ -10,7 +10,7 @@ import {isPureNode,migrateLogicGraph,compareSymbols,variablePalette,initializeVa
 import {newChoice,ANSWER_VARIABLE,typedValue} from './choiceModel.js';
 import {copySceneObjects,pasteSceneObjects,cloneStoryNodes,clipboardCommand} from './editorClipboard.js';
 import {copyAction,copyGroup} from './authoringModel.js';
-import {playbackStartId,deleteStoryNode,insertStoryNode} from './storyEditing.js';
+import {playbackStartId,deleteStoryNode,insertStoryNode,changeStoryNodeKind,STORY_NODE_KINDS} from './storyEditing.js';
 import {applyConnections,connectionError} from './storyConnections.js';
 import {InfoView, FloatingWindow} from './EditorHelp.jsx';
 import './editorHelp.css';
@@ -77,6 +77,7 @@ import MeshInspector from './MeshInspector.jsx';
 import MultiTransformInspector from './MultiTransformInspector.jsx';
 import {selectedObjectIds,selectSceneObject,transformSelection} from './sceneSelection.js';
 import CameraWorkspace from './CameraWorkspace.jsx';
+import CameraInspector from './CameraInspector.jsx';
 import {newCamera,cleanCamera,cameraFromView,cameraPose,resolveCamera} from './cameraModel.js';
 import {objectTransform,setObjectTransform,isObjectInScene,sceneStagingPoints} from './sceneEditing.js';
 import HierarchyTree from './HierarchyTree.jsx';
@@ -358,6 +359,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     [historyOpen, setHistoryOpen] = useState(false),
     [compactPanel,setCompactPanel]=useState('workspace'),
     [picker, setPicker] = useState(null),
+    [characterDraft,setCharacterDraft]=useState(null),
     [contextMenu,setContextMenu]=useState(null),
     [contextNodeId,setContextNodeId]=useState(null),
     [menu, setMenu] = useState(null),
@@ -697,13 +699,23 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         values,
       ),
     );
-  const deleteFlowNode = id => {
-    if(rt.running){setNotice('Остановите предпросмотр, чтобы удалить реплику.');return;}
-    const result=deleteStoryNode(structuredClone(project),id);
-    if(result.error){setNotice(result.error);return;}
-    mutate(p=>deleteStoryNode(p,id));
+  const deleteFlowNode = ids => {
+    if(rt.running){setNotice('Остановите предпросмотр, чтобы удалить ноды.');return;}
+    const next=structuredClone(project);let result;
+    for(const id of Array.isArray(ids)?ids:[ids]){
+      result=deleteStoryNode(next,id);
+      if(result.error){setNotice(result.error);return;}
+    }
+    if(!result)return;
+    mutate(p=>Object.assign(p,next));
     setSelectedBeat(result.nextId);setSelection({kind:'beat',id:result.nextId});
-    setNotice('Реплика и её связи удалены. Ctrl + Z — отменить.');
+    setNotice('Выделенные ноды и их связи удалены. Ctrl + Z — отменить.');
+  };
+  const nodeKindField=()=> <Field label="Тип блока"><Select value={beat.kind} options={STORY_NODE_KINDS} onChange={kind=>mutate(p=>changeStoryNodeKind(allBeats(p).find(b=>b.id===beat.id),kind))}/></Field>;
+  const createSpeaker=()=>{
+    const name=characterDraft?.trim();if(!name||running)return;
+    mutate(p=>{const character=createCharacter(p,sceneFor(p,beat.id).id,name);allBeats(p).find(b=>b.id===beat.id).speaker=character.name;});
+    setCharacterDraft(null);setNotice('Персонаж «'+name+'» создан и выбран для реплики.');
   };
   const start = (fromSelection=false) => {
     const startId=playbackStartId(project,beat.id,fromSelection);
@@ -927,20 +939,23 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   };
   const openSubsceneBeat=id=>{if(rt.running)rt.stop();setCameraPilotId(null);setCameraPreviewId(null);selectBeat(id);setDock('story');setMaximized(null);};
   const editSubscene=fn=>{if(!rt.running)mutate(fn);};
-  const openCameras=()=>{setDock('cameras');setMaximized(null);setDetailEditor(false);if(selection.kind!=='camera')setSelection({kind:'camera',id:displayScene.defaultCameraId||displayScene.cameras?.[0]?.id});};
-  const selectCamera=id=>{setSelection({kind:'camera',id});setDock('cameras');setDetailEditor(false);};
+  const selectCamera=id=>{
+    setSelection({kind:'camera',id});setDetailEditor(false);
+    setLayout(current=>({...current,hiddenInspector:false}));setCompactPanel('inspector');setMaximized(null);
+  };
+  const openCameras=()=>{setDock('cameras');selectCamera(selection.kind==='camera'?selection.id:displayScene.defaultCameraId||displayScene.cameras?.[0]?.id);};
   const changeCamera=(id,patch)=>{if(rt.running)return;mutate(p=>{const sc=p.subscenes.find(s=>s.id===displayScene.id),i=sc?.cameras?.findIndex(c=>c.id===id);if(i>=0)sc.cameras[i]=cleanCamera({...sc.cameras[i],...patch});});};
   const createCamera=(followTarget)=>{
     if(rt.running)return;const view=cameraApi.current?.capture();if(!view){setNotice('Дождитесь загрузки 3D-сцены.');return;}
     const c=newCamera(view,followTarget?'Слежение · '+followTarget.name:'Камера '+((scene.cameras?.length||0)+1));
     if(followTarget)Object.assign(c,{mode:'follow',followTargetId:followTarget.id,distance:3,height:1.7,yaw:-15,targetHeight:1.08});
     mutate(p=>{const sc=p.subscenes.find(s=>s.id===scene.id);sc.cameras||=[];sc.cameras.push(c);if(followTarget||!sc.defaultCameraId)sc.defaultCameraId=c.id;});
-    setSelection({kind:'camera',id:c.id});setDock('cameras');setMaximized(null);setDetailEditor(false);setShowCameras(true);setNotice(followTarget?'Следящая камера назначена основной.':'Камера создана из текущего вида.');
+    selectCamera(c.id);setShowCameras(true);setNotice(followTarget?'Следящая камера назначена основной.':'Камера создана из текущего вида.');
     if(followTarget){setMode('game');setCameraPreviewId(c.id);}else{setCameraPilotId(null);setMode('scene');}
   };
   const followCharacter=()=>{const target=objects.find(o=>o.id===selection.id&&o.type==='Персонаж')||objects.find(o=>o.type==='Персонаж'&&o.active);if(target)createCamera(target);};
   const captureCamera=id=>{const c=scene.cameras?.find(c=>c.id===id),view=cameraApi.current?.capture();if(c&&view){changeCamera(id,cameraFromView(c,view,world,objects,scene.kind));setCameraPilotId(null);setNotice('Ракурс сохранён.');}};
-  const pilotCamera=id=>{setFloatingDock(false);editScene();setCameraPilotId(id);setSelection({kind:'camera',id});setDock('cameras');};
+  const pilotCamera=id=>{setFloatingDock(false);editScene();setCameraPilotId(id);selectCamera(id);};
   const viewCamera=id=>{setCameraPilotId(null);setCameraPreviewId(id);setMode('game');};
   const deleteCamera=id=>{if(rt.running)return;mutate(p=>{const sc=p.subscenes.find(s=>s.id===scene.id);sc.cameras=sc.cameras.filter(c=>c.id!==id);if(sc.defaultCameraId===id)sc.defaultCameraId=sc.cameras[0]?.id||null;});if(cameraPilotId===id)setCameraPilotId(null);if(cameraPreviewId===id)setCameraPreviewId(null);setSelection({kind:'scene',id:scene.id});setNotice('Камера удалена. Ctrl+Z — отменить.');};
   useEffect(()=>{setCameraPilotId(null);setCameraPreviewId(null);setFocusRequest(0);},[displayScene.id]);
@@ -1174,11 +1189,14 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   const inspectedVariable=selection.kind==='variable'?selection.id:selection.kind==='beat'&&['variable','set-variable'].includes(beat.kind)?beat.variable:null;
   const renderInspector = () => {
     if(inspectedVariable&&(inspectedVariable===ANSWER_VARIABLE||Object.hasOwn(project.variables,inspectedVariable)))return <><VariableInspector key={inspectedVariable} variable={inspectedVariable} project={project} preview={preview} disabled={running} onEdit={updateVariable} onAddNode={(variable,kind)=>graphApi.current?.addVariableNode?.(variable,kind)}/>{selection.kind==='beat'&&<Button icon="Focus" onClick={()=>graphApi.current?.focus(beat.id)}>Показать ноду</Button>}</>;
-    if(isPureNode(beat)||['branch','set-variable'].includes(beat.kind))return <><div className="inspector-identity"><strong>{beat.kind==='branch'?'If · Если':beat.kind==='variable'?'Переменная':beat.kind==='set-variable'?'Задать переменную':'Логика · '+(compareSymbols[beat.operator]||beat.kind)}</strong></div><p className="choice-note">Настройки операции находятся на ноде. Круглые пины передают значения, стрелки задают ход истории. Подключите результат операции ко входу Set, чтобы изменить переменную.</p><Button icon="Focus" onClick={()=>graphApi.current?.focus(beat.id)}>Показать ноду</Button></>;
+    if(selection.kind==='beat'&&(isPureNode(beat)||['branch','set-variable'].includes(beat.kind)))return <><div className="inspector-identity"><strong>{beat.kind==='branch'?'If · Если':beat.kind==='variable'?'Переменная':beat.kind==='set-variable'?'Задать переменную':'Логика · '+(compareSymbols[beat.operator]||beat.kind)}</strong></div>{beat.kind==='branch'&&nodeKindField()}<p className="choice-note">Настройки операции находятся на ноде. Круглые пины передают значения, стрелки задают ход истории. Подключите результат операции ко входу Set, чтобы изменить переменную.</p><Button icon="Focus" onClick={()=>graphApi.current?.focus(beat.id)}>Показать ноду</Button></>;
 
     if(selection.kind==='camera'){
       const c=displayScene.cameras?.find(c=>c.id===selection.id);
-      if(c)return <><div className="inspector-identity"><Icon name="Video" size={25}/><div><strong>{c.name}</strong><small>{displayScene.location}</small></div></div><Fold title="Кадр" icon="ScanLine"><p>{c.mode==='follow'?'Следует за персонажем: '+(objects.find(o=>o.id===c.followTargetId)?.name||'цель недоступна'):'Фиксированная камера'}</p><p>Угол обзора {c.fov}°</p><Button icon="Settings2" onClick={openCameras}>Открыть настройки камеры</Button><Button icon="Eye" onClick={()=>viewCamera(c.id)}>Посмотреть через камеру</Button></Fold></>;
+      if(c)return <CameraInspector camera={c} scene={displayScene} objects={objects} state={world}
+        onChange={changeCamera} onDefault={id=>{if(!rt.running)mutate(p=>p.subscenes.find(s=>s.id===displayScene.id).defaultCameraId=id);}}
+        onDelete={deleteCamera} onPilot={pilotCamera} onView={viewCamera} onCapture={captureCamera}
+        piloting={cameraPilotId} running={running} onEdit={editScene}/>;
     }
     if (selection.kind === "batch") {
       const ph = PHASES.find((ph) =>
@@ -1636,17 +1654,15 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         </div>
         {beat.kind!=='branch'&&<Fold title="Диалог" icon="MessageSquare">
           <Field label="Говорит">
-            <Select
-              value={beat.speaker}
-              options={[
-                "Рассказчик",
-                ...project.objects
-                  .filter((o) => o.type === "Персонаж")
-                  .map((o) => o.name),
-              ]}
-              onChange={(speaker) => patchBeat({ speaker })}
-            />
+            <EditorSelect label="Говорит" value={beat.speaker}
+              options={[["Рассказчик","Рассказчик"],...project.objects.filter(o=>o.type==='Персонаж').map(o=>[o.name,o.name]),['__create_character__','＋ Создать персонажа…']]}
+              onChange={speaker=>speaker==='__create_character__'?setCharacterDraft(''):patchBeat({speaker})}/>
           </Field>
+          {characterDraft!==null&&<div className="speaker-create">
+            <Field label="Имя нового персонажа"><input autoFocus aria-label="Имя нового персонажа" value={characterDraft} onChange={e=>setCharacterDraft(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();createSpeaker();}if(e.key==='Escape'){e.stopPropagation();setCharacterDraft(null);}}}/></Field>
+            <Button icon="UserPlus" disabled={!characterDraft.trim()||running} onClick={createSpeaker}>Создать и выбрать</Button>
+            <Button onClick={()=>setCharacterDraft(null)}>Отмена</Button>
+          </div>}
           <textarea
             className="dialogue-text-field"
             aria-label="Текст выбранной реплики"
@@ -1654,45 +1670,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             rows={4}
             onChange={(e) => patchBeat({ text: e.target.value })}
           />
-          <Field label="Тип блока">
-            <Select
-              value={beat.kind}
-              options={[
-                ["dialogue", "Реплика"],
-                ["choice", "Выбор"],["branch","If · Если"],
-                ["gate", "Взаимодействие"],
-                ["merge", "Схождение"],
-                ["end", "Концовка"],
-              ]}
-              onChange={(kind) =>
-                patchBeat({
-                  kind,
-                  ...(kind === "end"
-                    ? { next: null, ending: beat.ending || "Конец истории" }
-                    : {}),
-                  ...(kind === "choice" && !beat.choices
-                    ? {
-                        choiceMode:'value',choices: [
-                          {
-                            id: uid("choice"),
-                            label: "Продолжить",
-                            condition: "always",
-                            next: null, result:{type:'string',value:'Продолжить'},availability:null,
-                          },
-                        ],
-                      }
-                    : {}),
-                  ...(kind === "branch"?{test:beat.test||{mode:'all',rules:[{variable:ANSWER_VARIABLE,operator:'eq',type:'string',value:''}]},trueNext:beat.trueNext||null,falseNext:beat.falseNext||null}:{}),
-                  ...(kind === "gate"
-                    ? {
-                        signal: beat.signal || "letter",
-                        timeout: beat.timeout || 30,
-                      }
-                    : {}),
-                })
-              }
-            />
-          </Field>
+          {nodeKindField()}
         </Fold>
         }<Fold title="Постановка реплики" icon="Clapperboard">
           {PHASES.map((p) => (
@@ -2376,7 +2354,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               {mode==='scene'&&!cameraPilotId&&<div className="scene-edit-bar">
                 <button className="scene-edit-add" onClick={()=>setPicker({kind:'object'})}><Icon name="Plus" size={14}/>Добавить объект / примитив</button>
                 {[['select','MousePointer2','Выбор','Q'],['translate','Move','Сдвиг','W'],['rotate','Rotate3D','Поворот','E'],['scale','Scaling','Масштаб','R']].map(([tool,icon,label,key])=><button key={tool} disabled={running||(selection.kind==='camera'&&(tool==='scale'||(tool==='rotate'&&displayScene.cameras?.find(c=>c.id===selection.id)?.mode==='follow')))} title={label+' · '+key} aria-pressed={editTool===tool} className={'transform-tool '+(editTool===tool?'active':'')} onClick={()=>setEditTool(tool)}><Icon name={icon} size={14}/><span className="tool-label">{label} · {key}</span></button>)}
-                <Button icon="Settings2" disabled={selection.kind!=='object'} title="Позиция, вращение и масштаб выбранного объекта" onClick={openObjectTransform}>Трансформация</Button>
+                <Button icon="Settings2" disabled={selection.kind!=='object'} title="Позиция, вращение и масштаб выбранного объекта" onClick={openObjectTransform}>Положение, поворот, масштаб</Button>
                 <button title="Привязка: 0,25 м / 15° / 0,1×" aria-pressed={snap} className={snap?'active':''} onClick={()=>setSnap(v=>!v)}><Icon name="Magnet" size={14}/></button>
                 <select aria-label="Оси трансформации" value={editSpace} onChange={e=>setEditSpace(e.target.value)}><option value="world">Мир</option><option value="local">Объект</option></select>
                 <Button icon="Video" title="Показать камеры в 3D" aria-pressed={showCameras} className={showCameras?"active":""} onClick={()=>setShowCameras(v=>!v)}/>
@@ -2620,7 +2598,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   onContext={point=>{if(!rt.running)setContextMenu({...point,kind:point.kind||'story'});}}
                   onAdd={(id,hook)=>{setSelectedBeat(id);setSelection({kind:'beat',id});setPicker({kind:'event',phase:hook});}}
                   positions={layout.positions['flow:all']||{}} onPositions={positions=>setPositions('flow:all',positions)} onReady={onGraphReady}/>
-              ) : dock === 'event' ? renderGraph('event') : dock === 'cameras' ? <CameraWorkspace scene={displayScene} objects={objects} state={world} selected={selection.kind==='camera'?selection.id:null} onSelect={selectCamera} onCreate={()=>createCamera()} onFollow={followCharacter} onChange={changeCamera} onDefault={id=>mutate(p=>p.subscenes.find(s=>s.id===scene.id).defaultCameraId=id)} onDelete={deleteCamera} onPilot={pilotCamera} onView={viewCamera} onCapture={captureCamera} piloting={cameraPilotId} running={running} onEdit={editScene}/> : dock === 'subscenes' ? <SubsceneWorkspace project={project} scene={displayScene} beat={nodes.find(b=>b.id===subsceneDraft?.fromBeatId)||beat} request={subsceneRequest} draft={subsceneDraft} onDraftChange={setSubsceneDraft} running={running}
+              ) : dock === 'event' ? renderGraph('event') : dock === 'cameras' ? <CameraWorkspace scene={displayScene} objects={objects} selected={selection.kind==='camera'?selection.id:null} onSelect={selectCamera} onCreate={()=>createCamera()} onFollow={followCharacter} running={running} onEdit={editScene}/> : dock === 'subscenes' ? <SubsceneWorkspace project={project} scene={displayScene} beat={nodes.find(b=>b.id===subsceneDraft?.fromBeatId)||beat} request={subsceneRequest} draft={subsceneDraft} onDraftChange={setSubsceneDraft} running={running}
                 onSaveLocation={async()=>{try{const data=await portableProject(exportLocation(project,displayScene.id));const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download='location.sacura-location.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setNotice('Локация сохранена в файл.');}catch(e){setNotice(e.message);}}}
                 onLoadLocation={async file=>{try{if(rt.running)return;const raw=await file.text(),next=structuredClone(project),created=importLocation(next,raw);mutate(p=>Object.assign(p,next));setSelectedBeat(created.entry);setSelection({kind:'scene',id:created.id});setMode('scene');setMaximized(null);setNotice('Локация загружена: '+created.name);}catch(e){setNotice('Локация не загружена: '+e.message);}}}
                 onStop={()=>rt.stop()} onSelect={id=>openSubscenes('edit',id)} onCreate={draft=>saveNewSubscene(draft)} onDuplicate={id=>saveNewSubscene(null,id)}
