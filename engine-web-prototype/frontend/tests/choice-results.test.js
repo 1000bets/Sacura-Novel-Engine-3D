@@ -112,7 +112,8 @@ test('variable search includes custom names, aliases and typed getters/setters w
  assert.equal(items.filter(i=>i.variable==='Монеты').length,2);
  assert.ok(items.find(i=>i.variable==='trust').label.includes('Доверие'));
  assert.ok(items.find(i=>i.variable==='trust').searchText.includes('trust'));
- assert.equal(items.filter(i=>i.variable===ANSWER_VARIABLE).length,1);
+ assert.equal(items.filter(i=>i.variable===ANSWER_VARIABLE).length,0);
+ assert.equal(variablePalette({...p,chapters:[{beats:[{kind:'variable',variable:ANSWER_VARIABLE}]}]}).filter(i=>i.variable===ANSWER_VARIABLE).length,1);
  for(const item of items){const n={kind:item.kind};initializeVariableNode(p,n,item.variable);assert.equal(n.variable,item.variable);if(item.variable!==ANSWER_VARIABLE)assert.equal(n.valueType,typeof p.variables[item.variable]);}
  assert.deepEqual(p.variables,{Монеты:10,permission:false,trust:0,message:'привет'});
 });

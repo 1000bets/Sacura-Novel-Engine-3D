@@ -17,7 +17,7 @@ export default function Scene({
   objects,
   state,
   selected, selectedIds,
-  onSelect, onContext,
+  onSelect, onContext, onPickPosition, actionPosition,
   onLetter,
   onInteract,
   mode = "scene",
@@ -26,7 +26,7 @@ export default function Scene({
   const host = useRef(),
     api = useRef();
   const callbacks = useRef();
-  callbacks.current = { onSelect, onContext, onLetter, onInteract, mode, state,objects,selected,selectedIds,sceneId,kind:"living",editTool,editSpace,snap,onTransform,onTransforms,focusRequest,editing,cameraScene,selectedCameraId,cameraPreviewId,cameraPilotId,onCameraChange,onCameraSelect,showCameras };
+  callbacks.current = { onSelect, onContext, onPickPosition, actionPosition, onLetter, onInteract, mode, state,objects,selected,selectedIds,sceneId,kind:"living",editTool,editSpace,snap,onTransform,onTransforms,focusRequest,editing,cameraScene,selectedCameraId,cameraPreviewId,cameraPilotId,onCameraChange,onCameraSelect,showCameras };
   useEffect(() => {
     const element = host.current;
     let renderer;
@@ -189,6 +189,7 @@ export default function Scene({
     const gizmo=createSceneGizmo(scene,camera,renderer.domElement,controls,()=>callbacks.current,()=>pickables);
     const physics=createScenePhysics(scene,()=>callbacks.current,()=>pickables);if(physicsApi)physicsApi.current=physics;
     const cameraRig=createCameraRig(scene,camera,controls,renderer.domElement,()=>callbacks.current);if(cameraApi)cameraApi.current=cameraRig;
+    const destinationMarker=new THREE.Mesh(new THREE.SphereGeometry(.09,16,12),new THREE.MeshBasicMaterial({color:0xffca68,depthTest:false}));destinationMarker.renderOrder=1000;destinationMarker.visible=false;scene.add(destinationMarker);
     const ray = new THREE.Raycaster(),
       mouse = new THREE.Vector2();
     let down;
@@ -205,6 +206,11 @@ export default function Scene({
         (-(e.clientY - r.top) / r.height) * 2 + 1,
       );
       ray.setFromCamera(mouse, camera);
+      if(callbacks.current.onPickPosition){
+        const point=ray.intersectObjects(pickables,true).find(h=>{let o=h.object;while(o){if(!o.visible)return false;o=o.parent;}return true;})?.point||ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0),new THREE.Vector3());
+        if(point)callbacks.current.onPickPosition(point.toArray().map(n=>Math.round(n*1000)/1000));
+        return;
+      }
       const cameraHit=cameraRig.pick(ray);if(cameraHit){callbacks.current.onCameraSelect?.(cameraHit);return;}
       const h = ray.intersectObjects(
         pickables.filter((m) => m.visible),
@@ -244,6 +250,7 @@ export default function Scene({
     let frame,previous=performance.now(),animTime=0;
     const render = () => {
       frame = requestAnimationFrame(render);
+      const destination=callbacks.current.actionPosition;destinationMarker.visible=Array.isArray(destination)&&destination.length===3&&callbacks.current.mode==='scene';if(destinationMarker.visible)destinationMarker.position.set(...destination);
       const now=performance.now(),dt=Math.min(.05,(now-previous)/1000);previous=now;
 
       const live = callbacks.current.state;
@@ -255,7 +262,7 @@ export default function Scene({
         if((o.builtin||o.id)==='door'&&callbacks.current.mode==='game'){mesh.userData.openAngle=THREE.MathUtils.damp(mesh.userData.openAngle||0,live.doors?.[o.id]==='Открыть'?-1.25:0,3,live.paused||live.pausedDoors?.[o.id]?0:dt);mesh.rotation.y+=mesh.userData.openAngle;}
         if(mesh.userData.marker)mesh.userData.marker.visible=live.interactionTarget===o.id||live.highlights?.[o.id];
         updateObjectHighlight(mesh,!!live.highlights?.[o.id],animTime);
-        updateCharacterVisual(mesh,o,dt,live.poses?.[o.id],!!live.motions?.[o.id]&&!live.motions[o.id].stopped&&!live.motions[o.id].paused&&live.motions[o.id].progress<1,live.paused,callbacks.current.mode==='scene'&&callbacks.current.editing);
+        updateCharacterVisual(mesh,{...o,walkAnimation:live.motions?.[o.id]?.animationId||o.walkAnimation},dt,live.poses?.[o.id],!!live.motions?.[o.id]&&!live.motions[o.id].stopped&&!live.motions[o.id].paused&&live.motions[o.id].progress<1,live.paused,callbacks.current.mode==='scene'&&callbacks.current.editing);
       });
       physics.update();
       gizmo.update();

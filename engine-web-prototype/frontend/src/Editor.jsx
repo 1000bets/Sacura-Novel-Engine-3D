@@ -6,7 +6,7 @@ import {storeAssetFile,retainObjectModel} from './assetFiles.js';
 import {beatPreview} from './storyLabels.js';
 import {editVariable} from './variableModel.js';
 import VariableInspector from './VariableInspector.jsx';
-import {isPureNode,migrateLogicGraph,compareSymbols,variablePalette,initializeVariableNode} from './logicModel.js';
+import {isPureNode,migrateLogicGraph,compareSymbols,variablePalette,initializeVariableNode,MATH_OPERATIONS,logicType,dataConnectionError} from './logicModel.js';
 import {newChoice,ANSWER_VARIABLE,typedValue} from './choiceModel.js';
 import {copySceneObjects,pasteSceneObjects,cloneStoryNodes,clipboardCommand} from './editorClipboard.js';
 import {copyAction,copyGroup} from './authoringModel.js';
@@ -34,6 +34,7 @@ import {
   bindingActions,
   normalizeBatches,
   addToBatch,
+  removeEventBinding,
   newEvent,
   makeAction,
   uid,
@@ -61,6 +62,8 @@ import LocationScene from "./LocationScene.jsx";
 import EditorGraph from "./EditorGraph.jsx";
 import EditorContextMenu from "./EditorContextMenu.jsx";
 import ActionFields from "./ActionFields.jsx";
+import EventInspector from "./EventInspector.jsx";
+import {exportLocation,importLocation} from "./locationFiles.js";
 import FailureLab from "./FailureLab.jsx";
 import SubsceneWorkspace from './SubsceneWorkspace.jsx';
 import CharacterWorkspace from './CharacterWorkspace.jsx';
@@ -210,10 +213,10 @@ function GameDialogue({
           {beat.choices?.map((c) => (
             <button
               key={c.id}
-              disabled={!ready || !conditionPass(c, variables,project)}
+              disabled={!ready || !conditionPass(c, variables,project,preview?.choiceResults)}
               onClick={() => running && onAdvance(c.id)}
             >
-              {!conditionPass(c, variables,project) && (
+              {!conditionPass(c, variables,project,preview?.choiceResults) && (
                 <Icon name="LockKeyhole" size={13} />
               )}
               <span>{c.label}</span>
@@ -449,6 +452,10 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     if(ids.length===previous.length&&ids.includes(current.id))return current;
     return ids.length?{kind:'object',id:ids.includes(current.id)?current.id:ids.at(-1),ids}:{kind:'scene',id:displayScene.id};
   }),[objects,displayScene.id]);
+  const [positionPick,setPositionPick]=useState(null);
+  const [eventSearch,setEventSearch]=useState('');
+  useEffect(()=>{if(picker?.kind==='event')setEventSearch('');},[picker?.kind,picker?.phase,picker?.batchId]);
+  useEffect(()=>{const cancel=e=>{if(e.key==='Escape')setPositionPick(null);};window.addEventListener('keydown',cancel);return ()=>window.removeEventListener('keydown',cancel);},[]);
   const issues = useMemo(() => validateStudio(project), [project]),
     variables = running ? preview.variables : project.variables,
     event = project.events.find((e) => e.id === eventContext?.eventId),
@@ -578,8 +585,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           beatId: data.flowBeatId || beat.id,
         });
         if(data.flowBeatId)setSelectedBeat(data.flowBeatId);
-        setDock("event");
-        setSelection({ kind: "event", id: data.event.id });
+        setSelection({ kind: "binding", id: data.binding.id });
+        setCompactPanel("inspector");
         return;
       }
       if (data.action) {
@@ -600,6 +607,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       else if (value.action)
         setSelection({ kind: "action", id: value.action.id });
       else if (value.binding) {
+        setCompactPanel("inspector");
         setSelection({ kind: "binding", id: value.binding.id });
         setEventContext({
           eventId: value.event.id,
@@ -628,6 +636,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         setPicker({ kind: "event", batchId, phase: phaseId });
         return;
       }
+      if(command==='removeBinding'&&selection.id===value){setEventContext(null);setSelection({kind:'beat',id:ownerId});}
       mutate((p) => {
         const b = allBeats(p).find((b) => b.id === ownerId),
           list = b.batches[phaseId],
@@ -646,12 +655,11 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           ];
         }
         if (command === "removeBinding") {
-          b.bindings = b.bindings.filter((x) => x.id !== value);
-          batch.bindingIds = batch.bindingIds.filter((id) => id !== value);
+          removeEventBinding(p,ownerId,value);
         }
       });
     },
-    [beat, nodes, mutate],
+    [beat, nodes, mutate, selection.id],
   );
   const patchAction = useCallback(
     (id, values) =>
@@ -708,7 +716,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     rt.start(project, startId);
   };
   const audition=(eventId)=>{setCameraPreviewId(null);setCameraPilotId(null);soundDesk.unlock().catch(()=>{});setMode('game');setFollow(false);rt.previewEvent(project,eventId,beat.id);};
-  const editSample=(eventId)=>{setEventContext({eventId});setSelection({kind:'event',id:eventId});setDock('event');setDetailEditor(false);};
+  const editSample=(eventId)=>{setEventContext({eventId});setSelection({kind:'event',id:eventId});setCompactPanel('inspector');setDetailEditor(false);};
   const selectObject = (id,options={}) => {
     if (!inspectorPinned) setSelection(current=>selectSceneObject(current,id,!!options.additive,objects));
   };
@@ -857,8 +865,11 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       if(kind==='choice'){b.choiceMode='value';b.choices=[newChoice(uid('choice'),'Ответ 1'),newChoice(uid('choice'),'Ответ 2')];}
       if(kind==='branch'){b.text='If · Если';b.next=null;b.condition=false;b.trueNext=null;b.falseNext=null;}
       if(kind==='variable'){let index=1;while(Object.hasOwn(p.variables,'Переменная '+index))index++;initializeVariableNode(p,b,placement?.variable||'Переменная '+index);}
-      if(kind==='literal'){b.valueType='number';b.value=0;}
-      if(kind==='compare'){b.operator=placement?.operator||'eq';b.valueType='number';b.a=0;b.b=0;}
+      if(kind==='literal'){b.valueType=placement?.valueType||'number';b.value=typedValue('',b.valueType);}
+      if(kind==='math'){b.operator=placement?.operator||'add';b.valueType='number';b.a=0;b.b=placement?.operator==='mul'||placement?.operator==='div'?1:0;}
+      if(kind==='convert'){b.inputType=placement?.inputType||'string';b.valueType=placement?.valueType||'number';b.value=typedValue('',b.inputType);}
+      if(kind==='not'){b.a=false;}
+      if(kind==='compare'){b.operator=placement?.operator||'eq';b.valueType=placement?.valueType||'number';b.a=typedValue('',b.valueType);b.b=typedValue('',b.valueType);}
       if(kind==='set-variable')initializeVariableNode(p,b,placement?.variable||Object.keys(p.variables).find(id=>id!==ANSWER_VARIABLE)||'Переменная 1');
       if(isPureNode(b)||['branch','set-variable'].includes(kind))b.next=null;
       if (kind === "gate") {
@@ -870,6 +881,10 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         b.ending = "Новая концовка";
       }
       insertStoryNode(p,chapter.id,beat.id,b);
+      if(placement?.pin){const pin=placement.pin;
+        const connection=pin.handleType==='source'?{source:pin.nodeId,sourceHandle:pin.handleId,target:id,targetHandle:placement.wireType==='flow'?'in':kind==='branch'?'condition':['set-variable','convert'].includes(kind)?'value':'a'}:{source:id,sourceHandle:placement.wireType==='flow'?'next':'value',target:pin.nodeId,targetHandle:pin.handleId};
+        const error=applyConnections(p,[connection]);if(error)setNotice(error);
+      }
     });
     if(placement?.position){placeContextNode(id,placement);setContextNodeId(id);}
     setSelectedBeat(id);
@@ -1159,7 +1174,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   const inspectedVariable=selection.kind==='variable'?selection.id:selection.kind==='beat'&&['variable','set-variable'].includes(beat.kind)?beat.variable:null;
   const renderInspector = () => {
     if(inspectedVariable&&(inspectedVariable===ANSWER_VARIABLE||Object.hasOwn(project.variables,inspectedVariable)))return <><VariableInspector key={inspectedVariable} variable={inspectedVariable} project={project} preview={preview} disabled={running} onEdit={updateVariable} onAddNode={(variable,kind)=>graphApi.current?.addVariableNode?.(variable,kind)}/>{selection.kind==='beat'&&<Button icon="Focus" onClick={()=>graphApi.current?.focus(beat.id)}>Показать ноду</Button>}</>;
-    if(isPureNode(beat)||['branch','set-variable'].includes(beat.kind))return <><div className="inspector-identity"><strong>{beat.kind==='branch'?'If · Если':beat.kind==='variable'?'Переменная':beat.kind==='set-variable'?'Задать переменную':'Логика · '+(compareSymbols[beat.operator]||beat.kind)}</strong></div><p className="choice-note">Выберите переменную в «Мой Blueprint» или её ноду Get / Set, чтобы открыть свойства в инспекторе. Круглые пины передают значения, стрелки задают ход истории.</p><Button icon="Focus" onClick={()=>graphApi.current?.focus(beat.id)}>Показать ноду</Button></>;
+    if(isPureNode(beat)||['branch','set-variable'].includes(beat.kind))return <><div className="inspector-identity"><strong>{beat.kind==='branch'?'If · Если':beat.kind==='variable'?'Переменная':beat.kind==='set-variable'?'Задать переменную':'Логика · '+(compareSymbols[beat.operator]||beat.kind)}</strong></div><p className="choice-note">Настройки операции находятся на ноде. Круглые пины передают значения, стрелки задают ход истории. Подключите результат операции ко входу Set, чтобы изменить переменную.</p><Button icon="Focus" onClick={()=>graphApi.current?.focus(beat.id)}>Показать ноду</Button></>;
 
     if(selection.kind==='camera'){
       const c=displayScene.cameras?.find(c=>c.id===selection.id);
@@ -1410,8 +1425,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 title="Открыть исходный шаблон"
                 icon="ExternalLink"
                 onClick={() => {
-                  setEventContext({ eventId: event.id });
-                  setSelection({ kind: "event", id: event.id });
+                  setEventContext({ eventId: binding.sourceEventId||event.id });
+                  setSelection({ kind: "event", id: binding.sourceEventId||event.id });
                 }}
               />
             </div>
@@ -1434,7 +1449,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                     }
                   />
                 </Field>
-                <ActionFields sceneId={sceneFor(project,contextBeat.id).id}
+                <ActionFields onPickPosition={id=>{editScene();setPositionPick({id,context:{...eventContext}});setNotice("Нажмите на место в 3D-сцене. Escape — отмена.");}} sceneId={sceneFor(project,contextBeat.id).id}
                   action={inspectedAction}
                   project={project}
                   onChange={(v) => patchAction(inspectedAction.id, v)}
@@ -1561,46 +1576,33 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               )}
             </Fold>
           )}
-          <Fold title="Группы действий" icon="ListOrdered">
-            {event.groups.map((g, i) => (
-              <button
-                className="inspector-list-item"
-                key={g.id}
-                onClick={() => graphApi.current?.focus(g.id)}
-              >
-                <span>{i + 1}</span>
-                <strong>{g.name}</strong>
-                <small>{g.actions.length}</small>
-              </button>
-            ))}
-            {!binding && (
-              <Button
-                icon="Plus"
-                onClick={() =>
-                  mutate((p) =>
-                    p.events
-                      .find((e) => e.id === event.id)
-                      .groups.push({
-                        id: uid("group"),
-                        name: "Следующий шаг",
-                        actions: [makeAction()],
-                      }),
-                  )
-                }
-              >
-                Следующая группа
-              </Button>
-            )}
+          <Fold title="Полное редактирование события" icon="ListOrdered">
+            <EventInspector event={event} project={project} binding={binding} sceneId={sceneFor(project,contextBeat.id).id}
+              onAction={patchAction} onPickPosition={id=>{editScene();setPositionPick({id,context:{...eventContext}});setNotice('Нажмите на место в 3D-сцене. Escape — отмена.');}}
+              onEdit={fn=>{
+                const detach=binding&&(!binding.localEventId||nodes.filter(b=>b.bindings.some(x=>x.eventId===event.id)).length>1||nodes.some(b=>b.bindings.filter(x=>x.eventId===event.id).length>1));
+                const nextId=detach?uid('event'):event.id;
+                mutate(p=>{
+                  let target=p.events.find(e=>e.id===event.id);
+                  if(binding){const item=allBeats(p).find(b=>b.id===contextBeat.id).bindings.find(b=>b.id===binding.id);
+                    if(detach){target={...structuredClone(target),id:nextId,standardPreset:false};for(const a of target.groups.flatMap(g=>g.actions))Object.assign(a,item.overrides&&a.id===target.groups[0]?.actions[0]?.id?item.overrides:{},item.actionOverrides?.[a.id]||{});p.events.push(target);item.sourceEventId=item.sourceEventId||event.id;item.eventId=target.id;item.localEventId=target.id;item.overrides={};item.actionOverrides={};}
+                  }
+                  fn(target);
+                });
+                if(nextId!==event.id)setEventContext(c=>({...c,eventId:nextId}));
+              }}/>
           </Fold>
+          {binding&&<Button icon="Trash2" onClick={()=>{mutate(p=>{removeEventBinding(p,contextBeat.id,binding.id);});setEventContext(null);setSelection({kind:'beat',id:contextBeat.id});}}>Удалить событие из реплики</Button>}
           <Button
             className="inspector-add"
             icon="Maximize2"
             onClick={() => {
               setDetailEditor(true);
-              setMaximized("graph");
+              setFloatingDock(true);
+              setMaximized(null);
             }}
           >
-            Все параметры рядом
+            Открыть событие в отдельном окне
           </Button>
         </>
       );
@@ -2030,6 +2032,28 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     placeContextNode(action.id,contextMenu);setSelection({kind:'action',id:action.id});
   };
   const contextItems=()=>{
+    if(contextMenu?.kind==='wire-drop'){
+      const type=contextMenu.valueType,fromSource=contextMenu.pin.handleType==='source';
+      const add=(kind,patch={})=>addBeat(kind,{...contextMenu,...patch,wireType:type});
+      if(type==='flow')return [['dialogue','Реплика'],['choice','Выбор игрока'],['branch','If · Если'],['set-variable','Задать переменную'],...(fromSource?[['end','Концовка']]:[])].map(([kind,label])=>({label,action:()=>add(kind)}));
+      const items=[];
+      if(type==='number')for(const [operator,op] of Object.entries(MATH_OPERATIONS))items.push({label:op.label,icon:'Calculator',action:()=>add('math',{operator})});
+      if(!fromSource&&type==='boolean')for(const operator of ['eq','gt','gte','lt','lte'])items.push({label:'Сравнение · '+compareSymbols[operator],action:()=>add('compare',{operator,valueType:'number'})});
+      if(type==='boolean')for(const [kind,label]of [['and','И'],['or','ИЛИ'],['not','НЕ']])items.push({label,icon:'Binary',action:()=>add(kind)});
+      if(fromSource){
+        if(type!=='any')for(const operator of type==='number'?Object.keys(compareSymbols):['eq','ne'])items.push({label:'Сравнить · '+compareSymbols[operator],icon:'Binary',action:()=>add('compare',{operator})});
+        for(const [valueType,label]of [['number','число'],['boolean','Да / нет'],['string','текст']])items.push({label:'Преобразовать в '+label,icon:'RefreshCw',action:()=>add('convert',{valueType,inputType:type==='any'?'string':type})});
+        for(const item of variablePalette(project).filter(i=>i.kind==='set-variable'&&logicType(project,{kind:'variable',variable:i.variable})===type))items.push({label:item.label,icon:'Database',action:()=>add('set-variable',{variable:item.variable})});
+        if(type==='boolean')items.push({label:'If · Если',icon:'GitFork',action:()=>add('branch')});
+      }else{
+        if(type==='any')for(const valueType of ['string','number','boolean'])items.push({label:'Значение · '+valueType,action:()=>add('literal',{valueType})});
+        else items.unshift({label:'Значение · '+type,action:()=>add('literal')});
+        for(const item of variablePalette(project).filter(i=>i.kind==='variable'&&(type==='any'||logicType(project,{kind:'variable',variable:i.variable})===type)))items.push({label:item.label,action:()=>add('variable',{variable:item.variable})});
+        if(type!=='any')items.push({label:'Конвертация в '+type,icon:'RefreshCw',action:()=>add('convert')});
+      }
+      return items;
+    }
+
     if(contextMenu?.kind==='variable-drop')return [['variable','Получить · Get'],...(contextMenu.variable===ANSWER_VARIABLE?[]:[['set-variable','Задать · Set']])].map(([kind,label])=>({label,icon:'Database',action:()=>addBeat(kind,contextMenu)}));
     if(contextMenu?.kind==='scene')return [
       {label:'Персонаж',icon:'PersonStanding',group:'Добавить объект',action:()=>addObject('Персонаж')},
@@ -2048,8 +2072,10 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     ]:Object.entries(TYPES).map(([type,t])=>({label:t.label,icon:t.icon,group:'Добавить ноду действия',action:()=>addContextAction(type)}));
     return [
       {label:'Переменные проекта',icon:'Database',children:variablePalette(project).map(item=>({...item,icon:item.kind==='variable'?'Database':'Pencil',action:()=>addBeat(item.kind,{...contextMenu,variable:item.variable})}))},
+      {label:'Математические операции',icon:'Calculator',children:Object.entries(MATH_OPERATIONS).map(([operator,op])=>({label:op.label,action:()=>addBeat('math',{...contextMenu,operator})}))},
+      {label:'Конвертации',icon:'RefreshCw',children:[['number','В число'],['boolean','В Да / нет'],['string','В текст']].map(([valueType,label])=>({label,action:()=>addBeat('convert',{...contextMenu,valueType})}))},
       {label:'Сравнения',icon:'Binary',children:['eq','ne','gte','lte','gt','lt'].map(operator=>({label:compareSymbols[operator]+' · '+({eq:'Равно',ne:'Не равно',gte:'Больше или равно',lte:'Меньше или равно',gt:'Больше',lt:'Меньше'})[operator],icon:'Binary',action:()=>addBeat('compare',{...contextMenu,operator})}))},
-      ...[['variable','Database','Переменная · получить'],['set-variable','Database','Переменная · задать'],['literal','Binary','Значение'],['and','Binary','И · оба условия'],['or','Binary','ИЛИ · любое условие']].map(([kind,icon,label])=>({label,icon,group:'Значения и переменные',action:()=>addBeat(kind,contextMenu)})),
+      ...[['variable','Database','Переменная · получить'],['set-variable','Database','Переменная · задать'],['literal','Binary','Значение'],['and','Binary','И · оба условия'],['or','Binary','ИЛИ · любое условие'],['not','Binary','НЕ · инверсия условия']].map(([kind,icon,label])=>({label,icon,group:'Значения и переменные',action:()=>addBeat(kind,contextMenu)})),
       ...[['dialogue','MessageSquare','Реплика'],['choice','GitFork','Выбор игрока'],['branch','GitFork','If · Если'],['gate','MousePointerClick','Ждать взаимодействие'],['merge','Merge','Схождение веток'],['end','Flag','Концовка']].map(([kind,icon,label])=>({label,icon,group:'Добавить ноду',action:()=>addBeat(kind,contextMenu)})),
       {label:'Добавить событие к выбранной реплике…',icon:'Layers',group:'События',action:()=>setPicker({kind:'event',phase:phase==='ALL'?'ON_START':phase})},
     ];
@@ -2379,7 +2405,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             >
               <LocationScene
                 sceneId={displayScene.id}
-                editTool={editTool} editSpace={editSpace} snap={snap} focusRequest={cameraPilotId?0:focusRequest} editing={!running&&!cameraPilotId} onTransform={transformObject} onTransforms={transformObjects}
+                editTool={editTool} editSpace={editSpace} snap={snap} focusRequest={cameraPilotId?0:focusRequest} editing={!running&&!cameraPilotId&&!positionPick} onTransform={transformObject} onTransforms={transformObjects}
                 cameraScene={displayScene} selectedCameraId={selection.kind==='camera'?selection.id:null} cameraPreviewId={cameraPreviewId} cameraPilotId={cameraPilotId} onCameraChange={changeCamera} onCameraSelect={selectCamera} cameraApi={cameraApi} physicsApi={physicsApi} showCameras={showCameras}
                 kind={displayScene.kind}
                 objects={objects}
@@ -2388,10 +2414,18 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 selectedIds={objectSelectionIds}
                 mode={mode}
                 showGrid={showGrid}
+                actionPosition={(()=>{const a=inspectedAction||(binding?bindingActions(project,binding):event?.groups.flatMap(g=>g.actions))?.find(a=>a.type==='move');return a?.type==='move'&&Array.isArray(a.value)?a.value:null;})()}
+                onPickPosition={positionPick?value=>{
+                  const request=positionPick;
+                  mutate(p=>{if(request.context.bindingId){const b=allBeats(p).find(b=>b.id===request.context.beatId)?.bindings.find(b=>b.id===request.context.bindingId);if(b){b.actionOverrides||={};b.actionOverrides[request.id]={...b.actionOverrides[request.id],value};}}
+                    else {const a=p.events.find(e=>e.id===request.context.eventId)?.groups.flatMap(g=>g.actions).find(a=>a.id===request.id);if(a)a.value=value;}});
+                  setPositionPick(null);setNotice('Координаты выбраны: '+value.join(', '));
+                }:undefined}
                 onSelect={selectObject}
                 onContext={point=>{if(!rt.running)setContextMenu({...point,kind:'scene'});}}
                 onInteract={interact}
               />
+              {positionPick&&<div className="viewport-caption"><strong>Выберите точку на сцене</strong><Button icon="X" onClick={()=>setPositionPick(null)}>Отмена</Button></div>}
               <GameDialogue project={running?rt.project:project}
                 beat={playBeat}
                 preview={preview}
@@ -2583,10 +2617,12 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 <StoryFlow running={running} onVariableEdit={updateVariable} onVariableAdd={(variable,kind,point)=>{if(!rt.running)addBeat(kind,{...point,variable});}} onInspectVariable={inspectVariable} selectedVariable={inspectedVariable} onVariableDrop={point=>{if(rt.running)return;if(point.get||point.set)addBeat(point.set&&point.variable!==ANSWER_VARIABLE?'set-variable':'variable',point);else setContextMenu({...point,kind:'variable-drop'});}} onLogicChange={(id,patch)=>{if(!rt.running)mutate(p=>Object.assign(allBeats(p).find(n=>n.id===id),patch));}} onVariable={(id,name,type,value)=>{if(!rt.running)mutate(p=>{const node=allBeats(p).find(n=>n.id===id);node.valueType=type;node.variable=name.trim();if(node.variable&&node.variable!==ANSWER_VARIABLE)p.variables[node.variable]=typedValue(value,type);});}} onChoice={(id,choiceId,patch)=>{if(!rt.running)mutate(p=>{const b=allBeats(p).find(n=>n.id===id);if(!choiceId)b.choices.push(newChoice(uid('choice'),patch.label));else if(!patch)b.choices=b.choices.filter(c=>c.id!==choiceId);else Object.assign(b.choices.find(c=>c.id===choiceId),patch);});}} onClipboard={graphClipboard} contextNodeId={contextNodeId} project={project} issues={issues} selectedId={beat.id} selectionId={selection.id} preview={preview}
                   onSelect={graphSelect} onOpen={openGraph} onBatch={changeBatch} onConnect={connect} onDeleteNode={deleteFlowNode}
                   onScene={id=>openSubscenes('edit',id)}
-                  onContext={point=>{if(!rt.running)setContextMenu({...point,kind:'story'});}}
+                  onContext={point=>{if(!rt.running)setContextMenu({...point,kind:point.kind||'story'});}}
                   onAdd={(id,hook)=>{setSelectedBeat(id);setSelection({kind:'beat',id});setPicker({kind:'event',phase:hook});}}
                   positions={layout.positions['flow:all']||{}} onPositions={positions=>setPositions('flow:all',positions)} onReady={onGraphReady}/>
               ) : dock === 'event' ? renderGraph('event') : dock === 'cameras' ? <CameraWorkspace scene={displayScene} objects={objects} state={world} selected={selection.kind==='camera'?selection.id:null} onSelect={selectCamera} onCreate={()=>createCamera()} onFollow={followCharacter} onChange={changeCamera} onDefault={id=>mutate(p=>p.subscenes.find(s=>s.id===scene.id).defaultCameraId=id)} onDelete={deleteCamera} onPilot={pilotCamera} onView={viewCamera} onCapture={captureCamera} piloting={cameraPilotId} running={running} onEdit={editScene}/> : dock === 'subscenes' ? <SubsceneWorkspace project={project} scene={displayScene} beat={nodes.find(b=>b.id===subsceneDraft?.fromBeatId)||beat} request={subsceneRequest} draft={subsceneDraft} onDraftChange={setSubsceneDraft} running={running}
+                onSaveLocation={async()=>{try{const data=await portableProject(exportLocation(project,displayScene.id));const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download='location.sacura-location.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setNotice('Локация сохранена в файл.');}catch(e){setNotice(e.message);}}}
+                onLoadLocation={async file=>{try{if(rt.running)return;const raw=await file.text(),next=structuredClone(project),created=importLocation(next,raw);mutate(p=>Object.assign(p,next));setSelectedBeat(created.entry);setSelection({kind:'scene',id:created.id});setMode('scene');setMaximized(null);setNotice('Локация загружена: '+created.name);}catch(e){setNotice('Локация не загружена: '+e.message);}}}
                 onStop={()=>rt.stop()} onSelect={id=>openSubscenes('edit',id)} onCreate={draft=>saveNewSubscene(draft)} onDuplicate={id=>saveNewSubscene(null,id)}
                 onPatch={patch=>editSubscene(p=>Object.assign(p.subscenes.find(s=>s.id===scene.id),patch))}
                 onKind={kind=>editSubscene(p=>changeSceneLocation(p,scene.id,kind))} onEntry={(id,reroute)=>editSubscene(p=>setSceneEntry(p,scene.id,id,reroute))}
@@ -2892,10 +2928,12 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                     ["branch", "GitFork", "If · Если", "Подключите условие и пути «Да» / «Нет»"],
                     ["variable", "Database", "Переменная", "Создать или прочитать значение прямо в графе"],
                     ["set-variable", "Database", "Задать переменную", "Изменить значение по ходу истории"],
+                    ...Object.entries(MATH_OPERATIONS).map(([operator,op])=>["math:"+operator,"Calculator",op.label,"Операция над числами"]),
+                    ...['number','boolean','string'].map(valueType=>["convert:"+valueType,"RefreshCw","Конвертация в "+valueType,"Преобразовать тип значения"]),
                     ...Object.entries(compareSymbols).map(([operator,label])=>["compare:"+operator,"Binary",label,"Сравнить два значения"]),
                     ["end", "Flag", "Концовка", "Завершить этот путь истории"],
                   ].map(([kind, icon, title, desc]) => (
-                    <button key={kind} onClick={() => kind.startsWith("compare:")?addBeat("compare",{operator:kind.split(":")[1]}):addBeat(kind)}>
+                    <button key={kind} onClick={() => kind.startsWith("math:")?addBeat("math",{operator:kind.split(":")[1]}):kind.startsWith("convert:")?addBeat("convert",{valueType:kind.split(":")[1]}):kind.startsWith("compare:")?addBeat("compare",{operator:kind.split(":")[1]}):addBeat(kind)}>
                       <Icon name={icon} size={22} />
                       <span>
                         <strong>{title}</strong>
@@ -2920,13 +2958,12 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                       onChange={(v) => setPicker((p) => ({ ...p, phase: v }))}
                     />
                   </Field>
-                  <Button icon="Plus" onClick={createEvent}>
-                    Создать шаблон
-                  </Button>
+
                 </div>
+                <input type="search" aria-label="Поиск событий" placeholder="Найти событие…" value={eventSearch} onChange={e=>setEventSearch(e.target.value)}/>
                 <div className="event-selection-list">
                   {project.events
-                    .filter((e) => !picker.assetId || e.id === picker.assetId)
+                    .filter((e) => (!picker.assetId || e.id === picker.assetId)&&e.name.toLowerCase().includes(eventSearch.toLowerCase()))
                     .map((e) => (
                       <button
                         key={e.id}
@@ -2965,6 +3002,9 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                       </button>
                     ))}
                 </div>
+                  <Button icon="Plus" onClick={createEvent}>
+                    Добавить событие
+                  </Button>
               </>
             ) : (
               <div className="create-options action-type-picker">

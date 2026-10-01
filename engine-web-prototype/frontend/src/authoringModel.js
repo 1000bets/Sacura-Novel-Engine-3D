@@ -15,6 +15,20 @@ export function eventFromAsset(kind,asset){
 export function ensureCreationLibrary(p){
  if(!p.actionTemplates)p.actionTemplates=[['move','Подойти к окну'],['pose','Улыбнуться'],['weather','Начать дождь'],['lighting','Тёплый свет'],['sound','Озвучка Алисы']].map(([type,name])=>({...makeAction(type),name,...(type==='sound'?{assetId:'voice-alice',duck:true}:{} )}));
  if(!p.groupTemplates)p.groupTemplates=[{id:uid('group'),name:'Реакция крупным планом',actions:[makeAction('pose','alice','улыбка'),makeAction('camera','camera','Крупный план')]}];
+ if(!p.standardEventsVersion){
+ for(const o of p.objects.filter(o=>o.type==='Персонаж'&&!o.model)){if(Array.isArray(o.enabledAnimations))o.enabledAnimations=[...new Set([...o.enabledAnimations,'ходит','сидит','машет'])];}
+ const target=p.objects.find(o=>o.type==='Персонаж')?.id||'';
+ const group=(name,actions)=>({id:uid('group'),name,actions});
+ const presets=[
+ ['Подойти с анимацией',[group('Подойти',[{...makeAction('move',target,[0,0,0]),animationId:'ходит'}])]],
+ ['Подойти и сесть',[group('Подойти к месту',[{...makeAction('move',target,[0,0,0]),animationId:'ходит'}]),group('Сесть',[makeAction('pose',target,'сидит')])]],
+ ['Приветствие крупным планом',[group('Приветствие',[makeAction('pose',target,'машет'),makeAction('camera','camera','Крупный план')])]],
+ ['Наступает вечер',[group('Окружение',[makeAction('time','world','Закат'),makeAction('lighting','world','Тёплый свет')])]],
+ ['Появиться в кадре',[group('Появление',[makeAction('visibility',target,'Показать'),makeAction('pose',target,'стоит')])]],
+ ];
+ p.events||=[];for(const [name,groups] of presets)p.events.push({...blankAsset('event'),name,groups,standardPreset:true});
+ p.standardEventsVersion=1;
+ }
  return p;
 }
 export function authoringProblems(kind,asset){

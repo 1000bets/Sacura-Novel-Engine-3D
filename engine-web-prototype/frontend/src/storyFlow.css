@@ -64,3 +64,17 @@
 .logic-if-route>span {min-width:0;width:100%;}
 .logic-if-route .story-destination {display:flex;margin-top:6px;}
 .logic-if-route .story-destination,.logic-if-route .story-destination-empty {grid-column:2;}
+
+/* Keep answers compact; place their handles on the card border. */
+.choice-result-output {position:relative;padding:10px 16px;border-top:1px solid var(--line);color:var(--info);font-size:12px;}
+.story-flow .node-answers {gap:8px;padding:10px;}
+.story-flow .node-answer {gap:6px;padding:8px;}
+.node-answer-text textarea {min-height:36px!important;}
+.story-flow .node-answer-enabled {min-height:24px;padding:2px 0;}
+.story-flow .node-answer-enabled>.data-pin {left:-25px!important;}
+.story-flow .node-answer-route {min-height:24px;padding:4px 0;color:var(--muted);font-size:10px;}
+.story-flow .node-answer-route>.react-flow__handle {right:-19px!important;}
+.story-flow .node-answer-settings {padding-top:4px;}
+.story-flow .node-answer-settings>summary {min-height:20px;padding:0;}
+.node-answer-settings p {font-size:10px;}
+.story-route {min-height:32px;}

@@ -112,7 +112,7 @@ export class PreviewRuntime {
       states: {},
       effects: {},
       instances: {},
-      variables: { ...project.variables },choiceResult:null,
+      variables: { ...project.variables },choiceResult:null,choiceResults:{},
       history: [],
       activity: [],audition:false,
       world: { positions: {}, poses: {}, visible: {} },
@@ -127,7 +127,7 @@ export class PreviewRuntime {
     this.audio.unlock?.().catch(()=>{});
     if(!this.running||!this.snapshot.audition||this.snapshot.world.location!==sceneFor(project,beatId).id){
       this.stop();this.running=true;this.project=structuredClone(project);const scene=sceneFor(project,beatId);
-      this.snapshot={...this.snapshot,beatId,phase:'EVENT_PREVIEW',audition:true,paused:false,ready:false,textVisible:false,error:null,activity:[],variables:{...project.variables},world:{location:scene.id,weather:scene.weather,time:scene.time,camera:'Общий план',cameraId:null,positions:{},poses:{},visible:{},motions:{},stagingPoints:sceneStagingPoints(scene,project.objects)}};
+      this.snapshot={...this.snapshot,beatId,phase:'EVENT_PREVIEW',audition:true,paused:false,ready:false,textVisible:false,error:null,activity:[],variables:{...project.variables},choiceResults:{},world:{location:scene.id,weather:scene.weather,time:scene.time,camera:'Общий план',cameraId:null,positions:{},poses:{},visible:{},motions:{},stagingPoints:sceneStagingPoints(scene,project.objects)}};
       for(const type of ['weather','time'])this.snapshot.effects[type]={key:type,type,name:scene[type],status:'held',owner:'SubScene',origin:scene.name};
     }else {this.project.events=structuredClone(project.events);}
     this.setSidechain(project.audioSettings?.sidechain);
@@ -239,8 +239,8 @@ export class PreviewRuntime {
     if(isPureNode(b))throw new Error('Эта нода вычисляет значение. Запустите реплику или If.');
     if(b.kind==='branch'||b.kind==='set-variable'){
       await this.phase(b,'ON_START',token);await this.phase(b,'AFTER',token);this.assert(token);
-      if(b.kind==='set-variable')this.snapshot.variables[b.variable]=variableValue(this.project,b.variable,b.inputs?.value?readLogic(this.project,b.inputs.value,this.snapshot.variables):b.value);
-      const next=chooseNext(this.project,b.id,null,this.snapshot.variables);
+      if(b.kind==='set-variable')this.snapshot.variables[b.variable]=variableValue(this.project,b.variable,b.inputs?.value?readLogic(this.project,b.inputs.value,this.snapshot.variables,new Set(),this.snapshot.choiceResults):b.value);
+      const next=chooseNext(this.project,b.id,null,this.snapshot.variables,this.snapshot.choiceResults);
       if(!next)throw new Error('У проверки не подключён выбранный выход. Соедините «Да» и «Нет» на графе.');
       await this.enter(next.id,token,automaticDepth+1);return;
     }
@@ -408,6 +408,7 @@ export class PreviewRuntime {
         let from=world.positions?.[a.target]||(movingObject?objectTransform(movingObject,world.location,sceneFor(this.project,this.snapshot.beatId).kind).position:'стол');
         if(previous&&movingObject)from=resolvedPosition(movingObject,world,sceneFor(this.project,this.snapshot.beatId).kind);
         const motion={from,to:a.value,progress:0,runId:event.runId};
+        motion.animationId=a.animationId;
         const destination=resolvedPosition(movingObject,{...world,motions:{},positions:{...world.positions,[a.target]:a.value}},scene.kind);
         const physics=this.physicsApi?.current;
         const needsPhysics=(navMeshSettings(scene).enabled&&movingObject.type==='Персонаж')||collisionSettings(movingObject).enabled;
@@ -566,13 +567,14 @@ export class PreviewRuntime {
     let selectedChoice;
     if(b.kind==='choice'){
       selectedChoice=b.choices?.find(c=>c.id===choiceId);
-      if(!selectedChoice||!conditionPass(selectedChoice,this.snapshot.variables,this.project))return;
+      if(!selectedChoice||!conditionPass(selectedChoice,this.snapshot.variables,this.project,this.snapshot.choiceResults))return;
     }
     const next = chooseNext(
       this.project,
       b.id,
       choiceId,
       this.snapshot.variables,
+      this.snapshot.choiceResults,
     );
     if (b.kind === "choice" && !next) return;
     if (!next && b.kind !== 'end') {
@@ -582,6 +584,7 @@ export class PreviewRuntime {
       return;
     }
     if(selectedChoice){
+      this.snapshot.choiceResults[b.id]={choiceId:selectedChoice.id,type:selectedChoice.result?.type||"string",value:choiceValue(selectedChoice)};
       if(selectedChoice.result?.type==='none'){this.snapshot.choiceResult=null;delete this.snapshot.variables[ANSWER_VARIABLE];}
       else {
       const value=choiceValue(selectedChoice);

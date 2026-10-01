@@ -1,3 +1,4 @@
+import {PhysicsNumber} from './NavigationInspector.jsx';
 import {projectAudioAssets} from './audioAssets.js';
 import {typedValue,variableName} from './choiceModel.js';
 import {ValueField} from './ChoiceInspector.jsx';
@@ -12,6 +13,7 @@ export default function ActionFields({
   onChange,
   compact = false,
   sceneId,
+  onPickPosition,
 }) {
   const field = (label, control) => (
     <label className="action-field">
@@ -22,7 +24,7 @@ export default function ActionFields({
   const select = (key, options) => (
     <select
       value={Array.isArray(a[key])?a[key].join(', '):a[key] ?? ""}
-      onChange={(e) => onChange({ [key]: e.target.value })}
+      onChange={(e) => {const value=e.target.value,coordinates=value.split(',').map(Number);onChange({[key]:a.type==='move'&&key==='value'&&coordinates.length===3&&coordinates.every(Number.isFinite)?coordinates:value});}}
     >
       {options.map((x) => {
         const [v, l] = Array.isArray(x) ? x : [x, x];
@@ -59,14 +61,19 @@ export default function ActionFields({
           type === "pose" ? "Персонаж" : "Объект",
           select(
             "target",
-            project.objects
-              .filter((o) => type !== "pose" || o.type === "Персонаж")
-              .filter((o) => !sceneId||!activeScene||isObjectInScene(o,activeScene)||o.id===a.target)
+            ([{id:"",name:"Выберите объект"},...project.objects])
+              .filter((o) => !o.id || type !== "pose" || o.type === "Персонаж")
+              .filter((o) => !o.id||!sceneId||!activeScene||isObjectInScene(o,activeScene)||o.id===a.target)
               .map((o) => [o.id, o.name]),
           ),
         )}
       {type === "move" &&
-        field("К точке", select("value", pointOptions))}
+        <>
+        {field("К точке", select("value", [["", "Выберите точку"],...pointOptions]))}
+        <div className="action-coordinates">{['X','Y','Z'].map((axis,i)=><PhysicsNumber key={axis} label={axis} value={Array.isArray(a.value)?a.value[i]:0} onChange={n=>{const value=Array.isArray(a.value)?[...a.value]:[0,0,0];value[i]=n;onChange({value});}}/>)}</div>
+        {onPickPosition&&<button type="button" onClick={()=>onPickPosition(a.id)}>Выбрать вручную на сцене</button>}
+        {target?.type==='Персонаж'&&field('Анимация движения',select('animationId',[["","По настройкам персонажа"],...characterAnimationOptions(target,a.animationId)]))}
+        </>}
       {type === "pose" &&
         field(
           "Анимация персонажа",

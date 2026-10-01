@@ -3238,3 +3238,7 @@ select option,select optgroup { background:var(--graphite-700); color:var(--ivor
 .subscene-workspace input.subscene-inline-title:focus { outline:1px solid var(--accent); outline-offset:3px; }
 
 .subscene-workspace button.subscene-inline-title:hover:not(:disabled) { background:transparent; color:inherit; }
+
+.inline-event-editor label{display:flex;flex-direction:column;gap:5px;margin:8px 0}.inline-event-group{border:1px solid var(--border,#4a4e54);padding:8px;margin:12px 0}.inline-event-action{padding:6px;border-bottom:1px solid #444}.action-coordinates{display:flex;gap:5px}.action-coordinates label{min-width:0;flex:1}.action-coordinates input{width:100%;min-width:0}
+
+.inline-event-editor input,.inline-event-editor textarea,.inline-event-editor select{width:100%;min-width:0}.moment-event>span>[role="button"]{margin-left:auto;padding:3px;cursor:pointer}.moment-event>span>[role="button"]:hover{color:var(--danger,#efaaaa)}.subscene-workspace header>.button{cursor:pointer;white-space:nowrap;padding:7px 10px;border:1px solid var(--line);border-radius:4px}.inline-event-action>details{margin:8px 0}

@@ -6,10 +6,10 @@ import {createStandardProject,listLocalProjects,rememberLocalProject,BACKUP_KEY,
 
 const storage=()=>{const data=new Map();return {getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v)};};
 
-test('empty project is editable, valid and stays empty after saving and migration',()=>{
+test('new project has standard event library and an empty story after saving and migration',()=>{
   const project=createEmptyProject('С нуля');
   assert.equal(project.title,'С нуля');assert.equal(project.subscenes.length,1);
-  assert.equal(project.objects.length,0);assert.equal(project.events.length,0);
+  assert.equal(project.objects.length,0);assert.equal(project.events.length,5);assert.equal(project.standardEventsVersion,1);
   assert.equal(project.actionTemplates.length,0);assert.equal(project.groupTemplates.length,0);
   assert.equal(allBeats(project).length,1);assert.equal(allBeats(project)[0].text,'');
   assert.equal(project.subscenes[0].cameras.length,1);

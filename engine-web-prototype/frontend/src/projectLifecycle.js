@@ -23,7 +23,7 @@ export function createEmptyProject(name='Новый проект') {
   return upgradeProject({
     version:2,id:uid('project'),title:projectName(name),revision:2,
     visualExamplesVersion:1,sceneEditingVersion:2,
-    variables:{trust:0,letter:false},objects:[],events:[],audioAssets:[],actionTemplates:[],groupTemplates:[],
+    variables:{},objects:[],events:[],audioAssets:[],actionTemplates:[],groupTemplates:[],
     scene:{location:sceneId,weather:'Ясно',time:'День',camera:'Общий план'},
     subscenes:[{id:sceneId,name:'Новая сцена',location:'Пустая сцена',kind:'living',entry,sceneId:'chapter1',weather:'Ясно',time:'День',color:'#bd94a9',stagingPoints:[]}],
     chapters:[{id:uid('chapter'),name:'Первый эпизод',subsceneId:sceneId,beats:[{id:entry,kind:'dialogue',speaker:'Рассказчик',text:'',next:null,bindings:[],mode:'SEQUENTIAL'}]}],

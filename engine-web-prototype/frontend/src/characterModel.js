@@ -3,6 +3,9 @@ import {isObjectInScene} from './sceneEditing.js';
 
 export const BUILTIN_CHARACTER_ANIMATIONS=[
  ['стоит','Спокойно стоит: руки опущены, голова прямо. Подходит для ожидания и нейтрального диалога.','PersonStanding'],
+ ['ходит','Идёт с движением рук.','Footprints'],
+ ['сидит','Сидит с согнутыми ногами.','Armchair'],
+ ['машет','Поднимает руку и приветствует.','Hand'],
  ['улыбка','Наклоняет голову и приподнимает руку; выражение лица становится мягче. Для радостной реакции.','Smile'],
  ['задумчивость','Слегка разворачивается и поднимает руку к голове. Для размышления или сомнения.','Brain'],
  ['танец','Ритмично покачивается, поворачивается и двигает поднятыми руками. Для танца и празднования.','Music2'],
@@ -26,7 +29,7 @@ export function characterAnimationId(character,pose,moving){
  if(pose)return has(pose)?pose:null;
  if(has(character?.idleAnimation))return character.idleAnimation;
  if(character?.idleAnimation!=null)return null;
- return available[0]?.id||null;
+ return has('стоит')?'стоит':available[0]?.id||null;
 }
 export function createCharacter(project,sceneId,name){
  if(!name?.trim())throw new Error('Укажите имя персонажа.');

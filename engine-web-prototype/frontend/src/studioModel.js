@@ -1,4 +1,4 @@
-import {isPureNode,isDataSource,readLogic,choiceEnabled,dataTargets,getInput} from './logicModel.js';
+import {isPureNode,isDataSource,readLogic,choiceEnabled,dataTargets,getInput,dataConnectionError} from './logicModel.js';
 import {choiceAvailable,evaluateCondition,availabilityOf,storyPorts,ANSWER_VARIABLE} from './choiceModel.js';
 import {createProject,allBeats,makeAction,uid,nextNode,routeTo,resolvedActions,TYPES,validActionTarget,validate as legacyValidate} from './model.js';
 import {extendVisualExamples} from './visualExamples.js';
@@ -24,7 +24,17 @@ export function normalizeBatches(b){
  return b;
 }
 const newBinding=(eventId,hook='ON_START',join='EVENT_END')=>({id:uid('bind'),eventId,hook,join,overrides:{},actionOverrides:{}});
-export function addToBatch(p,beatId,phase,batchId,eventId){const b=allBeats(p).find(x=>x.id===beatId),e=p.events.find(x=>x.id===eventId);if(!b||!e)return;normalizeBatches(b);const binding=newBinding(eventId,phase,e.retention==='AUTO_CLOSE_ON_FLOW_END'?'EVENT_END':'FLOW_END');b.bindings.push(binding);let g=b.batches[phase].find(x=>x.id===batchId);if(!g){g={id:uid('batch'),mode:'SEQUENTIAL',bindingIds:[]};b.batches[phase].push(g);}g.bindingIds.push(binding.id);return binding;}
+export function addToBatch(p,beatId,phase,batchId,eventId){const b=allBeats(p).find(x=>x.id===beatId),e=p.events.find(x=>x.id===eventId);if(!b||!e)return;normalizeBatches(b);const binding=newBinding(eventId,phase,e.retention==='AUTO_CLOSE_ON_FLOW_END'?'EVENT_END':'FLOW_END');if(e.standardPreset){const scene=sceneFor(p,beatId),character=p.objects.find(o=>o.type==='Персонаж'&&o.active!==false&&isObjectInScene(o,scene));
+ for(const a of e.groups.flatMap(g=>g.actions)){if(['move','pose','visibility'].includes(a.type)){const patch={target:character?.id||''};
+ if(a.type==='pose'&&character&&!enabledCharacterAnimations(character).some(c=>c.id===a.value))patch.value='';
+ if(a.type==='move'&&a.animationId&&character&&!enabledCharacterAnimations(character).some(c=>c.id===a.animationId))patch.animationId=character.walkAnimation||'';
+ binding.actionOverrides[a.id]=patch;}}
+ }b.bindings.push(binding);let g=b.batches[phase].find(x=>x.id===batchId);if(!g){g={id:uid('batch'),mode:'SEQUENTIAL',bindingIds:[]};b.batches[phase].push(g);}g.bindingIds.push(binding.id);return binding;}
+export function removeEventBinding(p,beatId,bindingId){
+ const beat=allBeats(p).find(b=>b.id===beatId),binding=beat?.bindings.find(b=>b.id===bindingId);if(!binding)return;
+ beat.bindings=beat.bindings.filter(b=>b.id!==bindingId);normalizeBatches(beat);
+ if(binding.localEventId&&!allBeats(p).some(b=>b.bindings.some(x=>x.eventId===binding.localEventId)))p.events=p.events.filter(e=>e.id!==binding.localEventId);
+}
 export function newEvent(type='move',target,value,name){return {id:uid('event'),name:name||TYPES[type].label,description:'',retention:TYPES[type].completion==='CONTINUOUS'?'HOLD_UNTIL_STOPPED':'AUTO_CLOSE_ON_FLOW_END',owner:'SubScene',groups:[{id:uid('group'),name:'Основное действие',actions:[makeAction(type,target,value)]}]};}
 export function upgradeProject(source){
  const p=ensureAudioSettings(structuredClone(source||createProject()));if(p.version===2){allBeats(p).forEach(normalizeBatches);return ensureCameras(ensureSceneEditing(ensureCreationLibrary(extendVisualExamples(p))));}
@@ -75,14 +85,15 @@ export function upgradeProject(source){
 }
 export function sceneFor(p,beatId){const c=p.chapters.find(c=>c.beats.some(b=>b.id===beatId));return p.subscenes.find(s=>s.id===c?.subsceneId)||p.subscenes[0];}
 export function edgesFor(p,b){return storyPorts(b).filter(port=>port.next).map(port=>({from:b.id,to:port.next,label:port.label,condition:port.condition,choiceId:port.id.startsWith('choice:')?port.id.slice(7):undefined}));}
-export function chooseNext(p,id,choiceId,vars){const b=allBeats(p).find(b=>b.id===id);if(!b)return null;let target=b.next;if(b.kind==='branch')target=(b.inputs?.condition?readLogic(p,b.inputs.condition,vars)===true:b.test?evaluateCondition(b.test,vars):b.condition===true)?b.trueNext:b.falseNext;else if(b.kind==='choice'){const c=b.choices.find(c=>c.id===choiceId);if(!c||!conditionPass(c,vars,p))return null;target=c.next||b.next;}return allBeats(p).find(n=>n.id===target)||null;}
-export function conditionPass(c,vars,p){try{return p&&c.enabledSource?choiceEnabled(p,c,vars):choiceAvailable(c,vars);}catch{return false;}}
+export function chooseNext(p,id,choiceId,vars,choiceResults={}){const b=allBeats(p).find(b=>b.id===id);if(!b)return null;let target=b.next;if(b.kind==='branch')target=(b.inputs?.condition?readLogic(p,b.inputs.condition,vars,new Set(),choiceResults)===true:b.test?evaluateCondition(b.test,vars):b.condition===true)?b.trueNext:b.falseNext;else if(b.kind==='choice'){const c=b.choices.find(c=>c.id===choiceId);if(!c||!conditionPass(c,vars,p,choiceResults))return null;target=c.next||b.next;}return allBeats(p).find(n=>n.id===target)||null;}
+export function conditionPass(c,vars,p,choiceResults={}){try{return p&&c.enabledSource?choiceEnabled(p,c,vars,choiceResults):choiceAvailable(c,vars);}catch{return false;}}
 
 export function validateStudio(p){
  const clone=structuredClone(p);allBeats(clone).forEach(b=>{b.mode='SEQUENTIAL';b.bindings.forEach(x=>x.join=x.join==='NONE'?'FLOW_END':x.join);});
  const issues=legacyValidate(clone).filter(i=>!i.id.startsWith('parallel-')).map(i=>i.fix==='fallback'?{...i,level:'warning'}:i);
  for(const scene of p.subscenes||[])for(const c of scene.cameras||[])if(c.mode==='follow'&&!p.objects.some(o=>o.id===c.followTargetId&&o.type==='Персонаж'&&o.active!==false&&isObjectInScene(o,scene)))issues.push({id:`camera-target-${c.id}`,beatId:scene.entry,level:'warning',title:'Камере не за кем следить',detail:`«${c.name}»: выберите доступного персонажа во вкладке «Камеры». Пока используется сохранённый кадр.`});
  for(const b of allBeats(p)){
+  for(const port of dataTargets(b)){const source=getInput(b,port),sourceNode=allBeats(p).find(n=>n.id===source);if(source&&(['math','convert','not'].includes(b.kind)||['math','convert','not','choice'].includes(sourceNode?.kind))){const error=dataConnectionError(p,{source,sourceHandle:'value',target:b.id,targetHandle:port});if(error)issues.push({id:`value-type-${b.id}-${port}`,beatId:b.id,level:'error',title:'Несовместимое соединение значений',detail:error});}}
   if(isPureNode(b)){
    if(b.kind==='variable'&&b.variable!==ANSWER_VARIABLE&&!Object.hasOwn(p.variables||{},b.variable))issues.push({id:`logic-variable-${b.id}`,beatId:b.id,level:'error',title:'Переменная не создана',detail:'Введите имя и начальное значение прямо в ноде.'});
    for(const source of Object.values(b.inputs||{}))if(source&&!allBeats(p).some(n=>n.id===source&&isDataSource(n)))issues.push({id:`logic-input-${b.id}-${source}`,beatId:b.id,level:'error',title:'Источник значения удалён',detail:'Переподключите круглый вход.'});
@@ -96,6 +107,8 @@ export function validateStudio(p){
   for(const binding of b.bindings)for(const a of bindingActions(p,binding))if(a.type==='camera'&&a.cameraId&&!sceneFor(p,b.id).cameras?.some(c=>c.id===a.cameraId))issues.push({id:`camera-missing-${b.id}-${binding.id}-${a.id}`,beatId:b.id,eventId:binding.eventId,level:'error',title:'Камера недоступна в этой сабсцене',detail:'Камера удалена или относится к другой локации. Выберите камеру этой сабсцены в действии «Сменить план».'});
   for(const binding of b.bindings)for(const action of bindingActions(p,binding)){
    const character=p.objects.find(object=>object.id===action.target&&object.type==='Персонаж');
+   if(p.events.find(e=>e.id===binding.eventId)?.standardPreset&&!validActionTarget(p,action))issues.push({id:`preset-target-${binding.id}-${action.id}`,beatId:b.id,eventId:binding.eventId,level:'error',title:'Выберите объект для стандартного события',detail:'Добавьте персонажа в локацию и выберите его в инспекторе события.'});
+   if(action.type==='move'&&action.animationId&&character&&!enabledCharacterAnimations(character).some(c=>c.id===action.animationId))issues.push({id:`move-animation-${binding.id}-${action.id}`,beatId:b.id,eventId:binding.eventId,level:'error',title:'Анимация движения недоступна',detail:'Выберите доступную анимацию движения в инспекторе.'});
    if(action.type==='pose'&&character&&!enabledCharacterAnimations(character).some(clip=>clip.id===action.value))issues.push({id:`action-animation-${binding.id}-${action.id}`,beatId:b.id,eventId:binding.eventId,level:'error',title:'Анимация персонажа недоступна',detail:`«${character.name}»: анимация удалена, отключена или отсутствует в новой модели. Выберите анимацию из его пула.`});
   }
   for(const phase of PHASES)for(const batch of batchesFor(b,phase.id)){
