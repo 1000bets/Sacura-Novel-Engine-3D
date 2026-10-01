@@ -27,6 +27,8 @@ runs:
       working-directory: ${{ github.workspace }}/engine-web-prototype
       env:
         VITE_SERVER_STORAGE: "true"
+        VITE_BUILD_SHA: ${{ github.sha }}
+        VITE_DEPLOY_ENV: staging
     - name: Configure isolated test storage
       shell: bash
       working-directory: ${{ github.workspace }}/engine-web-prototype
@@ -43,6 +45,7 @@ runs:
       env:
         DOMAIN: editor.example.com
         ACME_EMAIL: ops@example.com
+        SACURA_RELEASE: ${{ github.sha }}
     - run: docker compose up -d --build --wait --wait-timeout 180
       shell: bash
       working-directory: ${{ github.workspace }}/engine-web-prototype

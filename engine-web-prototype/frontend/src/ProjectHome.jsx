@@ -2,6 +2,7 @@ import React,{useEffect,useRef,useState} from 'react';
 import {Flower2,Plus,BookOpen,FolderOpen,ArrowRight,LogOut,Upload} from 'lucide-react';
 import Editor from './Editor.jsx';
 import ThemePicker from './ThemePicker.jsx';
+import BuildVersion from './BuildVersion.jsx';
 import {accountStorage} from './accountStorage.js';
 import {serverStorageEnabled,listServerProjects,openServerProject,saveServerProject,flushServerSaves} from './serverStorage.js';
 import {createEmptyProject,createStandardProject,listLocalProjects,rememberLocalProject,parseProjectFile} from './projectLifecycle.js';
@@ -53,5 +54,6 @@ export default function ProjectHome({user=null,onLogout}) {
     <input ref={fileInput} type="file" hidden accept="application/json,.json" onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(file)run(async()=>open(parseProjectFile(await file.text()).project,{save:true}));}}/><button className="project-home-import" disabled={busy} onClick={()=>fileInput.current?.click()}><Upload aria-hidden="true" size={16}/>Загрузить проект из файла</button>
    </section>
   </div>
+  <footer className="project-home-version"><BuildVersion/></footer>
  </main>;
 }
