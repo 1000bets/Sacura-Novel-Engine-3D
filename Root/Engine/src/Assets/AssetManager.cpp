@@ -16,6 +16,7 @@ AssetManager::AssetManager()
     RegisterLoader(StaticMeshAssetType, ModelLoaderInstance);
     RegisterLoader(TextureAssetType, TextureLoaderInstance);
     RegisterLoader(MaterialAssetType, MaterialLoaderInstance);
+    RegisterLoader(MaterialInstanceAssetType, MaterialInstanceLoaderInstance);
     RegisterLoader(SkeletalMeshAssetType, SkeletalLoaderInstance);
     RegisterLoader(SkeletonAssetType, SkeletalLoaderInstance);
     RegisterLoader(AnimationClipAssetType, SkeletalLoaderInstance);
@@ -422,7 +423,10 @@ void AssetManager::ScheduleWorkerLoad(AssetSlot& Slot, const AssetLoadContext& C
         Fault = WorkerLoadFault;
     }
 
-    Jobs->Schedule(OutstandingLoads, [this, Key, Generation, CapturedSession, Context, Loader, CancelFlag, ReleaseFlag, Fault]()
+    AssetLoadContext CapturedContext = Context;
+    CapturedContext.RegistrySnapshot = std::make_shared<const AssetRegistry>(*Registry);
+    CapturedContext.Registry = CapturedContext.RegistrySnapshot.get();
+    Jobs->Schedule(OutstandingLoads, [this, Key, Generation, CapturedSession, Context = std::move(CapturedContext), Loader, CancelFlag, ReleaseFlag, Fault]()
     {
         auto PushEvent = [this](CompletionEvent Event)
         {

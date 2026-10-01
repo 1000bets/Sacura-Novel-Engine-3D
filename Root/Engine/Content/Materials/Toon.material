@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 2,
+  "domain": "Surface",
+  "source": {
+    "assetId": "6c85f1fa-54c0-5069-9c00-cdc936cbb91f",
+    "subAssetId": null
+  },
+  "parameters": [
+    {
+      "id": "BaseColor",
+      "type": "Color",
+      "default": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "displayName": "BaseColor",
+      "group": "Surface"
+    },
+    {
+      "id": "Metallic",
+      "type": "Float",
+      "default": 0,
+      "displayName": "Metallic",
+      "group": "Surface",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "id": "Roughness",
+      "type": "Float",
+      "default": 0.5,
+      "displayName": "Roughness",
+      "group": "Surface",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "id": "Emissive",
+      "type": "Color",
+      "default": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "displayName": "Emissive",
+      "group": "Surface"
+    },
+    {
+      "id": "NormalStrength",
+      "type": "Float",
+      "default": 1,
+      "displayName": "NormalStrength",
+      "group": "Surface",
+      "range": [
+        0,
+        4
+      ]
+    },
+    {
+      "id": "OcclusionStrength",
+      "type": "Float",
+      "default": 1,
+      "displayName": "OcclusionStrength",
+      "group": "Surface",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "id": "BaseColorTexture",
+      "type": "Texture2D",
+      "default": null,
+      "displayName": "BaseColorTexture",
+      "group": "Surface",
+      "srgb": true
+    },
+    {
+      "id": "NormalTexture",
+      "type": "Texture2D",
+      "default": null,
+      "displayName": "NormalTexture",
+      "group": "Surface",
+      "srgb": false
+    },
+    {
+      "id": "MetallicRoughnessTexture",
+      "type": "Texture2D",
+      "default": null,
+      "displayName": "MetallicRoughnessTexture",
+      "group": "Surface",
+      "srgb": false
+    },
+    {
+      "id": "OcclusionTexture",
+      "type": "Texture2D",
+      "default": null,
+      "displayName": "OcclusionTexture",
+      "group": "Surface",
+      "srgb": false
+    },
+    {
+      "id": "EmissiveTexture",
+      "type": "Texture2D",
+      "default": null,
+      "displayName": "EmissiveTexture",
+      "group": "Surface",
+      "srgb": true
+    },
+    {
+      "id": "Steps",
+      "type": "Integer",
+      "default": 3,
+      "displayName": "Steps",
+      "group": "Surface",
+      "range": [
+        2,
+        16
+      ]
+    },
+    {
+      "id": "Smoothness",
+      "type": "Float",
+      "default": 0.05,
+      "displayName": "Smoothness",
+      "group": "Surface",
+      "range": [
+        0.001,
+        0.49
+      ]
+    },
+    {
+      "id": "Specular",
+      "type": "Float",
+      "default": 0.5,
+      "displayName": "Specular",
+      "group": "Surface",
+      "range": [
+        0,
+        4
+      ]
+    }
+  ],
+  "shadingModel": "Toon",
+  "blendMode": "Opaque"
+}

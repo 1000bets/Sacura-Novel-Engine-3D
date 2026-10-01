@@ -1,13 +1,13 @@
 # ---------------------------------------------------------------
-# Engine-owned third-party (SDL3, Diligent, SimpleMath, …)
+# Engine-owned third-party (SDL3, Diligent, SimpleMath, РІР‚В¦)
 # ---------------------------------------------------------------
 add_subdirectory(ThirdParty)
 
 # ---------------------------------------------------------------
-# Engine library (explicit sources — do not use file(GLOB) for compilation units)
+# Engine library (explicit sources РІР‚вЂќ do not use file(GLOB) for compilation units)
 # ---------------------------------------------------------------
 set(ENGINE_SRC
-    src/Assets/AssetGpuUploader.cpp
+    src/Rendering/Assets/AssetGpuUploader.cpp
     src/Assets/AssetManager.cpp
     src/Assets/AssetMetadata.cpp
     src/Assets/AssetPath.cpp
@@ -15,30 +15,36 @@ set(ENGINE_SRC
     src/Assets/AssetTypes.cpp
     src/Assets/ContentHash.cpp
     src/Assets/Guid.cpp
-    src/Assets/SceneAssetResolver.cpp
+    src/World/Resources/SceneAssetResolver.cpp
+    src/Assets/SurfaceVertices.cpp
     src/Assets/Loaders/MaterialLoader.cpp
     src/Assets/Loaders/ModelLoader.cpp
     src/Assets/Loaders/SkeletalLoader.cpp
     src/Assets/Loaders/TextureLoader.cpp
+    src/Core/IO/AtomicFileWriter.cpp
     src/Core/EnginePaths.cpp
-    src/Core/MemorySubsystem.cpp
+    src/Core/Object/MemorySubsystem.cpp
     src/Core/Subsystem.cpp
     src/Core/Threading/JobSystem.cpp
-    src/Core/Threading/RenderCommandQueue.cpp
-    src/Core/Threading/RenderFrameQueue.cpp
-    src/Core/Threading/RenderThread.cpp
+    src/Rendering/Threading/RenderCommandQueue.cpp
+    src/Rendering/Threading/RenderFrameQueue.cpp
+    src/Rendering/Threading/RenderThread.cpp
     src/Core/Threading/ThreadContext.cpp
     src/Engine.cpp
-    src/Game/PlaySession.cpp
-    src/Game/Scene.cpp
-    src/Game/SceneSerializer.cpp
-    src/Gameplay/CameraComponent.cpp
-    src/Gameplay/Component.cpp
-    src/Gameplay/GameObject.cpp
-    src/Gameplay/LightComponent.cpp
-    src/Gameplay/MeshRendererComponent.cpp
-    src/Gameplay/Object.cpp
-    src/Gameplay/ScriptComponent.cpp
+    src/World/Simulation/PlaySession.cpp
+    src/World/Scene.cpp
+    src/World/Serialization/SceneSerializer.cpp
+    src/World/Components/CameraComponent.cpp
+    src/World/Components/Component.cpp
+    src/World/GameObject.cpp
+    src/World/Components/LightComponent.cpp
+    src/World/Components/MeshRendererComponent.cpp
+    src/Core/Object/Object.cpp
+    src/World/Components/ScriptComponent.cpp
+    src/Materials/MaterialBindings.cpp
+    src/Materials/MaterialDefinition.cpp
+    src/Materials/MaterialDocumentIO.cpp
+    src/Materials/DynamicMaterialInstance.cpp
     src/ISystem.cpp
     src/Platform/WindowSubsystem.cpp
     src/Project/ProjectDescriptor.cpp
@@ -57,18 +63,21 @@ set(ENGINE_SRC
     src/Rendering/RHI/Renderer.cpp
     src/Rendering/RHI/ImGuiOverlayPass.cpp
     src/Rendering/RHI/EnvironmentLighting.cpp
+    src/Rendering/PresentationController.cpp
     src/Rendering/RenderView.cpp
     src/Rendering/RHI/GpuBuffer.cpp
     src/Rendering/RHI/RenderMesh.cpp
     src/Rendering/RHI/RenderResourceManager.cpp
     src/Rendering/SceneExtractor.cpp
+    src/Scripting/PythonBindings.cpp
+    src/Scripting/ScriptLifecycle.cpp
     src/Scripting/ScriptingSubsystem.cpp
     src/Story/StoryDocumentIO.cpp
     src/Story/StoryRuntime.cpp
 )
 
 set(ENGINE_HDR
-    inc/Assets/AssetGpuUploader.h
+    inc/Rendering/Assets/AssetGpuUploader.h
     inc/Assets/AssetHandle.h
     inc/Assets/AssetManager.h
     inc/Assets/AssetMetadata.h
@@ -78,7 +87,7 @@ set(ENGINE_HDR
     inc/Assets/AssetTypes.h
     inc/Assets/ContentHash.h
     inc/Assets/Guid.h
-    inc/Assets/SceneAssetResolver.h
+    inc/World/Resources/SceneAssetResolver.h
     inc/Assets/Loaders/IAssetLoader.h
     inc/Assets/Loaders/MaterialLoader.h
     inc/Assets/Loaders/ModelLoader.h
@@ -92,31 +101,32 @@ set(ENGINE_HDR
     inc/Assets/Resources/SkinBinding.h
     inc/Assets/Resources/StaticMeshResource.h
     inc/Assets/Resources/TextureResource.h
+    inc/Core/IO/AtomicFileWriter.h
     inc/Core/EnginePaths.h
-    inc/Core/MemorySubsystem.h
+    inc/Core/Object/MemorySubsystem.h
     inc/Core/Subsystem.h
     inc/Core/Threading/JobSystem.h
-    inc/Core/Threading/RenderCommandQueue.h
-    inc/Core/Threading/RenderFrameData.h
-    inc/Core/Threading/RenderFrameQueue.h
-    inc/Core/Threading/RenderThread.h
+    inc/Rendering/Threading/RenderCommandQueue.h
+    inc/Rendering/Frame/RenderFrameData.h
+    inc/Rendering/Threading/RenderFrameQueue.h
+    inc/Rendering/Threading/RenderThread.h
     inc/Core/Threading/ThreadContext.h
     inc/Core/Threading/ThreadRole.h
     inc/Core/Transform.h
     inc/Core/Types.h
     inc/Engine.h
-    inc/Game/PlaySession.h
-    inc/Game/Scene.h
-    inc/Game/SceneSerializer.h
-    inc/Gameplay/CameraComponent.h
-    inc/Gameplay/Component.h
-    inc/Gameplay/GameObject.h
-    inc/Gameplay/LightComponent.h
-    inc/Gameplay/LightSettings.h
-    inc/Gameplay/MeshRendererComponent.h
-    inc/Gameplay/Object.h
-    inc/Gameplay/ObjectHandle.h
-    inc/Gameplay/ScriptComponent.h
+    inc/World/Simulation/PlaySession.h
+    inc/World/Scene.h
+    inc/World/Serialization/SceneSerializer.h
+    inc/World/Components/CameraComponent.h
+    inc/World/Components/Component.h
+    inc/World/GameObject.h
+    inc/World/Components/LightComponent.h
+    inc/World/Components/LightSettings.h
+    inc/World/Components/MeshRendererComponent.h
+    inc/Core/Object/Object.h
+    inc/Core/Object/ObjectHandle.h
+    inc/World/Components/ScriptComponent.h
     inc/ISystem.h
     inc/Platform/GraphicsBackend.h
     inc/Platform/NativeWindowInfo.h
@@ -148,6 +158,7 @@ set(ENGINE_HDR
     src/Rendering/RHI/RenderContext.h
     src/Rendering/RHI/RenderDevice.h
     src/Rendering/RHI/Renderer.h
+    inc/Rendering/PresentationController.h
     inc/Rendering/RenderView.h
     src/Rendering/RHI/RenderSurface.h
     inc/Rendering/RenderLight.h
@@ -168,6 +179,8 @@ set(ENGINE_HDR
 add_library(Engine STATIC ${ENGINE_SRC} ${ENGINE_HDR}
     inc/UI/RenderViewportWidget.h
     src/UI/RenderViewportWidget.cpp
+    inc/UI/MaterialWidget.h
+    src/UI/MaterialWidget.cpp
     inc/UI/StoryWidget.h
     src/UI/StoryWidget.cpp
 )
@@ -190,7 +203,10 @@ if(NOT WIN32)
     )
 endif()
 
-target_link_libraries(Engine PUBLIC Sakura::EngineThirdParty)
+target_link_libraries(Engine
+    PUBLIC Sakura::EngineQtThirdParty nlohmann_json::nlohmann_json ozz_animation
+    PRIVATE Sakura::EngineThirdParty
+)
 
 target_compile_definitions(Engine
 PUBLIC
@@ -248,3 +264,6 @@ if(WIN32)
     target_compile_definitions(Engine PRIVATE PLATFORM_WIN32=1 D3D12_SUPPORTED=1)
 endif()
 target_compile_definitions(Engine PRIVATE ENGINE_DLL=1 VULKAN_SUPPORTED=1 GL_SUPPORTED=1)
+
+target_sources(Engine PRIVATE src/Rendering/RHI/MaterialShaderCompiler.cpp)
+target_link_libraries(Engine PRIVATE Diligent-ShaderTools spirv-cross-glsl)

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Gameplay/Object.h"
+#include "Core/Object/Object.h"
 #include "Reflection/PropertyDescriptor.h"
 #include "Reflection/TypeId.h"
 

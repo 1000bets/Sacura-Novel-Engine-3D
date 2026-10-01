@@ -1,10 +1,13 @@
+#include "World/Components/MeshRendererComponent.h"
+#include "World/Components/CameraComponent.h"
+#include "World/GameObject.h"
 #include "Engine.h"
 #include "Core/EnginePaths.h"
-#include "Core/MemorySubsystem.h"
-#include "Core/Threading/RenderFrameData.h"
-#include "Core/Threading/RenderThread.h"
+#include "Core/Object/MemorySubsystem.h"
+#include "Rendering/Frame/RenderFrameData.h"
+#include "Rendering/Threading/RenderThread.h"
 #include "Core/Threading/ThreadContext.h"
-#include "Game/Scene.h"
+#include "World/Scene.h"
 #include "Platform/WindowSubsystem.h"
 #include "Project/ProjectPaths.h"
 #include "Reflection/ReflectionSubsystem.h"
@@ -91,12 +94,17 @@ void Engine::ScanConfiguredContent()
     }
 }
 
-void Engine::ImportProjectScripts()
+ReflectionDiagnostic Engine::ImportProjectScripts()
 {
     Scripting.SetScriptsRoot(ScriptsRoot);
     if (!Scripting.IsPythonEnabled())
     {
-        return;
+        return ReflectionDiagnostic::Ok();
+    }
+
+    if (!Scripting.IsInitialized())
+    {
+        return ReflectionDiagnostic::Fail("Scripting initialization failed: " + InitializationError);
     }
 
     const ReflectionDiagnostic Imported = Scripting.ImportConfiguredModules();
@@ -104,11 +112,19 @@ void Engine::ImportProjectScripts()
     {
         PrintString(std::string("Scripting import failed: ") + Imported.Message);
     }
+    return Imported;
 }
 
 AssetDiagnostic Engine::LoadProjectContent(const ProjectDescriptor& Descriptor)
 {
     AssertGameThread();
+    ProjectDiagnostics.clear();
+    if (!bInitialized)
+    {
+        const AssetDiagnostic Failure = AssetDiagnostic::Fail(AssetErrorCode::InternalError, "ProjectLoad", "Engine initialization failed: " + InitializationError);
+        ProjectDiagnostics.push_back(Failure);
+        return Failure;
+    }
 
     ProjectPaths::SetRoot(Descriptor.ProjectRoot);
     SetContentRoot(ProjectPaths::Content());
@@ -127,12 +143,25 @@ AssetDiagnostic Engine::LoadProjectContent(const ProjectDescriptor& Descriptor)
         PrintString(std::string("AssetRegistry project scan failed: ") + ScanDiagnostic.Message);
     }
 
-    if (bInitialized)
+    ProjectDiagnostics = Registry.GetScanDiagnostics();
+    if (ScanDiagnostic.HasError() && ProjectDiagnostics.empty())
     {
-        ImportProjectScripts();
+        ProjectDiagnostics.push_back(ScanDiagnostic);
     }
-
-    return ScanDiagnostic;
+    const ReflectionDiagnostic Imported = ImportProjectScripts();
+    for (const ReflectionDiagnostic& Diagnostic : Scripting.GetImportDiagnostics())
+    {
+        ProjectDiagnostics.push_back(AssetDiagnostic::Fail(AssetErrorCode::InvalidData, "ScriptImport", Diagnostic.Message));
+    }
+    if (!Imported.bOk && Scripting.GetImportDiagnostics().empty())
+    {
+        ProjectDiagnostics.push_back(AssetDiagnostic::Fail(AssetErrorCode::InvalidData, "ScriptImport", Imported.Message));
+    }
+    if (!ProjectDiagnostics.empty())
+    {
+        return ProjectDiagnostics.front();
+    }
+    return AssetDiagnostic::Ok();
 }
 
 void Engine::UnloadProjectContent()
@@ -141,6 +170,7 @@ void Engine::UnloadProjectContent()
 
     AdoptScene({});
     StartupStory.clear();
+    AssetResolver.Clear();
     GpuUploader.Clear();
     Assets.Shutdown();
 
@@ -172,21 +202,28 @@ void Engine::InitializeCommon(bool bCreateWindowAndRender)
     CreateSubsystem<MemorySubsystem>();
 
     Jobs.Initialize();
+    bInitialized = true;
+    InitializationError.clear();
 
     {
         const ReflectionDiagnostic ReflectionInit = ReflectionSubsystem::Get().InitializeNative();
         if (!ReflectionInit.bOk)
         {
-            PrintString(std::string("Reflection InitializeNative failed: ") + ReflectionInit.Message);
+            InitializationError = ReflectionInit.Message;
+            PrintString(std::string("Reflection InitializeNative failed: ") + InitializationError);
+            Shutdown();
+            return;
         }
     }
 
     {
         Scripting.SetScriptsRoot(ScriptsRoot);
+        Scripting.BindMaterialEngine(this);
         const ReflectionDiagnostic ScriptingInit = Scripting.Initialize();
         if (!ScriptingInit.bOk)
         {
-            PrintString(std::string("Scripting initialize failed: ") + ScriptingInit.Message);
+            InitializationError = ScriptingInit.Message;
+            PrintString(std::string("Scripting initialize failed: ") + InitializationError);
         }
         else
         {
@@ -208,8 +245,7 @@ void Engine::InitializeCommon(bool bCreateWindowAndRender)
 
         ResolveShaderDirectory();
         const NativeWindowInfo WindowInfo = Window->GetNativeWindowInfo();
-        PresentationWidth = WindowInfo.Width;
-        PresentationHeight = WindowInfo.Height;
+        Presentation.Register(RenderSurfaceId{1}, WindowInfo);
         Render.Start(WindowInfo, ShaderDirectory, PreferredBackend);
         if (!Render.WaitUntilReady())
         {
@@ -254,7 +290,10 @@ void Engine::InitializeHeadless(const std::filesystem::path& InContentRoot)
         }
     }
     InitializeCommon(false);
-    PrintString("Engine: initialized headless");
+    if (bInitialized)
+    {
+        PrintString("Engine: initialized headless");
+    }
 }
 
 bool Engine::StartPresenting(const NativeWindowInfo& WindowInfo)
@@ -276,13 +315,13 @@ bool Engine::StartPresenting(const NativeWindowInfo& WindowInfo)
     }
     if (Render.GetState() != RenderThreadState::Stopped)
     {
-        PrintString("Engine: StartPresenting rejected — RenderThread is not stopped");
+        PrintString("Engine: StartPresenting rejected вЂ” RenderThread is not stopped");
         return false;
     }
 
     if (WindowInfo.WindowHandle == nullptr || WindowInfo.Width == 0 || WindowInfo.Height == 0)
     {
-        PrintString("Engine: StartPresenting rejected — invalid native window");
+        PrintString("Engine: StartPresenting rejected вЂ” invalid native window");
         return false;
     }
 
@@ -294,10 +333,8 @@ bool Engine::StartPresenting(const NativeWindowInfo& WindowInfo)
         return false;
     }
 
-    PresentationWidth = WindowInfo.Width;
-    PresentationHeight = WindowInfo.Height;
     bHeadless = false;
-    Presentations[1].Window = WindowInfo;
+    Presentation.Register(RenderSurfaceId{1}, WindowInfo);
     PrintString("Engine: presenting to editor native surface");
     return true;
 }
@@ -315,7 +352,8 @@ void Engine::StopPresenting()
         return;
     }
     Render.Stop();
-    Presentations.clear();
+    Presentation.Clear();
+    AssetResolver.Clear();
     GpuUploader.Clear();
     bHeadless = true;
     PrintString("Engine: presentation stopped");
@@ -354,20 +392,42 @@ bool Engine::StartGame()
     {
         return false;
     }
+    if (!PrepareSceneMaterials(*OwnedScene))
+    {
+        return false;
+    }
+    MaterialTime = 0.f;
     bGameRunning = true;
+    OwnedScene->BeginPlay();
     BeginStory(OwnedScene.get());
     return true;
 }
 
+std::shared_ptr<DynamicMaterialInstance> Engine::CreateDynamicMaterialInstance(const AssetKey& Material)
+{
+    AssertGameThread();
+    const auto Snapshot = AssetResolver.ResolveMaterial(Material);
+    if (!Snapshot)
+    {
+        return {};
+    }
+    return std::make_shared<DynamicMaterialInstance>(*Snapshot->Material);
+}
+
 void Engine::StopGame()
 {
-    bGameRunning = false;
     Story.BindScene(nullptr);
+    if (bGameRunning && OwnedScene != nullptr)
+    {
+        OwnedScene->EndPlay();
+    }
+    bGameRunning = false;
 }
 
 void Engine::TickWorld(Scene& World, float DeltaTime)
 {
     AssertGameThread();
+    MaterialTime += std::max(0.f, DeltaTime);
     World.Tick(DeltaTime);
     Story.Tick(DeltaTime);
 }
@@ -375,23 +435,18 @@ void Engine::TickWorld(Scene& World, float DeltaTime)
 void Engine::SetEditorRenderCamera(const RenderCamera& Camera)
 {
     AssertGameThread();
-    bEditorRenderCamera = true;
-    EditorRenderCamera = Camera;
     ConfigureRenderSurface(RenderSurfaceId{1}, true, Camera);
 }
 
 void Engine::UseGameRenderCamera()
 {
     AssertGameThread();
-    bEditorRenderCamera = false;
     ConfigureRenderSurface(RenderSurfaceId{1}, false, RenderCamera{});
 }
 
 void Engine::ResizePresentation(uint32_t Width, uint32_t Height)
 {
     AssertGameThread();
-    PresentationWidth = Width;
-    PresentationHeight = Height;
     ResizeRenderSurface(RenderSurfaceId{1}, Width, Height);
 }
 
@@ -410,27 +465,23 @@ bool Engine::RegisterRenderSurface(RenderSurfaceId Surface, const NativeWindowIn
         }
         return true;
     }
-    auto Existing = Presentations.find(Surface.Value);
-    if (Existing != Presentations.end())
+    if (Presentation.Contains(Surface, WindowInfo))
     {
-        if (Existing->second.Window.WindowHandle == WindowInfo.WindowHandle)
-        {
-            return true;
-        }
-        UnregisterRenderSurface(Surface);
+        return true;
     }
+    UnregisterRenderSurface(Surface);
     if (!Render.AttachSurface(Surface, WindowInfo))
     {
         return false;
     }
-    Presentations[Surface.Value].Window = WindowInfo;
+    Presentation.Register(Surface, WindowInfo);
     return true;
 }
 
 void Engine::UnregisterRenderSurface(RenderSurfaceId Surface)
 {
     AssertGameThread();
-    if (Presentations.erase(Surface.Value) != 0)
+    if (Presentation.Unregister(Surface))
     {
         Render.DetachSurface(Surface);
     }
@@ -439,35 +490,20 @@ void Engine::UnregisterRenderSurface(RenderSurfaceId Surface)
 void Engine::ResizeRenderSurface(RenderSurfaceId Surface, uint32_t Width, uint32_t Height)
 {
     AssertGameThread();
-    auto Existing = Presentations.find(Surface.Value);
-    if (Existing != Presentations.end())
-    {
-        Existing->second.Window.Width = Width;
-        Existing->second.Window.Height = Height;
-    }
+    Presentation.Resize(Surface, Width, Height);
     Render.ResizeSurface(Surface, Width, Height);
 }
 
 void Engine::ConfigureRenderSurface(RenderSurfaceId Surface, bool bEditScene, const RenderCamera& Camera, const RenderSettings& Settings)
 {
     AssertGameThread();
-    auto Existing = Presentations.find(Surface.Value);
-    if (Existing != Presentations.end())
-    {
-        Existing->second.bEditScene = bEditScene;
-        Existing->second.Camera = Camera;
-        Existing->second.Settings = Settings;
-    }
+    Presentation.Configure(Surface, bEditScene, Camera, Settings);
 }
 
 void Engine::SetRenderSurfaceImGuiOverlay(RenderSurfaceId Surface, ImGuiOverlaySnapshot Overlay)
 {
     AssertGameThread();
-    auto Existing = Presentations.find(Surface.Value);
-    if (Existing != Presentations.end())
-    {
-        Existing->second.Overlay = std::move(Overlay);
-    }
+    Presentation.SetOverlay(Surface, std::move(Overlay));
 }
 
 void Engine::Tick(float DeltaTime)
@@ -475,6 +511,7 @@ void Engine::Tick(float DeltaTime)
     AssertGameThread();
     BeginFrame();
 
+    AssetResolver.PollMaterialChanges();
     Assets.PumpCompletions();
     Scene* ActiveScene = GetActiveScene();
     if (ActiveScene != nullptr)
@@ -492,6 +529,10 @@ void Engine::Tick(float DeltaTime)
     else if (bGameRunning && OwnedScene != nullptr)
     {
         TickWorld(*OwnedScene, DeltaTime);
+    }
+    if (!Play.IsSimulating() && !bGameRunning)
+    {
+        MaterialTime += std::max(0.f, DeltaTime);
     }
     TickSubsystems(DeltaTime);
 
@@ -522,69 +563,7 @@ void Engine::EndFrame()
         return;
     }
 
-    auto Frame = std::make_unique<RenderFrameData>();
-    Frame->FrameIndex = NextFrameIndex;
-
-    if (Presentations.empty())
-    {
-        Scene* SceneToRender = GetActiveScene();
-        if (bEditorRenderCamera)
-        {
-            SceneToRender = OwnedScene.get();
-        }
-        if (SceneToRender != nullptr)
-        {
-            Extractor.Extract(*SceneToRender, Frame->Scene);
-        }
-        if (bEditorRenderCamera)
-        {
-            Frame->Scene.Camera = EditorRenderCamera;
-        }
-        else if (Frame->Scene.Camera.bValid && PresentationHeight > 0)
-        {
-            RenderCamera& Camera = Frame->Scene.Camera;
-            Camera.AspectRatio = static_cast<float>(PresentationWidth) / static_cast<float>(PresentationHeight);
-            Camera.Projection = Matrix::CreatePerspectiveFieldOfView(
-                Camera.FieldOfView * (3.14159265f / 180.f), Camera.AspectRatio, Camera.NearPlane, Camera.FarPlane);
-            Camera.ViewProjection = Camera.View * Camera.Projection;
-        }
-    }
-
-    for (auto& Entry : Presentations)
-    {
-        PresentationState& Presentation = Entry.second;
-        if (Presentation.Window.Width == 0 || Presentation.Window.Height == 0)
-        {
-            continue;
-        }
-        RenderViewFrame View;
-        View.Surface = RenderSurfaceId{Entry.first};
-        View.Settings = Presentation.Settings;
-        Scene* World = GetActiveScene();
-        if (Presentation.bEditScene)
-        {
-            World = OwnedScene.get();
-        }
-        if (World != nullptr)
-        {
-            Extractor.Extract(*World, View.Scene);
-        }
-        if (Presentation.Camera.bValid)
-        {
-            View.Scene.Camera = Presentation.Camera;
-        }
-        RenderCamera& Camera = View.Scene.Camera;
-        if (Camera.bValid)
-        {
-            Camera.AspectRatio = static_cast<float>(Presentation.Window.Width) / static_cast<float>(Presentation.Window.Height);
-            Camera.Projection = Matrix::CreatePerspectiveFieldOfView(
-                Camera.FieldOfView * 0.0174532925f, Camera.AspectRatio, Camera.NearPlane, Camera.FarPlane);
-            Camera.ViewProjection = Camera.View * Camera.Projection;
-        }
-        View.Overlay = std::move(Presentation.Overlay);
-        Frame->Views.push_back(std::move(View));
-    }
-    Render.SubmitFrame(std::move(Frame));
+    Render.SubmitFrame(Presentation.BuildFrame(NextFrameIndex, GetActiveScene(), OwnedScene.get(), MaterialTime));
     ++NextFrameIndex;
 }
 
@@ -602,9 +581,11 @@ void Engine::Shutdown()
     OwnedScene.reset();
 
     PrintString("Engine: shutting down");
+    AssetResolver.Clear();
     GpuUploader.Clear();
     Assets.Shutdown();
     Scripting.Shutdown();
+    Scripting.BindMaterialEngine(nullptr);
     ReflectionSubsystem::Get().Shutdown();
 
     if (!bHeadless || Render.GetState() != RenderThreadState::Stopped)
@@ -637,4 +618,81 @@ void Engine::Run()
 void Engine::RequestShutdown()
 {
     bRunning = false;
+}
+
+bool Engine::PrepareSceneMaterials(Scene& World)
+{
+    AssertGameThread();
+    if (!Render.IsReady())
+    {
+        return true;
+    }
+    bool bReady = true;
+    auto Prepare = [&](const AssetKey& Material, const std::shared_ptr<DynamicMaterialInstance>& Dynamic)
+    {
+        if (!Material.IsValid() && !Dynamic)
+        {
+            return;
+        }
+        const auto Snapshot = AssetResolver.ResolveMaterial(Material, Dynamic);
+        if (!Snapshot)
+        {
+            bReady = bReady && !AssetResolver.GetMaterialDiagnostic(Material).empty();
+            return;
+        }
+        const auto Compilation = GpuUploader.RequestMaterial(*Snapshot->Material);
+        const auto State = Compilation->State.load();
+        bReady = bReady && State != MaterialCompilationState::Queued && State != MaterialCompilationState::Compiling;
+    };
+    for (auto Iterator = MaterialWidgetBindings.begin(); Iterator != MaterialWidgetBindings.end();)
+    {
+        const auto Binding = Iterator->lock();
+        if (!Binding)
+        {
+            Iterator = MaterialWidgetBindings.erase(Iterator);
+            continue;
+        }
+        if (Binding->bVisible && !Binding->bPreview)
+        {
+            Prepare(Binding->Asset, Binding->Dynamic);
+        }
+        ++Iterator;
+    }
+    for (auto* Object : World.GetAllObjects())
+    {
+        for (auto* Component : Object->GetAllComponents())
+        {
+            if (auto* Mesh = dynamic_cast<MeshRendererComponent*>(Component))
+            {
+                Prepare(Mesh->GetMaterialAssetKey(), {});
+                Prepare({}, Mesh->DynamicMaterial);
+                for (const auto& Slot : Mesh->MaterialSlots.Entries)
+                {
+                    Prepare(Slot.Material, {});
+                }
+                for (const auto& Slot : Mesh->DynamicMaterialSlots)
+                {
+                    Prepare({}, Slot.second);
+                }
+            }
+            if (auto* Camera = dynamic_cast<CameraComponent*>(Component))
+            {
+                for (const auto& Effect : Camera->PostProcessEffects.Entries)
+                {
+                    if (Effect.bEnabled && Effect.Intensity > 0.f)
+                    {
+                        Prepare(Effect.Material, {});
+                        Prepare({}, Effect.DynamicMaterial);
+                    }
+                }
+            }
+        }
+    }
+    return bReady;
+}
+
+void Engine::RegisterMaterialWidgetBinding(const std::shared_ptr<MaterialWidgetBinding>& Binding)
+{
+    AssertGameThread();
+    MaterialWidgetBindings.push_back(Binding);
 }

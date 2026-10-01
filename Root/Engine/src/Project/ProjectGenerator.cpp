@@ -1,6 +1,6 @@
 #include "Project/ProjectGenerator.h"
 
-#include "Game/SceneSerializer.h"
+#include "World/Serialization/SceneSerializer.h"
 
 #include <fstream>
 

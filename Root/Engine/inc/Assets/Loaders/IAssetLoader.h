@@ -11,6 +11,7 @@
 struct AssetLoadContext
 {
     const AssetRegistry* Registry = nullptr;
+    std::shared_ptr<const AssetRegistry> RegistrySnapshot;
     AssetRegistryEntry Entry{};
     std::optional<SubAssetRecord> SubAsset{};
     AssetKey Key{};

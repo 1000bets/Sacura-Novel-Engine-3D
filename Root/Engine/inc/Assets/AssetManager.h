@@ -13,9 +13,11 @@
 #include "Assets/Resources/ModelResource.h"
 #include "Assets/Resources/SkeletalMeshResource.h"
 #include "Assets/Resources/SkeletonResource.h"
+#include "Assets/Resources/SkinBinding.h"
 #include "Assets/Resources/StaticMeshResource.h"
 #include "Assets/Resources/TextureResource.h"
 #include "Core/Threading/JobSystem.h"
+#include "Core/Threading/ThreadContext.h"
 
 #include <atomic>
 #include <cstdint>
@@ -24,6 +26,7 @@
 #include <mutex>
 #include <queue>
 #include <type_traits>
+#include <typeindex>
 #include <unordered_map>
 #include <vector>
 
@@ -48,6 +51,9 @@ public:
 
     void Initialize(AssetRegistry& Registry, JobSystem& Jobs);
     void Shutdown();
+    AssetDiagnostic RegisterLoader(const AssetType& Type, IAssetLoader& Loader);
+
+    template <typename ResourceType>
     AssetDiagnostic RegisterLoader(const AssetType& Type, IAssetLoader& Loader);
 
     template <typename ResourceType>
@@ -113,7 +119,7 @@ private:
     void ResetOutstandingLoadsGroup();
 
     template <typename ResourceType>
-    static AssetType ResourceAssetType();
+    AssetType ResourceAssetType() const;
 
     AssetRegistry* Registry = nullptr;
     JobSystem* Jobs = nullptr;
@@ -124,8 +130,10 @@ private:
     ModelLoader ModelLoaderInstance;
     TextureLoader TextureLoaderInstance;
     MaterialLoader MaterialLoaderInstance;
+    MaterialInstanceLoader MaterialInstanceLoaderInstance;
     SkeletalLoader SkeletalLoaderInstance;
     std::unordered_map<AssetType, IAssetLoader*, AssetTypeHash> LoadersByType;
+    std::unordered_map<std::type_index, AssetType> CustomResourceTypes;
 
     mutable std::mutex SlotsMutex;
     std::unordered_map<AssetKey, AssetSlot, AssetKeyHash> Slots;
@@ -143,7 +151,7 @@ private:
 };
 
 template <typename ResourceType>
-AssetType AssetManager::ResourceAssetType()
+AssetType AssetManager::ResourceAssetType() const
 {
     if constexpr (std::is_same_v<ResourceType, ModelResource>)
     {
@@ -156,6 +164,10 @@ AssetType AssetManager::ResourceAssetType()
     else if constexpr (std::is_same_v<ResourceType, MaterialResource>)
     {
         return MaterialAssetType;
+    }
+    else if constexpr (std::is_same_v<ResourceType, MaterialInstanceResource>)
+    {
+        return MaterialInstanceAssetType;
     }
     else if constexpr (std::is_same_v<ResourceType, StaticMeshResource>)
     {
@@ -173,16 +185,54 @@ AssetType AssetManager::ResourceAssetType()
     {
         return AnimationClipAssetType;
     }
+    else if constexpr (std::is_same_v<ResourceType, SkinBinding>)
+    {
+        return SkinBindingAssetType;
+    }
     else
     {
+        const auto Registered = CustomResourceTypes.find(std::type_index(typeid(ResourceType)));
+        if (Registered != CustomResourceTypes.end())
+        {
+            return Registered->second;
+        }
         return UnknownAssetType;
     }
 }
 
 template <typename ResourceType>
+AssetDiagnostic AssetManager::RegisterLoader(const AssetType& Type, IAssetLoader& Loader)
+{
+    const AssetType ExistingType = ResourceAssetType<ResourceType>();
+    if (ExistingType.IsValid() && ExistingType != Type)
+    {
+        return AssetDiagnostic::Fail(AssetErrorCode::ImportConflict, "AssetManager", "Resource type is already bound to a different asset type");
+    }
+    for (const auto& Registered : CustomResourceTypes)
+    {
+        if (Registered.second == Type && Registered.first != std::type_index(typeid(ResourceType)))
+        {
+            return AssetDiagnostic::Fail(AssetErrorCode::ImportConflict, "AssetManager", "Asset type is already bound to a different resource type");
+        }
+    }
+    const AssetDiagnostic Result = RegisterLoader(Type, Loader);
+    if (!Result.HasError())
+    {
+        CustomResourceTypes.emplace(std::type_index(typeid(ResourceType)), Type);
+    }
+    return Result;
+}
+
+template <typename ResourceType>
 void AssetManager::LoadAsync(const AssetKey& Key)
 {
-    RequestLoad(Key, ResourceAssetType<ResourceType>());
+    const AssetType ExpectedType = ResourceAssetType<ResourceType>();
+    if (!ExpectedType.IsValid())
+    {
+        PrintString("AssetManager: resource type requires typed loader registration");
+        return;
+    }
+    RequestLoad(Key, ExpectedType);
 }
 
 template <typename ResourceType>
@@ -195,19 +245,11 @@ bool AssetManager::TryGetLoaded(const AssetKey& Key, AssetHandle<ResourceType>& 
         return false;
     }
 
-    if (Slot->Type != ResourceAssetType<ResourceType>() && ResourceAssetType<ResourceType>().IsValid())
+    const AssetType ExpectedType = ResourceAssetType<ResourceType>();
+    if (!ExpectedType.IsValid() || Slot->Type != ExpectedType)
     {
-        if constexpr (std::is_same_v<ResourceType, StaticMeshResource>)
-        {
-            if (Slot->Type != StaticMeshAssetType)
-            {
-                return false;
-            }
-        }
-        else
-        {
-            return false;
-        }
+        OutHandle = {};
+        return false;
     }
 
     OutHandle = AssetHandle<ResourceType>(std::static_pointer_cast<const ResourceType>(Slot->Resource));

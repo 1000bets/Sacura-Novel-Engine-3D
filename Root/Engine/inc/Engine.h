@@ -1,21 +1,22 @@
 #pragma once
 
 #include "ISystem.h"
-#include "Assets/AssetGpuUploader.h"
+#include "Rendering/Assets/AssetGpuUploader.h"
 #include "Assets/AssetManager.h"
 #include "Assets/AssetRegistry.h"
-#include "Assets/SceneAssetResolver.h"
+#include "World/Resources/SceneAssetResolver.h"
 #include "Core/Threading/JobSystem.h"
-#include "Core/Threading/RenderThread.h"
+#include "Rendering/Threading/RenderThread.h"
 #include "Platform/GraphicsBackend.h"
 #include "Platform/NativeWindowInfo.h"
 #include "Project/ProjectDescriptor.h"
-#include "Game/PlaySession.h"
-#include "Rendering/SceneExtractor.h"
+#include "World/Simulation/PlaySession.h"
+#include "Rendering/PresentationController.h"
 #include "Rendering/ImGuiOverlaySnapshot.h"
 #include "Scripting/ScriptingSubsystem.h"
 #include "Story/StoryRuntime.h"
 #include <memory>
+#include "Materials/MaterialWidgetBinding.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -43,11 +44,12 @@ public:
 
     JobSystem& GetJobSystem() { return Jobs; }
     RenderThread& GetRenderThread() { return Render; }
-    SceneExtractor& GetSceneExtractor() { return Extractor; }
+    SceneExtractor& GetSceneExtractor() { return Presentation.GetSceneExtractor(); }
     AssetRegistry& GetAssetRegistry() { return Registry; }
     AssetManager& GetAssetManager() { return Assets; }
     AssetGpuUploader& GetAssetGpuUploader() { return GpuUploader; }
     SceneAssetResolver& GetSceneAssetResolver() { return AssetResolver; }
+    std::shared_ptr<DynamicMaterialInstance> CreateDynamicMaterialInstance(const AssetKey& Material);
     ScriptingSubsystem& GetScripting() { return Scripting; }
     WindowSubsystem* GetWindowSubsystem() const;
 
@@ -58,6 +60,8 @@ public:
     const std::filesystem::path& GetScriptsRoot() const { return ScriptsRoot; }
 
     AssetDiagnostic LoadProjectContent(const ProjectDescriptor& Descriptor);
+    const std::vector<AssetDiagnostic>& GetProjectDiagnostics() const { return ProjectDiagnostics; }
+    const std::string& GetInitializationError() const { return InitializationError; }
     void UnloadProjectContent();
 
     bool StartPresenting(const NativeWindowInfo& WindowInfo);
@@ -68,8 +72,12 @@ public:
     Scene* GetActiveScene() const;
     Scene* GetEditScene() const { return OwnedScene.get(); }
     bool StartGame();
+    bool PrepareSceneMaterials(Scene& World);
+    void RegisterMaterialWidgetBinding(const std::shared_ptr<MaterialWidgetBinding>& Binding);
+    float GetMaterialTime() const { return MaterialTime; }
     void StopGame();
     StoryRuntime& GetStoryRuntime() { return Story; }
+    void SetStartupStory(const std::filesystem::path& StoryPath) { StartupStory = StoryPath; }
     void SetEditorRenderCamera(const RenderCamera& Camera);
     void UseGameRenderCamera();
     void ResizePresentation(uint32_t Width, uint32_t Height);
@@ -97,7 +105,7 @@ private:
     void InitializeCommon(bool bCreateWindowAndRender);
     void ResolveShaderDirectory();
     void ScanConfiguredContent();
-    void ImportProjectScripts();
+    ReflectionDiagnostic ImportProjectScripts();
 
     bool bRunning = false;
     bool bInitialized = false;
@@ -107,10 +115,12 @@ private:
     std::string ShaderDirectory;
     std::filesystem::path ContentRoot;
     std::filesystem::path ScriptsRoot;
+    std::vector<AssetDiagnostic> ProjectDiagnostics;
+    std::string InitializationError;
 
     JobSystem Jobs;
     RenderThread Render;
-    SceneExtractor Extractor;
+    PresentationController Presentation;
     AssetRegistry Registry;
     AssetManager Assets;
     AssetGpuUploader GpuUploader;
@@ -121,17 +131,6 @@ private:
     StoryRuntime Story;
     std::filesystem::path StartupStory;
     bool bGameRunning = false;
-    bool bEditorRenderCamera = false;
-    RenderCamera EditorRenderCamera;
-    uint32_t PresentationWidth = 1;
-    uint32_t PresentationHeight = 1;
-    struct PresentationState
-    {
-        NativeWindowInfo Window;
-        RenderCamera Camera;
-        RenderSettings Settings;
-        ImGuiOverlaySnapshot Overlay;
-        bool bEditScene = false;
-    };
-    std::unordered_map<uint32_t, PresentationState> Presentations;
+    float MaterialTime = 0.f;
+    std::vector<std::weak_ptr<MaterialWidgetBinding>> MaterialWidgetBindings;
 };

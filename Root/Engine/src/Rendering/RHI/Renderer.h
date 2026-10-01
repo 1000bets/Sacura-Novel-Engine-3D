@@ -7,6 +7,9 @@
 #include "Rendering/RHI/RenderResourceManager.h"
 #include "Rendering/RenderResourceHandles.h"
 #include "Rendering/ImGuiOverlaySnapshot.h"
+#include "Materials/MaterialDefinition.h"
+#include "Materials/MaterialCompilation.h"
+#include "Materials/MaterialImageRequest.h"
 
 #include <cstdint>
 #include <string>
@@ -23,6 +26,7 @@ struct IPipelineState;
 struct IShaderResourceBinding;
 struct IShader;
 struct IDeviceContext;
+struct ITextureView;
 struct ISwapChain;
 class ImGuiDiligentRenderer;
 }
@@ -38,6 +42,10 @@ public:
     void RemoveSurface(RenderSurfaceId Surface);
     void ResizeSurface(RenderSurfaceId Surface, uint32_t Width, uint32_t Height);
     std::unordered_map<uint32_t, RenderStatistics> GetStatistics() const;
+    void PrepareMaterial(const ResolvedMaterial& Material, std::shared_ptr<MaterialCompilation> Compilation);
+    void QueueMaterialImage(std::shared_ptr<MaterialImageRequest> Request);
+    void PollMaterialImages();
+    void ClearMaterialResources();
 
     MeshHandle GetDefaultMesh() const { return DefaultMesh; }
     bool IsInitialized() const { return bInitialized; }
@@ -46,9 +54,12 @@ public:
     const RenderResourceManager& GetResources() const { return Resources; }
 
 private:
+    std::string GetMaterialVariantKey(const std::string& MaterialKey) const;
     bool CreatePipeline(const std::string& ShaderDirectory);
+    void UpdateMaterialCompilations();
     bool CreateSurfaceResources(RenderSurfaceId Surface);
-    void RenderView(const RenderViewFrame& View, uint64_t FrameIndex);
+    void RenderView(const RenderViewFrame& View, uint64_t FrameIndex, Diligent::ITextureView* Output = nullptr);
+    void RenderMaterialPreview(const MaterialImageRequest& Request, Diligent::ITextureView* Output);
     void CreateImGuiOverlay();
     void DestroyImGuiOverlay();
     void RenderImGuiOverlay(Diligent::IDeviceContext* Context, Diligent::ISwapChain* SwapChain, const ImGuiOverlaySnapshot& Overlay);
@@ -57,6 +68,7 @@ private:
     RenderDevice Device;
     RenderResourceManager Resources;
     MeshHandle DefaultMesh;
+    MeshHandle PreviewMeshes[3];
 
     struct PipelineState;
     PipelineState* Pipeline = nullptr;

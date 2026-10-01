@@ -13,6 +13,8 @@ AssetRegistry::AssetRegistry()
     RegisterAssetType({ModelAssetType, "Model", {".glb"}, false});
     RegisterAssetType({TextureAssetType, "Texture", {".png", ".jpg", ".jpeg"}, true});
     RegisterAssetType({MaterialAssetType, "Material", {".material"}, true});
+    RegisterAssetType({MaterialInstanceAssetType, "Material Instance", {".materialinstance"}, true});
+    RegisterAssetType({ShaderSourceAssetType, "Shader Source", {".hlsl", ".hlsli"}, false});
     RegisterAssetType({StaticMeshAssetType, "Static Mesh", {}, true});
     RegisterAssetType({SkeletalMeshAssetType, "Skeletal Mesh", {}, true});
     RegisterAssetType({SkeletonAssetType, "Skeleton", {}, true});
@@ -527,6 +529,28 @@ AssetDiagnostic AssetRegistry::RegisterExistingAsset(const std::string& Relative
     return AssetDiagnostic::Ok();
 }
 
+AssetDiagnostic AssetRegistry::UpdateSourceFingerprint(const AssetId& Id, ContentHash Fingerprint)
+{
+    AssertGameThread();
+    const auto Found = EntriesById.find(Id);
+    if (Found == EntriesById.end())
+    {
+        return AssetDiagnostic::Fail(AssetErrorCode::NotFound, "AssetRegistry", "Asset disappeared during source update", {Id});
+    }
+    auto Metadata = Found->second.Metadata;
+    Metadata.SourceFingerprint = Fingerprint;
+    if (Found->second.Mount == AssetMount::Game)
+    {
+        AssetDiagnostic Diagnostic;
+        if (!AssetMetadataIO::TrySaveToFile(Found->second.AbsoluteMetaPath, Metadata, Diagnostic))
+        {
+            return Diagnostic;
+        }
+    }
+    Found->second.Metadata = std::move(Metadata);
+    return AssetDiagnostic::Ok();
+}
+
 AssetDiagnostic AssetRegistry::Unregister(const AssetId& Id)
 {
     AssertGameThread();
@@ -650,6 +674,10 @@ AssetDiagnostic AssetRegistry::RenamePair(const std::string& OldRelativeOrVirtua
     }
 
     AssetMount NewMount = AssetMount::Game;
+    if (Entry.Mount != AssetMount::Game)
+    {
+        return AssetDiagnostic::Fail(AssetErrorCode::InvalidData, "AssetRegistry", "Engine assets are read-only", {Entry.Metadata.Guid}, Entry.VirtualPath);
+    }
     std::string NewRelativeInsideContent;
     std::filesystem::path NewContentRoot;
     if (!ResolvePathRoots(NewRelativeOrVirtualPath, NewMount, NewRelativeInsideContent, NewContentRoot))
@@ -693,8 +721,15 @@ AssetDiagnostic AssetRegistry::RenamePair(const std::string& OldRelativeOrVirtua
     std::filesystem::rename(Entry.AbsoluteMetaPath, NewMetaAbsolute, Error);
     if (Error)
     {
-        std::filesystem::rename(NewAbsolute, Entry.AbsolutePath);
-        return AssetDiagnostic::Fail(AssetErrorCode::InternalError, "AssetRegistry", "Failed to rename .meta; data file rolled back", {Entry.Metadata.Guid}, NewVirtualPath);
+        std::error_code RollbackError;
+        std::filesystem::rename(NewAbsolute, Entry.AbsolutePath, RollbackError);
+        std::string Message = "Failed to rename .meta: " + Error.message();
+        if (RollbackError)
+        {
+            Message += "; data rollback failed: " + RollbackError.message();
+            ScanContent();
+        }
+        return AssetDiagnostic::Fail(AssetErrorCode::InternalError, "AssetRegistry", Message, {Entry.Metadata.Guid}, NewVirtualPath);
     }
 
     IdsByVirtualPath.erase(Entry.VirtualPath);

@@ -37,15 +37,20 @@ float3 Composite(float2 Coordinates)
     return Scene * Revealage + Accumulation.rgb / max(Accumulation.a, 0.0001) * (1.0 - Revealage);
 }
 
+float4 CompositeMain(FullscreenOutput Input) : SV_TARGET
+{
+    return float4(Composite(Input.Coordinates), 1.0);
+}
+
 float4 ToneMapMain(FullscreenOutput Input) : SV_TARGET
 {
-    float3 Radiance = Composite(Input.Coordinates);
+    float3 Radiance = SceneImage.SampleLevel(SceneImage_sampler, Input.Coordinates, 0).rgb;
     float3 Bloom = 0.0;
     for (int Row = -2; Row <= 2; ++Row)
     {
         for (int Column = -2; Column <= 2; ++Column)
         {
-            Bloom += max(Composite(Input.Coordinates + float2(Column, Row) * Resolution.xy * 2.0) - Parameters.z, 0.0);
+            Bloom += max(SceneImage.SampleLevel(SceneImage_sampler, Input.Coordinates + float2(Column, Row) * Resolution.xy * 2.0, 0).rgb - Parameters.z, 0.0);
         }
     }
     Radiance = (Radiance + Bloom * Parameters.y / 25.0) * Parameters.x;
@@ -89,4 +94,12 @@ float4 AntialiasMain(FullscreenOutput Input) : SV_TARGET
         return float4(Inner, 1.0);
     }
     return float4(Outer, 1.0);
+}
+
+float4 PreviewAntialiasMain(FullscreenOutput Input) : SV_TARGET
+{
+    float3 Linear = max(AntialiasMain(Input).rgb, 0.0);
+    float3 Low = Linear * 12.92;
+    float3 High = 1.055 * pow(Linear, 1.0 / 2.4) - 0.055;
+    return float4(lerp(High, Low, step(Linear, float3(0.0031308, 0.0031308, 0.0031308))), 1.0);
 }

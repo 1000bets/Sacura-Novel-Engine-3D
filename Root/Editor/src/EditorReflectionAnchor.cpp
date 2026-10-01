@@ -1,5 +1,5 @@
 #include "Actions/BuiltinEditorActions.h"
-#include "EditorAction.h"
+#include "Actions/EditorAction.h"
 
 void ForceTouchEditorRegistrars()
 {
@@ -12,6 +12,8 @@ void ForceTouchEditorRegistrars()
     (void)CreateSpotLightObjectAction::StaticReflectionTypeId();
     (void)AddCameraComponentAction::StaticReflectionTypeId();
     (void)AddLightComponentAction::StaticReflectionTypeId();
+    (void)AddArrowComponentAction::StaticReflectionTypeId();
+    (void)&AddArrowComponentAction::s_ReflectionClassRegistrar;
     (void)AddMeshRendererComponentAction::StaticReflectionTypeId();
     (void)&EditorAction::s_ReflectionClassRegistrar;
     (void)&CreateEmptyObjectAction::s_ReflectionClassRegistrar;

@@ -46,6 +46,7 @@ FetchContent_Declare(
     GIT_TAG        ${SAKURA_DILIGENT_CORE_GIT_TAG}
     GIT_SHALLOW    TRUE
     SOURCE_DIR     ${CMAKE_CURRENT_SOURCE_DIR}/DiligentCore
+    PATCH_COMMAND ${CMAKE_COMMAND} -DDILIGENT_SOURCE_DIRECTORY=<SOURCE_DIR> -P ${CMAKE_CURRENT_SOURCE_DIR}/PatchDiligentOpenGLQuery.cmake
 )
 
 FetchContent_Declare(
@@ -82,6 +83,9 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(SDL3 DiligentCore)
+set(DILIGENT_SOURCE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/DiligentCore")
+include("${CMAKE_CURRENT_SOURCE_DIR}/PatchDiligentOpenGLQuery.cmake")
+unset(DILIGENT_SOURCE_DIRECTORY)
 
 # DiligentTools embeds its own ImGui into Diligent-Imgui when target "imgui" is absent.
 # Do not add a top-level target named "imgui" — leave Tools' bundled ImGui alone.
@@ -220,16 +224,19 @@ target_link_libraries(SakuraEngineThirdParty INTERFACE
 )
 
 if(SAKURA_PYTHON_AVAILABLE)
+    add_library(SakuraPythonThirdParty INTERFACE)
+    add_library(Sakura::PythonThirdParty ALIAS SakuraPythonThirdParty)
     if(TARGET Python3::Python)
-        target_link_libraries(SakuraEngineThirdParty INTERFACE
+        target_link_libraries(SakuraPythonThirdParty INTERFACE
             pybind11::embed
             Python3::Python
         )
     else()
-        target_link_libraries(SakuraEngineThirdParty INTERFACE
+        target_link_libraries(SakuraPythonThirdParty INTERFACE
             pybind11::embed
         )
     endif()
+    target_link_libraries(SakuraEngineThirdParty INTERFACE Sakura::PythonThirdParty)
     target_compile_definitions(SakuraEngineThirdParty INTERFACE SAKURA_ENABLE_PYTHON=1)
 endif()
 

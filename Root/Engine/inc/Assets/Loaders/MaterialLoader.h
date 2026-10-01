@@ -11,3 +11,11 @@ public:
     void CollectDependencies(const AssetLoadContext& Context, std::vector<AssetKey>& OutDependencies) const override;
     std::shared_ptr<const void> Load(const AssetLoadContext& Context, AssetDiagnostic& OutDiagnostic) override;
 };
+
+class MaterialInstanceLoader : public MaterialLoader
+{
+public:
+    AssetType GetAssetType() const override { return MaterialInstanceAssetType; }
+    const char* GetLoaderName() const override { return "MaterialInstanceLoader"; }
+    std::shared_ptr<const void> Load(const AssetLoadContext& Context, AssetDiagnostic& OutDiagnostic) override;
+};

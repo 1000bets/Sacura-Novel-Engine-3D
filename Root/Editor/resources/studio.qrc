@@ -6,4 +6,10 @@
         <file alias="studio_sakura_overlay.png">studio/studio_sakura_overlay.png</file>
         <file alias="checkbox_check.png">studio/checkbox_check.png</file>
     </qresource>
+    <qresource prefix="/component-icons">
+        <file alias="sun.png">component-icons/sun.png</file>
+        <file alias="lightbulb.png">component-icons/lightbulb.png</file>
+        <file alias="flashlight.png">component-icons/flashlight.png</file>
+        <file alias="LICENSE">component-icons/LICENSE</file>
+    </qresource>
 </RCC>

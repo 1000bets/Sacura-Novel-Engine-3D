@@ -1,10 +1,10 @@
 #include "Project/ProjectSession.h"
 
-#include "Core/MemorySubsystem.h"
+#include "Core/Object/MemorySubsystem.h"
 #include "Core/Threading/ThreadContext.h"
 #include "Engine.h"
-#include "Game/Scene.h"
-#include "Game/SceneSerializer.h"
+#include "World/Scene.h"
+#include "World/Serialization/SceneSerializer.h"
 #include "Project/ProjectPaths.h"
 #include "Story/StoryDocumentIO.h"
 
@@ -18,6 +18,7 @@ bool ProjectSession::OpenProject(const std::filesystem::path& ProjectFile)
     LastError.clear();
     IssueCount = 0;
     LastContentDiagnostic = AssetDiagnostic::Ok();
+    Diagnostics.clear();
     Health = ProjectSessionHealth::Closed;
 
     if (BoundEngine == nullptr)
@@ -76,6 +77,54 @@ void ProjectSession::CloseProject()
     IssueCount = 0;
     LastError.clear();
     LastContentDiagnostic = AssetDiagnostic::Ok();
+    Diagnostics.clear();
+}
+
+bool ProjectSession::RelocateContentPath(
+    const std::filesystem::path& Source,
+    const std::filesystem::path& Destination,
+    std::string& OutError)
+{
+    if (!OpenedProject.has_value())
+    {
+        OutError = "No project is open";
+        return false;
+    }
+    ProjectDescriptor Updated = *OpenedProject;
+    bool bChanged = false;
+    auto Relocate = [&](std::filesystem::path& Path)
+    {
+        if (Path.empty())
+        {
+            return;
+        }
+        const std::filesystem::path Relative = Path.lexically_normal().lexically_relative(Source.lexically_normal());
+        if (Relative.empty() || *Relative.begin() == "..")
+        {
+            return;
+        }
+        if (Relative == ".")
+        {
+            Path = Destination.lexically_normal();
+        }
+        else
+        {
+            Path = (Destination / Relative).lexically_normal();
+        }
+        bChanged = true;
+    };
+    Relocate(Updated.StartupScene);
+    Relocate(Updated.StartupStory);
+    if (bChanged)
+    {
+        if (!Updated.TrySaveToFile(OutError))
+        {
+            return false;
+        }
+        OpenedProject = std::move(Updated);
+        BoundEngine->SetStartupStory(OpenedProject->StartupStory);
+    }
+    return true;
 }
 
 bool ProjectSession::IsOpen() const
@@ -104,7 +153,13 @@ bool ProjectSession::ApplyOpenedProject()
     ProjectPaths::SetRoot(Descriptor.ProjectRoot);
 
     LastContentDiagnostic = BoundEngine->LoadProjectContent(Descriptor);
-    IssueCount = static_cast<int>(BoundEngine->GetAssetRegistry().GetScanDiagnostics().size());
+    Diagnostics = BoundEngine->GetProjectDiagnostics();
+    IssueCount = static_cast<int>(Diagnostics.size());
+    if (!BoundEngine->IsInitialized())
+    {
+        LastError = LastContentDiagnostic.Message;
+        return false;
+    }
     if (LastContentDiagnostic.HasError())
     {
         LastError = LastContentDiagnostic.Message;
@@ -124,6 +179,7 @@ bool ProjectSession::ApplyOpenedProject()
         {
             LastError = Loaded.Error;
             Health = ProjectSessionHealth::Degraded;
+            Diagnostics.push_back(AssetDiagnostic::Fail(AssetErrorCode::InvalidData, "StartupStory", LastError, {}, Descriptor.StartupStory.generic_string()));
             ++IssueCount;
             PrintString("ProjectSession: startupStory load failed: " + LastError);
         }
@@ -137,6 +193,7 @@ bool ProjectSession::ApplyOpenedProject()
         {
             LastError = Loaded.Error.empty() ? "Failed to load startupScene" : Loaded.Error;
             Health = ProjectSessionHealth::Degraded;
+            Diagnostics.push_back(AssetDiagnostic::Fail(AssetErrorCode::InvalidData, "StartupScene", LastError, {}, Descriptor.StartupScene.generic_string()));
             ++IssueCount;
             PrintString(std::string("ProjectSession: startupScene load failed: ") + LastError);
             return true;

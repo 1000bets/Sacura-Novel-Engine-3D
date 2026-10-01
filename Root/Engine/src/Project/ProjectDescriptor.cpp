@@ -1,3 +1,4 @@
+#include "Core/IO/AtomicFileWriter.h"
 #include "Project/ProjectDescriptor.h"
 
 #include <fstream>
@@ -228,34 +229,5 @@ bool ProjectDescriptor::TrySaveToFile(std::string& OutError) const
         Document["startupStory"] = RelativeStartup.generic_string();
     }
 
-    std::error_code DirectoryError;
-    std::filesystem::create_directories(ProjectFile.parent_path(), DirectoryError);
-
-    const std::filesystem::path TemporaryFile = ProjectFile.string() + ".tmp";
-    {
-        std::ofstream Output(TemporaryFile, std::ios::binary | std::ios::trunc);
-        if (!Output)
-        {
-            OutError = "Failed to write temporary project file";
-            return false;
-        }
-
-        Output << Document.dump(2);
-        if (!Output)
-        {
-            OutError = "Failed while writing project JSON";
-            return false;
-        }
-    }
-
-    std::error_code RenameError;
-    std::filesystem::rename(TemporaryFile, ProjectFile, RenameError);
-    if (RenameError)
-    {
-        std::filesystem::remove(TemporaryFile);
-        OutError = "Failed to replace project file";
-        return false;
-    }
-
-    return true;
+    return AtomicFileWriter::WriteText(ProjectFile, Document.dump(2), OutError);
 }

@@ -48,10 +48,33 @@ int main(int ArgumentCount, char** Arguments)
     }
 
     Engine EngineInstance;
+    const std::string Backend = ParseFlagPath(ArgumentCount, Arguments, "--backend", "--backend=").string();
+    if (Backend == "D3D12")
+    {
+        EngineInstance.SetGraphicsBackend(GraphicsBackend::D3D12);
+    }
+    else if (Backend == "Vulkan")
+    {
+        EngineInstance.SetGraphicsBackend(GraphicsBackend::Vulkan);
+    }
+    else if (Backend == "OpenGL")
+    {
+        EngineInstance.SetGraphicsBackend(GraphicsBackend::OpenGL);
+    }
+    else if (!Backend.empty() && Backend != "Auto")
+    {
+        PrintString("Unknown graphics backend: " + Backend);
+        return 1;
+    }
     EngineInstance.InitializeHeadless({});
+    if (!EngineInstance.IsInitialized())
+    {
+        PrintString("SakuraPlayer: engine initialization failed: " + EngineInstance.GetInitializationError());
+        return 1;
+    }
     ProjectSession Session;
     Session.BindEngine(&EngineInstance);
-    if (!Session.OpenProject(ProjectFile) || !EngineInstance.StartGame())
+    if (!Session.OpenProject(ProjectFile) || EngineInstance.GetEditScene() == nullptr)
     {
         QString Error = QString::fromStdString(Session.GetLastError());
         if (Error.isEmpty())
@@ -104,12 +127,34 @@ int main(int ArgumentCount, char** Arguments)
     EngineInstance.UseGameRenderCamera();
     QElapsedTimer Clock;
     Clock.start();
+    bool bGameStarted = false;
+    const auto Screenshot = ParseFlagPath(ArgumentCount, Arguments, "--screenshot-player", "--screenshot-player=");
+    int PresentedFrames = 0;
     QTimer Timer;
     QObject::connect(&Timer, &QTimer::timeout, &Window, [&]()
     {
         const float DeltaTime = std::min(0.25f, static_cast<float>(Clock.restart()) / 1000.0f);
         EngineInstance.Tick(DeltaTime);
+        if (!bGameStarted && EngineInstance.PrepareSceneMaterials(*EngineInstance.GetEditScene()))
+        {
+            bGameStarted = EngineInstance.StartGame();
+        }
         Dialogue->Refresh(true);
+        if (bGameStarted && !Screenshot.empty())
+        {
+            ++PresentedFrames;
+            if (PresentedFrames >= 30)
+            {
+                if (!Window.grab().save(QString::fromStdString(Screenshot.string())))
+                {
+                    PrintString("SakuraPlayer: failed to save screenshot");
+                    Application.exit(1);
+                    return;
+                }
+                PrintString("SakuraPlayer: screenshot saved to " + Screenshot.string());
+                Application.quit();
+            }
+        }
         if (!EngineInstance.IsRunning())
         {
             Application.quit();

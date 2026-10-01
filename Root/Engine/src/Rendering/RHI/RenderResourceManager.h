@@ -31,6 +31,7 @@ public:
     MeshHandle CreateDefaultQuadMesh();
     MeshHandle CreateMeshFromCpuData(const StaticMeshResource& Mesh);
     TextureHandle CreateTextureFromCpuData(const TextureResource& Texture);
+    TextureHandle CreateTextureFromCpuData(const TextureResource& Texture, bool bSrgb);
 
     const RenderMesh* GetMesh(MeshHandle Mesh) const;
     Diligent::ITexture* GetTexture(TextureHandle Texture) const;

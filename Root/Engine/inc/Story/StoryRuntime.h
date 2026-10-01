@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Story/StoryTypes.h"
-#include "Gameplay/ObjectHandle.h"
+#include "Core/Object/ObjectHandle.h"
 
 #include <filesystem>
 #include <string>
@@ -23,6 +23,10 @@ enum class StoryPlaybackPhase
 class StoryRuntime
 {
 public:
+    StoryRuntime() = default;
+    ~StoryRuntime();
+    StoryRuntime(const StoryRuntime&) = delete;
+    StoryRuntime& operator=(const StoryRuntime&) = delete;
     void BindScene(Scene* InScene);
 
     bool LoadFromFile(const std::filesystem::path& AbsolutePath);
@@ -69,6 +73,7 @@ private:
     void TickActiveAction(float DeltaTime);
     void CompleteActiveAction();
     void CancelAllActions();
+    void ReleaseActionTransform(ActiveAction& Action);
     GameObject* ResolvePrimaryCameraObject() const;
 
     ObjectHandle BoundScene;

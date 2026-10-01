@@ -1,7 +1,7 @@
 #include "Reflection/Json/ReflectionJson.h"
 
 #include "Assets/Guid.h"
-#include "Gameplay/Object.h"
+#include "Core/Object/Object.h"
 #include "Reflection/Class.h"
 #include "Reflection/PropertyAccess.h"
 #include "Reflection/ReflectionSubsystem.h"
@@ -41,6 +41,18 @@ ReflectionDiagnostic ReflectionJson::ReflectedValueToJson(
     const ReflectedValue& Value,
     nlohmann::json& OutJson)
 {
+    if (ValueTypeId.Value == "engine.MaterialSlots" || ValueTypeId.Value == "engine.PostProcessEffects")
+    {
+        try
+        {
+            OutJson = nlohmann::json::parse(Value.StringValue);
+            return ReflectionDiagnostic::Ok();
+        }
+        catch (const std::exception& Exception)
+        {
+            return ReflectionDiagnostic::Fail(Exception.what());
+        }
+    }
     if (ValueTypeId.Value == "engine.bool")
     {
         if (Value.ValueKind != ReflectedValue::Kind::Bool)
@@ -123,6 +135,15 @@ ReflectionDiagnostic ReflectionJson::JsonToReflectedValue(
     const nlohmann::json& JsonValue,
     ReflectedValue& OutValue)
 {
+    if (ValueTypeId.Value == "engine.MaterialSlots" || ValueTypeId.Value == "engine.PostProcessEffects")
+    {
+        if (!JsonValue.is_array())
+        {
+            return ReflectionDiagnostic::Fail("Expected material bindings array");
+        }
+        OutValue = ReflectedValue::MakeString(JsonValue.dump());
+        return ReflectionDiagnostic::Ok();
+    }
     if (ValueTypeId.Value == "engine.bool")
     {
         if (!JsonValue.is_boolean())

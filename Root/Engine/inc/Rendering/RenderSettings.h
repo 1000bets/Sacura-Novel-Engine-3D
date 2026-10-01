@@ -8,6 +8,7 @@ struct RenderSettings
     float BloomThreshold = 1.f;
     float ShadowDistance = 80.f;
     bool bAntialiasing = true;
+    bool bMaterialPostProcess = true;
 };
 
 struct RenderStatistics

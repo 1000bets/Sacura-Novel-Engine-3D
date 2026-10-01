@@ -1,12 +1,13 @@
 #pragma once
 
-#include "EditorAction.h"
-#include "Gameplay/CameraComponent.h"
-#include "Gameplay/LightComponent.h"
-#include "Gameplay/MeshRendererComponent.h"
+#include "Actions/EditorAction.h"
+#include "World/Components/CameraComponent.h"
+#include "World/Components/LightComponent.h"
+#include "World/Components/ArrowComponent.h"
+#include "World/Components/MeshRendererComponent.h"
 #include "Rendering/RenderLight.h"
 
-#include "EditorCommands.h"
+#include "Commands/EditorCommands.h"
 
 class CreateEmptyObjectAction : public EditorAction
 {
@@ -228,3 +229,24 @@ protected:
 };
 
 ENGINE_CLASS_END(AddMeshRendererComponentAction)
+
+class AddArrowComponentAction : public EditorAction
+{
+    ENGINE_CLASS(AddArrowComponentAction, EditorAction, "editor.AddArrowComponentAction", 1)
+
+public:
+    const char* GetMenuCategory() const override { return ComponentsCategory; }
+    const char* GetDisplayName() const override { return "Arrow Component"; }
+    int GetSortOrder() const override { return 15; }
+    bool RequiresSelection() const override { return true; }
+
+    bool Execute(EditorActionContext& Context) const override
+    {
+        return AddComponentToSelection(Context, TypeId{ArrowComponent::StaticReflectionTypeId()});
+    }
+
+protected:
+    AddArrowComponentAction() = default;
+};
+
+ENGINE_CLASS_END(AddArrowComponentAction)

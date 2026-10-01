@@ -143,6 +143,7 @@ bool RenderDevice::InitializeBackend(GraphicsBackend Backend, const NativeWindow
 
         EngineD3D12CreateInfo EngineCI;
         EngineCI.Features.DurationQueries = DEVICE_FEATURE_STATE_OPTIONAL;
+        EngineCI.Features.AsyncShaderCompilation = DEVICE_FEATURE_STATE_OPTIONAL;
         EngineCI.Features.IndependentBlend = DEVICE_FEATURE_STATE_ENABLED;
 #    ifdef _DEBUG
         EngineCI.SetValidationLevel(VALIDATION_LEVEL_2);
@@ -179,6 +180,7 @@ bool RenderDevice::InitializeBackend(GraphicsBackend Backend, const NativeWindow
 
         EngineVkCreateInfo EngineCI;
         EngineCI.Features.DurationQueries = DEVICE_FEATURE_STATE_OPTIONAL;
+        EngineCI.Features.AsyncShaderCompilation = DEVICE_FEATURE_STATE_OPTIONAL;
         EngineCI.Features.IndependentBlend = DEVICE_FEATURE_STATE_ENABLED;
 #    ifdef _DEBUG
         EngineCI.SetValidationLevel(VALIDATION_LEVEL_2);
@@ -215,6 +217,7 @@ bool RenderDevice::InitializeBackend(GraphicsBackend Backend, const NativeWindow
 
         EngineGLCreateInfo EngineCI;
         EngineCI.Features.DurationQueries = DEVICE_FEATURE_STATE_OPTIONAL;
+        EngineCI.Features.AsyncShaderCompilation = DEVICE_FEATURE_STATE_OPTIONAL;
         EngineCI.Features.IndependentBlend = DEVICE_FEATURE_STATE_ENABLED;
         EngineCI.Window = Window;
 #    ifdef _DEBUG

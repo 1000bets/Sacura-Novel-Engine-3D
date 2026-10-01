@@ -1,3 +1,4 @@
+#include <cmath>
 #include "Assets/Loaders/ModelLoader.h"
 #include "Assets/Resources/MaterialResource.h"
 #include "Assets/Resources/StaticMeshResource.h"
@@ -173,15 +174,34 @@ bool BuildStaticMeshFromPrimitive(
         fastgltf::copyFromAccessor<fastgltf::math::fvec2>(Asset, TexCoordAccessor, TexCoords.data());
     }
 
+    std::vector<fastgltf::math::fvec4> Tangents;
+    const auto* TangentAttribute = Primitive.findAttribute("TANGENT");
+    if (TangentAttribute != Primitive.attributes.end())
+    {
+        const fastgltf::Accessor& TangentAccessor = Asset.accessors[TangentAttribute->accessorIndex];
+        Tangents.resize(TangentAccessor.count);
+        fastgltf::copyFromAccessor<fastgltf::math::fvec4>(Asset, TangentAccessor, Tangents.data());
+    }
+
     OutMesh.Vertices.resize(Positions.size());
     for (size_t Index = 0; Index < Positions.size(); ++Index)
     {
         StaticMeshVertex& Vertex = OutMesh.Vertices[Index];
         Vertex.Position = DirectX::SimpleMath::Vector3(Positions[Index][0], Positions[Index][1], Positions[Index][2]);
+        if (!std::isfinite(Vertex.Position.x) || !std::isfinite(Vertex.Position.y) || !std::isfinite(Vertex.Position.z))
+        {
+            OutDiagnostic = AssetDiagnostic::Fail(AssetErrorCode::InvalidData, "ModelLoader", "Non-finite vertex position", Key, Path);
+            return false;
+        }
         if (Index < Normals.size())
         {
             Vertex.Normal = DirectX::SimpleMath::Vector3(Normals[Index][0], Normals[Index][1], Normals[Index][2]);
             Vertex.bHasNormal = true;
+        }
+        if (Index < Tangents.size())
+        {
+            Vertex.Tangent = {Tangents[Index][0], Tangents[Index][1], Tangents[Index][2], Tangents[Index][3]};
+            Vertex.bHasTangent = true;
         }
         if (Index < TexCoords.size())
         {
@@ -230,6 +250,16 @@ bool BuildStaticMeshFromPrimitive(
             OutMesh.Indices[Index] = Index;
         }
     }
+
+    for (uint32_t Index : OutMesh.Indices)
+    {
+        if (Index >= OutMesh.Vertices.size())
+        {
+            OutDiagnostic = AssetDiagnostic::Fail(AssetErrorCode::InvalidData, "ModelLoader", "Triangle index exceeds vertex count", Key, Path);
+            return false;
+        }
+    }
+    PrepareSurfaceVertices(OutMesh);
 
     StaticMeshSubmesh Submesh{};
     Submesh.IndexOffset = 0;

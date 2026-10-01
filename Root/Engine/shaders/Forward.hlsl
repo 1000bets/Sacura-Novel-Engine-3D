@@ -24,7 +24,7 @@ cbuffer ObjectConstants
     float4x4 World;
     float4x4 NormalTransform;
     float4 BaseColor;
-    float4 MaterialParameters;
+    float4 SurfaceParameters;
     float4 EmissiveAlphaMode;
 };
 
@@ -45,6 +45,7 @@ struct VertexInput
     float3 Normal : ATTRIB1;
     float2 TextureCoordinates : ATTRIB2;
     float4 Color : ATTRIB3;
+    float4 Tangent : ATTRIB4;
 };
 
 struct VertexOutput
@@ -54,10 +55,26 @@ struct VertexOutput
     float3 Normal : NORMAL;
     float2 TextureCoordinates : TEX_COORD;
     float4 Color : COLOR;
+    float4 Tangent : TANGENT;
 };
 
 VertexOutput VSMain(VertexInput Input)
 {
+#if defined(SAKURA_CUSTOM_MATERIAL) && SAKURA_MODIFY_VERTEX
+    SakuraVertex Vertex;
+    Vertex.Position = Input.Position;
+    Vertex.Normal = Input.Normal;
+    Vertex.Tangent = Input.Tangent;
+    Vertex.TextureCoordinates = Input.TextureCoordinates;
+    Vertex.VertexColor = Input.Color;
+    Vertex.Time = FrameParameters.w;
+    ModifyVertex(Vertex);
+    Input.Position = Vertex.Position;
+    Input.Normal = Vertex.Normal;
+    Input.Tangent = Vertex.Tangent;
+    Input.TextureCoordinates = Vertex.TextureCoordinates;
+    Input.Color = Vertex.VertexColor;
+#endif
     VertexOutput Output;
     float4 WorldPosition = mul(float4(Input.Position, 1.0), World);
     Output.Position = mul(WorldPosition, ViewProjection);
@@ -68,27 +85,61 @@ VertexOutput VSMain(VertexInput Input)
     Output.WorldPosition = WorldPosition.xyz;
     Output.Normal = mul(float4(Input.Normal, 0.0), NormalTransform).xyz;
     Output.TextureCoordinates = Input.TextureCoordinates;
-    Output.Color = Input.Color;
+    Output.Color = Input.Color * BaseColor;
+    Output.Tangent.xyz = mul(float4(Input.Tangent.xyz, 0.0), World).xyz;
+    Output.Tangent.w = Input.Tangent.w * sign(determinant((float3x3)World));
     return Output;
 }
 
+#ifdef SAKURA_CUSTOM_MATERIAL
+SakuraSurface ReadMaterialSurface(VertexOutput Input, bool FrontFace)
+{
+    SakuraSurfaceInput SurfaceInput;
+    SurfaceInput.WorldPosition = Input.WorldPosition;
+    SurfaceInput.Normal = normalize(Input.Normal);
+    SurfaceInput.Tangent = Input.Tangent;
+    if (!FrontFace)
+    {
+        SurfaceInput.Normal = -SurfaceInput.Normal;
+        SurfaceInput.Tangent = -SurfaceInput.Tangent;
+    }
+    SurfaceInput.TextureCoordinates = Input.TextureCoordinates;
+    SurfaceInput.VertexColor = Input.Color;
+    SurfaceInput.Time = FrameParameters.w;
+    SakuraSurface Surface = EvaluateSurface(SurfaceInput);
+#if SAKURA_BLEND_MODE == 1
+    clip(Surface.Opacity - SurfaceParameters.z);
+#endif
+    return Surface;
+}
+#endif
+
 float4 ReadColor(VertexOutput Input)
 {
+#ifdef SAKURA_CUSTOM_MATERIAL
+    SakuraSurface MaterialSurface = ReadMaterialSurface(Input, true);
+    return float4(MaterialSurface.Albedo, MaterialSurface.Opacity);
+#else
     float4 Surface = BaseColor * Input.Color;
-    if (MaterialParameters.w > 0.5)
+    if (SurfaceParameters.w > 0.5)
     {
         Surface *= BaseColorImage.Sample(BaseColorImage_sampler, Input.TextureCoordinates);
     }
     if (EmissiveAlphaMode.w > 0.5 && EmissiveAlphaMode.w < 1.5)
     {
-        clip(Surface.a - MaterialParameters.z);
+        clip(Surface.a - SurfaceParameters.z);
     }
     return Surface;
+#endif
 }
 
-void ShadowMain(VertexOutput Input)
+void ShadowMain(VertexOutput Input, bool FrontFace : SV_IsFrontFace)
 {
+#ifdef SAKURA_CUSTOM_MATERIAL
+    ReadMaterialSurface(Input, FrontFace);
+#else
     ReadColor(Input);
+#endif
 }
 
 float ShadowVisibility(uint LightIndex, float3 Position, float3 Normal, float3 ToLight)
@@ -174,18 +225,30 @@ float3 Fresnel(float Cosine, float3 Reflectance)
 
 float4 ShadeSurface(VertexOutput Input, bool FrontFace)
 {
+#ifdef SAKURA_CUSTOM_MATERIAL
+    SakuraSurface MaterialSurface = ReadMaterialSurface(Input, FrontFace);
+    float4 Surface = float4(MaterialSurface.Albedo, MaterialSurface.Opacity);
+    float3 Normal = normalize(MaterialSurface.Normal);
+    float Metallic = saturate(MaterialSurface.Metalness);
+    float Roughness = clamp(MaterialSurface.RoughnessValue, 0.045, 1.0);
+    float3 Result = MaterialSurface.Emission;
+#if SAKURA_SHADING_MODEL == 1
+    return float4(max(Surface.rgb + Result, 0.0), saturate(Surface.a));
+#endif
+#else
     float4 Surface = ReadColor(Input);
     float3 Normal = normalize(Input.Normal);
     if (!FrontFace)
     {
         Normal = -Normal;
     }
+    float Metallic = saturate(SurfaceParameters.x);
+    float Roughness = clamp(SurfaceParameters.y, 0.045, 1.0);
+    float3 Result = EmissiveAlphaMode.xyz;
+#endif
     float3 ViewDirection = normalize(CameraPosition.xyz - Input.WorldPosition);
-    float Metallic = saturate(MaterialParameters.x);
-    float Roughness = clamp(MaterialParameters.y, 0.045, 1.0);
     float3 Reflectance = lerp(0.04, Surface.rgb, Metallic);
     float NormalView = max(dot(Normal, ViewDirection), 0.001);
-    float3 Result = EmissiveAlphaMode.xyz;
     for (uint LightIndex = 0; LightIndex < (uint)FrameParameters.x; ++LightIndex)
     {
         LightData Light = Lights[LightIndex];
@@ -218,14 +281,31 @@ float4 ShadeSurface(VertexOutput Input, bool FrontFace)
         float Geometry = GeometryTerm(NormalView, Roughness) * GeometryTerm(NormalLight, Roughness);
         float3 Specular = Distribution * Geometry * Reflection / max(4.0 * NormalView * NormalLight, 0.0001);
         float3 Diffuse = (1.0 - Reflection) * (1.0 - Metallic) * Surface.rgb / 3.14159265;
-        Result += (Diffuse + Specular) * Light.ColorIntensity.rgb * Light.ColorIntensity.w
-            * NormalLight * Attenuation * ShadowVisibility(LightIndex, Input.WorldPosition, Normal, ToLight);
+        float Visibility = 1.0;
+#if !defined(SAKURA_CUSTOM_MATERIAL) || SAKURA_RECEIVE_SHADOWS
+        Visibility = ShadowVisibility(LightIndex, Input.WorldPosition, Normal, ToLight);
+#endif
+#if defined(SAKURA_CUSTOM_MATERIAL) && SAKURA_SHADING_MODEL == 2
+        float Steps = max(MaterialSurface.ToonSteps, 2.0);
+        float ScaledLight = NormalLight * (Steps - 1.0);
+        float BandedLight = (floor(ScaledLight) + smoothstep(0.5 - MaterialSurface.ToonSmoothness,
+            0.5 + MaterialSurface.ToonSmoothness, frac(ScaledLight))) / (Steps - 1.0);
+        float Highlight = smoothstep(0.9 - MaterialSurface.ToonSmoothness, 0.9 + MaterialSurface.ToonSmoothness, NormalHalf)
+            * MaterialSurface.ToonSpecular;
+        Result += (Surface.rgb * BandedLight + Highlight) * Light.ColorIntensity.rgb * Light.ColorIntensity.w * Attenuation * Visibility;
+#else
+        Result += (Diffuse + Specular) * Light.ColorIntensity.rgb * Light.ColorIntensity.w * NormalLight * Attenuation * Visibility;
+#endif
     }
     float3 EnvironmentFresnel = Reflectance + (max(1.0 - Roughness, Reflectance) - Reflectance) * pow(1.0 - NormalView, 5.0);
     float3 Irradiance = IrradianceImage.SampleLevel(IrradianceImage_sampler, Normal, 0).rgb;
     float3 Reflection = ReflectionImage.SampleLevel(ReflectionImage_sampler, reflect(-ViewDirection, Normal), Roughness * 5.0).rgb;
     float2 IntegratedBrdf = BrdfImage.SampleLevel(BrdfImage_sampler, float2(NormalView, Roughness), 0).rg;
-    Result += FrameParameters.y * ((1.0 - EnvironmentFresnel) * (1.0 - Metallic) * Surface.rgb * Irradiance
+    float Occlusion = 1.0;
+#ifdef SAKURA_CUSTOM_MATERIAL
+    Occlusion = saturate(MaterialSurface.Occlusion);
+#endif
+    Result += Occlusion * FrameParameters.y * ((1.0 - EnvironmentFresnel) * (1.0 - Metallic) * Surface.rgb * Irradiance
         + Reflection * (Reflectance * IntegratedBrdf.x + IntegratedBrdf.y));
     return float4(max(Result, 0.0), saturate(Surface.a));
 }
@@ -249,4 +329,10 @@ TransparencyOutput TransparencyMain(VertexOutput Input, bool FrontFace : SV_IsFr
     Output.Accumulation = float4(Surface.rgb * Surface.a, Surface.a) * Weight;
     Output.Revealage = Surface.a;
     return Output;
+}
+
+float4 AdditiveMain(VertexOutput Input, bool FrontFace : SV_IsFrontFace) : SV_TARGET
+{
+    float4 Surface = ShadeSurface(Input, FrontFace);
+    return float4(Surface.rgb * Surface.a, 0.0);
 }

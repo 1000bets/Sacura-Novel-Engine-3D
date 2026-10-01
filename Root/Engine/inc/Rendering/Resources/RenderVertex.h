@@ -10,6 +10,7 @@ struct RenderVertex
     Vector3 Normal = Vector3::Up;
     Vector2 TexCoord = Vector2::Zero;
     DirectX::SimpleMath::Color VertexColor = DirectX::SimpleMath::Color(1.f, 1.f, 1.f, 1.f);
+    Vector4 Tangent = Vector4::Zero;
 };
 
 struct FrameConstants

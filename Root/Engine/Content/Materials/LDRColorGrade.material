@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "domain": "PostProcess",
+  "source": {
+    "assetId": "581f3aa1-d73e-57e4-b36e-96e948ed489b",
+    "subAssetId": null
+  },
+  "parameters": [
+    {
+      "id": "Tint",
+      "type": "Color",
+      "default": [
+        1,
+        0.95,
+        0.95,
+        1
+      ],
+      "displayName": "Tint",
+      "group": "Surface"
+    }
+  ],
+  "postProcessStage": "AfterToneMapping"
+}

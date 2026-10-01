@@ -97,3 +97,14 @@ Scripts/PackEngineSourceApp/*.spec
 Scripts/PackEngineSourceApp/PackEngineSourceApp.exe
 
 /Root/Engine/ThirdParty/Qt/
+
+# Local tests and MCP connections
+/Root/Tests/
+/Tests/
+.mcp.json
+mcp.json
+mcp-config.json
+mcp_config.json
+/.cursor/mcp.json
+/.vscode/mcp.json
+/.codex/config.toml

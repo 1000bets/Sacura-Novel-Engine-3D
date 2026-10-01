@@ -10,8 +10,8 @@ public:
     void Extract(const Scene& SourceScene, RenderScene& Output) const;
 
 private:
-    Matrix ComputeWorldMatrix(const class GameObject& Object) const;
-    void ExtractRenderableObjects(const Scene& SourceScene, RenderScene& Output) const;
-    void ExtractCamera(const Scene& SourceScene, RenderScene& Output) const;
-    void ExtractLights(const Scene& SourceScene, RenderScene& Output) const;
+    struct ExtractionContext;
+    void ExtractRenderableObjects(const Scene& SourceScene, RenderScene& Output, ExtractionContext& Context) const;
+    void ExtractCamera(const Scene& SourceScene, RenderScene& Output, ExtractionContext& Context) const;
+    void ExtractLights(const Scene& SourceScene, RenderScene& Output, ExtractionContext& Context) const;
 };

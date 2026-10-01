@@ -1,5 +1,5 @@
 #include "Platform/WindowSubsystem.h"
-#include "Core/Threading/RenderThread.h"
+#include "Rendering/Threading/RenderThread.h"
 #include "Core/Threading/ThreadContext.h"
 
 #include <SDL3/SDL.h>

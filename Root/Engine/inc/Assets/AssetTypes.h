@@ -38,6 +38,8 @@ inline const AssetType StoryAssetType{"Story"};
 inline const AssetType ModelAssetType{"Model"};
 inline const AssetType TextureAssetType{"Texture"};
 inline const AssetType MaterialAssetType{"Material"};
+inline const AssetType MaterialInstanceAssetType{"MaterialInstance"};
+inline const AssetType ShaderSourceAssetType{"ShaderSource"};
 inline const AssetType StaticMeshAssetType{"StaticMesh"};
 inline const AssetType SkeletalMeshAssetType{"SkeletalMesh"};
 inline const AssetType SkeletonAssetType{"Skeleton"};

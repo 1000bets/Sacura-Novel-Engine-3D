@@ -14,6 +14,7 @@ public:
 
     bool IsValid() const { return Resource != nullptr; }
     const ResourceType* Get() const { return Resource.get(); }
+    std::shared_ptr<const ResourceType> GetSharedResource() const { return Resource; }
     const ResourceType& operator*() const { return *Resource; }
     const ResourceType* operator->() const { return Resource.get(); }
 

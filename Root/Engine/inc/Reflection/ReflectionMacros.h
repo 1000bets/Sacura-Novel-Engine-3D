@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/MemorySubsystem.h"
+#include "Core/Object/MemorySubsystem.h"
 #include "Reflection/Class.h"
 #include "Reflection/PendingRegistry.h"
 #include "Reflection/PropertyDescriptor.h"
@@ -32,6 +32,11 @@ struct ReflectionCategoryTag
 struct ReflectionAssetTypeTag
 {
     const char* Text = nullptr;
+};
+
+struct ReflectionAssetTypesTag
+{
+    std::initializer_list<const char*> Types;
 };
 
 struct ReflectionCompanionPropertyTag
@@ -70,6 +75,14 @@ inline void ApplyReflectArgument(PropertyAttributes& Attributes, ReflectionAsset
     Attributes.AssetTypeFilter = Tag.Text;
 }
 
+inline void ApplyReflectArgument(PropertyAttributes& Attributes, ReflectionAssetTypesTag Tag)
+{
+    for (const char* Type : Tag.Types)
+    {
+        Attributes.AllowedAssetTypes.emplace_back(Type);
+    }
+}
+
 inline void ApplyReflectArgument(PropertyAttributes& Attributes, ReflectionCompanionPropertyTag Tag)
 {
     Attributes.CompanionProperty = Tag.Text;
@@ -106,6 +119,7 @@ inline PropertyAttributes MakePropertyAttributes(Arguments&&... Values)
 #define RF_UI_RANGE(MinimumValue, MaximumValue) ReflectionUiRangeTag{static_cast<double>(MinimumValue), static_cast<double>(MaximumValue)}
 #define RF_CATEGORY(TextLiteral) ReflectionCategoryTag{TextLiteral}
 #define RF_ASSET_TYPE(TextLiteral) ReflectionAssetTypeTag{TextLiteral}
+#define RF_ASSET_TYPES(...) ReflectionAssetTypesTag{{__VA_ARGS__}}
 #define RF_COMPANION_PROPERTY(TextLiteral) ReflectionCompanionPropertyTag{TextLiteral}
 #define RF_EDITOR_HIDDEN ReflectionEditorHiddenTag{}
 

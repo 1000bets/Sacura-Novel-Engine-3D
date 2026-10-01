@@ -1,6 +1,6 @@
 #include "Reflection/PropertyAccess.h"
 
-#include "Gameplay/Object.h"
+#include "Core/Object/Object.h"
 #include "Reflection/Class.h"
 #include "Reflection/ReflectionSubsystem.h"
 #include "Reflection/TypeDescriptor.h"

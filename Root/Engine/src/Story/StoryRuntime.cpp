@@ -1,10 +1,10 @@
 #include "Story/StoryRuntime.h"
 
 #include "Core/Threading/ThreadContext.h"
-#include "Core/MemorySubsystem.h"
-#include "Game/Scene.h"
-#include "Gameplay/CameraComponent.h"
-#include "Gameplay/GameObject.h"
+#include "Core/Object/MemorySubsystem.h"
+#include "World/Scene.h"
+#include "World/Components/CameraComponent.h"
+#include "World/GameObject.h"
 #include "Story/StoryDocumentIO.h"
 
 #include <algorithm>
@@ -34,6 +34,11 @@ Quaternion SlerpQuaternion(const Quaternion& Start, const Quaternion& End, float
 {
     return Quaternion::Slerp(Start, End, Alpha);
 }
+}
+
+StoryRuntime::~StoryRuntime()
+{
+    Stop();
 }
 
 void StoryRuntime::BindScene(Scene* InScene)
@@ -356,6 +361,7 @@ void StoryRuntime::PrepareActiveAction()
             FailAction("MoveTo target not found: " + Action.Definition.TargetObjectId);
             return;
         }
+        Target->bStoryControllingTransform = true;
         Action.StartPosition = Target->GetTransform().Position;
         return;
     }
@@ -366,6 +372,7 @@ void StoryRuntime::PrepareActiveAction()
         return;
     }
     Action.PrimaryCameraObject = Camera->GetObjectHandle();
+    Camera->bStoryControllingTransform = true;
     Action.StartPosition = Camera->GetTransform().Position;
     Action.StartRotation = Camera->GetTransform().Rotation;
     if (Action.Definition.bUseTargetObjectTransform)
@@ -375,8 +382,17 @@ void StoryRuntime::PrepareActiveAction()
             FailAction("CameraCut target not found: " + Action.Definition.TargetObjectId);
             return;
         }
-        Action.Definition.TargetPosition = Target->GetTransform().Position;
-        Action.Definition.TargetRotation = Target->GetTransform().Rotation;
+        Matrix Destination = Target->GetWorldMatrix();
+        if (Camera->GetParent() != nullptr)
+        {
+            Destination *= Camera->GetParent()->GetWorldMatrix().Invert();
+        }
+        Vector3 DestinationScale;
+        if (!Destination.Decompose(DestinationScale, Action.Definition.TargetRotation, Action.Definition.TargetPosition))
+        {
+            FailAction("CameraCut target transform cannot be decomposed");
+            return;
+        }
         Action.Definition.bHasTargetRotation = true;
     }
 }
@@ -422,7 +438,7 @@ void StoryRuntime::TickActiveAction(float DeltaTime)
         }
         Transform ObjectTransform = Target->GetTransform();
         ObjectTransform.Position = LerpVector3(Action.StartPosition, Action.Definition.TargetPosition, Alpha);
-        Target->SetTransform(ObjectTransform);
+        Target->m_Transform = ObjectTransform;
 
         if (Alpha >= 1.0f)
         {
@@ -459,7 +475,7 @@ void StoryRuntime::TickActiveAction(float DeltaTime)
                 Action.Definition.TargetRotation,
                 Alpha);
         }
-        Camera->SetTransform(CameraTransform);
+        Camera->m_Transform = CameraTransform;
 
         if (Alpha >= 1.0f)
         {
@@ -475,6 +491,7 @@ void StoryRuntime::CompleteActiveAction()
         return;
     }
 
+    ReleaseActionTransform(ActionQueue[ActiveActionIndex]);
     ActionQueue[ActiveActionIndex].State = StoryActionState::Completed;
     ++ActiveActionIndex;
 
@@ -492,12 +509,32 @@ void StoryRuntime::CancelAllActions()
     {
         if (Action.State == StoryActionState::Running)
         {
+            ReleaseActionTransform(Action);
             Action.State = StoryActionState::Cancelled;
         }
     }
     ActionQueue.clear();
     ActiveActionIndex = 0;
     bActionSequenceRunning = false;
+}
+
+void StoryRuntime::ReleaseActionTransform(ActiveAction& Action)
+{
+    Scene* World = GetScene();
+    if (World == nullptr)
+    {
+        return;
+    }
+    ObjectHandle Identity = Action.TargetObject;
+    if (Action.Definition.Kind == StoryActionKind::CameraCut)
+    {
+        Identity = Action.PrimaryCameraObject;
+    }
+    GameObject* ControlledObject = World->FindByHandle(Identity);
+    if (ControlledObject != nullptr)
+    {
+        ControlledObject->bStoryControllingTransform = false;
+    }
 }
 
 GameObject* StoryRuntime::ResolvePrimaryCameraObject() const
@@ -507,27 +544,10 @@ GameObject* StoryRuntime::ResolvePrimaryCameraObject() const
     {
         return nullptr;
     }
-
-    GameObject* Fallback = nullptr;
-    for (GameObject* ObjectInstance : World->GetAllObjects())
+    CameraComponent* Camera = World->FindPrimaryCamera();
+    if (Camera == nullptr)
     {
-        if (ObjectInstance == nullptr || !ObjectInstance->IsActiveInHierarchy())
-        {
-            continue;
-        }
-        CameraComponent* Camera = ObjectInstance->GetComponent<CameraComponent>();
-        if (Camera == nullptr || !Camera->IsEnabled())
-        {
-            continue;
-        }
-        if (Camera->bPrimary)
-        {
-            return ObjectInstance;
-        }
-        if (Fallback == nullptr)
-        {
-            Fallback = ObjectInstance;
-        }
+        return nullptr;
     }
-    return Fallback;
+    return Camera->GetGameObject();
 }

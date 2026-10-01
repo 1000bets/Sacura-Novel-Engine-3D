@@ -1,6 +1,6 @@
 #include "Story/StoryDocumentIO.h"
 
-#include "Game/SceneSerializer.h"
+#include "Core/IO/AtomicFileWriter.h"
 
 #include <fstream>
 #include <nlohmann/json.hpp>
@@ -477,8 +477,6 @@ StorySerializeResult StoryDocumentIO::SaveToFile(const StoryDocument& Document, 
         return Result;
     }
 
-    const SceneSerializeResult WriteResult = SceneSerializer::WriteTextFileAtomically(AbsolutePath, JsonText);
-    Result.bOk = WriteResult.bOk;
-    Result.Error = WriteResult.Error;
+    Result.bOk = AtomicFileWriter::WriteText(AbsolutePath, JsonText, Result.Error);
     return Result;
 }

@@ -1,51 +1,5 @@
 # ---------------------------------------------------------------
-# Editor dependencies (owned by Editor)
-# ---------------------------------------------------------------
-add_subdirectory(ThirdParty)
-
-# ---------------------------------------------------------------
-# EditorCore — application-independent import, document and undo operations
-# Logical layer: EditorCore. CMake target: EditorCore.
-# ---------------------------------------------------------------
-set(EDITOR_CORE_SRC
-    src/AssetTools/AssetImporter.cpp
-    src/AssetTools/FbxToGlbConverter.cpp
-    src/AssetTools/GlbImporter.cpp
-    src/AssetTools/ImageImporter.cpp
-    src/EditorAction.cpp
-    src/EditorCommandStack.cpp
-    src/EditorCommands.cpp
-    src/SceneDocument.cpp
-)
-
-set(EDITOR_CORE_HDR
-    inc/AssetTools/AssetImporter.h
-    inc/AssetTools/FbxToGlbConverter.h
-    inc/AssetTools/GlbImporter.h
-    inc/AssetTools/ImageImporter.h
-    inc/AssetTools/ImportRequest.h
-    inc/AssetTools/ImportResult.h
-    inc/EditorAction.h
-    inc/EditorActionContext.h
-    inc/EditorCommandStack.h
-    inc/EditorCommands.h
-    inc/SceneDocument.h
-)
-
-add_library(EditorCore STATIC ${EDITOR_CORE_SRC} ${EDITOR_CORE_HDR})
-add_library(Sakura::EditorCore ALIAS EditorCore)
-
-target_include_directories(EditorCore PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/inc
-)
-
-target_link_libraries(EditorCore PUBLIC
-    Engine
-    Sakura::EditorCoreThirdParty
-)
-
-# ---------------------------------------------------------------
-# Editor (Qt UI layer) — QWidget shell, adapters, viewport host
+# Editor (Qt UI layer) РІР‚вЂќ QWidget shell, adapters, viewport host
 # Logical layer: QtEditorFramework. CMake target: Editor.
 # ---------------------------------------------------------------
 if(NOT SAKURA_BUILD_EDITOR)
@@ -57,30 +11,41 @@ set(CMAKE_AUTORCC ON)
 
 set(EDITOR_SRC
     src/Editor.cpp
-    src/AssetImportDialog.cpp
-    src/ContentBrowserWidget.cpp
-    src/EditorMainWindow.cpp
+    src/Panels/AssetImportDialog.cpp
+    src/Panels/ContentBrowserWidget.cpp
+    src/Shell/EditorMainWindow.cpp
+    src/Shell/EditorMainWindowSupport.cpp
+    src/Shell/EditorMainWindowLayout.cpp
+    src/Shell/EditorMainWindowWorkspace.cpp
+    src/Shell/EditorMainWindowSelection.cpp
+    src/Shell/EditorMainWindowClipboard.cpp
+    src/Shell/EditorMainWindowActions.cpp
+    src/Shell/EditorMainWindowSimulation.cpp
+    src/Shell/EditorMainWindowViewport.cpp
+    src/Shell/EditorMainWindowAssets.cpp
+    src/Panels/HierarchyTreeWidget.cpp
     src/EditorReflectionAnchor.cpp
-    src/EditorViewportWidget.cpp
-    src/ProjectBrowserDialog.cpp
-    src/ReflectionInspector.cpp
-    src/TemplateCardWidget.cpp
+    src/Viewport/EditorViewportWidget.cpp
+    src/Launcher/ProjectBrowserDialog.cpp
+    src/Panels/ReflectionInspector.cpp
+    src/Launcher/TemplateCardWidget.cpp
 )
 
 set(EDITOR_HDR
     inc/Editor.h
     inc/Actions/BuiltinEditorActions.h
-    inc/AssetImportDialog.h
-    inc/ContentBrowserWidget.h
-    inc/EditorAssetMime.h
-    inc/EditorClipboard.h
-    inc/EditorMainWindow.h
+    inc/Panels/AssetImportDialog.h
+    inc/Panels/HierarchyTreeWidget.h
+    inc/Panels/ContentBrowserWidget.h
+    inc/Panels/EditorAssetMime.h
+    inc/Shell/EditorClipboard.h
+    inc/Shell/EditorMainWindow.h
     inc/EditorReflectionAnchor.h
-    inc/EditorTheme.h
-    inc/EditorViewportWidget.h
-    inc/ProjectBrowserDialog.h
-    inc/ReflectionInspector.h
-    inc/TemplateCardWidget.h
+    inc/Shell/EditorTheme.h
+    inc/Viewport/EditorViewportWidget.h
+    inc/Launcher/ProjectBrowserDialog.h
+    inc/Panels/ReflectionInspector.h
+    inc/Launcher/TemplateCardWidget.h
 )
 
 set(EDITOR_RESOURCES
@@ -90,15 +55,21 @@ set(EDITOR_RESOURCES
 add_library(Editor STATIC ${EDITOR_SRC} ${EDITOR_HDR} ${EDITOR_RESOURCES})
 add_library(Sakura::Editor ALIAS Editor)
 
+target_include_directories(Editor PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
 target_include_directories(Editor PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/inc
 )
 
 target_link_libraries(Editor PUBLIC
     EditorCore
+)
+target_link_libraries(Editor PRIVATE
     Sakura::EditorThirdParty
 )
 
 target_compile_definitions(Editor PUBLIC
     SAKURA_EDITOR_RESOURCES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources/studio"
 )
+
+target_sources(Editor PRIVATE src/Panels/MaterialBindingsDialog.cpp)

@@ -1,5 +1,5 @@
 #include "Reflection/Class.h"
-#include "Core/MemorySubsystem.h"
+#include "Core/Object/MemorySubsystem.h"
 
 Class::Class()
     : Object("Class")

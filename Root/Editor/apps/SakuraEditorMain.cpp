@@ -1,10 +1,10 @@
 #include "Core/EnginePaths.h"
 #include "Core/Threading/ThreadContext.h"
-#include "EditorMainWindow.h"
+#include "Shell/EditorMainWindow.h"
 #include "EditorReflectionAnchor.h"
 #include "Engine.h"
 #include "Project/ProjectSession.h"
-#include "ProjectBrowserDialog.h"
+#include "Launcher/ProjectBrowserDialog.h"
 
 #include <QApplication>
 #include <QTimer>
@@ -59,7 +59,30 @@ int main(int ArgumentCount, char** Arguments)
 
     Engine BoundEngine;
     ForceTouchEditorRegistrars();
+    const std::string Backend = ParseFlagPath(ArgumentCount, Arguments, "--backend", "--backend=").string();
+    if (Backend == "D3D12")
+    {
+        BoundEngine.SetGraphicsBackend(GraphicsBackend::D3D12);
+    }
+    else if (Backend == "Vulkan")
+    {
+        BoundEngine.SetGraphicsBackend(GraphicsBackend::Vulkan);
+    }
+    else if (Backend == "OpenGL")
+    {
+        BoundEngine.SetGraphicsBackend(GraphicsBackend::OpenGL);
+    }
+    else if (!Backend.empty() && Backend != "Auto")
+    {
+        PrintString("Unknown graphics backend: " + Backend);
+        return 1;
+    }
     BoundEngine.InitializeHeadless({});
+    if (!BoundEngine.IsInitialized())
+    {
+        PrintString("SakuraEditor: engine initialization failed: " + BoundEngine.GetInitializationError());
+        return 1;
+    }
 
     ProjectSession Session;
     Session.BindEngine(&BoundEngine);
@@ -87,27 +110,29 @@ int main(int ArgumentCount, char** Arguments)
         PrintString(std::string("SakuraEditor: project opened in degraded state: ") + Session.GetLastError());
     }
 
-    EditorMainWindow MainWindow(BoundEngine, Session);
-    MainWindow.show();
-
-    const std::filesystem::path EditorShot = ParseFlagPath(ArgumentCount, Arguments, "--screenshot-editor", "--screenshot-editor=");
-    if (!EditorShot.empty())
+    int ExitCode = 0;
     {
-        QTimer::singleShot(200, [&]()
-        {
-            if (!MainWindow.CaptureScreenshot(QString::fromStdString(EditorShot.string())))
-            {
-                PrintString("SakuraEditor: failed to capture editor screenshot");
-                Application.exit(1);
-                return;
-            }
-            PrintString(std::string("SakuraEditor: editor screenshot saved to ") + EditorShot.generic_string());
-            Application.exit(0);
-        });
-        return Application.exec();
-    }
+        EditorMainWindow MainWindow(BoundEngine, Session);
+        MainWindow.show();
 
-    const int ExitCode = Application.exec();
+        const std::filesystem::path EditorShot = ParseFlagPath(ArgumentCount, Arguments, "--screenshot-editor", "--screenshot-editor=");
+        if (!EditorShot.empty())
+        {
+            QTimer::singleShot(200, [&]()
+            {
+                if (!MainWindow.CaptureScreenshot(QString::fromStdString(EditorShot.string())))
+                {
+                    PrintString("SakuraEditor: failed to capture editor screenshot");
+                    Application.exit(1);
+                    return;
+                }
+                PrintString(std::string("SakuraEditor: editor screenshot saved to ") + EditorShot.generic_string());
+                Application.exit(0);
+            });
+        }
+
+        ExitCode = Application.exec();
+    }
 
     Session.CloseProject();
     BoundEngine.StopPresenting();

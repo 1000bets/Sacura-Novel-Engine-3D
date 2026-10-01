@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
+#include <vector>
 
 enum class PropertyFlags : uint32_t
 {
@@ -45,6 +47,7 @@ struct PropertyAttributes
     const char* Category = nullptr;
     const char* Description = nullptr;
     const char* AssetTypeFilter = nullptr;
+    std::vector<std::string> AllowedAssetTypes;
     const char* CompanionProperty = nullptr;
     bool bEditorHidden = false;
     bool bHasRange = false;

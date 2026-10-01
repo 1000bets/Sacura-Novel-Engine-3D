@@ -103,6 +103,7 @@ MeshHandle RenderResourceManager::CreateMeshFromCpuData(const StaticMeshResource
     {
         const auto& SourceVertex = SourceMesh.Vertices[Index];
         UploadVertices[Index].Position = SourceVertex.Position;
+        UploadVertices[Index].Tangent = SourceVertex.Tangent;
         UploadVertices[Index].Normal = Vector3::Zero;
         if (SourceVertex.bHasNormal)
         {
@@ -165,6 +166,11 @@ MeshHandle RenderResourceManager::CreateMeshFromCpuData(const StaticMeshResource
 
 TextureHandle RenderResourceManager::CreateTextureFromCpuData(const TextureResource& SourceTexture)
 {
+    return CreateTextureFromCpuData(SourceTexture, SourceTexture.ColorSpace == TextureColorSpace::Srgb);
+}
+
+TextureHandle RenderResourceManager::CreateTextureFromCpuData(const TextureResource& SourceTexture, bool bSrgb)
+{
     AssertRenderThread();
     assert(Device != nullptr);
 
@@ -178,7 +184,11 @@ TextureHandle RenderResourceManager::CreateTextureFromCpuData(const TextureResou
     Desc.Type = RESOURCE_DIM_TEX_2D;
     Desc.Width = SourceTexture.Width;
     Desc.Height = SourceTexture.Height;
-    Desc.Format = SourceTexture.ColorSpace == TextureColorSpace::Srgb ? TEX_FORMAT_RGBA8_UNORM_SRGB : TEX_FORMAT_RGBA8_UNORM;
+    Desc.Format = TEX_FORMAT_RGBA8_UNORM;
+    if (bSrgb)
+    {
+        Desc.Format = TEX_FORMAT_RGBA8_UNORM_SRGB;
+    }
     Desc.MipLevels = 1;
     Desc.BindFlags = BIND_SHADER_RESOURCE;
     Desc.Usage = USAGE_IMMUTABLE;

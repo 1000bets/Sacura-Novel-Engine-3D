@@ -24,6 +24,7 @@ public:
 
     bool OpenProject(const std::filesystem::path& ProjectFile);
     void CloseProject();
+    bool RelocateContentPath(const std::filesystem::path& Source, const std::filesystem::path& Destination, std::string& OutError);
 
     bool IsOpen() const;
     const ProjectDescriptor* GetProject() const;
@@ -32,6 +33,7 @@ public:
     const std::string& GetLastError() const { return LastError; }
     int GetIssueCount() const { return IssueCount; }
     const AssetDiagnostic& GetLastContentDiagnostic() const { return LastContentDiagnostic; }
+    const std::vector<AssetDiagnostic>& GetDiagnostics() const { return Diagnostics; }
 
 private:
     bool ApplyOpenedProject();
@@ -42,4 +44,5 @@ private:
     std::string LastError;
     int IssueCount = 0;
     AssetDiagnostic LastContentDiagnostic = AssetDiagnostic::Ok();
+    std::vector<AssetDiagnostic> Diagnostics;
 };

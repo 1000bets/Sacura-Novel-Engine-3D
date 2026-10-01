@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Gameplay/ObjectHandle.h"
+#include "Core/Object/ObjectHandle.h"
 #include "Reflection/PropertyDescriptor.h"
 #include "Reflection/ReflectedValue.h"
 #include "Reflection/TypeId.h"
@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include <vector>
 
+class Engine;
 class ScriptComponent;
 class Class;
 
@@ -43,11 +44,14 @@ public:
 
     bool IsInitialized() const { return bInitialized; }
     bool IsPythonEnabled() const;
+    void BindMaterialEngine(Engine* Runtime) { MaterialEngine = Runtime; }
+    Engine* GetMaterialEngine() const { return MaterialEngine; }
 
     void SetScriptsRoot(const std::filesystem::path& ScriptsRoot);
     const std::filesystem::path& GetScriptsRoot() const { return ScriptsRoot; }
 
     ReflectionDiagnostic ImportConfiguredModules();
+    const std::vector<ReflectionDiagnostic>& GetImportDiagnostics() const { return ImportDiagnostics; }
     ReflectionDiagnostic ImportModule(const std::string& ModuleName);
 
     ReflectionDiagnostic PublishPythonClass(const PythonClassPublishRequest& Request);
@@ -61,8 +65,10 @@ private:
     ScriptingSubsystem();
     ~ScriptingSubsystem();
 
+    Engine* MaterialEngine = nullptr;
     bool bInitialized = false;
     std::filesystem::path ScriptsRoot;
+    std::vector<ReflectionDiagnostic> ImportDiagnostics;
     uint64_t NextScriptInstanceId = 1;
 
 #if defined(SAKURA_ENABLE_PYTHON)

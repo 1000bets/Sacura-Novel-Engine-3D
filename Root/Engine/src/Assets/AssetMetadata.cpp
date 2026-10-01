@@ -1,3 +1,4 @@
+#include "Core/IO/AtomicFileWriter.h"
 #include "Assets/AssetMetadata.h"
 
 #include <fstream>
@@ -163,20 +164,12 @@ bool AssetMetadataIO::TryLoadFromFile(const std::string& AbsoluteMetaPath, Asset
 
 bool AssetMetadataIO::TrySaveToFile(const std::string& AbsoluteMetaPath, const AssetMetadata& Metadata, AssetDiagnostic& OutError)
 {
-    std::ofstream Stream(AbsoluteMetaPath, std::ios::trunc);
-    if (!Stream)
+    std::string WriteError;
+    if (!AtomicFileWriter::WriteText(AbsoluteMetaPath, ToJson(Metadata).dump(2), WriteError))
     {
-        OutError = AssetDiagnostic::Fail(AssetErrorCode::InternalError, "AssetMetadata", "Failed to write .meta", {}, AbsoluteMetaPath);
+        OutError = AssetDiagnostic::Fail(AssetErrorCode::InternalError, "AssetMetadata", WriteError, {}, AbsoluteMetaPath);
         return false;
     }
-
-    Stream << ToJson(Metadata).dump(2);
-    if (!Stream)
-    {
-        OutError = AssetDiagnostic::Fail(AssetErrorCode::InternalError, "AssetMetadata", "Failed while writing .meta", {}, AbsoluteMetaPath);
-        return false;
-    }
-
     OutError = AssetDiagnostic::Ok();
     return true;
 }

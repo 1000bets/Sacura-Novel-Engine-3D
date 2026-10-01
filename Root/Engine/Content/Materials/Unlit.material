@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 2,
+  "domain": "Surface",
+  "source": {
+    "assetId": "cab7136e-3cd5-59b2-ab43-d5c34715aae1",
+    "subAssetId": null
+  },
+  "parameters": [
+    {
+      "id": "BaseColor",
+      "type": "Color",
+      "default": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "displayName": "BaseColor",
+      "group": "Surface"
+    },
+    {
+      "id": "Emissive",
+      "type": "Color",
+      "default": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "displayName": "Emissive",
+      "group": "Surface"
+    },
+    {
+      "id": "BaseColorTexture",
+      "type": "Texture2D",
+      "default": null,
+      "displayName": "BaseColorTexture",
+      "group": "Surface",
+      "srgb": true
+    }
+  ],
+  "shadingModel": "Unlit",
+  "blendMode": "Opaque"
+}

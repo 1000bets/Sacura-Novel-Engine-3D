@@ -12,8 +12,10 @@ struct StaticMeshVertex
     DirectX::SimpleMath::Vector3 Position{};
     DirectX::SimpleMath::Vector3 Normal{};
     DirectX::SimpleMath::Vector2 TexCoord{};
+    DirectX::SimpleMath::Vector4 Tangent{};
     bool bHasNormal = false;
     bool bHasTexCoord = false;
+    bool bHasTangent = false;
 };
 
 struct StaticMeshSubmesh
@@ -30,3 +32,5 @@ struct StaticMeshResource
     std::vector<StaticMeshSubmesh> Submeshes;
     AxisAlignedBounds Bounds{};
 };
+
+void PrepareSurfaceVertices(StaticMeshResource& Mesh);

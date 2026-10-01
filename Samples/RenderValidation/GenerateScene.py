@@ -78,7 +78,7 @@ for Row in range(32):
         if ((Row // 4) + (Column // 4)) % 2:
             Alpha = 0
         Pixels.extend([255, 255, 255, Alpha])
-TexturePath = Content / "Textures" / "Cutout.png"
+TexturePath = Content / "Textures" / "CutoutMask.png"
 TexturePath.write_bytes(b"\x89PNG\r\n\x1a\n" + Chunk(b"IHDR", struct.pack(">IIBBBBB", 32, 32, 8, 6, 0, 0, 0)) + Chunk(b"IDAT", zlib.compress(Pixels)) + Chunk(b"IEND", b""))
 Metadata(TexturePath, "Texture")
 
@@ -111,7 +111,7 @@ GlassBlue = Material("GlassBlue", baseColor=[0.08, 0.3, 1, 0.55], alphaMode="BLE
 Mesh("IntersectingRed", "Plane", GlassRed, [-0.6, 0.7, 1.1], [2.4, 1.3, 1], [0, 0.38268343, 0, 0.92387953])
 Mesh("IntersectingBlue", "Plane", GlassBlue, [0.6, 0.7, 1.1], [2.4, 1.3, 1], [0, -0.38268343, 0, 0.92387953])
 Cutout = Material("Cutout", baseColor=[0.1, 0.8, 0.3, 1], alphaMode="MASK", alphaCutoff=0.5, doubleSided=True,
-    baseColorTexture={"assetId": Identifier("Cutout.png"), "subAssetId": None})
+    baseColorTexture={"assetId": Identifier("CutoutMask.png"), "subAssetId": None})
 Mesh("Cutout", "Plane", Cutout, [2.8, 1.1, -0.5], [1.2, 1.8, 1])
 Emission = Material("Emission", baseColor=[1, 0.2, 0.1, 1], emissive=[12, 2, 0.3])
 Mesh("Emission", "Sphere", Emission, [-2.8, 1.1, -0.5], [0.6, 0.6, 0.6])

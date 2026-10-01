@@ -1,10 +1,11 @@
+#include "Materials/MaterialBindings.h"
 #include "Reflection/ReflectionSubsystem.h"
 
-#include "Core/MemorySubsystem.h"
+#include "Core/Object/MemorySubsystem.h"
 #include "Core/Threading/ThreadContext.h"
-#include "Gameplay/Component.h"
-#include "Gameplay/GameObject.h"
-#include "Gameplay/ScriptComponent.h"
+#include "World/Components/Component.h"
+#include "World/GameObject.h"
+#include "World/Components/ScriptComponent.h"
 #include "Reflection/PendingRegistry.h"
 #include "Reflection/PropertyAccess.h"
 #include "Reflection/ReflectionValueCodec.h"
@@ -116,6 +117,16 @@ void ReflectionSubsystem::RegisterBuiltinValueTypes()
     {
         TypeDescriptor Descriptor;
         FillBuiltinType<Color>(Descriptor, "engine.Color", sizeof(Color));
+        RegisterTypeDescriptor(std::move(Descriptor));
+    }
+    {
+        TypeDescriptor Descriptor;
+        FillBuiltinType<MaterialSlotOverrides>(Descriptor, "engine.MaterialSlots", sizeof(MaterialSlotOverrides));
+        RegisterTypeDescriptor(std::move(Descriptor));
+    }
+    {
+        TypeDescriptor Descriptor;
+        FillBuiltinType<MaterialPostProcessEffects>(Descriptor, "engine.PostProcessEffects", sizeof(MaterialPostProcessEffects));
         RegisterTypeDescriptor(std::move(Descriptor));
     }
 }

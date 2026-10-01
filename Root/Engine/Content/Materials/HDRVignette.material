@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 2,
+  "domain": "PostProcess",
+  "source": {
+    "assetId": "7f0cabfa-fa28-5f15-b501-fc020e494199",
+    "subAssetId": null
+  },
+  "parameters": [
+    {
+      "id": "Strength",
+      "type": "Float",
+      "default": 0.5,
+      "displayName": "Strength",
+      "group": "Surface",
+      "range": [
+        0,
+        1
+      ]
+    }
+  ],
+  "postProcessStage": "BeforeToneMapping"
+}
