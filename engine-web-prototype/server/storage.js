@@ -4,11 +4,11 @@ import {mkdirSync} from 'node:fs';
 import {dirname} from 'node:path';
 import {S3Client, PutObjectCommand, GetObjectCommand, HeadBucketCommand, CreateBucketCommand} from '@aws-sdk/client-s3';
 
-export const MESH_LIMIT=3*1024*1024;
+export const MESH_LIMIT=100*1024*1024;
 export const meshPattern=/^\/api\/meshes\/([a-f0-9]{64}\.(?:glb|obj))$/;
 export function httpError(status,message){return Object.assign(new Error(message),{status});}
 export function validateMesh(body,format){
- if(!Buffer.isBuffer(body)||!body.length||body.length>MESH_LIMIT)throw httpError(413,'Размер модели должен быть от 1 байта до 3 МБ.');
+ if(!Buffer.isBuffer(body)||!body.length||body.length>MESH_LIMIT)throw httpError(413,'Размер модели должен быть от 1 байта до 100 МБ.');
  if(!['glb','obj'].includes(format))throw httpError(400,'Поддерживаются GLB и OBJ.');
  if(format==='glb'){
   if(body.length<20||body.readUInt32LE(0)!==0x46546c67||body.readUInt32LE(4)!==2||body.readUInt32LE(8)!==body.length||body.readUInt32LE(16)!==0x4e4f534a)throw httpError(400,'Повреждён GLB.');

@@ -20,7 +20,7 @@ export default function MeshInspector({object,onChange,disabled,allowUpload=true
   {allowUpload&&<><input ref={fileInput} type="file" hidden accept=".glb,.obj" onChange={event=>{upload(event.target.files?.[0]);event.target.value='';}}/>
    <div className="mesh-import" onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();upload(e.dataTransfer.files?.[0]);}}>
     <strong>{object.model?.name||'Custom mesh'}</strong>
-    <small>GLB / OBJ · до 3 МБ. GLB со встроенными текстурами; OBJ — геометрия без MTL. Размеры и начало координат сохраняются.</small>
+    <small>GLB / OBJ · до 100 МБ. GLB со встроенными текстурами; OBJ — геометрия без MTL. Размеры и начало координат сохраняются.</small>
     <Button icon="Upload" onClick={()=>fileInput.current.click()}>{busy?'Загрузка…':object.model?'Заменить меш':'Загрузить меш'}</Button>
     {object.model&&<Button icon="RotateCcw" onClick={()=>{setError('');commit({model:null,materialOverrides:{}});}}>Вернуть примитив</Button>}
    </div></>}

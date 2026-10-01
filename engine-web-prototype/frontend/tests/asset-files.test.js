@@ -30,5 +30,8 @@ test('models remain in the library when the last instance is removed or replaced
 test('directory imports preserve relative paths and parse reusable model data',async()=>{
  const imported=await importAssetFiles([{name:'prop.obj',webkitRelativePath:'Props/Furniture/prop.obj',size:model.src.length,text:async()=>model.src}],'Imported');
  assert.equal(imported[0].path,'Imported/Props/Furniture/prop.obj');assert.equal(imported[0].model.format,'obj');assert.equal(imported[0].kind,'model');
+ const large=await importAssetFiles([{name:'large.obj',size:100*1024*1024,text:async()=>model.src}]);
+ assert.equal(large[0].bytes,100*1024*1024);
+ await assert.rejects(importAssetFiles([{name:'large.obj',size:100*1024*1024+1}]),/100 МБ/);
  await assert.rejects(importAssetFiles([{name:'large.bin',size:4*1024*1024}]),/3 МБ/);
 });

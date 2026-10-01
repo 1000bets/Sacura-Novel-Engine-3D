@@ -4,7 +4,7 @@ import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {Readable} from 'node:stream';
-import {createStorage} from '../storage.js';
+import {createStorage,validateMesh,MESH_LIMIT} from '../storage.js';
 import {createAuth} from '../auth.js';
 import {createApp} from '../app.js';
 
@@ -53,5 +53,12 @@ test('S3 deduplicates meshes, project references round trip and private download
  assert.equal((await request('/api/projects/'+p.id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({project:p,expectedRevision:0})})).status,200);
  assert.equal((await (await request('/api/projects/'+p.id)).json()).project.objects[0].model.src,mesh.src);
  assert.equal((await request('/api/meshes?format=glb',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:'bad'})).status,400);
- assert.equal((await request('/api/meshes?format=obj',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Buffer.alloc(3*1024*1024+1)})).status,413);
+ assert.equal((await request('/api/meshes?format=obj',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Buffer.alloc(100*1024*1024+1)})).status,413);
 }));
+
+test('models up to 100 MiB are accepted and larger models are rejected',()=>{
+ assert.equal(MESH_LIMIT,100*1024*1024);
+ const body=Buffer.alloc(MESH_LIMIT,32);body.write('v 0 0 0\n');
+ assert.doesNotThrow(()=>validateMesh(body,'obj'));
+ assert.throws(()=>validateMesh(Buffer.alloc(MESH_LIMIT+1),'obj'),error=>error.status===413);
+});
