@@ -418,6 +418,14 @@ export class PreviewRuntime {
           motion.path=physics.planMotion(movingObject,start,destination);motion.position=samplePath(motion.path,0);
         }
         world.motions={...world.motions,[a.target]:motion};
+        const footstepKey=a.footstepAssetId?event.runId+':'+a.id+':footsteps':null;
+        try{
+        if(footstepKey){
+          this.snapshot.instances[event.runId].audioKeys.push(footstepKey);
+          const playback=this.audio.play(a.footstepAssetId,{key:footstepKey,volume:a.footstepVolume??1,loop:true,duck:false});
+          if(this.audio.get(footstepKey))this.audio.get(footstepKey).runId=event.runId;
+          Promise.resolve(playback).catch(()=>{});
+        }
         for(let elapsed=0;elapsed<duration;elapsed+=50){await this.delay(Math.min(50,duration-elapsed),token,event.runId);const progress=Math.min(1,(elapsed+50)/duration);
           if(motion.path){
             const section=pathSection(motion.path,motion.progress,progress);
@@ -425,13 +433,14 @@ export class PreviewRuntime {
             catch(error){motion.stopped=true;throw error;}
             motion.position=section.at(-1);
           }
-          motion.progress=progress;activity.progress=motion.progress;this.emit();}}
+          motion.progress=progress;activity.progress=motion.progress;this.emit();}
         if (
           event.owner === "SubScene" &&
           event.originScene !== this.snapshot.world.location
         )
           throw new Error("CANCELLED");
         world.positions = { ...world.positions, [a.target]: world.motions[a.target]?.position||a.value };
+        }finally{if(footstepKey)this.audio.stop(footstepKey);}}
         break;
       case "pose":
         world.poses = { ...world.poses, [a.target]: a.value };

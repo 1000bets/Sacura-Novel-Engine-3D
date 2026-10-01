@@ -72,6 +72,8 @@ export default function ActionFields({
         {field("К точке", select("value", [["", "Выберите точку"],...pointOptions]))}
         <div className="action-coordinates">{['X','Y','Z'].map((axis,i)=><PhysicsNumber key={axis} label={axis} value={Array.isArray(a.value)?a.value[i]:0} onChange={n=>{const value=Array.isArray(a.value)?[...a.value]:[0,0,0];value[i]=n;onChange({value});}}/>)}</div>
         {onPickPosition&&<button type="button" onClick={()=>onPickPosition(a.id)}>Выбрать вручную на сцене</button>}
+        {field('Звук шагов',select('footstepAssetId',[["","Не выбран · без звука"],...projectAudioAssets(project).filter(asset=>asset.kind==='sound').map(asset=>[asset.id,asset.name])]))}
+        {a.footstepAssetId&&field('Громкость шагов',<input type="number" min="0" max="1" step="0.1" value={a.footstepVolume??1} onChange={e=>onChange({footstepVolume:Math.max(0,Math.min(1,Number(e.target.value)))})}/>)}
         {target?.type==='Персонаж'&&field('Анимация движения',select('animationId',[["","По настройкам персонажа"],...characterAnimationOptions(target,a.animationId)]))}
         </>}
       {type === "pose" &&

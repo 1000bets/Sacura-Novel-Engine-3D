@@ -9,7 +9,7 @@ export function projectAudioAssets(project){
   const kind=['music','voice','sound'].includes(file.audioKind)?file.audioKind:'sound';
   assets.set(file.id,{id:file.id,name:file.name.replace(/\.[^.]+$/,''),file:file.name,url:file.src,kind,speaker:kind==='music'?'Музыка':kind==='voice'?'Озвучка':'Эффект',caption:file.path||file.name,imported:true});
  }
- return [...assets.values()];
+ return [...assets.values()].map(asset=>{const patch=project?.assetOverrides?.['audio-file:'+asset.id];return patch?{...asset,file:patch.name||asset.file,name:(patch.name||asset.file).replace(/\.[^.]+$/,''),kind:patch.audioKind||asset.kind}:asset;});
 }
 export async function validateImportedAudio(files,output){
  for(const file of files){if(file.kind!=='audio')continue;

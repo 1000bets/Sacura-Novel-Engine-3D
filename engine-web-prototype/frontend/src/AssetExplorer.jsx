@@ -5,7 +5,7 @@ import {collectAssetFiles,assetFolders,folderContents,cleanAssetPath,importAsset
 import './assetExplorer.css';
 
 const icons={model:'FileBox',image:'Image',audio:'FileAudio',file:'File'};
-export default function AssetExplorer({project,audioAssets,onImport,onCreateFolder,onSelectObject,onPlaceModel,onAudio,disabled}){
+export default function AssetExplorer({project,audioAssets,onImport,onCreateFolder,onSelectObject,onSelectFile,onPlaceModel,onAudio,disabled}){
  const [dragging,setDragging]=useState(false),[folder,setFolder]=useState(''),[search,setSearch]=useState(''),[selected,setSelected]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[newFolder,setNewFolder]=useState(null),[expanded,setExpanded]=useState(new Set(['']));
  const input=useRef(),directory=useRef(),uploading=useRef(false),dragDepth=useRef(0);
  const files=useMemo(()=>collectAssetFiles(project,audioAssets),[project,audioAssets]);
@@ -14,7 +14,7 @@ export default function AssetExplorer({project,audioAssets,onImport,onCreateFold
  const navigate=next=>{setFolder(next);setSearch('');setSelected(null);setExpanded(previous=>new Set([...previous,next]));};
  const upload=async list=>{
   if(disabled||uploading.current||!list?.length)return;uploading.current=true;setBusy(true);setError('');
-  try{const imported=await importAssetFiles(Array.from(list),path);const stored=await onImport(imported);setSelected(stored?.[0]?.id||imported[0]?.id);}catch(cause){setError(cause.message);}finally{uploading.current=false;setBusy(false);}
+  try{const imported=await importAssetFiles(Array.from(list),path);const stored=await onImport(imported);setSelected(stored?.[0]?.id||imported[0]?.id);onSelectFile?.(stored?.[0]?.id||imported[0]?.id);}catch(cause){setError(cause.message);}finally{uploading.current=false;setBusy(false);}
  };
  const createFolder=async event=>{event.preventDefault();const name=cleanAssetPath(newFolder);if(!name)return;const next=[path,name].filter(Boolean).join('/');try{await onCreateFolder(next);navigate(next);setNewFolder(null);setError('');}catch(cause){setError(cause.message);}};
  const tree=(parent='',depth=0)=>folders.filter(item=>item&&item.split('/').slice(0,-1).join('/')===parent).map(item=>{const children=folders.some(child=>child.startsWith(item+'/'));return <React.Fragment key={item}><div className="asset-folder-row" style={{paddingLeft:depth*14}}>
@@ -38,7 +38,7 @@ export default function AssetExplorer({project,audioAssets,onImport,onCreateFold
   <div className="asset-explorer-body"><nav className="asset-folder-tree" aria-label="Папки проекта"><button className={'asset-root '+(!path?'selected':'')} onClick={()=>navigate('')}><Icon name="FolderOpen" size={16}/>Assets</button>{tree()}</nav>
    <div className="asset-file-area">
     <div className="asset-file-grid" aria-label="Файлы и папки">{contents.folders.map(item=><button key={item} className="asset-file-tile folder" onClick={()=>navigate(item)}><Icon name="Folder" size={34}/><strong>{item.split('/').at(-1)}</strong><small>Папка</small></button>)}
-     {contents.files.map(item=><button key={item.id} className={'asset-file-tile '+(selected===item.id?'selected':'')} aria-pressed={selected===item.id} onClick={()=>setSelected(item.id)} onDoubleClick={()=>!disabled&&open(item)}>
+     {contents.files.map(item=><button key={item.id} className={'asset-file-tile '+(selected===item.id?'selected':'')} aria-pressed={selected===item.id} onClick={()=>{setSelected(item.id);onSelectFile?.(item.id);}} onDoubleClick={()=>!disabled&&open(item)}>
       {item.kind==='image'&&!/\.svg$/i.test(item.name)?<img src={item.src} alt=""/>:<Icon name={icons[item.kind]||'File'} size={32}/>}<strong>{item.name}</strong><small>{item.builtin?'Встроенный файл':item.bytes!=null?`${(item.bytes/1024).toFixed(1)} КБ`:'Файл проекта'}</small>{search&&<small>{item.path}</small>}
      </button>)}
     </div>

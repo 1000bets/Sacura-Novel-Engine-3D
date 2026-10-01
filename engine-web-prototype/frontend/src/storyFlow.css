@@ -78,3 +78,5 @@
 .story-flow .node-answer-settings>summary {min-height:20px;padding:0;}
 .node-answer-settings p {font-size:10px;}
 .story-route {min-height:32px;}
+
+.moment-event[draggable=true]{cursor:grab}.moment-event[draggable=true]:active{cursor:grabbing}.moment-phase{min-height:40px}

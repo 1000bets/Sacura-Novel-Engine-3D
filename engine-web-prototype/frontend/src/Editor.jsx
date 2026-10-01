@@ -1,3 +1,7 @@
+import FileInspector from './FileInspector.jsx';
+import {collectAssetFiles,updateAssetFile} from './assetFiles.js';
+import {moveEventBinding} from './eventPlacement.js';
+import {createObjectGroup,addObjectsToGroup,sceneObjectGroups} from './objectGroups.js';
 import {validateImportSize} from './fileLimits.js';
 import {projectAudioAssets,validateImportedAudio} from './audioAssets.js';
 import {accountStorage} from './accountStorage.js';
@@ -1189,7 +1193,19 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     setMaximized(current=>current==='graph'||current==='hierarchy'||current==='scene'?null:current);
   };
   const inspectedVariable=selection.kind==='variable'?selection.id:selection.kind==='beat'&&['variable','set-variable'].includes(beat.kind)?beat.variable:null;
+  const createSelectionGroup=()=>{if(rt.running)return;const next=structuredClone(project),group=createObjectGroup(next,displayScene.id,objectSelectionIds);if(!group)return;mutate(p=>Object.assign(p,next));setSelection({kind:'object',id:group.objectIds[0],ids:group.objectIds,groupId:group.id});};
+  const moveBinding=(sourceId,id,targetId,phase,batchId,beforeId)=>{if(rt.running)return;mutate(p=>moveEventBinding(p,sourceId,id,targetId,phase,batchId,beforeId));if(eventContext?.bindingId===id){setEventContext(c=>({...c,beatId:targetId}));setSelectedBeat(targetId);}};
   const renderInspector = () => {
+    if(selection.kind==='file'){
+      const file=collectAssetFiles(project,projectAudioAssets(project)).find(f=>f.id===selection.id);
+      if(file)return <FileInspector key={file.id+file.name} file={file} disabled={running} onChange={patch=>{if(rt.running)return;const next=structuredClone(project);updateAssetFile(next,file,patch);mutate(p=>Object.assign(p,next));}} onPlaceModel={placeLibraryModel} onPreviewAudio={file=>{const key='file-preview';if(soundDesk.get(key)?.status==='playing'){soundDesk.stop(key);return;}soundDesk.play(file.audioId||file.id,{key,duck:false});}}/>;
+      return <p>Файл больше не существует.</p>;
+    }
+    if(selection.kind==='object'&&selection.groupId){
+      const group=project.objectGroups?.find(g=>g.id===selection.groupId);
+      if(group)return <><Field label="Имя группы"><input disabled={running} value={group.name} onChange={e=>{const name=e.target.value;if(!rt.running)mutate(p=>p.objectGroups.find(g=>g.id===group.id).name=name);}}/></Field><p>{selectedObjects.length} объектов · перемещаются вместе</p><MultiTransformInspector key={objectSelectionIds.join('|')} objects={selectedObjects} disabled={running} onChange={change=>{if(!rt.running)mutate(p=>{for(const item of transformSelection(selectedObjects,displayScene,change))setObjectTransform(p,item.id,displayScene.id,item.value);});}} onFocus={()=>setFocusRequest({nonce:uid('focus')})} onDuplicate={duplicateObjects} onDelete={deleteObjects} onReset={()=>{if(!rt.running)mutate(p=>{for(const id of objectSelectionIds){const object=p.objects.find(o=>o.id===id);if(object?.transforms)delete object.transforms[displayScene.id];}});}}/><Button icon="Ungroup" disabled={running} onClick={()=>{mutate(p=>p.objectGroups=p.objectGroups.filter(g=>g.id!==group.id));setSelection({kind:'object',id:objectSelectionIds[0],ids:objectSelectionIds});}}>Разгруппировать</Button></>;
+    }
+
     if(inspectedVariable&&(inspectedVariable===ANSWER_VARIABLE||Object.hasOwn(project.variables,inspectedVariable)))return <><VariableInspector key={inspectedVariable} variable={inspectedVariable} project={project} preview={preview} disabled={running} onEdit={updateVariable} onAddNode={(variable,kind)=>graphApi.current?.addVariableNode?.(variable,kind)}/>{selection.kind==='beat'&&<Button icon="Focus" onClick={()=>graphApi.current?.focus(beat.id)}>Показать ноду</Button>}</>;
     if(selection.kind==='beat'&&(isPureNode(beat)||['branch','set-variable'].includes(beat.kind)))return <><div className="inspector-identity"><strong>{beat.kind==='branch'?'If · Если':beat.kind==='variable'?'Переменная':beat.kind==='set-variable'?'Задать переменную':'Логика · '+(compareSymbols[beat.operator]||beat.kind)}</strong></div>{beat.kind==='branch'&&nodeKindField()}<p className="choice-note">Настройки операции находятся на ноде. Круглые пины передают значения, стрелки задают ход истории. Подключите результат операции ко входу Set, чтобы изменить переменную.</p><Button icon="Focus" onClick={()=>graphApi.current?.focus(beat.id)}>Показать ноду</Button></>;
 
@@ -2042,6 +2058,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       {label:'Источник освещения',icon:'Lightbulb',group:'Добавить объект',action:()=>addObject('Источник света')},
       {label:'Камера из текущего вида',icon:'Video',group:'Добавить объект',action:()=>createCamera()},
       {label:'Приблизить выделение',icon:'Focus',group:'Выделение',shortcut:'F',disabled:!objectSelectionIds.length,action:()=>setFocusRequest({nonce:uid('focus')})},
+      {label:'Сгруппировать выделение',icon:'FolderPlus',group:'Выделение',disabled:objectSelectionIds.length<2,action:createSelectionGroup},
       {label:'Дублировать выделение',icon:'Copy',group:'Выделение',disabled:!objectSelectionIds.length,action:duplicateObjects},
       {label:'Удалить выделение',icon:'Trash2',group:'Выделение',shortcut:'Del',disabled:!objectSelectionIds.length,action:deleteObjects},
       {label:showGrid?'Скрыть сетку':'Показать сетку',icon:'Grid2X2',group:'Вид',action:()=>setShowGrid(v=>!v)},
@@ -2265,7 +2282,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             />
           </div>
           <div className="hierarchy-tree">
-              <HierarchyTree scene={displayScene} objects={objects} points={sceneStagingPoints(displayScene,objects)} query={query} selected={selection.id} selectedIds={objectSelectionIds}
+              <HierarchyTree groups={sceneObjectGroups(project,displayScene.id,objects)} disabled={running} onCreateGroup={createSelectionGroup} onSelectGroup={group=>{if(rt.running)return;setMode('scene');setSelection({kind:'object',id:group.objectIds[0],ids:group.objectIds,groupId:group.id});openObjectTransform();}} onGroupDrop={(groupId,ids)=>{if(!rt.running)mutate(p=>addObjectsToGroup(p,groupId,ids));}} scene={displayScene} objects={objects} points={sceneStagingPoints(displayScene,objects)} query={query} selected={selection.id} selectedIds={objectSelectionIds}
                 expanded={layout.treeOpen||{}} onExpanded={treeOpen=>setLayout(l=>({...l,treeOpen}))}
                 onSelectObject={(id,options)=>{if(!running){setMode('scene');setCameraPilotId(null);setCameraPreviewId(null);}selectObject(id,options);}}
                 onFrameObject={id=>{editScene();setSelection({kind:'object',id});setFocusRequest({nonce:uid('focus')});}}
@@ -2595,7 +2612,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 />
               ) : ["story", "timeline", "staging"].includes(dock) ? (
                 <StoryFlow running={running} onVariableEdit={updateVariable} onVariableAdd={(variable,kind,point)=>{if(!rt.running)addBeat(kind,{...point,variable});}} onInspectVariable={inspectVariable} selectedVariable={inspectedVariable} onVariableDrop={point=>{if(rt.running)return;if(point.get||point.set)addBeat(point.set&&point.variable!==ANSWER_VARIABLE?'set-variable':'variable',point);else setContextMenu({...point,kind:'variable-drop'});}} onLogicChange={(id,patch)=>{if(!rt.running)mutate(p=>Object.assign(allBeats(p).find(n=>n.id===id),patch));}} onVariable={(id,name,type,value)=>{if(!rt.running)mutate(p=>{const node=allBeats(p).find(n=>n.id===id);node.valueType=type;node.variable=name.trim();if(node.variable&&node.variable!==ANSWER_VARIABLE)p.variables[node.variable]=typedValue(value,type);});}} onChoice={(id,choiceId,patch)=>{if(!rt.running)mutate(p=>{const b=allBeats(p).find(n=>n.id===id);if(!choiceId)b.choices.push(newChoice(uid('choice'),patch.label));else if(!patch)b.choices=b.choices.filter(c=>c.id!==choiceId);else Object.assign(b.choices.find(c=>c.id===choiceId),patch);});}} onClipboard={graphClipboard} contextNodeId={contextNodeId} project={project} issues={issues} selectedId={beat.id} selectionId={selection.id} preview={preview}
-                  onSelect={graphSelect} onOpen={openGraph} onBatch={changeBatch} onConnect={connect} onDeleteNode={deleteFlowNode}
+                  onSelect={graphSelect} onOpen={openGraph} onMoveBinding={moveBinding} onBatch={changeBatch} onConnect={connect} onDeleteNode={deleteFlowNode}
                   onScene={id=>openSubscenes('edit',id)}
                   onContext={point=>{if(!rt.running)setContextMenu({...point,kind:point.kind||'story'});}}
                   onAdd={(id,hook)=>{setSelectedBeat(id);setSelection({kind:'beat',id});setPicker({kind:'event',phase:hook});}}
@@ -2617,7 +2634,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 onReset={(id,sceneId)=>editSubscene(p=>{const character=p.objects.find(object=>object.id===id);if(character?.transforms)delete character.transforms[sceneId];})}
                 onPlace={(id,sceneId)=>{openSubscenes("edit",sceneId);editScene();setSelection({kind:"object",id});setFocusRequest({nonce:uid("focus")});}}
                 onDuplicate={duplicateCharacter} onDelete={id=>{if(!rt.running)deleteObject(id);}}/> : dock === "files" ? (
-                <AssetExplorer project={project} audioAssets={projectAudioAssets(project)} disabled={running}
+                <AssetExplorer onSelectFile={id=>{setSelection({kind:'file',id});setLayout(l=>({...l,hiddenInspector:false}));setCompactPanel('inspector');setMaximized(null);}} project={project} audioAssets={projectAudioAssets(project)} disabled={running}
                   onImport={importProjectAudioFiles}
                   onCreateFolder={path=>changeAssetLibrary(p=>{p.assetFolders=[...new Set([...(p.assetFolders||[]),path])];})}
                   onSelectObject={selectObject} onPlaceModel={placeLibraryModel} onAudio={()=>{setDock('sound');setDetailEditor(false);}}/>

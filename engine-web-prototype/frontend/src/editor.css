@@ -3268,3 +3268,5 @@ select option,select optgroup { background:var(--graphite-700); color:var(--ivor
 .camera-component-list strong { display: block; font-size: 12px; }
 .camera-component-list small { display: block; color: var(--muted); margin-top: 5px; font-size: 11px; }
 .camera-component-list>button.active { border-color: var(--accent); background: var(--line); }
+
+.tree-object-group{margin:4px 0;border-left:1px solid var(--divider);padding-left:6px}.tree-object-group .tree-folder{flex:1;text-align:left;display:flex;align-items:center;gap:6px}.file-inspector-preview{max-width:100%;max-height:240px;object-fit:contain}
