@@ -23,7 +23,8 @@ export function applyConnections(project,changes){
  const beats=allBeats(project);
  for(const c of changes){
   const beat=beats.find(b=>b.id===c.source);
-  if(c.sourceHandle==='value'){if(c.target){const target=beats.find(b=>b.id===c.target);setInput(target,c.targetHandle,c.disconnect?null:c.source);if(!c.disconnect&&target.kind==='compare'){target.valueType=logicType(project,beat);target.a=typedValue(target.a,target.valueType);target.b=typedValue(target.b,target.valueType);}}else for(const target of beats)for(const port of dataTargets(target))if(getInput(target,port)===c.source)setInput(target,port,null);continue;}
+  if(c.sourceHandle==='value'){if(c.target){const target=beats.find(b=>b.id===c.target);setInput(target,c.targetHandle,c.disconnect?null:c.source);if(!c.disconnect&&target.kind==='convert'){target.inputType=logicType(project,beat)==='any'?'string':logicType(project,beat);}
+ if(!c.disconnect&&target.kind==='compare'){target.valueType=logicType(project,beat);target.a=typedValue(target.a,target.valueType);target.b=typedValue(target.b,target.valueType);}}else for(const target of beats)for(const port of dataTargets(target))if(getInput(target,port)===c.source)setInput(target,port,null);continue;}
   if(beat.kind==='branch'){beat[c.sourceHandle==='true'?'trueNext':'falseNext']=c.target||null;continue;}
   if(beat.kind==='choice'&&c.sourceHandle==='next')beat.choiceMode='value';
   const owner=beat.kind==='choice'&&c.sourceHandle!=='next'?beat.choices.find(x=>'choice:'+x.id===c.sourceHandle):beat;

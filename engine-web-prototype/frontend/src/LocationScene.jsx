@@ -18,14 +18,14 @@ function Exterior({
   kind,
   objects,
   state,
-  onSelect, onContext,
+  onSelect, onContext, onPickPosition, actionPosition,
   onInteract,
   mode = "scene",
   showGrid = true, selected, selectedIds, sceneId, editTool, editSpace, snap, onTransform, onTransforms, focusRequest, editing=true, cameraScene, selectedCameraId, cameraPreviewId, cameraPilotId, onCameraChange, onCameraSelect, cameraApi, physicsApi, showCameras=true,
 }) {
   const host = useRef(),
     live = useRef();
-  live.current = { state, onSelect, onContext, onInteract, mode, showGrid,objects,selected,selectedIds,sceneId,kind,editTool,editSpace,snap,onTransform,onTransforms,focusRequest,editing,cameraScene,selectedCameraId,cameraPreviewId,cameraPilotId,onCameraChange,onCameraSelect,showCameras };
+  live.current = { state, onSelect, onContext, onPickPosition, actionPosition, onInteract, mode, showGrid,objects,selected,selectedIds,sceneId,kind,editTool,editSpace,snap,onTransform,onTransforms,focusRequest,editing,cameraScene,selectedCameraId,cameraPreviewId,cameraPilotId,onCameraChange,onCameraSelect,showCameras };
   useEffect(() => {
     let renderer;
     try {
@@ -175,6 +175,7 @@ function Exterior({
     const physics=createScenePhysics(scene,()=>live.current,()=>picks);if(physicsApi)physicsApi.current=physics;
     const cameraRig=createCameraRig(scene,camera,controls,renderer.domElement,()=>live.current);if(cameraApi)cameraApi.current=cameraRig;
     let down;
+    const destinationMarker=new THREE.Mesh(new THREE.SphereGeometry(.09,16,12),new THREE.MeshBasicMaterial({color:0xffca68,depthTest:false}));destinationMarker.renderOrder=1000;destinationMarker.visible=false;scene.add(destinationMarker);
     const ray = new THREE.Raycaster();
     const press = (e) => {down=e.button===0&&!e.altKey?[e.clientX,e.clientY]:null;renderer.domElement.closest(".scene-viewport")?.focus({preventScroll:true});};
     const click = (e) => {
@@ -188,6 +189,11 @@ function Exterior({
         ),
         camera,
       );
+      if(live.current.onPickPosition){
+        const point=ray.intersectObjects(picks,true).find(h=>{let o=h.object;while(o){if(!o.visible)return false;o=o.parent;}return true;})?.point||ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0),new THREE.Vector3());
+        if(point)live.current.onPickPosition(point.toArray().map(n=>Math.round(n*1000)/1000));
+        return;
+      }
       const cameraHit=cameraRig.pick(ray);if(cameraHit){live.current.onCameraSelect?.(cameraHit);return;}
       let hit = ray.intersectObjects(
         picks.filter((m) => m.visible),
@@ -205,6 +211,7 @@ function Exterior({
     let frame, lastMode, editorCamera, lastCamera,previous=performance.now(),cameraReady=false;
     const render = () => {
       frame = requestAnimationFrame(render);
+      const destination=live.current.actionPosition;destinationMarker.visible=Array.isArray(destination)&&destination.length===3&&live.current.mode==='scene';if(destinationMarker.visible)destinationMarker.position.set(...destination);
       const { state, mode, showGrid,objects } = live.current;
       const now=performance.now(),dt=Math.min(.05,(now-previous)/1000);previous=now;const animTime=updateAtmosphere(state,dt);
       grid.visible = showGrid && mode === "scene";
@@ -226,7 +233,7 @@ function Exterior({
         updateLightObject(mesh,o,live.current.mode==='scene');
         updateMeshVisual(mesh,o);if(o.type!=='Персонаж'&&o.type!=='Источник света'&&!mesh.userData.placeholder)applyMaterialAssignments(mesh,o);
         updateObjectHighlight(mesh,state.interactionTarget===o.id||!!state.highlights?.[o.id],animTime);
-        updateCharacterVisual(mesh,o,dt,state.poses?.[o.id],!!state.motions?.[o.id]&&!state.motions[o.id].stopped&&!state.motions[o.id].paused&&state.motions[o.id].progress<1,state.paused,mode==='scene'&&live.current.editing);
+        updateCharacterVisual(mesh,{...o,walkAnimation:state.motions?.[o.id]?.animationId||o.walkAnimation},dt,state.poses?.[o.id],!!state.motions?.[o.id]&&!state.motions[o.id].stopped&&!state.motions[o.id].paused&&state.motions[o.id].progress<1,state.paused,mode==='scene'&&live.current.editing);
 
       });
       physics.update();

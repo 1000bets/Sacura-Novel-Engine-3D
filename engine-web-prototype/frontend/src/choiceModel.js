@@ -35,8 +35,12 @@ export function conditionSummary(condition){
  return condition.rules.map(r=>`${variableName(r.variable)||'Переменная'} ${({eq:'=',ne:'≠',gt:'>',gte:'≥',lt:'<',lte:'≤'})[r.operator]||'?'} ${r.type==='boolean'?(typedValue(r.value,'boolean')?'да':'нет'):String(r.value??'')}`).join(condition.mode==='any'?' или ':' и ');
 }
 export function newChoice(id,label='Новый ответ'){return {id,label,condition:'always',availability:null,result:{type:'none'},next:null};}
+export function choiceResultType(beat){
+ const types=[...new Set((beat?.choices||[]).filter(c=>c.result?.type!=='none').map(c=>c.result?.type||'string'))];
+ return types.length===1?types[0]:types.length?'any':null;
+}
 export function storyPorts(beat){
- if(beat.kind==='end'||['variable','literal','compare','and','or'].includes(beat.kind))return [];
+ if(beat.kind==='end'||['variable','literal','compare','and','or','not','math','convert'].includes(beat.kind))return [];
  if(beat.kind==='branch')return [{id:'true',label:'Да',next:beat.trueNext},{id:'false',label:'Нет',next:beat.falseNext}];
  if(beat.kind!=='choice')return [{id:'next',label:'Дальше',next:beat.next}];
  return [...(beat.choices||[]).map(c=>({id:'choice:'+c.id,label:c.label,condition:c.enabledSource?'Условие из графа':conditionSummary(availabilityOf(c)),result:choiceValue(c),resultType:c.result?.type==='none'?null:c.result?.type||'string',next:c.next})),{id:'next',label:'После выбора',next:beat.choiceMode==='value'||(beat.choices||[]).some(c=>!c.next)?beat.next:null,common:true}];

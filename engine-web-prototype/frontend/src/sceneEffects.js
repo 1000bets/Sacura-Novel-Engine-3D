@@ -35,21 +35,27 @@ export function decoratePaper(mesh,label){
 export function animatePose(mesh,pose,t,moving,paused){
  if(!mesh.userData.isCharacter)return;
  const parts=mesh.userData.parts||{};
- const dance=pose==='танец',sad=pose==='грусть',smile=pose==='улыбка';
+ const dance=pose==='танец',sad=pose==='грусть',smile=pose==='улыбка',sit=pose==='сидит',wave=pose==='машет';
+ moving=moving||pose==='ходит';
+ for(const part of Object.values(parts)){if(part.userData.poseOrigin)part.position.copy(part.userData.poseOrigin);}
+ for(const name of ['torso','head','left','right'])if(sit&&parts[name])parts[name].position.y-=.35;
+ for(const [i,name] of ['leftLeg','rightLeg'].entries()){const leg=parts[name];if(leg){leg.rotation.x=sit?-Math.PI/2:moving?Math.sin(t*9+i*Math.PI)*.6:0;if(sit){leg.position.y=.25;leg.position.z=.2;}}}
  mesh.rotation.z+=dance?Math.sin(t*4)*.12:0;
  mesh.rotation.y+=pose==='задумчивость'?.35:dance?Math.sin(t*2)*.7:0;
  if(parts.head)parts.head.rotation.z=sad?.24:smile?-.13:0;
  if(parts.left)parts.left.rotation.z=dance?-.8-Math.sin(t*5)*.3:smile?-.6:-.12;
- if(parts.right)parts.right.rotation.z=dance?.8+Math.sin(t*5)*.3:pose==='задумчивость'?-1.1:.12;
+ if(parts.right)parts.right.rotation.z=wave?-2.1+Math.sin(t*5)*.3:dance?.8+Math.sin(t*5)*.3:pose==='задумчивость'?-1.1:.12;
  if(parts.left)parts.left.rotation.x=moving?Math.sin(t*9)*.6:0;
  if(parts.right)parts.right.rotation.x=moving?-Math.sin(t*9)*.6:0;
  if(parts.face)parts.face.scale.y=smile?.6:sad?1.5:1;
 }
 export function addCharacterDetails(group,mat){
- const head=group.children[1];const parts={head};
+ const head=group.children[1];const parts={head,torso:group.children[0]};
+ for(const [name,x]of [["leftLeg",-.12],["rightLeg",.12]]){const leg=new THREE.Mesh(new THREE.CapsuleGeometry(.085,.3,4,8),mat.clone());leg.position.set(x,.23,0);group.add(leg);parts[name]=leg;}
  for(const [name,x]of [['left',-.29],['right',.29]]){const arm=new THREE.Mesh(new THREE.CapsuleGeometry(.075,.38,4,8),mat.clone());arm.position.set(x,.76,0);group.add(arm);parts[name]=arm;}
  for(const x of [-.065,.065]){const eye=new THREE.Mesh(new THREE.SphereGeometry(.026,8,6),new THREE.MeshBasicMaterial({color:'#343139'}));eye.position.set(x,.025,.163);head.add(eye);}
  const face=new THREE.Mesh(new THREE.BoxGeometry(.07,.014,.008),new THREE.MeshBasicMaterial({color:'#775150'}));face.position.set(0,-.065,.17);head.add(face);parts.face=face;
+ for(const part of Object.values(parts))part.userData.poseOrigin=part.position.clone();
  group.userData.isCharacter=true;group.userData.parts=parts;
 }
 

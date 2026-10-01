@@ -21,7 +21,7 @@ export function buildStoryFlow(project) {
     }))}));
     const ports=storyPorts(beat);
     const eventHeight = phases.reduce((total,phase) => total + phase.batches.reduce((n,b) => n + 34 + b.events.reduce((sum,e) => sum + 76 + Math.min(2,e.actions.length)*18,0),0),0);
-    return {id:beat.id,type:'moment',position:{x:0,y:0},width:beat.kind==='variable'?220:beat.kind==='set-variable'?260:360,height:beat.kind==='variable'?90:beat.kind==='set-variable'?210:isPureNode(beat)||['branch','set-variable'].includes(beat.kind)?330:340+eventHeight+ports.length*175,
+    return {id:beat.id,type:'moment',position:{x:0,y:0},width:beat.kind==='variable'?220:beat.kind==='set-variable'?260:360,height:beat.kind==='variable'?90:beat.kind==='set-variable'?210:isPureNode(beat)||['branch','set-variable'].includes(beat.kind)?250:340+eventHeight+ports.length*95,
       data:{beat,scene,phases,ports,entry:scene?.entry===beat.id}};
   });
   const edges = [];
