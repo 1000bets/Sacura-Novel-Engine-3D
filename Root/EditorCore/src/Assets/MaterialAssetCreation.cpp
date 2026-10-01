@@ -59,7 +59,9 @@ AssetDiagnostic MaterialAssetCreation::Create(AssetRegistry& Registry, const std
         AssetRegistryEntry Template;
         if (!Registry.TryGetByPath(TemplatePath, Template))
         {
-            return AssetDiagnostic::Fail(AssetErrorCode::NotFound, "CreateMaterial", "Builtin material template is unavailable");
+            return AssetDiagnostic::Fail(AssetErrorCode::NotFound, "CreateMaterial",
+                std::string("Builtin material template is unavailable: ") + TemplatePath
+                + "\nEngine Content: " + Registry.GetEngineContentRoot().generic_string());
         }
         ResolvedMaterial Resolved;
         Diagnostic = MaterialDocumentIO::Resolve(Registry, AssetKey{Template.Metadata.Guid, {}}, Resolved);

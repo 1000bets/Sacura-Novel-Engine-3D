@@ -232,12 +232,14 @@ function(sakura_stage_engine_runtime TargetName)
     set(SakuraEngineSourceShaders "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/shaders")
     set(SakuraEngineSourceConfig "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/Config")
 
-    add_custom_command(TARGET ${TargetName} POST_BUILD
+    add_custom_target(${TargetName}RuntimeAssets
         COMMAND ${CMAKE_COMMAND} -E make_directory
-            "${SakuraStageRoot}/Bin"
             "${SakuraStageRoot}/Engine/Content"
             "${SakuraStageRoot}/Engine/Shaders"
             "${SakuraStageRoot}/Engine/Config"
+            "$<TARGET_FILE_DIR:${TargetName}>/Engine/Content"
+            "$<TARGET_FILE_DIR:${TargetName}>/Engine/Shaders"
+            "$<TARGET_FILE_DIR:${TargetName}>/Engine/Config"
         COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${SakuraEngineSourceShaders}"
             "${SakuraStageRoot}/Engine/Shaders"
@@ -247,15 +249,26 @@ function(sakura_stage_engine_runtime TargetName)
         COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${SakuraEngineSourceConfig}"
             "${SakuraStageRoot}/Engine/Config"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${SakuraEngineSourceShaders}"
+            "$<TARGET_FILE_DIR:${TargetName}>/Engine/Shaders"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${SakuraEngineSourceContent}"
+            "$<TARGET_FILE_DIR:${TargetName}>/Engine/Content"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${SakuraEngineSourceConfig}"
+            "$<TARGET_FILE_DIR:${TargetName}>/Engine/Config"
+        COMMENT "Deploy engine assets for ${TargetName}"
+        VERBATIM
+    )
+    add_dependencies(${TargetName} ${TargetName}RuntimeAssets)
+
+    add_custom_command(TARGET ${TargetName} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${SakuraStageRoot}/Bin"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "$<TARGET_FILE:${TargetName}>"
             "${SakuraStageRoot}/Bin/"
-        COMMAND ${CMAKE_COMMAND} -E make_directory
-            "$<TARGET_FILE_DIR:${TargetName}>/shaders"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${SakuraEngineSourceShaders}"
-            "$<TARGET_FILE_DIR:${TargetName}>/shaders"
-        COMMENT "Stage engine runtime for ${TargetName}"
+        COMMENT "Stage engine executable for ${TargetName}"
         VERBATIM
     )
 endfunction()

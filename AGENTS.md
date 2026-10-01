@@ -47,6 +47,7 @@ Rules:
 - Sample: `Samples/SampleProject/` (not part of Engine Content).
 - Source packer (no build / Diligent / PhysX / Qt): `Scripts/PackEngineSourceApp/PackEngineSourceApp.py` or `PackEngineSourceApp.exe` → RAR under `Scripts/PackEngineSourceApp/Output/` (needs WinRAR `Rar.exe`). Rebuild exe: `python -m PyInstaller --onefile --console --name PackEngineSourceApp Scripts/PackEngineSourceApp/PackEngineSourceApp.py`.
 - CMake staging: `sakura_stage_engine_runtime(<target>)` → `${CMAKE_BINARY_DIR}/Stage/{Bin,Engine/...}`.
+- Engine assets are also deployed to `<TargetExecutableDirectory>/Engine/{Content,Shaders,Config}` for direct build-directory launches. Asset deployment runs on every target build, including builds without relinking; Content includes builtin Material/HLSL files and their metadata. Creation integration tests resolve EnginePaths from the executable for both direct and staged layouts, without substituting source-tree Engine Content or shader paths.
 
 ### Runtime hosting and scene ownership
 
