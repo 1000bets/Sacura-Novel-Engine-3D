@@ -30,5 +30,17 @@ test('models remain in the library when the last instance is removed or replaced
 test('directory imports preserve relative paths and parse reusable model data',async()=>{
  const imported=await importAssetFiles([{name:'prop.obj',webkitRelativePath:'Props/Furniture/prop.obj',size:model.src.length,text:async()=>model.src}],'Imported');
  assert.equal(imported[0].path,'Imported/Props/Furniture/prop.obj');assert.equal(imported[0].model.format,'obj');assert.equal(imported[0].kind,'model');
- await assert.rejects(importAssetFiles([{name:'large.bin',size:4*1024*1024}]),/3 МБ/);
+ await assert.rejects(importAssetFiles([{name:'large.bin',size:100*1024*1024+1}]),/100 МБ/);
+});
+
+test('all file kinds accept 100 MiB and reject larger files before reading',async()=>{
+ const OriginalReader=globalThis.FileReader;
+ globalThis.FileReader=class{readAsDataURL(){this.result='data:application/octet-stream;base64,YQ==';this.onload();}};
+ try{
+  for(const name of ['large.obj','large.png','large.wav','large.bin']){
+   const files=await importAssetFiles([{name,size:100*1024*1024,text:async()=>model.src}],'Models');
+   assert.equal(files[0].bytes,100*1024*1024);assert.equal(files[0].path,'Models/'+name);
+   await assert.rejects(importAssetFiles([{name,size:100*1024*1024+1}]),/100 МБ/);
+  }
+ }finally{globalThis.FileReader=OriginalReader;}
 });

@@ -40,7 +40,7 @@ export async function checkModels(base,cookie,savedProject){
    assert.deepEqual(await client.openServerProject(project.id),project);
    assert.equal((await client.persistModel({format:'glb',src:glbSrc,name:'copy.glb'})).src,project.objects[1].model.src);
    assert.equal((await fetch('/api/meshes?format=glb',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:'broken'})).status,400);
-   assert.equal((await fetch('/api/meshes?format=obj',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Buffer.alloc(3*1024*1024+1)})).status,413);
+   assert.equal((await fetch('/api/meshes?format=obj',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Buffer.alloc(100*1024*1024+1)})).status,413);
    assert.equal((await nativeFetch(base+project.objects[0].model.src)).status,401);
    const other=await nativeFetch(base+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({login:'other-'+randomUUID(),password:randomUUID()})});
    assert.equal(other.status,201);const otherCookie=other.headers.get('set-cookie').split(';')[0];

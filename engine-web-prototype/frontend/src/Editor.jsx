@@ -1,3 +1,4 @@
+import {validateImportSize} from './fileLimits.js';
 import {projectAudioAssets,validateImportedAudio} from './audioAssets.js';
 import {accountStorage} from './accountStorage.js';
 import {serverStorageEnabled,saveServerProject,listServerProjects,openServerProject,portableProject} from './serverStorage.js';
@@ -840,6 +841,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     if(!e.target.files?.length)return;
     const file=e.target.files[0];e.target.value='';
     await runFileOperation(async()=>{
+      validateImportSize(file);
       const {project:next,template}=parseProjectFile(await file.text());
       replaceProject(next);setNotice(template?'Создан проект из файла шаблона.':'Проект загружен.');
     });
@@ -2600,7 +2602,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   positions={layout.positions['flow:all']||{}} onPositions={positions=>setPositions('flow:all',positions)} onReady={onGraphReady}/>
               ) : dock === 'event' ? renderGraph('event') : dock === 'cameras' ? <CameraWorkspace scene={displayScene} objects={objects} selected={selection.kind==='camera'?selection.id:null} onSelect={selectCamera} onCreate={()=>createCamera()} onFollow={followCharacter} running={running} onEdit={editScene}/> : dock === 'subscenes' ? <SubsceneWorkspace project={project} scene={displayScene} beat={nodes.find(b=>b.id===subsceneDraft?.fromBeatId)||beat} request={subsceneRequest} draft={subsceneDraft} onDraftChange={setSubsceneDraft} running={running}
                 onSaveLocation={async()=>{try{const data=await portableProject(exportLocation(project,displayScene.id));const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download='location.sacura-location.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setNotice('Локация сохранена в файл.');}catch(e){setNotice(e.message);}}}
-                onLoadLocation={async file=>{try{if(rt.running)return;const raw=await file.text(),next=structuredClone(project),created=importLocation(next,raw);mutate(p=>Object.assign(p,next));setSelectedBeat(created.entry);setSelection({kind:'scene',id:created.id});setMode('scene');setMaximized(null);setNotice('Локация загружена: '+created.name);}catch(e){setNotice('Локация не загружена: '+e.message);}}}
+                onLoadLocation={async file=>{try{if(rt.running)return;validateImportSize(file);const raw=await file.text(),next=structuredClone(project),created=importLocation(next,raw);mutate(p=>Object.assign(p,next));setSelectedBeat(created.entry);setSelection({kind:'scene',id:created.id});setMode('scene');setMaximized(null);setNotice('Локация загружена: '+created.name);}catch(e){setNotice('Локация не загружена: '+e.message);}}}
                 onStop={()=>rt.stop()} onSelect={id=>openSubscenes('edit',id)} onCreate={draft=>saveNewSubscene(draft)} onDuplicate={id=>saveNewSubscene(null,id)}
                 onPatch={patch=>editSubscene(p=>Object.assign(p.subscenes.find(s=>s.id===scene.id),patch))}
                 onKind={kind=>editSubscene(p=>changeSceneLocation(p,scene.id,kind))} onEntry={(id,reroute)=>editSubscene(p=>setSceneEntry(p,scene.id,id,reroute))}

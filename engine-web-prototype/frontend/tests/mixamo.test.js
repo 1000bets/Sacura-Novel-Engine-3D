@@ -47,7 +47,7 @@ test('incompatible and ambiguous rigs fail with actionable errors',()=>{
  assert.throws(()=>retargetMixamoAnimations(source.root,target.root,[]),/несколько костей/);
 });
 test('FBX upload validates size, target skin and missing animations',async()=>{
- await assert.rejects(importCharacterFile({name:'large.fbx',size:MAX_ANIMATION_FILE_BYTES+1},{animationsOnly:true}),/20 МБ/);
+ await assert.rejects(importCharacterFile({name:'large.fbx',size:MAX_ANIMATION_FILE_BYTES+1},{animationsOnly:true}),/100 МБ/);
  await assert.rejects(importCharacterFile(new File([mixamoFbx()],'Wave.fbx'),{animationsOnly:true}),/Сначала загрузите/);
  await assert.rejects(importCharacterFile(new File([mixamoFbx({animated:false})],'Empty.fbx'),{animationsOnly:true,targetModel:{src:dataUrl(humanoidGlb())}}),/нет анимаций/);
  await assert.rejects(importCharacterFile(new File([mixamoFbx()],'Wave.fbx'),{animationsOnly:true,targetModel:{src:dataUrl(humanoidGlb({skinned:false}))}}),/нет skinned mesh/);

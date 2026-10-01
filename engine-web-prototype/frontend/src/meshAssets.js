@@ -1,9 +1,10 @@
+import {MAX_IMPORT_BYTES} from './fileLimits.js';
 import {persistModel} from './serverStorage.js';
 import * as THREE from 'three';
 import {OBJLoader} from 'three/addons/loaders/OBJLoader.js';
 import {parseCharacterGlb,loadModelBuffer,disposeCharacterAsset} from './characterAssets.js';
 
-export const MAX_MESH_BYTES=3*1024*1024;
+export const MAX_MESH_BYTES=MAX_IMPORT_BYTES;
 export async function parseMeshAsset(model){
  if(model.format==='obj'){
   let text=model.src;if(text.startsWith('/api/meshes/')){const response=await fetch(text,{credentials:'same-origin'});if(!response.ok)throw new Error('Не удалось загрузить OBJ.');text=await response.text();}
@@ -19,7 +20,7 @@ export function materialSlots(root){
 export async function importMeshFile(file){
  const format=file.name.split('.').at(-1).toLowerCase();
  if(!['glb','obj'].includes(format))throw new Error('Выберите файл GLB или OBJ.');
- if(file.size>MAX_MESH_BYTES)throw new Error('Максимальный размер модели — 3 МБ.');
+ if(file.size>MAX_MESH_BYTES)throw new Error('Максимальный размер модели — 100 МБ.');
  const src=format==='obj'?await file.text():await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('Не удалось прочитать модель.'));reader.readAsDataURL(file);});
  const model={format,src,name:file.name,bytes:file.size},root=await parseMeshAsset(model);
  try{

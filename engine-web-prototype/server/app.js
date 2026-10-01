@@ -34,7 +34,7 @@ export function createApp(storage,{secureCookies=false}={}){
  app.get('/api/auth',(req,res)=>res.json({user:req.user}));
  app.get('/api/projects',(req,res)=>res.json(storage.list(req.user.id)));
  app.get('/api/projects/:id',(req,res)=>res.json(storage.get(req.user.id,req.params.id)));
- app.put('/api/projects/:id',express.json({limit:'32mb'}),(req,res)=>{
+ app.put('/api/projects/:id',express.json({limit:'256mb'}),(req,res)=>{
   if(!/^[\w-]{1,120}$/.test(req.params.id))throw httpError(400,'Некорректный ID.');
   res.json(storage.save(req.user.id,req.params.id,req.body.project,req.body.expectedRevision));
  });

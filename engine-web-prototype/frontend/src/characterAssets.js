@@ -1,10 +1,11 @@
+import {MAX_IMPORT_BYTES} from './fileLimits.js';
 import {persistModel} from './serverStorage.js';
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {retargetMixamoAnimations} from './mixamoAnimations.js';
 
-export const MAX_CHARACTER_FILE_BYTES=3*1024*1024;
-export const MAX_ANIMATION_FILE_BYTES=20*1024*1024;
+export const MAX_CHARACTER_FILE_BYTES=MAX_IMPORT_BYTES;
+export const MAX_ANIMATION_FILE_BYTES=MAX_IMPORT_BYTES;
 // Files travel with the project JSON; reject external dependencies before parsing.
 export function validateCharacterGlb(buffer){
  const view=new DataView(buffer);
@@ -38,7 +39,7 @@ export async function parseMixamoFbx(buffer){
  finally{for(const texture of textures)texture.dispose();}
 }
 async function importMixamoFile(file,{targetModel,inPlace=true}={}){
- if(file.size>MAX_ANIMATION_FILE_BYTES)throw new Error('Максимальный размер FBX анимации — 20 МБ.');
+ if(file.size>MAX_ANIMATION_FILE_BYTES)throw new Error('Максимальный размер FBX анимации — 100 МБ.');
  if(!targetModel?.src)throw new Error('Сначала загрузите GLB-модель humanoid-персонажа со скелетом.');
  const source=await parseMixamoFbx(await file.arrayBuffer());let target;
  try{
@@ -58,7 +59,7 @@ async function importMixamoFile(file,{targetModel,inPlace=true}={}){
 export async function importCharacterFile(file,{animationsOnly=false,targetModel,inPlace=true}={}){
  if(animationsOnly&&/\.fbx$/i.test(file.name))return importMixamoFile(file,{targetModel,inPlace});
  if(!/\.glb$/i.test(file.name))throw new Error(animationsOnly?'Выберите анимацию GLB или FBX из Mixamo.':'Выберите модель GLB со встроенными ресурсами.');
- if(file.size>MAX_CHARACTER_FILE_BYTES)throw new Error('Максимальный размер GLB — 3 МБ.');
+ if(file.size>MAX_CHARACTER_FILE_BYTES)throw new Error('Максимальный размер GLB — 100 МБ.');
  const buffer=await file.arrayBuffer(),asset=await parseCharacterGlb(buffer);
  try{
   let hasMesh=false;asset.scene.traverse(node=>{if(node.isMesh)hasMesh=true;});

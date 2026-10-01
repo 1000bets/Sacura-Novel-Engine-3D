@@ -13,7 +13,7 @@ export default function SoundImport({onImport,disabled}){
   }catch(cause){setError(cause.message);setStatus('');}finally{setBusy(false);}
  };
  return <section className="sound-import" aria-label="Загрузка звуков" aria-busy={busy} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();upload(e.dataTransfer.files);}}>
-  <div><strong>Загрузить свои звуки</strong><p>Перетащите аудиофайлы сюда или выберите их на компьютере. До 3 МБ на файл.</p></div>
+  <div><strong>Загрузить свои звуки</strong><p>Перетащите аудиофайлы сюда или выберите их на компьютере. До 100 МБ на файл.</p></div>
   <Field label="Тип звука"><Select value={kind} disabled={disabled||busy} options={[["sound","Звуковой эффект"],["music","Музыка"],["voice","Озвучка"]]} onChange={setKind}/></Field>
   <Button icon="Upload" disabled={disabled||busy||!onImport} onClick={()=>input.current.click()}>{busy?'Загрузка…':'Выбрать звуки'}</Button>
   <input ref={input} type="file" accept={AUDIO_FILE_ACCEPT} multiple hidden onChange={e=>{upload(e.target.files);e.target.value='';}}/>

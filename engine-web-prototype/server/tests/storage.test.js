@@ -4,7 +4,7 @@ import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {Readable} from 'node:stream';
-import {createStorage} from '../storage.js';
+import {createStorage,validateMesh,MESH_LIMIT} from '../storage.js';
 import {createApp} from '../app.js';
 
 async function fixture(run){
@@ -51,5 +51,18 @@ test('S3 deduplicates meshes, project references round trip and private download
  assert.equal((await request('/api/projects/'+p.id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({project:p,expectedRevision:0})})).status,200);
  assert.equal((await (await request('/api/projects/'+p.id)).json()).project.objects[0].model.src,mesh.src);
  assert.equal((await request('/api/meshes?format=glb',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:'bad'})).status,400);
- assert.equal((await request('/api/meshes?format=obj',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Buffer.alloc(3*1024*1024+1)})).status,413);
+ assert.equal((await request('/api/meshes?format=obj',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Buffer.alloc(100*1024*1024+1)})).status,413);
+}));
+
+test('model size boundary accepts 100 MiB and rejects one extra byte',()=>{
+ assert.equal(MESH_LIMIT,100*1024*1024);
+ const body=Buffer.alloc(MESH_LIMIT,32);body.write('v 0 0 0\n');
+ assert.doesNotThrow(()=>validateMesh(body,'obj'));
+ assert.throws(()=>validateMesh(Buffer.alloc(MESH_LIMIT+1),'obj'),error=>error.status===413);
+});
+test('large non-model assets survive project save beyond the former 32 MiB limit',()=>fixture(async({request})=>{
+ const p={...project,assetFiles:[{id:'image',name:'large.png',kind:'image',src:'data:image/png;base64,'+'A'.repeat(33*1024*1024)}]};
+ const saved=await request('/api/projects/'+p.id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({project:p,expectedRevision:0})});
+ assert.equal(saved.status,200);
+ assert.equal((await saved.json()).project.assetFiles[0].src.length,p.assetFiles[0].src.length);
 }));

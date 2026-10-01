@@ -1,5 +1,6 @@
+import {validateImportSize} from './fileLimits.js';
 import {uid} from './model.js';
-import {importMeshFile,MAX_MESH_BYTES} from './meshAssets.js';
+import {importMeshFile} from './meshAssets.js';
 
 export function cleanAssetPath(path){return String(path||'').replaceAll('\\','/').split('/').filter(part=>part&&part!=='.'&&part!=='..').join('/');}
 export function fileKind(name){const ext=String(name).split('.').at(-1).toLowerCase();return ['glb','obj'].includes(ext)?'model':['png','jpg','jpeg','webp','gif','svg'].includes(ext)?'image':['wav','mp3','ogg','m4a','aac','flac','webm'].includes(ext)?'audio':'file';}
@@ -40,7 +41,7 @@ export function retainObjectModel(project,object){
 export async function importAssetFiles(files,path=''){
  const results=[];
  for(const file of files){
-  if(file.size>MAX_MESH_BYTES)throw new Error(`${file.name}: максимальный размер файла — 3 МБ.`);
+  validateImportSize(file);
   const kind=fileKind(file.name),model=kind==='model'?await importMeshFile(file):null;
   const src=model?.src||await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error(`Не удалось прочитать ${file.name}.`));reader.readAsDataURL(file);});
   results.push({id:uid('file'),name:file.name,path:cleanAssetPath([path,file.webkitRelativePath||file.name].filter(Boolean).join('/')),kind,src,bytes:file.size,...(model?{model}:{})});
