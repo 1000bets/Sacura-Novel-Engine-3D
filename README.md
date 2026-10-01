@@ -75,9 +75,9 @@ ctest --preset windows-msvc-debug
 
 ## Material и Material Instance
 
-Material (`.material`, версия 2) задаёт HLSL, область применения, настройки рендера и параметры по умолчанию. Material Instance (`.materialinstance`, версия 1) наследуется от Material или другого экземпляра и хранит только локальные переопределения. Оба типа назначаются мешам; для отдельных material slots можно задать свои экземпляры. Старые материалы версии 1 открываются без изменения GUID и файлов; явное сохранение через EditorCore MaterialDocument переводит их в новый формат.
+Material (`.material`, версия 2) задаёт HLSL, область применения, настройки рендера и параметры по умолчанию. Material Instance (`.materialinstance`, версия 1) наследуется от Material или другого экземпляра и хранит только локальные переопределения. Оба типа назначаются мешам; для отдельных material slots можно задать свои экземпляры. Старые материалы версии 1 загружаются без изменения GUID и файлов; явное сохранение через EditorCore MaterialDocument переводит их в новый формат.
 
-В Content Browser доступны Create Material, Create Material Instance и Create Child Instance. Material и Material Instance используют общий механизм активации ассетов; редактор этих типов можно подключить через RegisterAssetEditor. Загрузка, назначение и рендеринг материалов работают независимо от редактора ассетов.
+В Content Browser доступны Create Material, Create Material Instance и Create Child Instance. Material и Material Instance используют общий механизм активации ассетов; редактор этих типов можно подключить через RegisterAssetEditor. Загрузка, назначение и рендеринг материалов работают независимо от редактора ассетов. Контракт подключения будущего интерфейса описан в [MaterialEditorUiContract.md](Root/EditorCore/MaterialEditorUiContract.md); предложенная сессия редактирования пока не реализована.
 
 Surface поддерживает Lit, Unlit и Toon с Opaque, Masked, Translucent или Additive. Standard PBR использует Base Color, Normal, Metallic/Roughness, Occlusion и Emissive maps. Камера хранит упорядоченный список постэффектов с интенсивностью и включённостью; материал определяет выполнение до или после tone mapping. UI-материалы назначаются отдельному `MaterialWidget` из Engine UI. Текст, кнопки и компоновка остаются обычными средствами Qt.
 
