@@ -14,7 +14,7 @@ test('OBJ import preserves geometry, discovers slots and survives project serial
 });
 test('unsupported, oversized and empty models fail before attachment',async()=>{
  await assert.rejects(importMeshFile(file(obj,'model.fbx')),/GLB или OBJ/);
- await assert.rejects(importMeshFile({...file(),size:MAX_MESH_BYTES+1}),/3 МБ/);
+ await assert.rejects(importMeshFile({...file(),size:MAX_MESH_BYTES+1}),/100 МБ/);
  await assert.rejects(importMeshFile(file('v 0 0 0\n')),/нет геометрии/);
 });
 test('slot assignments override the whole object and reset to imported materials',async()=>{

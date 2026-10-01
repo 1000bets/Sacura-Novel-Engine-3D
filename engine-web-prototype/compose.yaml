@@ -21,6 +21,8 @@ services:
     environment:
       APP_USER: ${APP_USER:-}
       APP_PASSWORD: ${APP_PASSWORD:-}
+      TRUST_PROXY: "1" # API is private; Nginx overwrites the forwarded client IP.
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       S3_BUCKET: ${S3_BUCKET:-sacura-meshes}
       S3_REGION: ${S3_REGION:-us-east-1}

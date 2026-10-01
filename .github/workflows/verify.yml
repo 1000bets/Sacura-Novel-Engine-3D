@@ -2,6 +2,7 @@ name: Verify web prototype
 on:
   push:
   pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -11,3 +12,53 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./engine-web-prototype/ci
+  deploy-staging:
+    needs: verify
+    if: github.ref == 'refs/heads/staging' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: staging
+      url: https://sacura-test.duckdns.org
+    concurrency:
+      group: sacura-staging-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install staging SSH credentials
+        shell: bash
+        env:
+          SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.STAGING_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_KEY" && test -n "$KNOWN_HOSTS"
+          install -m 700 -d ~/.ssh
+          umask 077
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/staging_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Upload and activate verified release
+        shell: bash
+        env:
+          STAGING_HOST: ${{ vars.STAGING_HOST || '89.37.185.93' }}
+          STAGING_USER: ${{ vars.STAGING_USER || 'sacura-deploy' }}
+          STAGING_PORT: ${{ vars.STAGING_PORT || '22' }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_SHA" =~ ^[a-f0-9]{40}$ ]]
+          ssh_options=(-i ~/.ssh/staging_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20)
+          destination="$STAGING_USER@$STAGING_HOST"
+          directory="/opt/sacura/staging/releases/$GITHUB_SHA"
+          git archive "$GITHUB_SHA" engine-web-prototype | gzip > "$RUNNER_TEMP/staging.tar.gz"
+          ssh "${ssh_options[@]}" -p "$STAGING_PORT" "$destination" "mkdir -p '$directory'"
+          scp "${ssh_options[@]}" -P "$STAGING_PORT" "$RUNNER_TEMP/staging.tar.gz" "$destination:$directory/source.tar.gz"
+          ssh "${ssh_options[@]}" -p "$STAGING_PORT" "$destination" "tar -xzf '$directory/source.tar.gz' -C '$directory' && bash '$directory/engine-web-prototype/deploy/activate-staging.sh' '$GITHUB_SHA'"
+      - name: Remove staging SSH credentials
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path=Path.home()/'.ssh/staging_key'
+          path.unlink(missing_ok=True)
+          PY

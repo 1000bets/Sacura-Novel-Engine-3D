@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {retargetMixamoAnimations} from './mixamoAnimations.js';
 
-export const MAX_CHARACTER_FILE_BYTES=3*1024*1024;
+export const MAX_CHARACTER_FILE_BYTES=100*1024*1024;
 export const MAX_ANIMATION_FILE_BYTES=20*1024*1024;
 // Files travel with the project JSON; reject external dependencies before parsing.
 export function validateCharacterGlb(buffer){
@@ -58,7 +58,7 @@ async function importMixamoFile(file,{targetModel,inPlace=true}={}){
 export async function importCharacterFile(file,{animationsOnly=false,targetModel,inPlace=true}={}){
  if(animationsOnly&&/\.fbx$/i.test(file.name))return importMixamoFile(file,{targetModel,inPlace});
  if(!/\.glb$/i.test(file.name))throw new Error(animationsOnly?'Выберите анимацию GLB или FBX из Mixamo.':'Выберите модель GLB со встроенными ресурсами.');
- if(file.size>MAX_CHARACTER_FILE_BYTES)throw new Error('Максимальный размер GLB — 3 МБ.');
+ if(file.size>MAX_CHARACTER_FILE_BYTES)throw new Error('Максимальный размер GLB — 100 МБ.');
  const buffer=await file.arrayBuffer(),asset=await parseCharacterGlb(buffer);
  try{
   let hasMesh=false;asset.scene.traverse(node=>{if(node.isMesh)hasMesh=true;});

@@ -4,7 +4,8 @@ import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {Readable} from 'node:stream';
-import {createStorage} from '../storage.js';
+import {createStorage,validateMesh,MESH_LIMIT} from '../storage.js';
+import {createAuth} from '../auth.js';
 import {createApp} from '../app.js';
 
 async function fixture(run){
@@ -15,10 +16,11 @@ async function fixture(run){
   return {};
  }};
  const filename=join(dir,'projects.sqlite'),storage=createStorage({filename,s3,bucket:'test'});
+ await createAuth(storage.db).migrateOwner('owner','1');
  const server=createApp(storage).listen(0,'127.0.0.1');
  await new Promise(resolve=>server.once('listening',resolve));
  const base=`http://127.0.0.1:${server.address().port}`;
- const registration=await fetch(base+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({login:'owner',password:'1'})});
+ const registration=await fetch(base+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({login:'owner',password:'1'})});
  const cookie=registration.headers.get('set-cookie').split(';')[0],user=(await registration.json()).user;
  const request=(path,options={})=>fetch(base+path,{...options,headers:{Cookie:cookie,...options.headers}});
  try{await run({storage,request,base,filename,s3,user,puts:()=>puts});}
@@ -51,5 +53,12 @@ test('S3 deduplicates meshes, project references round trip and private download
  assert.equal((await request('/api/projects/'+p.id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({project:p,expectedRevision:0})})).status,200);
  assert.equal((await (await request('/api/projects/'+p.id)).json()).project.objects[0].model.src,mesh.src);
  assert.equal((await request('/api/meshes?format=glb',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:'bad'})).status,400);
- assert.equal((await request('/api/meshes?format=obj',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Buffer.alloc(3*1024*1024+1)})).status,413);
+ assert.equal((await request('/api/meshes?format=obj',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Buffer.alloc(100*1024*1024+1)})).status,413);
 }));
+
+test('models up to 100 MiB are accepted and larger models are rejected',()=>{
+ assert.equal(MESH_LIMIT,100*1024*1024);
+ const body=Buffer.alloc(MESH_LIMIT,32);body.write('v 0 0 0\n');
+ assert.doesNotThrow(()=>validateMesh(body,'obj'));
+ assert.throws(()=>validateMesh(Buffer.alloc(MESH_LIMIT+1),'obj'),error=>error.status===413);
+});

@@ -6,6 +6,12 @@ env_file="${SACURA_ENV_FILE:-.env}"
 command -v docker >/dev/null || { echo 'Install Docker Engine and Compose plugin first.' >&2; exit 1; }
 [[ -f "$env_file" ]] || { echo 'Copy .env.example to .env and fill S3_SECRET_KEY, DOMAIN and ACME_EMAIL.' >&2; exit 1; }
 compose=(docker compose --env-file "$env_file" -f compose.yaml -f compose.production.yaml)
+if [[ -n "${SACURA_RELEASE:-}" ]]; then
+ compose+=(-f compose.release.yaml)
+fi
+if [[ -n "${SACURA_COMPOSE_PROJECT:-}" ]]; then
+ compose+=(-p "$SACURA_COMPOSE_PROJECT")
+fi
 "${compose[@]}" config --quiet
 case "${1:-deploy}" in
  check)

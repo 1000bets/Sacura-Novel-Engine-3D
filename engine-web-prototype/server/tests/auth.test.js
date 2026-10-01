@@ -11,6 +11,9 @@ const project=(title='Личный проект')=>({id:'same-id',version:2,titl
 test('accounts, durable sessions, project and mesh isolation, logout',async t=>{
  const dir=mkdtempSync(join(tmpdir(),'sacura-auth-')),filename=join(dir,'db.sqlite');
  const storage=createStorage({filename,s3:{send:async()=>({})},bucket:'test'});
+ const auth=createAuth(storage.db);await auth.migrateOwner('seed','seed');
+ const seed=await auth.login({login:'seed',password:'seed'});
+ const invite=()=>auth.createInvite(seed.id).token;
  const server=createApp(storage).listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));
  t.after(async()=>{await new Promise(resolve=>server.close(resolve));storage.db.close();rmSync(dir,{recursive:true});});
  const base=`http://127.0.0.1:${server.address().port}`;
@@ -19,11 +22,11 @@ test('accounts, durable sessions, project and mesh isolation, logout',async t=>{
   return {status:response.status,data:await response.json(),cookie:response.headers.get('set-cookie')?.split(';')[0]};
  }
  assert.equal((await request('/projects')).status,401);
- const a=await request('/auth/register',{body:{login:'alice',password:'1'}}),b=await request('/auth/register',{body:{login:'bob',password:'2'}});
+ const a=await request('/auth/register',{body:{login:'alice',password:'1',invite:invite()}}),b=await request('/auth/register',{body:{login:'bob',password:'2',invite:invite()}});
  assert.equal(a.status,201);assert.equal(b.status,201);assert.match(a.cookie,/sacura_session=/);
- assert.equal((await request('/auth/register',{body:{login:'alice',password:'3'}})).status,409);
+ assert.equal((await request('/auth/register',{body:{login:'alice',password:'3',invite:invite()}})).status,409);
  assert.equal((await request('/auth/login',{body:{login:'alice',password:'wrong'}})).status,401);
- assert.equal((await request('/auth/login',{body:{login:'alice',password:'1'}})).status,200);
+ assert.equal((await request('/auth/login',{body:{login:'alice',password:'1',invite:invite()}})).status,200);
  assert.equal((await request('/projects/same-id',{cookie:a.cookie,method:'PUT',body:{project:project(),expectedRevision:0}})).status,200);
  assert.deepEqual((await request('/projects',{cookie:b.cookie})).data,[]);
  assert.equal((await request('/projects/same-id',{cookie:b.cookie})).status,404);
@@ -52,7 +55,8 @@ test('legacy projects preserved, assigned only to configured previous owner, res
   legacy.prepare('INSERT INTO projects VALUES(?,?,?,?,?)').run('same-id','Старый',JSON.stringify(project('Старый')),1,'2026-01-01');
   legacy.prepare('INSERT INTO project_versions VALUES(?,?,?,?)').run('same-id',1,JSON.stringify(project('Старый')),'2026-01-01');legacy.close();
   storage=createStorage({filename,s3:{},bucket:'test'});
-  const auth=createAuth(storage.db),newUser=await auth.register({login:'new',password:'1'});
+  const auth=createAuth(storage.db);storage.db.prepare('INSERT INTO users VALUES(?,?,?)').run('seed','seed','unused');
+  const newUser=await auth.register({login:'new',password:'1',invite:auth.createInvite('seed').token});
   assert.deepEqual(storage.list(newUser.id),[]);
   await auth.migrateOwner('owner','1');
   const owner=await auth.login({login:'owner',password:'1'});assert.equal(storage.get(owner.id,'same-id').project.title,'Старый');

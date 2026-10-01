@@ -40,8 +40,9 @@ export function retainObjectModel(project,object){
 export async function importAssetFiles(files,path=''){
  const results=[];
  for(const file of files){
-  if(file.size>MAX_MESH_BYTES)throw new Error(`${file.name}: максимальный размер файла — 3 МБ.`);
-  const kind=fileKind(file.name),model=kind==='model'?await importMeshFile(file):null;
+  const kind=fileKind(file.name),limit=kind==='model'?MAX_MESH_BYTES:3*1024*1024;
+  if(file.size>limit)throw new Error(`${file.name}: максимальный размер файла — ${limit/1024/1024} МБ.`);
+  const model=kind==='model'?await importMeshFile(file):null;
   const src=model?.src||await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error(`Не удалось прочитать ${file.name}.`));reader.readAsDataURL(file);});
   results.push({id:uid('file'),name:file.name,path:cleanAssetPath([path,file.webkitRelativePath||file.name].filter(Boolean).join('/')),kind,src,bytes:file.size,...(model?{model}:{})});
  }

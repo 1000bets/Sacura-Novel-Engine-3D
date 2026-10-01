@@ -27,11 +27,14 @@ runs:
       working-directory: ${{ github.workspace }}/engine-web-prototype
       env:
         VITE_SERVER_STORAGE: "true"
+        VITE_BUILD_SHA: ${{ github.sha }}
+        VITE_DEPLOY_ENV: staging
     - name: Configure isolated test storage
       shell: bash
       working-directory: ${{ github.workspace }}/engine-web-prototype
       run: |
         cp .env.example .env
+        printf '\nAPP_USER=smoke-owner\nAPP_PASSWORD=%s\n' "$(openssl rand -hex 32)" >> .env
         printf '\nS3_SECRET_KEY=%s\n' "$(openssl rand -hex 32)" >> .env
     - run: docker compose config --quiet
       shell: bash
@@ -43,10 +46,15 @@ runs:
       env:
         DOMAIN: editor.example.com
         ACME_EMAIL: ops@example.com
+        SACURA_RELEASE: ${{ github.sha }}
     - run: docker compose up -d --build --wait --wait-timeout 180
       shell: bash
       working-directory: ${{ github.workspace }}/engine-web-prototype
-    - run: node deploy/smoke.mjs
+    - run: |
+        set -a
+        source .env
+        set +a
+        node deploy/smoke.mjs
       shell: bash
       working-directory: ${{ github.workspace }}/engine-web-prototype
       env:
@@ -57,7 +65,11 @@ runs:
     - run: docker compose up -d --wait --wait-timeout 180
       shell: bash
       working-directory: ${{ github.workspace }}/engine-web-prototype
-    - run: node deploy/smoke.mjs
+    - run: |
+        set -a
+        source .env
+        set +a
+        node deploy/smoke.mjs
       shell: bash
       working-directory: ${{ github.workspace }}/engine-web-prototype
       env:

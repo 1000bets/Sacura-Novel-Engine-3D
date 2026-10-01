@@ -1,4 +1,5 @@
 import {randomBytes,randomUUID,scrypt as derive,timingSafeEqual,createHash} from 'node:crypto';
+import {readFileSync} from 'node:fs';
 import {promisify} from 'node:util';
 import {httpError} from './storage.js';
 const scrypt=promisify(derive);
@@ -7,19 +8,54 @@ export const SESSION_SECONDS=30*24*60*60;
 export function createAuth(db){
  db.exec(`CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,login TEXT NOT NULL UNIQUE,password_hash TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),expires_at INTEGER NOT NULL);`);
+ db.exec(readFileSync(new URL('./migrations/001-invites.sql',import.meta.url),'utf8'));
  function credentials(body){
   if(typeof body?.login!=='string'||!body.login.trim()||typeof body?.password!=='string'||!body.password)throw httpError(400,'Укажите логин и пароль.');
   return {login:body.login.trim(),password:body.password};
  }
- async function register(body){
+ async function prepareUser(body){
   const {login,password}=credentials(body);
   const salt=randomBytes(16).toString('hex'),hash=(await scrypt(password,salt,64)).toString('hex'),id=randomUUID();
-  try{db.prepare('INSERT INTO users VALUES(?,?,?)').run(id,login,salt+':'+hash);}
+  return {id,login,passwordHash:salt+':'+hash};
+ }
+ function insertUser({id,login,passwordHash}){
+  try{db.prepare('INSERT INTO users VALUES(?,?,?)').run(id,login,passwordHash);}
   catch(error){if(db.prepare('SELECT id FROM users WHERE login=?').get(login))throw httpError(409,'Этот логин уже занят.');throw error;}
   return {id,login};
  }
+ function validateInvite(token){
+  if(typeof token!=='string'||! /^[a-f0-9]{64}$/.test(token))throw httpError(403,'Для регистрации нужна действующая ссылка приглашения.');
+  const invite=db.prepare('SELECT * FROM invites WHERE token_hash=?').get(digest(token));
+  if(!invite)throw httpError(403,'Приглашение не найдено. Попросите новую ссылку.');
+  if(invite.used_at!==null)throw httpError(403,'Приглашение уже использовано. Попросите новую ссылку.');
+  if(invite.expires_at<=Date.now())throw httpError(403,'Срок приглашения истёк. Попросите новую ссылку.');
+  return invite;
+ }
  return {
-  register,
+  validateInvite(token){return {expiresAt:new Date(validateInvite(token).expires_at).toISOString()};},
+  createInvite(userId){
+   const token=randomBytes(32).toString('hex'),createdAt=Date.now(),expiresAt=createdAt+72*60*60*1000;
+   db.prepare('INSERT INTO invites(id,token_hash,created_by_user_id,created_at,expires_at) VALUES(?,?,?,?,?)').run(randomUUID(),digest(token),userId,createdAt,expiresAt);
+   return {token,expiresAt:new Date(expiresAt).toISOString()};
+  },
+  async register(body){
+   validateInvite(body?.invite);
+   // Do expensive password derivation before taking SQLite's write lock.
+   const prepared=await prepareUser(body);
+   db.exec('BEGIN IMMEDIATE');
+   try{
+    const invite=validateInvite(body.invite),user=insertUser(prepared);
+    db.prepare('UPDATE invites SET used_at=?,used_by_user_id=? WHERE id=?').run(Date.now(),user.id,invite.id);
+    db.exec('COMMIT');return user;
+   }catch(error){db.exec('ROLLBACK');throw error;}
+  },
+  rateLimit(key,limit,windowMs){
+   const now=Date.now();
+   db.prepare('DELETE FROM auth_rate_limits WHERE expires_at<=?').run(now);
+   const row=db.prepare(`INSERT INTO auth_rate_limits VALUES(?,1,?)
+    ON CONFLICT(key) DO UPDATE SET attempts=attempts+1 RETURNING attempts,expires_at`).get(key,now+windowMs);
+   return {allowed:row.attempts<=limit,retryAfter:Math.max(1,Math.ceil((row.expires_at-now)/1000))};
+  },
   async login(body){
    const {login,password}=credentials(body),row=db.prepare('SELECT * FROM users WHERE login=?').get(login);
    const [salt,hash]=(row?.password_hash||'00000000000000000000000000000000:'+ '0'.repeat(128)).split(':');
@@ -36,7 +72,7 @@ export function createAuth(db){
   logout(token){db.prepare('DELETE FROM sessions WHERE token_hash=?').run(digest(token||''));},
   async migrateOwner(login,password){
    if(!login||!password)return;
-   const user=db.prepare('SELECT id,login FROM users WHERE login=?').get(login)||await register({login,password});
+   const user=db.prepare('SELECT id,login FROM users WHERE login=?').get(login)||insertUser(await prepareUser({login,password}));
    const legacy=db.prepare("SELECT json FROM projects WHERE owner_id=''").all();
    db.exec('BEGIN IMMEDIATE');
    try{

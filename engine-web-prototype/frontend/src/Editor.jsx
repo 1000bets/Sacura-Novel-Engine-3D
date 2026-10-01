@@ -2753,6 +2753,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 Экспортировать JSON
               </button>
               <button disabled={projectFileBusy} onClick={restorePreviousProject}><Icon name="History"/>Восстановить предыдущий проект</button>
+              {onHome&&<button disabled={projectFileBusy} onClick={()=>runFileOperation(async()=>{setMenu(null);rt.stop();await onHome(project);})}><Icon name="FolderOpen"/>Главное меню</button>}
             </>
           ) : menu === "Правка" ? (
             <><button disabled={running} onClick={()=>editClipboard('copy')}><Icon name="Copy"/>Копировать <kbd>Ctrl C</kbd></button><button disabled={running||!clipboard.current} onClick={()=>editClipboard('paste')}><Icon name="ClipboardPaste"/>Вставить <kbd>Ctrl V</kbd></button><button onClick={resetLayout}><Icon name="PanelsTopLeft"/>Восстановить раскладку</button><button

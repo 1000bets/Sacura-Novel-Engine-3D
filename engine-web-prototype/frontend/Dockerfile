@@ -4,6 +4,8 @@ COPY package*.json ./
 RUN npm ci
 COPY . .
 ENV VITE_SERVER_STORAGE=true
+ARG VITE_BUILD_SHA=local
+ARG VITE_DEPLOY_ENV=local
 RUN npm run build
 FROM nginxinc/nginx-unprivileged:1.28-alpine
 COPY --from=build /app/dist /usr/share/nginx/html
