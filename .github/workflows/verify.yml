@@ -40,7 +40,7 @@ jobs:
       - name: Upload and activate verified release
         shell: bash
         env:
-          STAGING_HOST: ${{ vars.STAGING_HOST || '208.92.227.154' }}
+          STAGING_HOST: ${{ vars.STAGING_HOST || '89.37.185.93' }}
           STAGING_USER: ${{ vars.STAGING_USER || 'sacura-deploy' }}
           STAGING_PORT: ${{ vars.STAGING_PORT || '22' }}
         run: |

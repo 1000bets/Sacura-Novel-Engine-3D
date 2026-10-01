@@ -65,9 +65,9 @@ Caddy автоматически получает и обновляет TLS-се
 
 ## Staging: автоматический деплой после merge
 
-Домен staging: `https://sacura-test.duckdns.org`, VPS: `208.92.227.154`. Workflow `.github/workflows/verify.yml` запускает тесты и проверку контейнеров; затем только для `push` в `staging` (включая merge PR) запускает `deploy-staging`. Ручной запуск `workflow_dispatch` разрешает повторить деплой текущей `staging`. PR и другие ветки запускают проверки без деплоя. Одновременно выполняется один деплой; предыдущий запущенный деплой не прерывается.
+Домен staging: `https://sacura-test.duckdns.org`, VPS: `89.37.185.93`. Workflow `.github/workflows/verify.yml` запускает тесты и проверку контейнеров; затем только для `push` в `staging` (включая merge PR) запускает `deploy-staging`. Ручной запуск `workflow_dispatch` разрешает повторить деплой текущей `staging`. PR и другие ветки запускают проверки без деплоя. Одновременно выполняется один деплой; предыдущий запущенный деплой не прерывается.
 
-GitHub Environment `staging` содержит `STAGING_SSH_KEY` и должен содержать `STAGING_KNOWN_HOSTS` с подтверждённым ключом сервера. Переменные окружения: `STAGING_HOST=208.92.227.154`, `STAGING_PORT=22`, `STAGING_USER=sacura-deploy`. Пароль root не хранится в GitHub и не используется CI. SSH проверяет host key строго; workflow не использует `StrictHostKeyChecking=no` или непроверенный `ssh-keyscan`.
+GitHub Environment `staging` содержит `STAGING_SSH_KEY` и должен содержать `STAGING_KNOWN_HOSTS` с подтверждённым ключом сервера. Переменные окружения: `STAGING_HOST=89.37.185.93`, `STAGING_PORT=22`, `STAGING_USER=sacura-deploy`. Пароль root не хранится в GitHub и не используется CI. SSH проверяет host key строго; workflow не использует `StrictHostKeyChecking=no` или непроверенный `ssh-keyscan`.
 
 Первичная подготовка Ubuntu после установки Docker: передать **публичный** ключ деплоя и выполнить от root:
 
