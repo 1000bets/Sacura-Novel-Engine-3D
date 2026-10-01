@@ -1,5 +1,6 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {Flower2,Plus,BookOpen,FolderOpen,ArrowRight,LogOut,Upload} from 'lucide-react';
+import {Flower2,Plus,BookOpen,FolderOpen,ArrowRight,LogOut,Upload,UserPlus} from 'lucide-react';
+import InviteDialog from './InviteDialog.jsx';
 import Editor from './Editor.jsx';
 import ThemePicker from './ThemePicker.jsx';
 import BuildVersion from './BuildVersion.jsx';
@@ -11,6 +12,7 @@ import './projectHome.css';
 
 export default function ProjectHome({user=null,onLogout}) {
  const [active,setActive]=useState(null),[projects,setProjects]=useState([]),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[creating,setCreating]=useState(false),[name,setName]=useState('Новый проект');
+ const [inviting,setInviting]=useState(false);
  const operation=useRef(false),fileInput=useRef(null),newButton=useRef(null);
  async function refresh(){
   setLoading(true);setError('');
@@ -39,7 +41,7 @@ export default function ProjectHome({user=null,onLogout}) {
  function cancelCreate(){setCreating(false);newButton.current?.focus();}
  if(active)return <Editor key={active.id} initialProject={active} user={user} onLogout={onLogout} onHome={home}/>;
  return <main className="project-home">
-  <header className="project-home-header"><div className="project-home-brand"><Flower2 aria-hidden="true" size={28}/><span>Sacura <small>Novel Studio</small></span></div><div className="project-home-account"><ThemePicker/>{user&&<><span>{user.login}</span><button disabled={busy} onClick={()=>run(()=>onLogout())}><LogOut aria-hidden="true" size={16}/>Выйти</button></>}</div></header>
+  <header className="project-home-header"><div className="project-home-brand"><Flower2 aria-hidden="true" size={28}/><span>Sacura <small>Novel Studio</small></span></div><div className="project-home-account"><ThemePicker/>{user&&<><span>{user.login}</span><button disabled={busy} onClick={()=>setInviting(true)}><UserPlus aria-hidden="true" size={16}/>Пригласить пользователя</button><button disabled={busy} onClick={()=>run(()=>onLogout())}><LogOut aria-hidden="true" size={16}/>Выйти</button></>}</div></header>
   <div className="project-home-content">
    <p className="project-home-eyebrow">ВАША СЛЕДУЮЩАЯ ИСТОРИЯ</p><h1>С чего начнём?</h1><p className="project-home-intro">Создайте новую визуальную новеллу или продолжите свой проект.</p>
    <section className="project-home-actions" aria-label="Начать работу">
@@ -54,6 +56,7 @@ export default function ProjectHome({user=null,onLogout}) {
     <input ref={fileInput} type="file" hidden accept="application/json,.json" onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(file)run(async()=>open(parseProjectFile(await file.text()).project,{save:true}));}}/><button className="project-home-import" disabled={busy} onClick={()=>fileInput.current?.click()}><Upload aria-hidden="true" size={16}/>Загрузить проект из файла</button>
    </section>
   </div>
+  {inviting&&<InviteDialog onClose={()=>setInviting(false)}/>}
   <footer className="project-home-version"><BuildVersion/></footer>
  </main>;
 }

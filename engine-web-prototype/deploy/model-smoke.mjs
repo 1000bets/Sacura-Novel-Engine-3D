@@ -42,7 +42,9 @@ export async function checkModels(base,cookie,savedProject){
    assert.equal((await fetch('/api/meshes?format=glb',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:'broken'})).status,400);
    assert.equal((await fetch('/api/meshes?format=obj',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Buffer.alloc(3*1024*1024+1)})).status,413);
    assert.equal((await nativeFetch(base+project.objects[0].model.src)).status,401);
-   const other=await nativeFetch(base+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({login:'other-'+randomUUID(),password:randomUUID()})});
+   const invited=await nativeFetch(base+'/api/invites',{method:'POST',headers:{Cookie:cookie}});assert.equal(invited.status,201);
+   const invite=new URL((await invited.json()).url).searchParams.get('invite');
+   const other=await nativeFetch(base+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({login:'other-'+randomUUID(),password:randomUUID(),invite})});
    assert.equal(other.status,201);const otherCookie=other.headers.get('set-cookie').split(';')[0];
    for(const path of ['/api/projects/'+project.id,project.objects[0].model.src,project.objects[1].model.src])assert.equal((await nativeFetch(base+path,{headers:{Cookie:otherCookie}})).status,404);
   }

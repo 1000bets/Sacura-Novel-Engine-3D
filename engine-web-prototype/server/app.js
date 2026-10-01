@@ -2,34 +2,47 @@ import express from 'express';
 import {createAuth,SESSION_SECONDS} from './auth.js';
 import {pipeline} from 'node:stream/promises';
 import {MESH_LIMIT,httpError} from './storage.js';
-export function createApp(storage,{secureCookies=false}={}){
+export function createApp(storage,{secureCookies=false,trustProxy=false,frontendBaseUrl=''}={}){
  const auth=createAuth(storage.db);
  const token=req=>req.headers.cookie?.split(';').map(value=>value.trim()).find(value=>value.startsWith('sacura_session='))?.slice(15)||'';
  const cookieOptions={httpOnly:true,sameSite:'lax',secure:secureCookies,path:'/'};
- const app=express();app.disable('x-powered-by');
+ const app=express();app.disable('x-powered-by');app.set('trust proxy',trustProxy);
+ const rateLimit=(name,limit,windowMs,user=false)=>(req,res,next)=>{
+  const result=auth.rateLimit(name+':'+(user?req.user.id:req.ip),limit,windowMs);
+  if(!result.allowed)return res.set('Retry-After',String(result.retryAfter)).status(429).json({error:'Слишком много попыток. Повторите позже.'});
+  next();
+ };
  app.get('/api/health',async(req,res)=>{try{await storage.ready();res.json({status:'ok'});}catch{res.status(503).json({status:'unavailable'});}});
  app.use((req,res,next)=>{
   res.set('Cache-Control','no-store');
+  res.set('Referrer-Policy','no-referrer');
   if(!['GET','HEAD','OPTIONS'].includes(req.method)){
    if(req.headers['sec-fetch-site']==='cross-site')return res.status(403).json({error:'Запрос с другого сайта запрещён.'});
    if(req.headers.origin){try{if(new URL(req.headers.origin).host!==req.headers.host)return res.status(403).json({error:'Недопустимый Origin.'});}catch{return res.status(403).end();}}
   }
   next();
  });
- app.post('/api/auth/register',express.json({limit:'16kb'}),async(req,res)=>{
+ app.post('/api/auth/register',rateLimit('register',3,60*60*1000),express.json({limit:'16kb'}),async(req,res)=>{
+  if(auth.user(token(req)))throw httpError(409,'Вы уже вошли в аккаунт.');
   const user=await auth.register(req.body);
   res.cookie('sacura_session',auth.session(user),{...cookieOptions,maxAge:SESSION_SECONDS*1000});res.status(201).json({user});
  });
- app.post('/api/auth/login',express.json({limit:'16kb'}),async(req,res)=>{
+ app.post('/api/auth/login',rateLimit('login',5,60*1000),express.json({limit:'16kb'}),async(req,res)=>{
   const user=await auth.login(req.body);
   res.cookie('sacura_session',auth.session(user),{...cookieOptions,maxAge:SESSION_SECONDS*1000});res.json({user});
  });
+ app.post('/api/invites/validate',rateLimit('invite-validation',30,60*1000),express.json({limit:'16kb'}),(req,res)=>res.json(auth.validateInvite(req.body?.invite)));
  app.post('/api/auth/logout',(req,res)=>{auth.logout(token(req));res.clearCookie('sacura_session',cookieOptions);res.json({ok:true});});
  app.use((req,res,next)=>{
   req.user=auth.user(token(req));
   if(!req.user)return res.status(401).json({error:'Войдите в аккаунт.'});
   if(req.headers['x-sacura-user']&&req.headers['x-sacura-user']!==req.user.id)return res.status(401).json({error:'Аккаунт изменился. Обновите страницу.'});
   next();
+ });
+ app.post('/api/invites',rateLimit('invite-creation',10,60*60*1000,true),(req,res)=>{
+  const url=new URL('/register',frontendBaseUrl||`${secureCookies?'https':'http'}://${req.get('host')}`);
+  const invite=auth.createInvite(req.user.id);url.searchParams.set('invite',invite.token);
+  res.status(201).json({url:url.href,expiresAt:invite.expiresAt});
  });
  app.get('/api/auth',(req,res)=>res.json({user:req.user}));
  app.get('/api/projects',(req,res)=>res.json(storage.list(req.user.id)));
@@ -45,6 +58,7 @@ export function createApp(storage,{secureCookies=false}={}){
   res.set('Content-Type',req.params.key.endsWith('.glb')?'model/gltf-binary':'text/plain; charset=utf-8');
   res.set('X-Content-Type-Options','nosniff');
   res.set('Cache-Control','no-store');
+  res.set('Referrer-Policy','no-referrer');
   if(object.ContentLength!==undefined)res.set('Content-Length',String(object.ContentLength));
   await pipeline(object.Body,res);
  });

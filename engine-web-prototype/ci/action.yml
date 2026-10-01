@@ -34,6 +34,7 @@ runs:
       working-directory: ${{ github.workspace }}/engine-web-prototype
       run: |
         cp .env.example .env
+        printf '\nAPP_USER=smoke-owner\nAPP_PASSWORD=%s\n' "$(openssl rand -hex 32)" >> .env
         printf '\nS3_SECRET_KEY=%s\n' "$(openssl rand -hex 32)" >> .env
     - run: docker compose config --quiet
       shell: bash
@@ -49,7 +50,11 @@ runs:
     - run: docker compose up -d --build --wait --wait-timeout 180
       shell: bash
       working-directory: ${{ github.workspace }}/engine-web-prototype
-    - run: node deploy/smoke.mjs
+    - run: |
+        set -a
+        source .env
+        set +a
+        node deploy/smoke.mjs
       shell: bash
       working-directory: ${{ github.workspace }}/engine-web-prototype
       env:
@@ -60,7 +65,11 @@ runs:
     - run: docker compose up -d --wait --wait-timeout 180
       shell: bash
       working-directory: ${{ github.workspace }}/engine-web-prototype
-    - run: node deploy/smoke.mjs
+    - run: |
+        set -a
+        source .env
+        set +a
+        node deploy/smoke.mjs
       shell: bash
       working-directory: ${{ github.workspace }}/engine-web-prototype
       env:

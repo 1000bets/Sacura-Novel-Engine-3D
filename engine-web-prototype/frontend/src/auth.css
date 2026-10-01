@@ -6,3 +6,5 @@
 .auth-card button{min-height:44px;padding:10px 16px;border:1px solid var(--border-strong,#514658);border-radius:8px;font:inherit;color:inherit;cursor:pointer}.auth-submit{background:#6e4163}.auth-switch{width:100%;margin-top:16px;background:transparent}.auth-card button:disabled{opacity:.65;cursor:wait}.auth-card :focus-visible{outline:2px solid #d8add0;outline-offset:3px}.auth-card .auth-error{color:#ffb4b4;margin:0 0 8px;line-height:1.5}
 
 .auth-logout-error{position:fixed;bottom:16px;left:16px;right:16px;z-index:10000;padding:16px;border:1px solid var(--error);border-radius:8px;background:var(--bg-panel);color:var(--text-primary)}
+
+.auth-card a.auth-switch{display:block;text-align:center;line-height:1.5;color:var(--text-secondary);text-decoration:underline;text-underline-offset:3px}
