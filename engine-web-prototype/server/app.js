@@ -39,7 +39,7 @@ export function createApp(storage,{secureCookies=false,trustProxy=false,frontend
   if(req.headers['x-sacura-user']&&req.headers['x-sacura-user']!==req.user.id)return res.status(401).json({error:'Аккаунт изменился. Обновите страницу.'});
   next();
  });
- app.post('/api/invites',rateLimit('invite-creation',10,60*60*1000,true),(req,res)=>{
+ app.post('/api/invites',rateLimit('invite-creation',100,60*60*1000,true),(req,res)=>{
   const url=new URL('/register',frontendBaseUrl||`${secureCookies?'https':'http'}://${req.get('host')}`);
   const invite=auth.createInvite(req.user.id);url.searchParams.set('invite',invite.token);
   res.status(201).json({url:url.href,expiresAt:invite.expiresAt});

@@ -81,7 +81,7 @@ test('IP limits ignore spoofed X-Forwarded-For by default and reset after their 
  assert.equal((await request('/auth/register',{body:{}})).status,429);
  for(let i=0;i<30;i++)assert.equal((await request('/invites/validate',{body:{invite:'bad'}})).status,403);
  assert.equal((await request('/invites/validate',{body:{invite:'bad'}})).status,429);
- for(let i=0;i<10;i++)assert.equal((await request('/invites',{cookie,body:{}})).status,201);
+ for(let i=0;i<100;i++)assert.equal((await request('/invites',{cookie,body:{}})).status,201);
  assert.equal((await request('/invites',{cookie,body:{}})).status,429);
  const relogin='sacura_session='+auth.session(await auth.login({login:'creator',password:'secret'}));
  assert.equal((await request('/invites',{cookie:relogin,body:{}})).status,429);
