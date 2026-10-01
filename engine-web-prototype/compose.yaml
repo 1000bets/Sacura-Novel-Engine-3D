@@ -1,0 +1,50 @@
+name: sacura
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+services:
+  web:
+    logging: *logging
+    build: ./frontend
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${HTTP_PORT:-8080}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+  api:
+    logging: *logging
+    build: ./server
+    environment:
+      APP_USER: ${APP_USER:-}
+      APP_PASSWORD: ${APP_PASSWORD:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      S3_BUCKET: ${S3_BUCKET:-sacura-meshes}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY in .env}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?Set S3_SECRET_KEY in .env}
+      S3_CREATE_BUCKET: ${S3_CREATE_BUCKET:-true}
+    volumes: ["projects:/data"]
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+  minio:
+    logging: *logging
+    build: ./deploy/minio
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY in .env}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?Set S3_SECRET_KEY in .env}
+    volumes: ["meshes:/data"]
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+volumes:
+  projects:
+  meshes:

@@ -3,6 +3,7 @@
 
 # JetBrains IDE settings
 .idea/
+.vscode/
 
 # Compiled Object files
 *.slo
@@ -60,6 +61,8 @@ compile_commands.json
 *.log
 *.bak
 *.swp
+*.swo
+*~
 
 # vcpkg
 vcpkg_installed/
@@ -70,7 +73,67 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
-/.agents/
+.agents/
+
+# Web dependencies, build output and tool caches
+node_modules/
+dist/
+.vite/
+.sites-runtime/
+*.tsbuildinfo
+
+# Generated test and coverage reports
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+blob-report/
+
+# Python tooling used by local scripts and skills
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
 
 # Local design references
-/design-system/
+/engine-web-prototype/design-system/
+
+# Server secrets, dependencies and persistent state
+.env
+.env.*
+!.env.example
+!.env.*.example
+!.env.sample
+!.env.*.sample
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite-journal
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+*.sqlite3-journal
+/engine-web-prototype/data/
+/engine-web-prototype/server/data/
+/engine-web-prototype/backups/
+/engine-web-prototype/server/backups/
+
+# Local project exports (source fixtures and bundled templates stay visible)
+/*.sacura.json
+/*.sacura-template.json
+/engine-web-prototype/*.sacura.json
+/engine-web-prototype/*.sacura-template.json
+/engine-web-prototype/frontend/*.sacura.json
+/engine-web-prototype/frontend/*.sacura-template.json
+
+# OS metadata
+.DS_Store
+._*
+.AppleDouble/
+.LSOverride
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
