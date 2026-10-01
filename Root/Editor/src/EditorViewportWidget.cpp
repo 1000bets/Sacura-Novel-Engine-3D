@@ -28,110 +28,110 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
-constexpr float DegreesToRadians = 0.01745329251994329577f;
-constexpr float RadiansToDegrees = 57.2957795130823208768f;
-constexpr float MinFocusDistance = 0.25f;
-constexpr float MaxPitchDegrees = 89.0f;
-constexpr float LookSensitivity = 0.18f;
-constexpr float OrbitSensitivity = 0.25f;
-constexpr float PanSensitivity = 0.01f;
-constexpr float DollySensitivity = 0.0025f;
-constexpr float WheelDollyFactor = 0.12f;
-constexpr float MinMoveSpeed = 0.25f;
-constexpr float MaxMoveSpeed = 250.0f;
+    constexpr float DegreesToRadians = 0.01745329251994329577f;
+    constexpr float RadiansToDegrees = 57.2957795130823208768f;
+    constexpr float MinFocusDistance = 0.25f;
+    constexpr float MaxPitchDegrees = 89.0f;
+    constexpr float LookSensitivity = 0.18f;
+    constexpr float OrbitSensitivity = 0.25f;
+    constexpr float PanSensitivity = 0.01f;
+    constexpr float DollySensitivity = 0.0025f;
+    constexpr float WheelDollyFactor = 0.12f;
+    constexpr float MinMoveSpeed = 0.25f;
+    constexpr float MaxMoveSpeed = 250.0f;
 
-constexpr quint32 ForwardKeyScanCode = 0x11;
-constexpr quint32 BackwardKeyScanCode = 0x1f;
-constexpr quint32 LeftKeyScanCode = 0x1e;
-constexpr quint32 RightKeyScanCode = 0x20;
-constexpr quint32 DownKeyScanCode = 0x10;
-constexpr quint32 UpKeyScanCode = 0x12;
-constexpr quint32 SpaceKeyScanCode = 0x39;
-constexpr quint32 RotateGizmoKeyScanCode = 0x12;
-constexpr quint32 ScaleGizmoKeyScanCode = 0x13;
+    constexpr quint32 ForwardKeyScanCode = 0x11;
+    constexpr quint32 BackwardKeyScanCode = 0x1f;
+    constexpr quint32 LeftKeyScanCode = 0x1e;
+    constexpr quint32 RightKeyScanCode = 0x20;
+    constexpr quint32 DownKeyScanCode = 0x10;
+    constexpr quint32 UpKeyScanCode = 0x12;
+    constexpr quint32 SpaceKeyScanCode = 0x39;
+    constexpr quint32 RotateGizmoKeyScanCode = 0x12;
+    constexpr quint32 ScaleGizmoKeyScanCode = 0x13;
 
-float ClampPitch(float PitchDegrees)
-{
-    return std::clamp(PitchDegrees, -MaxPitchDegrees, MaxPitchDegrees);
-}
-
-void ExtractYawPitch(const Vector3& Forward, float& OutYawDegrees, float& OutPitchDegrees)
-{
-    const Vector3 SafeForward = Forward.LengthSquared() > 0.000001f ? Forward : Vector3::Forward;
-    OutYawDegrees = std::atan2(SafeForward.x, SafeForward.z) * RadiansToDegrees;
-    OutPitchDegrees = std::asin(std::clamp(SafeForward.y, -1.0f, 1.0f)) * RadiansToDegrees;
-}
-
-Vector3 DirectionFromYawPitch(float YawDegrees, float PitchDegrees)
-{
-    const float Yaw = YawDegrees * DegreesToRadians;
-    const float Pitch = PitchDegrees * DegreesToRadians;
-    const float CosPitch = std::cos(Pitch);
-    Vector3 Direction(std::sin(Yaw) * CosPitch, std::sin(Pitch), std::cos(Yaw) * CosPitch);
-    Direction.Normalize();
-    return Direction;
-}
-
-ImGuiOverlaySnapshot CaptureImGuiOverlay(const ImDrawData* DrawData)
-{
-    ImGuiOverlaySnapshot Snapshot;
-    if (DrawData == nullptr || !DrawData->Valid || DrawData->CmdListsCount <= 0)
+    float ClampPitch(float PitchDegrees)
     {
+        return std::clamp(PitchDegrees, -MaxPitchDegrees, MaxPitchDegrees);
+    }
+
+    void ExtractYawPitch(const Vector3& Forward, float& OutYawDegrees, float& OutPitchDegrees)
+    {
+        const Vector3 SafeForward = Forward.LengthSquared() > 0.000001f ? Forward : Vector3::Forward;
+        OutYawDegrees = std::atan2(SafeForward.x, SafeForward.z) * RadiansToDegrees;
+        OutPitchDegrees = std::asin(std::clamp(SafeForward.y, -1.0f, 1.0f)) * RadiansToDegrees;
+    }
+
+    Vector3 DirectionFromYawPitch(float YawDegrees, float PitchDegrees)
+    {
+        const float Yaw = YawDegrees * DegreesToRadians;
+        const float Pitch = PitchDegrees * DegreesToRadians;
+        const float CosPitch = std::cos(Pitch);
+        Vector3 Direction(std::sin(Yaw) * CosPitch, std::sin(Pitch), std::cos(Yaw) * CosPitch);
+        Direction.Normalize();
+        return Direction;
+    }
+
+    ImGuiOverlaySnapshot CaptureImGuiOverlay(const ImDrawData* DrawData)
+    {
+        ImGuiOverlaySnapshot Snapshot;
+        if (DrawData == nullptr || !DrawData->Valid || DrawData->CmdListsCount <= 0)
+        {
+            return Snapshot;
+        }
+
+        static_assert(sizeof(ImGuiOverlayVertex) == sizeof(ImDrawVert), "ImGui overlay vertex layout must match ImDrawVert");
+        static_assert(sizeof(uint16_t) == sizeof(ImDrawIdx), "ImGui overlay index type must match ImDrawIdx");
+
+        Snapshot.DisplayWidth = DrawData->DisplaySize.x;
+        Snapshot.DisplayHeight = DrawData->DisplaySize.y;
+        Snapshot.FramebufferScaleX = DrawData->FramebufferScale.x;
+        Snapshot.FramebufferScaleY = DrawData->FramebufferScale.y;
+        Snapshot.Lists.reserve(static_cast<size_t>(DrawData->CmdListsCount));
+
+        for (int ListIndex = 0; ListIndex < DrawData->CmdListsCount; ++ListIndex)
+        {
+            const ImDrawList* SourceList = DrawData->CmdLists[ListIndex];
+            ImGuiOverlayDrawList& TargetList = Snapshot.Lists.emplace_back();
+            TargetList.Vertices.resize(static_cast<size_t>(SourceList->VtxBuffer.Size));
+            if (SourceList->VtxBuffer.Size > 0)
+            {
+                std::memcpy(
+                    TargetList.Vertices.data(),
+                    SourceList->VtxBuffer.Data,
+                    static_cast<size_t>(SourceList->VtxBuffer.Size) * sizeof(ImDrawVert));
+            }
+            TargetList.Indices.resize(static_cast<size_t>(SourceList->IdxBuffer.Size));
+            if (SourceList->IdxBuffer.Size > 0)
+            {
+                std::memcpy(
+                    TargetList.Indices.data(),
+                    SourceList->IdxBuffer.Data,
+                    static_cast<size_t>(SourceList->IdxBuffer.Size) * sizeof(ImDrawIdx));
+            }
+            TargetList.Commands.reserve(static_cast<size_t>(SourceList->CmdBuffer.Size));
+            for (int CommandIndex = 0; CommandIndex < SourceList->CmdBuffer.Size; ++CommandIndex)
+            {
+                const ImDrawCmd& SourceCommand = SourceList->CmdBuffer[CommandIndex];
+                if (SourceCommand.UserCallback != nullptr || SourceCommand.ElemCount == 0)
+                {
+                    continue;
+                }
+                ImGuiOverlayDrawCommand TargetCommand;
+                TargetCommand.IndexOffset = SourceCommand.IdxOffset;
+                TargetCommand.IndexCount = SourceCommand.ElemCount;
+                TargetCommand.VertexOffset = SourceCommand.VtxOffset;
+                TargetCommand.ClipMinX = SourceCommand.ClipRect.x;
+                TargetCommand.ClipMinY = SourceCommand.ClipRect.y;
+                TargetCommand.ClipMaxX = SourceCommand.ClipRect.z;
+                TargetCommand.ClipMaxY = SourceCommand.ClipRect.w;
+                TargetList.Commands.push_back(TargetCommand);
+            }
+        }
+
+        Snapshot.bValid = !Snapshot.Lists.empty();
         return Snapshot;
     }
-
-    static_assert(sizeof(ImGuiOverlayVertex) == sizeof(ImDrawVert), "ImGui overlay vertex layout must match ImDrawVert");
-    static_assert(sizeof(uint16_t) == sizeof(ImDrawIdx), "ImGui overlay index type must match ImDrawIdx");
-
-    Snapshot.DisplayWidth = DrawData->DisplaySize.x;
-    Snapshot.DisplayHeight = DrawData->DisplaySize.y;
-    Snapshot.FramebufferScaleX = DrawData->FramebufferScale.x;
-    Snapshot.FramebufferScaleY = DrawData->FramebufferScale.y;
-    Snapshot.Lists.reserve(static_cast<size_t>(DrawData->CmdListsCount));
-
-    for (int ListIndex = 0; ListIndex < DrawData->CmdListsCount; ++ListIndex)
-    {
-        const ImDrawList* SourceList = DrawData->CmdLists[ListIndex];
-        ImGuiOverlayDrawList& TargetList = Snapshot.Lists.emplace_back();
-        TargetList.Vertices.resize(static_cast<size_t>(SourceList->VtxBuffer.Size));
-        if (SourceList->VtxBuffer.Size > 0)
-        {
-            std::memcpy(
-                TargetList.Vertices.data(),
-                SourceList->VtxBuffer.Data,
-                static_cast<size_t>(SourceList->VtxBuffer.Size) * sizeof(ImDrawVert));
-        }
-        TargetList.Indices.resize(static_cast<size_t>(SourceList->IdxBuffer.Size));
-        if (SourceList->IdxBuffer.Size > 0)
-        {
-            std::memcpy(
-                TargetList.Indices.data(),
-                SourceList->IdxBuffer.Data,
-                static_cast<size_t>(SourceList->IdxBuffer.Size) * sizeof(ImDrawIdx));
-        }
-        TargetList.Commands.reserve(static_cast<size_t>(SourceList->CmdBuffer.Size));
-        for (int CommandIndex = 0; CommandIndex < SourceList->CmdBuffer.Size; ++CommandIndex)
-        {
-            const ImDrawCmd& SourceCommand = SourceList->CmdBuffer[CommandIndex];
-            if (SourceCommand.UserCallback != nullptr || SourceCommand.ElemCount == 0)
-            {
-                continue;
-            }
-            ImGuiOverlayDrawCommand TargetCommand;
-            TargetCommand.IndexOffset = SourceCommand.IdxOffset;
-            TargetCommand.IndexCount = SourceCommand.ElemCount;
-            TargetCommand.VertexOffset = SourceCommand.VtxOffset;
-            TargetCommand.ClipMinX = SourceCommand.ClipRect.x;
-            TargetCommand.ClipMinY = SourceCommand.ClipRect.y;
-            TargetCommand.ClipMaxX = SourceCommand.ClipRect.z;
-            TargetCommand.ClipMaxY = SourceCommand.ClipRect.w;
-            TargetList.Commands.push_back(TargetCommand);
-        }
-    }
-
-    Snapshot.bValid = !Snapshot.Lists.empty();
-    return Snapshot;
-}
 }
 
 class EditorGizmoOverlay : public QWidget
@@ -256,7 +256,7 @@ public:
         if (Owner->BoundEngine != nullptr)
         {
             Owner->BoundEngine->SetRenderSurfaceImGuiOverlay(
-                RenderSurfaceId{Owner->GetViewId().Value},
+                RenderSurfaceId{ Owner->GetViewId().Value },
                 CaptureImGuiOverlay(ImGui::GetDrawData()));
         }
     }
@@ -459,7 +459,7 @@ void EditorViewportWidget::SetEditorToolsEnabled(bool bEnabled)
         ResetCameraNavigation();
         if (BoundEngine != nullptr)
         {
-            BoundEngine->SetRenderSurfaceImGuiOverlay(RenderSurfaceId{GetViewId().Value}, {});
+            BoundEngine->SetRenderSurfaceImGuiOverlay(RenderSurfaceId{ GetViewId().Value }, {});
         }
     }
     SyncGizmoOverlay();
