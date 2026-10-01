@@ -151,6 +151,14 @@ void MaterialDocument::SetSource(std::string Text)
     AppendRevision(std::move(Next));
 }
 
+void MaterialDocument::SetDocumentAndSource(nlohmann::json Document, std::string Text)
+{
+    Revision Next;
+    Next.Document = std::move(Document);
+    Next.Source = std::move(Text);
+    AppendRevision(std::move(Next));
+}
+
 bool MaterialDocument::Undo()
 {
     if (CurrentRevision == 0 || IsReadOnly())

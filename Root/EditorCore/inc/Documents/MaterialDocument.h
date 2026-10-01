@@ -13,6 +13,7 @@ public:
     AssetDiagnostic BuildResolved(ResolvedMaterial& OutMaterial) const;
     void SetDocument(nlohmann::json Document);
     void SetSource(std::string Text);
+    void SetDocumentAndSource(nlohmann::json Document, std::string Text);
     bool Undo();
     bool Redo();
     bool IsDirty() const;

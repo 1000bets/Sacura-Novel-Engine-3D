@@ -1426,23 +1426,6 @@ void ContentBrowserWidget::CreateMaterial(bool bInstance, bool bSelectedParent)
         Registry->TryGetByPath(Selected.toStdString(), Entry);
         Parent = AssetKey{Entry.Metadata.Guid, {}};
     }
-    else
-    {
-        const auto Selected = QInputDialog::getItem(this, tr("Material"), tr("Domain"),
-            {"Surface", "PostProcess", "UserInterface"}, 0, false, &bAccepted);
-        if (!bAccepted)
-        {
-            return;
-        }
-        if (Selected == "PostProcess")
-        {
-            Domain = MaterialDomain::PostProcess;
-        }
-        else if (Selected == "UserInterface")
-        {
-            Domain = MaterialDomain::UserInterface;
-        }
-    }
     const auto Name = QInputDialog::getText(this, tr("Create Material"), tr("Asset name"), QLineEdit::Normal, {}, &bAccepted);
     if (!bAccepted || Name.isEmpty())
     {
