@@ -420,3 +420,23 @@ button:focus-visible { outline-color: var(--accent); }
 .subscene-map .react-flow__controls-button { background: var(--bg-panel-elevated); color: var(--text-primary); fill: var(--text-primary); border-color: var(--border-subtle); }
 .subscene-map .react-flow__controls-button:hover { background: var(--bg-hover); }
 .global-timeline-node.playing { box-shadow: none; outline-color: var(--success); }
+
+/* Nested systems remain distinct from their camera children. */
+.tree-system-children { margin-left: 14px; min-width: 0; }
+.tree-camera-children { margin-left: 14px; min-width: 0; }
+.tree-camera-children .tree-row { padding-left: 12px; align-items: center; }
+.tree-camera-children .tree-row>svg { flex-shrink: 0; }
+.tree-camera-children .tree-row>span { flex: 1; min-width: 0; text-align: left; }
+/* Camera names and actions wrap within the available scene width. */
+.viewport-commandbar .camera-view-badge { flex: 1 1 220px; min-width: 0; flex-wrap: wrap; }
+.camera-view-name { min-width: 0; overflow-wrap: anywhere; white-space: normal; line-height: 1.5; }
+.camera-view-badge>svg, .camera-view-badge>button { flex-shrink: 0; }
+.viewport-commandbar .camera-pilot-bar { flex-wrap: wrap; min-width: 0; }
+.viewport-commandbar .camera-pilot-bar>span { min-width: 0; overflow-wrap: anywhere; }
+.viewport-commandbar .camera-pilot-bar small { display: block; line-height: 1.5; }
+
+/* Anchor scene help to the toolbar rather than the small help icon. */
+.viewport-commandbar { position: relative; }
+.viewport-commandbar .viewport-help { position: static; margin: 0; padding: 0; border: 0; }
+.viewport-commandbar .viewport-help summary { margin: 0; }
+.viewport-commandbar .viewport-help>div { top: 100%; left: 8px; right: 8px; width: auto; max-width: 290px; max-height: min(260px, 40dvh); overflow: auto; overflow-wrap: anywhere; z-index: 20; }

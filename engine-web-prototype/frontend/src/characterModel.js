@@ -34,7 +34,7 @@ export function characterAnimationId(character,pose,moving){
 export function createCharacter(project,sceneId,name){
  if(!name?.trim())throw new Error('Укажите имя персонажа.');
  if(!project.subscenes.some(scene=>scene.id===sceneId))throw new Error('Выберите локацию персонажа.');
- const character={id:uid('character'),name:name.trim(),type:'Персонаж',color:'#bb99aa',active:true,subsceneId:sceneId,description:'',idleAnimation:'стоит',enabledAnimations:BUILTIN_CHARACTER_ANIMATIONS.map(clip=>clip.id),transforms:{[sceneId]:{position:[0,0,0],rotation:[0,0,0],scale:[1,1,1]}}};
+ const character={id:uid('character'),name:name.trim(),type:'Персонаж',dialogueWidgetId:null,color:'#bb99aa',active:true,subsceneId:sceneId,description:'',idleAnimation:'стоит',enabledAnimations:BUILTIN_CHARACTER_ANIMATIONS.map(clip=>clip.id),transforms:{[sceneId]:{position:[0,0,0],rotation:[0,0,0],scale:[1,1,1]}}};
  project.objects.push(character);return character;
 }
 export function setCharacterInScene(project,id,sceneId,present){

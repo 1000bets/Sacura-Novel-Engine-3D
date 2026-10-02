@@ -1,3 +1,4 @@
+import {subscribeLanguage} from './i18n.js';
 import * as THREE from 'three';
 
 import {resolvedPosition} from './sceneEditing.js';
@@ -23,8 +24,10 @@ export function gameCamera(kind,state,objects=[]){
 }
 export function labelSprite(text){
  const canvas=document.createElement('canvas');canvas.width=512;canvas.height=96;const c=canvas.getContext('2d');
- c.fillStyle='#22252deb';c.beginPath();c.roundRect(2,2,508,92,15);c.fill();c.strokeStyle='#d8b584';c.lineWidth=3;c.stroke();c.fillStyle='#f4e1bd';c.font='500 27px Segoe UI';c.textAlign='center';c.textBaseline='middle';c.fillText(text,256,48);
- const texture=new THREE.CanvasTexture(canvas),sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,depthTest:false}));sprite.scale.set(1.3,.245,1);sprite.renderOrder=10;return sprite;
+ const draw=()=>{c.clearRect(0,0,512,96);c.fillStyle='#22252deb';c.beginPath();c.roundRect(2,2,508,92,15);c.fill();c.strokeStyle='#d8b584';c.lineWidth=3;c.stroke();c.fillStyle='#f4e1bd';c.font='500 27px Segoe UI';c.textAlign='center';c.textBaseline='middle';c.fillText(typeof text==='function'?text():text,256,48);};draw();
+ const texture=new THREE.CanvasTexture(canvas),sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,depthTest:false}));sprite.scale.set(1.3,.245,1);sprite.renderOrder=10;
+ if(typeof text==='function'){const unsubscribe=subscribeLanguage(()=>{draw();texture.needsUpdate=true;});sprite.material.addEventListener('dispose',unsubscribe);}
+ return sprite;
 }
 export function decoratePaper(mesh,label){
  mesh.geometry.dispose();mesh.geometry=new THREE.BoxGeometry(.64,.025,.43);

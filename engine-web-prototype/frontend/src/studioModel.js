@@ -1,3 +1,6 @@
+import {ensureInputSettings,validateInputSettings} from './inputModel.js';
+import {ensureWidgets,validateWidgets} from './widgetModel.js';
+import {interactionTargets,playerControls} from './interactionModel.js';
 import {isPureNode,isDataSource,readLogic,choiceEnabled,dataTargets,getInput,dataConnectionError} from './logicModel.js';
 import {choiceAvailable,evaluateCondition,availabilityOf,storyPorts,ANSWER_VARIABLE} from './choiceModel.js';
 import {createProject,allBeats,makeAction,uid,nextNode,routeTo,resolvedActions,TYPES,validActionTarget,validate as legacyValidate} from './model.js';
@@ -37,7 +40,7 @@ export function removeEventBinding(p,beatId,bindingId){
 }
 export function newEvent(type='move',target,value,name){return {id:uid('event'),name:name||TYPES[type].label,description:'',retention:TYPES[type].completion==='CONTINUOUS'?'HOLD_UNTIL_STOPPED':'AUTO_CLOSE_ON_FLOW_END',owner:'SubScene',groups:[{id:uid('group'),name:'Основное действие',actions:[makeAction(type,target,value)]}]};}
 export function upgradeProject(source){
- const p=ensureAudioSettings(structuredClone(source||createProject()));if(p.version===2){allBeats(p).forEach(normalizeBatches);return ensureCameras(ensureSceneEditing(ensureCreationLibrary(extendVisualExamples(p))));}
+ const p=ensureInputSettings(ensureAudioSettings(structuredClone(source||createProject())));if(p.version===2){allBeats(p).forEach(normalizeBatches);return ensureWidgets(ensureCameras(ensureSceneEditing(ensureCreationLibrary(extendVisualExamples(p)))));}
  const original=structuredClone(p);p.version=2;p.revision=2;p.audioAssets=AUDIO_ASSETS;p.subscenes=[
  {id:'living',name:'Вечер в гостиной',location:'Гостиная',kind:'living',entry:'a1',sceneId:'chapter1',weather:'Дождь',time:'Закат',color:'#afa1e2'},
  {id:'garden',name:'Следы в саду',location:'Старый сад',kind:'garden',entry:'garden-entry',sceneId:'chapter1',weather:'Гроза',time:'Ночь',color:'#8ec2ab'},
@@ -45,7 +48,7 @@ export function upgradeProject(source){
  ];
  p.chapters.forEach(c=>{c.subsceneId='living';c.beats.forEach(b=>{if(!('next'in b))b.next=b.kind==='end'?null:nextNode(original,b.id,routeTo(original,b.id))?.id||null;if(b.kind==='choice')b.choices.forEach(c=>{if(!c.next)c.next=nextNode(original,b.id,routeTo(original,b.id),c.id)?.id||null;});normalizeBatches(b);});});
  const ev=(id,name,type,target,value,extra={})=>{const e=newEvent(type,target,value,name);e.id=id;e.groups[0].id=id+'-g';Object.assign(e,extra);p.events.push(e);return e;};
- const music=ev('studio-music','Главная тема','music','audio','Главная тема',{retention:'HOLD_UNTIL_REPLACED',channel:'Audio.BGM',owner:'Scene'});Object.assign(music.groups[0].actions[0],{assetId:'music-main',volume:.42,loop:true,fade:1.2});
+ const music=ev('studio-music','Главная тема','music','audio','Главная тема',{retention:'HOLD_UNTIL_REPLACED',channel:'Audio.BGM',owner:'Scene'});Object.assign(music.groups[0].actions[0],{assetId:'music-main',volume:.42,loop:true,fadeIn:1.2,fadeInEnabled:true});
  ev('studio-rain','Дождь за окном','weather','world','Дождь',{retention:'HOLD_UNTIL_REPLACED',channel:'World.Weather'});
  ev('studio-night','Ночь наступает','time','world','Ночь',{retention:'HOLD_UNTIL_REPLACED',channel:'World.Time'});
  ev('studio-storm','Гроза в саду','weather','world','Гроза',{retention:'HOLD_UNTIL_REPLACED',channel:'World.Weather'});
@@ -81,7 +84,7 @@ export function upgradeProject(source){
  for(const nodes of[garden,station])for(const b of nodes)for(const binding of b.bindings){const e=p.events.find(e=>e.id===binding.eventId);if(e?.retention!=='AUTO_CLOSE_ON_FLOW_END')binding.join='FLOW_END';}
  p.chapters.push({id:'garden-chapter',subsceneId:'garden',name:'Следы под дождём',beats:garden},{id:'station-chapter',subsceneId:'station',name:'Билет в один конец',beats:station});
  p.objects.push({id:'garden-note',name:'Записка на скамье',type:'Активный меш',color:'#e6d4a2',active:true,position:'стол',subsceneId:'garden',interaction:'Прочитать записку'},{id:'ticket',name:'Билет',type:'Активный меш',color:'#9ebed2',active:true,position:'стол',subsceneId:'station',interaction:'Предъявить билет'});
- const end=allBeats(p).find(b=>b.id==='d6');if(end)end.ending='Дом, в котором ждут';return ensureCameras(ensureSceneEditing(ensureCreationLibrary(extendVisualExamples(p))));
+ const end=allBeats(p).find(b=>b.id==='d6');if(end)end.ending='Дом, в котором ждут';return ensureWidgets(ensureCameras(ensureSceneEditing(ensureCreationLibrary(extendVisualExamples(p)))));
 }
 export function sceneFor(p,beatId){const c=p.chapters.find(c=>c.beats.some(b=>b.id===beatId));return p.subscenes.find(s=>s.id===c?.subsceneId)||p.subscenes[0];}
 export function edgesFor(p,b){return storyPorts(b).filter(port=>port.next).map(port=>({from:b.id,to:port.next,label:port.label,condition:port.condition,choiceId:port.id.startsWith('choice:')?port.id.slice(7):undefined}));}
@@ -101,8 +104,13 @@ export function validateStudio(p){
   }
   for(const port of dataTargets(b)){const source=getInput(b,port);if(source&&!allBeats(p).some(n=>n.id===source&&isDataSource(n)))issues.push({id:`logic-source-${b.id}-${port}`,beatId:b.id,level:'error',title:'Источник значения удалён',detail:'Переподключите круглый вход.'});}
   if(b.kind==='set-variable'&&!Object.hasOwn(p.variables||{},b.variable))issues.push({id:`set-variable-${b.id}`,beatId:b.id,level:'error',title:'Переменная не создана',detail:'Введите имя в ноде переменной.'});
-  const location=sceneFor(p,b.id),gateObject=p.objects.find(o=>o.id===b.signal);
-  if(b.kind==='gate'&&gateObject&&!isObjectInScene(gateObject,location))issues.push({id:`gate-location-${b.id}`,beatId:b.id,level:'error',title:'Предмет ожидания отсутствует в сабсцене',detail:`«${gateObject.name}» недоступен в «${location.name}». Выберите предмет этой локации: иначе игрок не сможет продолжить.`});
+  const location=sceneFor(p,b.id);
+  if(b.kind==='gate'){
+    for(const id of interactionTargets(b)){const object=p.objects.find(o=>o.id===id);if(object&&!isObjectInScene(object,location))issues.push({id:`gate-location-${b.id}${interactionTargets(b).length>1?'-'+id:''}`,beatId:b.id,level:'error',title:'Предмет ожидания отсутствует в сабсцене',detail:object.name});}
+    const controls=playerControls(b),character=p.objects.find(o=>o.id===controls.characterId);
+    if(controls.mode!=='none'&&(!character||character.type!=='Персонаж'||character.active===false||!isObjectInScene(character,location)))issues.push({id:`gate-player-${b.id}`,beatId:b.id,level:'error',title:'Выберите доступного персонажа для управления',detail:location.name});
+    for(const id of interactionTargets(b)){const eventId=b.interactionEvents?.[id];if(eventId&&!p.events.some(e=>e.id===eventId))issues.push({id:`gate-event-${b.id}-${id}`,beatId:b.id,level:'error',title:'Событие взаимодействия удалено',detail:eventId});}
+  }
   for(const binding of b.bindings)for(const a of bindingActions(p,binding)){const object=p.objects.find(o=>o.id===a.target);if(object&&!isObjectInScene(object,location))issues.push({id:`action-location-${binding.id}-${a.id}`,beatId:b.id,eventId:binding.eventId,level:['move','pose','visibility','highlight','door'].includes(a.type)?'error':'warning',title:'Цель действия отсутствует в сабсцене',detail:`«${object.name}» недоступен в «${location.name}». Выберите объект этой локации или добавьте персонажа в её состав.`});}
   for(const binding of b.bindings)for(const a of bindingActions(p,binding))if(a.type==='camera'&&a.cameraId&&!sceneFor(p,b.id).cameras?.some(c=>c.id===a.cameraId))issues.push({id:`camera-missing-${b.id}-${binding.id}-${a.id}`,beatId:b.id,eventId:binding.eventId,level:'error',title:'Камера недоступна в этой сабсцене',detail:'Камера удалена или относится к другой локации. Выберите камеру этой сабсцены в действии «Сменить план».'});
   for(const binding of b.bindings)for(const action of bindingActions(p,binding)){
@@ -136,6 +144,7 @@ export function validateStudio(p){
   }
   for(const edge of edgesFor(p,b))if(edge.to&&!allBeats(p).some(n=>n.id===edge.to))issues.push({id:`edge-${b.id}-${edge.to}`,beatId:b.id,level:'error',title:'Переход ведёт в удалённую реплику',detail:edge.to});
  }
+ issues.push(...validateWidgets(p),...validateInputSettings(p));
  return [...new Map(issues.map(i=>[i.id,i])).values()];
 }
 export function fixStudio(p,i){const n=structuredClone(p);if(i.fix==='wait-previous'){allBeats(n).find(b=>b.id===i.beatId).bindings.find(b=>b.id===i.bindingId).join='EVENT_END';return n;}if(i.fix==='reset-overrides'){allBeats(n).find(b=>b.id===i.beatId).bindings.filter(b=>b.eventId===i.eventId).forEach(b=>{b.overrides={};b.actionOverrides={};});return n;}if(i.fix==='sequence-batch'){const b=allBeats(n).find(b=>b.id===i.beatId),g=b.batches[i.phase].find(g=>g.id===i.batchId);g.mode='SEQUENTIAL';g.bindingIds.forEach(id=>{const binding=b.bindings.find(x=>x.id===id);binding.join=n.events.find(e=>e.id===binding.eventId)?.retention==='AUTO_CLOSE_ON_FLOW_END'?'EVENT_END':'FLOW_END';});return n;}return null;}

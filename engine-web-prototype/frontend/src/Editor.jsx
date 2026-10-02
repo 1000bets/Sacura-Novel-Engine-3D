@@ -1,7 +1,18 @@
+import InputWorkspace,{InputContextSettings} from './InputWorkspace.jsx';
+import TouchInput from './TouchInput.jsx';
+import {inputContextsFor,inputHelp} from './inputModel.js';
+import LanguagePicker from './LanguagePicker.jsx';
+import WidgetWorkspace from './WidgetWorkspace.jsx';
+import WidgetRenderer,{WidgetMenu} from './WidgetRenderer.jsx';
+import WidgetAssignment from './WidgetAssignment.jsx';
+import {resolveWidget,createDialogueVariant,isUnmodifiedDefaultWidget} from './widgetModel.js';
+import {t as tr, useLocale, literalLabel, localeTag, message} from './i18n.jsx';
+import InteractionInspector from './InteractionInspector.jsx';
+import {interactionTargets} from './interactionModel.js';
 import FileInspector from './FileInspector.jsx';
 import {collectAssetFiles,updateAssetFile} from './assetFiles.js';
 import {moveEventBinding} from './eventPlacement.js';
-import {createObjectGroup,addObjectsToGroup,sceneObjectGroups} from './objectGroups.js';
+import {createObjectGroup,addObjectsToGroup,removeObjectsFromGroups,sceneObjectGroups} from './objectGroups.js';
 import {validateImportSize} from './fileLimits.js';
 import {projectAudioAssets,validateImportedAudio} from './audioAssets.js';
 import {accountStorage} from './accountStorage.js';
@@ -121,11 +132,12 @@ function loadProject() {
   return readProject(p);
 }
 function Fold({ title, icon, children, open = true, extra }) {
+ useLocale();
   return (
     <details className="inspector-section" open={open}>
       <summary>
         <Icon name="ChevronRight" size={12} />
-        <span>{title}</span>
+        <span>{tr(title)}</span>
         {extra}
       </summary>
       <div className="inspector-fields">{children}</div>
@@ -133,12 +145,13 @@ function Fold({ title, icon, children, open = true, extra }) {
   );
 }
 function ResizeBar({ axis, onMove, onReset, label }) {
+ useLocale();
   const drag = useRef();
   return (
     <div
       role="separator"
       tabIndex={0}
-      aria-label={label}
+      aria-label={tr(label)}
       aria-orientation={axis === "x" ? "vertical" : "horizontal"}
       className={"splitter " + axis}
       onDoubleClick={onReset}
@@ -190,100 +203,49 @@ function GameDialogue({
   onStart,
   show,
   objectLabel,
+  widgetOverride,
+  onUiAction,
 }) {
+ useLocale();
   if (!show || !beat || (running && !preview.textVisible)) return null;
   if (preview?.phase === "FINISHED" && running)
     return (
       <div className="game-ending">
         <Icon name="Flower2" size={29} />
-        <span>Конец истории</span>
+        <span>{tr("Конец истории")}</span>
         <strong>{preview.ending}</strong>
-        <Button onClick={onStart}>Сыграть ещё раз</Button>
+        <Button onClick={onStart}>{tr("Сыграть ещё раз")}</Button>
       </div>
     );
   const ready = !running || (preview.ready && !preview.paused);
   const canAdvance=ready&&!['choice','gate'].includes(beat.kind);
-  const next=()=>{if(canAdvance)running?onAdvance():onStart();};
-  return (
-    <div
-      className="game-ui"
-      onPointerDown={(e) => e.stopPropagation()}
-      onPointerUp={(e) => e.stopPropagation()}
-    >
-      <div className="game-name">
-        <Icon name="Flower2" size={18} />
-        {beat.speaker}
-      </div>
-      {beat.kind === "choice" && (
-        <div className="game-choices">
-          {beat.choices?.map((c) => (
-            <button
-              key={c.id}
-              disabled={!ready || !conditionPass(c, variables,project,preview?.choiceResults)}
-              onClick={() => running && onAdvance(c.id)}
-            >
-              {!conditionPass(c, variables,project,preview?.choiceResults) && (
-                <Icon name="LockKeyhole" size={13} />
-              )}
-              <span>{c.label}</span>
-              <Icon name="ChevronRight" size={14} />
-            </button>
-          ))}
-        </div>
-      )}
-      <div className={'game-dialogue '+(canAdvance?'can-advance':'')} role={canAdvance?'button':undefined} tabIndex={canAdvance?0:undefined} aria-label={canAdvance?'Продолжить диалог':undefined} onClick={next} onKeyDown={e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();e.stopPropagation();next();}}}>
-        <p>{beat.text}</p>
-        {beat.kind === "gate" ? (
-          <div className="game-wait">
-            <Icon name="MousePointer2" size={14} />
-            <span>
-              {preview?.hint ||
-                `Нажмите на объект «${objectLabel || beat.signal}» в сцене`}
-            </span>
-          </div>
-        ) : (
-          <span
-            className="game-next"
-            title={running ? "Следующая реплика" : "Запустить сцену"}
-            aria-hidden="true"
-          >
-            <Icon name={ready ? "ChevronDown" : "LoaderCircle"} size={20} />
-          </span>
-        )}
-        <div className="game-dialogue-footer">
-          <span>
-            {running
-              ? preview.paused
-                ? "Пауза"
-                : preview.phase === "AFTER"
-                  ? "Завершение постановки"
-                  : !preview.ready
-                    ? "Выполняются действия"
-                    : beat.kind === "gate"
-                      ? "Сценарий ждёт взаимодействия"
-                      : beat.kind === "choice"
-                        ? "Выберите ответ"
-                        : "Нажмите, чтобы продолжить"
-              : "Предпросмотр выбранной реплики"}
-          </span>
-          <span>
-            {running ? "PLAYTEST" : "UI PREVIEW"}{" "}
-            <Icon name="Flower2" size={12} />
-          </span>
-        </div>
-      </div>
-    </div>
-  );
+  const dialogueWidget=widgetOverride||resolveWidget(project,'dialogue',beat);
+  if (beat.kind==='gate' && beat.controls?.mode && beat.controls.mode!=='none' && isUnmodifiedDefaultWidget(dialogueWidget)) {
+    const help=inputHelp(project.input,inputContextsFor(project,beat),beat.controls.mode==='point-click'?['interact','point']:['move','interact','point']);
+    return <div className="game-task">
+      <strong>{beat.text}</strong>
+      <div><small>{tr(help)}</small><span className="interaction-checklist" role="status" aria-label={tr('Осмотренные предметы')}>
+        {interactionTargets(beat).map(id=><span key={id} className={preview?.interacted?.includes(id)?'done':''}>{project.objects.find(o=>o.id===id)?.name||id}</span>)}
+      </span></div>
+      {preview?.hint&&<small className="interaction-hint">{message(preview.hint)}</small>}
+    </div>;
+  }
+  const status=beat.kind==='gate'?(message(preview?.hint)||(beat.controls?.mode&&beat.controls.mode!=='none'?inputHelp(project.input,inputContextsFor(project,beat),['move','interact','point']):`${tr('Нажмите на объект')} «${objectLabel||beat.signal}»`)):
+    !running?tr('Предпросмотр выбранной реплики'):!preview.ready?tr('Выполняются действия'):beat.kind==='choice'?tr('Выберите ответ'):tr('Нажмите, чтобы продолжить');
+  return <WidgetRenderer widget={dialogueWidget} context={{speaker:beat.speaker,text:beat.text,status,title:project.title,choices:beat.kind==='choice'?beat.choices:[],selectedChoiceId:preview?.inputChoiceId,ready,canAdvance}}
+    onAction={action=>{if(action==='advance'&&canAdvance)running?onAdvance():onStart();else if(action!=='advance')onUiAction?.(action);}}
+    onChoice={id=>running&&onAdvance(id)} choiceEnabled={choice=>conditionPass(choice,variables,project,preview?.choiceResults)}/>;
 }
 
 // Keep everyday workspaces visible; secondary tools remain one click away.
 const dockTools = [
   ["story", "Поток истории"], ["subscenes", "Сабсцены"], ["characters", "Персонажи"],
-  ["cameras", "Камеры"], ["files", "Проводник"], ["active", "Звук и окружение"], ["event", "Событие"],
+  ["widgets", "Виджеты UI"], ["cameras", "Камеры"], ["input", "Ввод"], ["files", "Проводник"], ["active", "Звук и окружение"], ["event", "Событие"],
   ["create", "Создание"], ["assets", "Проект"], ["sound", "Звук"],
   ["samples", "Эффекты"], ["issues", "Проблемы"],
 ];
 function DockTools({ dock, event, issueCount, onSelect }) {
+ useLocale();
   const [open, setOpen] = useState(false);
   const [opensUp, setOpensUp] = useState(false);
   const popup = useRef(null), trigger = useRef(null);
@@ -293,7 +255,7 @@ function DockTools({ dock, event, issueCount, onSelect }) {
     if (!open) return;
     const outside = e => { if (!popup.current?.contains(e.target)) setOpen(false); };
     const escape = e => {
-      if (e.key === "Escape") { e.stopPropagation(); setOpen(false); trigger.current?.focus(); }
+      if (e.key === "Escape" && !e.defaultPrevented) { e.stopPropagation(); setOpen(false); trigger.current?.focus(); }
     };
     document.addEventListener("pointerdown", outside);
     document.addEventListener("keydown", escape, true);
@@ -305,17 +267,17 @@ function DockTools({ dock, event, issueCount, onSelect }) {
   return <>
     {dockTools.slice(0, 5).map(([id, label]) => <button key={id}
       aria-pressed={dock === id} className={dock === id ? "active" : ""}
-      onClick={() => onSelect(id)}>{label}</button>)}
+      onClick={() => onSelect(id)}>{tr(label)}</button>)}
     <div className={"dock-more" + (opensUp ? " opens-up" : "")} ref={popup} onBlur={e => {
       if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false);
     }}>
       <button ref={trigger} className={current ? "active" : ""}
         aria-expanded={open} aria-controls={open ? "dock-more-tools" : undefined}
-        onClick={e => {setOpensUp(window.innerHeight - e.currentTarget.getBoundingClientRect().bottom < 270); setOpen(v => !v);}}>{"Ещё"}<Icon name="ChevronDown" size={12}/></button>
-      {open && <div className="dock-more-popup" id="dock-more-tools" aria-label="Другие инструменты">
+        onClick={e => {setOpensUp(window.innerHeight - e.currentTarget.getBoundingClientRect().bottom < 270); setOpen(v => !v);}}>{tr("Ещё")}<Icon name="ChevronDown" size={12}/></button>
+      {open && <div className="dock-more-popup" id="dock-more-tools" aria-label={tr("Другие инструменты")}>
         {secondary.map(([id, label]) => <button key={id} disabled={id === "event" && !event}
           aria-pressed={dock === id} onClick={() => {onSelect(id); setOpen(false); trigger.current?.focus();}}>
-          <span>{label}</span>{id === "issues" && issueCount > 0 && <span className="tool-issue-count">{issueCount}</span>}
+          <span>{tr(label)}</span>{id === "issues" && issueCount > 0 && <span className="tool-issue-count">{issueCount}</span>}
           {dock === id && <Icon name="Check" size={13}/>}
         </button>)}
       </div>}
@@ -324,6 +286,7 @@ function DockTools({ dock, event, issueCount, onSelect }) {
 }
 
 export default function Editor({initialProject=null,user=null,onLogout,onHome}) {
+ useLocale();
   const clipboard=useRef(null);
   const seed = useRef();
   if (!seed.current) {
@@ -380,6 +343,9 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     [detailEditor, setDetailEditor] = useState(false),
     [history, setHistory] = useState([]),
     [authorRequest,setAuthorRequest]=useState(null),
+    [widgetRequest,setWidgetRequest]=useState(null),
+    [gameMenu,setGameMenu]=useState(null),
+    [previewWidgetId,setPreviewWidgetId]=useState(null),
     [subsceneRequest,setSubsceneRequest]=useState(null),
     [subsceneDraft,setSubsceneDraft]=useState(null),
     [editTool,setEditTool]=useState("translate"),
@@ -423,16 +389,21 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   useEffect(()=>{
     if(rt.invalidateStoryPreview(project))setNotice('Маршрут истории изменён. Предпросмотр остановлен — нажмите «Запуск» или «С реплики», чтобы проверить новые связи.');
   },[project,rt]);
+  const [inputDevices,setInputDevices]=useState([]);
   const world = useMemo(
     () =>
       running
         ? {
             ...preview.world,
             paused: preview.paused,
+            inputActive:!preview.audition&&!['FINISHED','ERROR'].includes(preview.phase)&&gameMenu!=='mainMenu',
+            inputReady:preview.ready,
+            inputContexts:inputContextsFor(playProject,playBeat),
             weatherPaused: preview.effects.weather?.status === "paused",
             particlesPaused:preview.effects.particles?.status==='paused',
             interactionTarget:
-              preview.phase === "WAITING_OBJECT" ? playBeat.signal : null,
+              preview.phase === "WAITING_OBJECT" && !preview.world.playerControl ? playBeat.signal : null,
+            interactionTargets:preview.phase==='WAITING_OBJECT'?interactionTargets(playBeat).filter(id=>!preview.interacted?.includes(id)):[],
           }
         : {
             weather: scene.weather,
@@ -443,7 +414,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             poses: {},
             visible: {},
           },
-    [running, preview, scene, playBeat.signal],
+    [running, preview, scene, playBeat, playProject, gameMenu],
   );
   const objects = useMemo(
     () =>
@@ -716,14 +687,17 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     setSelectedBeat(result.nextId);setSelection({kind:'beat',id:result.nextId});
     setNotice('Выделенные ноды и их связи удалены. Ctrl + Z — отменить.');
   };
-  const nodeKindField=()=> <Field label="Тип блока"><Select value={beat.kind} options={STORY_NODE_KINDS} onChange={kind=>mutate(p=>changeStoryNodeKind(allBeats(p).find(b=>b.id===beat.id),kind))}/></Field>;
+  const nodeKindField=()=> <Field label={tr("Тип блока")}><Select value={beat.kind} options={STORY_NODE_KINDS} onChange={kind=>mutate(p=>changeStoryNodeKind(allBeats(p).find(b=>b.id===beat.id),kind))}/></Field>;
   const createSpeaker=()=>{
     const name=characterDraft?.trim();if(!name||running)return;
     mutate(p=>{const character=createCharacter(p,sceneFor(p,beat.id).id,name);allBeats(p).find(b=>b.id===beat.id).speaker=character.name;});
-    setCharacterDraft(null);setNotice('Персонаж «'+name+'» создан и выбран для реплики.');
+    setCharacterDraft(null);setNotice(tr("Персонаж «{0}» создан и выбран для реплики.", [name]));
   };
-  const start = (fromSelection=false) => {
-    const startId=playbackStartId(project,beat.id,fromSelection);
+  const openWidgets=id=>{setWidgetRequest({id,token:uid("widget-request")});setDock("widgets");setDetailEditor(false);setFloatingDock(true);setMaximized(null);setCompactPanel("workspace");};
+  const customizeWidget=owner=>{const id=uid('widget');mutate(p=>createDialogueVariant(p,owner,id));openWidgets(id);};
+  const start = (fromSelection=false,entryId=null) => {
+    setGameMenu(null);setPreviewWidgetId(null);
+    const startId=entryId||playbackStartId(project,beat.id,fromSelection);
     if(!startId){setNotice('Укажите начальную реплику во вкладке «Сабсцены».');return;}
     setCameraPreviewId(null);setCameraPilotId(null);
     soundDesk.unlock().catch(()=>{});
@@ -731,6 +705,11 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     setMode("game");
     setShowDialogue(true);
     rt.start(project, startId);
+  };
+  const widgetAction=action=>{
+    if(action==='start'||action==='restart')start(false,project.subscenes[0]?.entry);
+    if(action==='resume'&&preview?.paused){setPreviewWidgetId(null);rt.togglePause();}
+    if(action==='mainMenu'){rt.stop();setMode('game');setGameMenu('mainMenu');setPreviewWidgetId(null);}
   };
   const audition=(eventId)=>{setCameraPreviewId(null);setCameraPilotId(null);soundDesk.unlock().catch(()=>{});setMode('game');setFollow(false);rt.previewEvent(project,eventId,beat.id);};
   const editSample=(eventId)=>{setEventContext({eventId});setSelection({kind:'event',id:eventId});setCompactPanel('inspector');setDetailEditor(false);};
@@ -802,7 +781,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       if(serverStorageEnabled){const saved=await saveServerProject(project);setProject(current=>current===project?saved:current);setSaveError(null);setNotice('Проект сохранён на сервере.');return;}
       const result=await writeProjectFile(await portableProject(project),{handle:projectFile.current,chooseFile:window.showSaveFilePicker?.bind(window),download:downloadFile,filename:projectFilename(project.title)});
       projectFile.current=result.handle;
-      setNotice(result.downloaded?'Файл проекта передан в загрузки: '+result.filename:'Проект сохранён: '+result.filename);
+      setNotice(result.downloaded?tr("Файл проекта передан в загрузки: {0}", [result.filename]):tr("Проект сохранён: {0}", [result.filename]));
     });
   };
   const openProjectDialog = mode => {
@@ -815,17 +794,17 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     if(projectDialog==='new'){
       const template=projectTemplates.find(t=>t.id===templateId);
       const next=template?projectFromTemplate(template,name):createEmptyProject(name);
-      replaceProject(next);setNotice(template?'Создан проект из шаблона «'+template.name+'».':'Создан пустой проект.');
+      replaceProject(next);setNotice(template?tr("Создан проект из шаблона «{0}».", [template.name]):'Создан пустой проект.');
     } else if(projectDialog==='template'){
       storeTemplate(accountStorage,createProjectTemplate(project,name));
-      setNotice('Шаблон «'+name.trim()+'» записан. Он доступен при создании нового проекта.');
+      setNotice(tr("Шаблон «{0}» записан. Он доступен при создании нового проекта.", [name.trim()]));
     } else {
       const next=copyProjectAs(project,name);
       if(serverStorageEnabled){const saved=await saveServerProject(next);replaceProject(saved);setProjectDialog(null);setNotice('Копия проекта сохранена на сервере.');return;}
       const result=await writeProjectFile(await portableProject(next),{chooseFile:window.showSaveFilePicker?.bind(window),download:downloadFile,filename:projectFilename(next.title)});
       backupProject(accountStorage,project);projectFile.current=result.handle;seed.current.error=null;
       setProject(next);setHistory([]);
-      setNotice(result.downloaded?'Копия проекта передана в загрузки: '+result.filename:'Копия проекта сохранена: '+result.filename);
+      setNotice(result.downloaded?tr("Копия проекта передана в загрузки: {0}", [result.filename]):tr("Копия проекта сохранена: {0}", [result.filename]));
     }
     setProjectDialog(null);
   });
@@ -926,7 +905,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   };
   const openAuthoring=(kind='event',options={})=>{setAuthorRequest({kind,...options,token:uid('request')});setDock('create');setMaximized('graph');setDetailEditor(false);setEventContext(null);setPicker(null);setMenu(null);};
   const createEvent = () => openAuthoring('event');
-  const editScene=()=>{if(rt.running){if(rt.snapshot.beatId)setSelectedBeat(rt.snapshot.beatId);rt.stop();}setCameraPilotId(null);setCameraPreviewId(null);setMode('scene');setMaximized(null);setCompactPanel('workspace');};
+  const editScene=()=>{setGameMenu(null);setPreviewWidgetId(null);if(rt.running){if(rt.snapshot.beatId)setSelectedBeat(rt.snapshot.beatId);rt.stop();}setCameraPilotId(null);setCameraPreviewId(null);setMode('scene');setMaximized(null);setCompactPanel('workspace');};
   const openSubscenes=(mode='edit',id=displayScene.id)=>{
     if(rt.running)rt.stop();const target=project.subscenes.find(s=>s.id===id);
     if(target&&mode!=='create'){setSelectedBeat(target.entry);setSelection({kind:'scene',id});}
@@ -945,7 +924,13 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   };
   const openSubsceneBeat=id=>{if(rt.running)rt.stop();setCameraPilotId(null);setCameraPreviewId(null);selectBeat(id);setDock('story');setMaximized(null);};
   const editSubscene=fn=>{if(!rt.running)mutate(fn);};
-  const selectCamera=id=>{
+  const selectCamera=(id,{preview=true}={})=>{
+    if(!id)return;
+    if(preview){
+      setCameraPilotId(null);setCameraPreviewId(id);setFocusRequest(0);
+      if(!rt.running)setMode('scene');
+      cameraApi.current?.preview(id);
+    }
     setSelection({kind:'camera',id});setDetailEditor(false);
     setLayout(current=>({...current,hiddenInspector:false}));setCompactPanel('inspector');setMaximized(null);
   };
@@ -961,7 +946,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   };
   const followCharacter=()=>{const target=objects.find(o=>o.id===selection.id&&o.type==='Персонаж')||objects.find(o=>o.type==='Персонаж'&&o.active);if(target)createCamera(target);};
   const captureCamera=id=>{const c=scene.cameras?.find(c=>c.id===id),view=cameraApi.current?.capture();if(c&&view){changeCamera(id,cameraFromView(c,view,world,objects,scene.kind));setCameraPilotId(null);setNotice('Ракурс сохранён.');}};
-  const pilotCamera=id=>{setFloatingDock(false);editScene();setCameraPilotId(id);selectCamera(id);};
+  const pilotCamera=id=>{setFloatingDock(false);editScene();setCameraPilotId(id);setCameraPreviewId(null);selectCamera(id,{preview:false});};
   const viewCamera=id=>{setCameraPilotId(null);setCameraPreviewId(id);setMode('game');};
   const deleteCamera=id=>{if(rt.running)return;mutate(p=>{const sc=p.subscenes.find(s=>s.id===scene.id);sc.cameras=sc.cameras.filter(c=>c.id!==id);if(sc.defaultCameraId===id)sc.defaultCameraId=sc.cameras[0]?.id||null;});if(cameraPilotId===id)setCameraPilotId(null);if(cameraPreviewId===id)setCameraPreviewId(null);setSelection({kind:'scene',id:scene.id});setNotice('Камера удалена. Ctrl+Z — отменить.');};
   useEffect(()=>{setCameraPilotId(null);setCameraPreviewId(null);setFocusRequest(0);},[displayScene.id]);
@@ -1003,10 +988,19 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     mutate(p=>p.objects.push(copy));setSelection({kind:'object',id:copy.id});setFocusRequest({nonce:uid('focus')});
   };
   const deleteObject=id=>{mutate(p=>{const removed=p.objects.find(o=>o.id===id);p.objects=p.objects.filter(o=>o.id!==id);retainObjectModel(p,removed);});setSelection({kind:'scene',id:scene.id});setNotice('Объект удалён. Ctrl+Z — вернуть; ссылки в событиях видны во вкладке «Ошибки».');};
+  const addStagingPoint=()=>{
+    if(rt.running)return;const id=uid('point'),selectedObject=objects.find(o=>o.id===selection.id),position=contextMenu?.worldPosition||(selectedObject?objectTransform(selectedObject,scene.id,scene.kind).position:[0,0,0]);
+    mutate(p=>{const target=p.subscenes.find(s=>s.id===scene.id);target.stagingPoints||=[];target.stagingPoints.push({id,label:'Новая точка постановки',position:[position[0],0,position[2]]});});
+    setSelection({kind:'point',id});editScene();setPicker(null);setContextMenu(null);openObjectTransform();
+    setLayout(l=>({...l,treeOpen:{...l.treeOpen,[scene.id+':points']:true}}));
+  };
+  const addSoundEvent=()=>{if(rt.running)return;const e=newEvent('sound','world','Звук','Новое звуковое событие');mutate(p=>p.events.push(e));setPicker(null);setContextMenu(null);editSample(e.id);setNotice('Выберите аудиофайл в инспекторе; затем добавьте событие к реплике.');};
+  const addEmptyGroup=()=>{if(rt.running)return;const next=structuredClone(project),group=createObjectGroup(next,scene.id,[],'Новая группа',{allowEmpty:true});mutate(p=>Object.assign(p,next));setSelection({kind:'group',id:group.id});setLayout(l=>({...l,treeOpen:{...l.treeOpen,[scene.id+':objects']:true,[scene.id+':'+group.id]:true}}));openObjectTransform();};
   const addObject = (type,primitive="box") => {
+    if(rt.running)return;
     editScene();
-    const id = uid("object");
-    mutate((p) =>
+    const id = uid("object"),groupId=picker?.groupId||(selection.kind==='group'?selection.id:selection.groupId),position=contextMenu?.worldPosition;
+    mutate((p) => {
       p.objects.push({
         id,
         type,
@@ -1018,9 +1012,11 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         interaction: "Осмотреть",
         primitive,
         ...(type==='Источник света'?{light:{intensity:35,distance:10,decay:2},color:'#fff0d0'}:{}),
-        transforms:{[scene.id]:{position:[0,type==="Персонаж"?0:type==='Источник света'?2:.3,1],rotation:[0,0,0],scale:[1,1,1]}},
-      }),
-    );
+        transforms:{[scene.id]:{position:position?[position[0],type==="Персонаж"?0:position[1],position[2]]:[0,type==="Персонаж"?0:type==='Источник света'?2:.3,1],rotation:[0,0,0],scale:[1,1,1]}},
+      });
+      if(groupId)addObjectsToGroup(p,groupId,[id]);
+    });
+    setContextMenu(null);
     setSelection({ kind: "object", id });
     setFocusRequest({nonce:uid('focus')});
     setPicker(null);
@@ -1066,7 +1062,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       );
     });
     setDock("story");
-    setNotice("Звук назначен реплике " + beat.id);
+    setNotice(tr("Звук назначен реплике {0}", [beat.id]));
   };
   const fix = (i) => {
     let next = fixStudio(project, i) || fixIssue(project, i);
@@ -1111,7 +1107,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   useEffect(() => {
     const listener = (e) => {
       const command=clipboardCommand(e);
-      if(command&&!e.target.closest?.('.react-flow')&&!contextMenu&&!picker&&!projectDialog&&!detailEditor&&!menu&&!running&&mode==='scene'&&(selection.kind==='object'||e.target.closest?.('.scene-viewport,.hierarchy'))){e.preventDefault();objectClipboard(command);return;}
+      if(command&&!e.target.closest?.('.react-flow, .widget-workspace')&&!contextMenu&&!picker&&!projectDialog&&!detailEditor&&!menu&&!running&&mode==='scene'&&(selection.kind==='object'||e.target.closest?.('.scene-viewport,.hierarchy'))){e.preventDefault();objectClipboard(command);return;}
       const tool = ({KeyQ:'select',KeyW:'translate',KeyE:'rotate',KeyR:'scale'})[e.code];
       if (
         tool && !e.defaultPrevented && !e.repeat &&
@@ -1119,7 +1115,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         mode === 'scene' && !running && !cameraPilotId &&
         !contextMenu && !picker && !projectDialog && !detailEditor && !menu &&
         !e.target.isContentEditable &&
-        !e.target.closest?.('input, textarea, select, [role="textbox"], [role="dialog"], .react-flow, .scene-viewport[data-navigating="true"]')
+        !e.target.closest?.('input, textarea, select, [role="textbox"], [role="dialog"], .react-flow, .widget-workspace, .scene-viewport[data-navigating="true"]')
       ) {
         if(selection.kind==='camera'&&(tool==='scale'||(tool==='rotate'&&displayScene.cameras?.find(c=>c.id===selection.id)?.mode==='follow')))return;
         e.preventDefault();
@@ -1132,14 +1128,15 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         mode === 'scene' && !running && selection.kind === 'object' && objectSelectionIds.length &&
         !contextMenu && !picker && !projectDialog && !detailEditor &&
         !e.target.isContentEditable &&
-        !e.target.closest?.('input, textarea, select, [role="textbox"], [role="dialog"], .react-flow')
+        !e.target.closest?.('input, textarea, select, [role="textbox"], [role="dialog"], .react-flow, .widget-workspace')
       ) {
         e.preventDefault();
         deleteObjects();
         return;
       }
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && !e.defaultPrevented) {
         if(contextMenu){e.preventDefault();setContextMenu(null);return;}
+        if(dock==='widgets'&&floatingDock){e.preventDefault();setFloatingDock(false);return;}
         setCompactPanel('workspace');
         setPicker(null);
         setMenu(null);
@@ -1164,14 +1161,14 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       }
     };
     const nativeClipboard=e=>{
-      if(e.defaultPrevented||running||mode!=='scene'||contextMenu||picker||projectDialog||detailEditor||menu||e.target.isContentEditable||e.target.closest?.('input,textarea,select,[role="textbox"],[role="dialog"],.react-flow'))return;
+      if(e.defaultPrevented||running||mode!=='scene'||contextMenu||picker||projectDialog||detailEditor||menu||e.target.isContentEditable||e.target.closest?.('input,textarea,select,[role="textbox"],[role="dialog"],.react-flow,.widget-workspace'))return;
       if(selection.kind!=='object'&&!e.target.closest?.('.scene-viewport,.hierarchy'))return;
       e.preventDefault();objectClipboard(e.type==='copy'?'copy':'paste');
       if(e.type==='copy')e.clipboardData?.setData('text/plain','Sacura · объекты сцены');
     };
     window.addEventListener("keydown", listener);window.addEventListener('copy',nativeClipboard);window.addEventListener('paste',nativeClipboard);
     return () => {window.removeEventListener("keydown", listener);window.removeEventListener('copy',nativeClipboard);window.removeEventListener('paste',nativeClipboard);};
-  }, [history,project,projectDialog,mode,running,selection,picker,detailEditor,cameraPilotId,menu,displayScene,contextMenu]);
+  }, [history,project,projectDialog,mode,running,selection,picker,detailEditor,cameraPilotId,menu,displayScene,contextMenu,dock,floatingDock]);
 
   const updateVariable = (id,patch) => {
     if(rt.running)return 'Остановите игру, чтобы редактировать переменные.';
@@ -1196,18 +1193,26 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   const createSelectionGroup=()=>{if(rt.running)return;const next=structuredClone(project),group=createObjectGroup(next,displayScene.id,objectSelectionIds);if(!group)return;mutate(p=>Object.assign(p,next));setSelection({kind:'object',id:group.objectIds[0],ids:group.objectIds,groupId:group.id});};
   const moveBinding=(sourceId,id,targetId,phase,batchId,beforeId)=>{if(rt.running)return;mutate(p=>moveEventBinding(p,sourceId,id,targetId,phase,batchId,beforeId));if(eventContext?.bindingId===id){setEventContext(c=>({...c,beatId:targetId}));setSelectedBeat(targetId);}};
   const renderInspector = () => {
+    if(selection.kind==='point'){
+      const point=sceneStagingPoints(scene,project.objects).find(p=>p.id===selection.id);
+      if(point){const patch=value=>{if(!rt.running)mutate(p=>Object.assign(p.subscenes.find(s=>s.id===scene.id).stagingPoints.find(x=>x.id===point.id),value));};return <fieldset disabled={running} className="staging-point-editor"><legend>{tr("Точка постановки")}</legend><label>{tr("Название")}<input value={point.label} onChange={e=>patch({label:e.target.value})}/></label>{['X','Y','Z'].map((axis,i)=><label key={axis}>{tr("Положение ")}{axis}{tr(", м")}<input type="number" step="0.1" value={point.position[i]} onChange={e=>patch({position:point.position.map((v,j)=>i===j?Number(e.target.value):v),objectId:undefined,objectOrigin:undefined})}/></label>)}<small>{tr("Выберите эту точку в действии «Переместить → К точке».")}</small><Button icon="Focus" onClick={()=>setFocusRequest({nonce:uid('focus'),position:point.position})}>{tr("Показать в сцене")}</Button><Button icon="Trash2" onClick={()=>{mutate(p=>{const s=p.subscenes.find(s=>s.id===scene.id);s.stagingPoints=s.stagingPoints.filter(x=>x.id!==point.id);});setSelection({kind:'scene',id:scene.id});}}>{tr("Удалить точку")}</Button></fieldset>;}
+    }
+    if(selection.kind==='group'){
+      const group=project.objectGroups?.find(g=>g.id===selection.id);
+      if(group)return <><Field label={tr("Название группы")}><input disabled={running} value={group.name} onChange={e=>{const name=e.target.value;mutate(p=>p.objectGroups.find(g=>g.id===group.id).name=name);}}/></Field><Button icon="Plus" disabled={running} onClick={()=>setPicker({kind:'object',groupId:group.id})}>{tr("Создать объект в группе")}</Button><p>{tr("Перетащите сюда объекты из иерархии.")}</p></>;
+    }
     if(selection.kind==='file'){
       const file=collectAssetFiles(project,projectAudioAssets(project)).find(f=>f.id===selection.id);
       if(file)return <FileInspector key={file.id+file.name} file={file} disabled={running} onChange={patch=>{if(rt.running)return;const next=structuredClone(project);updateAssetFile(next,file,patch);mutate(p=>Object.assign(p,next));}} onPlaceModel={placeLibraryModel} onPreviewAudio={file=>{const key='file-preview';if(soundDesk.get(key)?.status==='playing'){soundDesk.stop(key);return;}soundDesk.play(file.audioId||file.id,{key,duck:false});}}/>;
-      return <p>Файл больше не существует.</p>;
+      return <p>{tr("Файл больше не существует.")}</p>;
     }
     if(selection.kind==='object'&&selection.groupId){
       const group=project.objectGroups?.find(g=>g.id===selection.groupId);
-      if(group)return <><Field label="Имя группы"><input disabled={running} value={group.name} onChange={e=>{const name=e.target.value;if(!rt.running)mutate(p=>p.objectGroups.find(g=>g.id===group.id).name=name);}}/></Field><p>{selectedObjects.length} объектов · перемещаются вместе</p><MultiTransformInspector key={objectSelectionIds.join('|')} objects={selectedObjects} disabled={running} onChange={change=>{if(!rt.running)mutate(p=>{for(const item of transformSelection(selectedObjects,displayScene,change))setObjectTransform(p,item.id,displayScene.id,item.value);});}} onFocus={()=>setFocusRequest({nonce:uid('focus')})} onDuplicate={duplicateObjects} onDelete={deleteObjects} onReset={()=>{if(!rt.running)mutate(p=>{for(const id of objectSelectionIds){const object=p.objects.find(o=>o.id===id);if(object?.transforms)delete object.transforms[displayScene.id];}});}}/><Button icon="Ungroup" disabled={running} onClick={()=>{mutate(p=>p.objectGroups=p.objectGroups.filter(g=>g.id!==group.id));setSelection({kind:'object',id:objectSelectionIds[0],ids:objectSelectionIds});}}>Разгруппировать</Button></>;
+      if(group)return <><Field label={tr("Имя группы")}><input disabled={running} value={group.name} onChange={e=>{const name=e.target.value;if(!rt.running)mutate(p=>p.objectGroups.find(g=>g.id===group.id).name=name);}}/></Field><p>{selectedObjects.length} {tr("объектов · перемещаются вместе")}</p><MultiTransformInspector key={objectSelectionIds.join('|')} objects={selectedObjects} disabled={running} onChange={change=>{if(!rt.running)mutate(p=>{for(const item of transformSelection(selectedObjects,displayScene,change))setObjectTransform(p,item.id,displayScene.id,item.value);});}} onFocus={()=>setFocusRequest({nonce:uid('focus')})} onDuplicate={duplicateObjects} onDelete={deleteObjects} onReset={()=>{if(!rt.running)mutate(p=>{for(const id of objectSelectionIds){const object=p.objects.find(o=>o.id===id);if(object?.transforms)delete object.transforms[displayScene.id];}});}}/><Button icon="Ungroup" disabled={running} onClick={()=>{mutate(p=>p.objectGroups=p.objectGroups.filter(g=>g.id!==group.id));setSelection({kind:'object',id:objectSelectionIds[0],ids:objectSelectionIds});}}>{tr("Разгруппировать")}</Button></>;
     }
 
-    if(inspectedVariable&&(inspectedVariable===ANSWER_VARIABLE||Object.hasOwn(project.variables,inspectedVariable)))return <><VariableInspector key={inspectedVariable} variable={inspectedVariable} project={project} preview={preview} disabled={running} onEdit={updateVariable} onAddNode={(variable,kind)=>graphApi.current?.addVariableNode?.(variable,kind)}/>{selection.kind==='beat'&&<Button icon="Focus" onClick={()=>graphApi.current?.focus(beat.id)}>Показать ноду</Button>}</>;
-    if(selection.kind==='beat'&&(isPureNode(beat)||['branch','set-variable'].includes(beat.kind)))return <><div className="inspector-identity"><strong>{beat.kind==='branch'?'If · Если':beat.kind==='variable'?'Переменная':beat.kind==='set-variable'?'Задать переменную':'Логика · '+(compareSymbols[beat.operator]||beat.kind)}</strong></div>{beat.kind==='branch'&&nodeKindField()}<p className="choice-note">Настройки операции находятся на ноде. Круглые пины передают значения, стрелки задают ход истории. Подключите результат операции ко входу Set, чтобы изменить переменную.</p><Button icon="Focus" onClick={()=>graphApi.current?.focus(beat.id)}>Показать ноду</Button></>;
+    if(inspectedVariable&&(inspectedVariable===ANSWER_VARIABLE||Object.hasOwn(project.variables,inspectedVariable)))return <><VariableInspector key={inspectedVariable} variable={inspectedVariable} project={project} preview={preview} disabled={running} onEdit={updateVariable} onAddNode={(variable,kind)=>graphApi.current?.addVariableNode?.(variable,kind)}/>{selection.kind==='beat'&&<Button icon="Focus" onClick={()=>graphApi.current?.focus(beat.id)}>{tr("Показать ноду")}</Button>}</>;
+    if(selection.kind==='beat'&&(isPureNode(beat)||['branch','set-variable'].includes(beat.kind)))return <><div className="inspector-identity"><strong>{beat.kind==='branch'?tr("If · Если"):beat.kind==='variable'?tr("Переменная"):beat.kind==='set-variable'?tr("Задать переменную"):tr("Логика · ")+(compareSymbols[beat.operator]||beat.kind)}</strong></div>{beat.kind==='branch'&&nodeKindField()}<p className="choice-note">{tr("Настройки операции находятся на ноде. Круглые пины передают значения, стрелки задают ход истории. Подключите результат операции ко входу Set, чтобы изменить переменную.")}</p><Button icon="Focus" onClick={()=>graphApi.current?.focus(beat.id)}>{tr("Показать ноду")}</Button></>;
 
     if(selection.kind==='camera'){
       const c=displayScene.cameras?.find(c=>c.id===selection.id);
@@ -1229,13 +1234,13 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             <div className="inspector-identity">
               <Icon name="Workflow" size={24} />
               <div>
-                <strong>Группа событий {index + 1}</strong>
+                <strong>{tr("Группа событий ")}{index + 1}</strong>
                 <small>
-                  {ph.label} · {beat.id}
+                  {tr(ph.label)} · {beat.id}
                 </small>
               </div>
             </div>
-            <Fold title="Порядок запуска" icon="GitFork">
+            <Fold title={tr("Порядок запуска")} icon="GitFork">
               <Select
                 value={batch.mode}
                 options={[
@@ -1246,8 +1251,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               />
               <p className="resource-note">
                 {batch.mode === "PARALLEL"
-                  ? "Все события стартуют вместе. Выход — после результатов, указанных на связях."
-                  : "Следующее событие начинается после результата предыдущего."}
+                  ? tr("Все события стартуют вместе. Выход — после результатов, указанных на связях.")
+                  : tr("Следующее событие начинается после результата предыдущего.")}
               </p>
               <div className="button-row">
                 <Button
@@ -1255,18 +1260,16 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   disabled={index === 0}
                   onClick={() => changeBatch(batch.id, "move", -1)}
                 >
-                  Раньше
-                </Button>
+                  {tr("Раньше")}</Button>
                 <Button
                   icon="ArrowDown"
                   disabled={index === list.length - 1}
                   onClick={() => changeBatch(batch.id, "move", 1)}
                 >
-                  Позже
-                </Button>
+                  {tr("Позже")}</Button>
               </div>
             </Fold>
-            <Fold title="События в группе" icon="Layers">
+            <Fold title={tr("События в группе")} icon="Layers">
               {batch.bindings.map((b) => (
                 <div className="batch-member" key={b.id}>
                   <button
@@ -1281,14 +1284,13 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   </button>
                   <Button
                     icon="X"
-                    title="Убрать событие из реплики"
+                    title={tr("Убрать событие из реплики")}
                     onClick={() => changeBatch(batch.id, "removeBinding", b.id)}
                   />
                 </div>
               ))}
               <Button icon="Plus" onClick={() => changeBatch(batch.id, "add")}>
-                Добавить в эту группу
-              </Button>
+                {tr("Добавить в эту группу")}</Button>
             </Fold>
             {index > 0 && (
               <Button
@@ -1299,8 +1301,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   changeBatch(batch.id, "joinPrevious");
                 }}
               >
-                Запустить вместе с предыдущей
-              </Button>
+                {tr("Запустить вместе с предыдущей")}</Button>
             )}
           </>
         );
@@ -1333,16 +1334,18 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 value={o.name}
                 onChange={(e) => patch({ name: e.target.value })}
               />
-              <small>{o.type}</small>
+              <small>{tr(o.type)}</small>
             </div>
             <input
               type="checkbox"
               checked={o.active}
               onChange={(e) => patch({ active: e.target.checked })}
-              title="Объект активен"
+              title={tr("Объект активен")}
             />
           </div>
-          {o.type==='Персонаж'&&<Button icon="Users" onClick={()=>{setDock('characters');setCompactPanel('workspace');}}>Модель и анимации персонажа</Button>}
+          <Field label={tr("Группа в иерархии")}><Select disabled={running} value={project.objectGroups?.find(g=>g.sceneId===scene.id&&g.objectIds.includes(o.id))?.id||''} options={[["","Объекты сцены · корень"],...(project.objectGroups||[]).filter(g=>g.sceneId===scene.id).map(g=>[g.id,literalLabel(g.name)])]} onChange={groupId=>mutate(p=>groupId?addObjectsToGroup(p,groupId,[o.id]):removeObjectsFromGroups(p,scene.id,[o.id]))}/></Field>
+          {o.type==='Персонаж'&&<Fold title={tr("Виджет диалога")} icon="PanelsTopLeft"><WidgetAssignment project={project} character={o} onCustomize={()=>customizeWidget({characterId:o.id})} onChange={dialogueWidgetId=>patch({dialogueWidgetId})} onEdit={openWidgets} disabled={running}/></Fold>}
+          {o.type==='Персонаж'&&<Button icon="Users" onClick={()=>{setDock('characters');setCompactPanel('workspace');}}>{tr("Модель и анимации персонажа")}</Button>}
           <TransformInspector object={o} scene={scene} disabled={running} onChange={value=>transformObject(o.id,value)}
             onReset={()=>mutate(p=>{const x=p.objects.find(x=>x.id===o.id);if(x.transforms)delete x.transforms[scene.id];})}
             onFocus={()=>{editScene();setFocusRequest({nonce:uid('focus')});}} onDuplicate={()=>duplicateObject(o)} onDelete={()=>deleteObject(o.id)}/>
@@ -1358,28 +1361,28 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               }
               mutate(p=>{const target=p.objects.find(x=>x.id===o.id);if(!target)return;if('model' in values&&target.model?.src!==values.model?.src)retainObjectModel(p,target);Object.assign(target,values);});
             }}/>}
-          {running&&<Button icon="Square" onClick={editScene}>Остановить и редактировать сцену</Button>}
-          <Fold title="Объект сцены" icon="Box">
-            <Field label="Опорная точка">
+          {running&&<Button icon="Square" onClick={editScene}>{tr("Остановить и редактировать сцену")}</Button>}
+          <Fold title={tr("Объект сцены")} icon="Box">
+            <Field label={tr("Опорная точка")}>
               <Select
                 value=""
                 disabled={running}
-                options={[["","Переместить к точке…"],...sceneStagingPoints(scene,objects).filter(point=>point.objectId!==o.id).map(point=>[point.id,point.label])]}
+                options={[["","Переместить к точке…"],...sceneStagingPoints(scene,objects).filter(point=>point.objectId!==o.id).map(point=>[point.id,literalLabel(point.label)])]}
                 onChange={id=>{const point=sceneStagingPoints(scene,objects).find(point=>point.id===id);if(!point||running)return;const transform=objectTransform(o,scene.id,scene.kind),height=transform.position[1];transform.position=[...point.position];if(o.type!=='Персонаж')transform.position[1]=height;transformObject(o.id,transform);}}
               />
             </Field>
-            <Field label="Локация">
+            <Field label={tr("Локация")}>
               <Select
                 value={o.subsceneId || ""}
                 options={[
                   ["", "Все сабсцены"],
-                  ...project.subscenes.map((s) => [s.id, s.location]),
+                  ...project.subscenes.map((s) => [s.id, literalLabel(s.location)]),
                 ]}
                 onChange={(subsceneId) => patch({ subsceneId })}
               />
             </Field>
-            {!o.model&&!o.builtin&&!['letter','door','fireplace','garden-note','ticket'].includes(o.id)&&o.type!=='Персонаж'&&o.type!=='Источник света'&&<Field label="Форма"><Select value={o.primitive||'box'} options={[["box","Куб"],["sphere","Сфера"],["cylinder","Цилиндр"]]} onChange={primitive=>patch({primitive})}/></Field>}
-            <Field label={o.type==='Источник света'?'Цвет света':'Цвет в макете'}>
+            {!o.model&&!o.builtin&&!['letter','door','fireplace','garden-note','ticket'].includes(o.id)&&o.type!=='Персонаж'&&o.type!=='Источник света'&&<Field label={tr("Форма")}><Select value={o.primitive||'box'} options={[["box","Куб"],["sphere","Сфера"],["cylinder","Цилиндр"]]} onChange={primitive=>patch({primitive})}/></Field>}
+            <Field label={o.type==='Источник света'?tr("Цвет света"):tr("Цвет в макете")}>
               <input
                 type="color"
                 value={o.color || "#b99cac"}
@@ -1387,10 +1390,10 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               />
             </Field>
           </Fold>
-          {o.type==='Источник света'&&<Fold title="Освещение" icon="Lightbulb"><Field label="Интенсивность"><input type="number" min="0" step="1" disabled={running} value={o.light?.intensity??35} onChange={e=>patch({light:{...o.light,intensity:Math.max(0,Number(e.target.value))}})}/></Field><Field label="Дальность, м"><input type="number" min="0" step="0.5" disabled={running} value={o.light?.distance??10} onChange={e=>patch({light:{...o.light,distance:Math.max(0,Number(e.target.value))}})}/></Field><p className="resource-note">Точечный источник светит во все стороны. Дальность 0 — без ограничения.</p></Fold>}
+          {o.type==='Источник света'&&<Fold title={tr("Освещение")} icon="Lightbulb"><Field label={tr("Интенсивность")}><input type="number" min="0" step="1" disabled={running} value={o.light?.intensity??35} onChange={e=>patch({light:{...o.light,intensity:Math.max(0,Number(e.target.value))}})}/></Field><Field label={tr("Дальность, м")}><input type="number" min="0" step="0.5" disabled={running} value={o.light?.distance??10} onChange={e=>patch({light:{...o.light,distance:Math.max(0,Number(e.target.value))}})}/></Field><p className="resource-note">{tr("Точечный источник светит во все стороны. Дальность 0 — без ограничения.")}</p></Fold>}
           {o.type === "Активный меш" && (
-            <Fold title="Взаимодействие" icon="MousePointer2">
-              <Field label="Действие игрока">
+            <Fold title={tr("Взаимодействие")} icon="MousePointer2">
+              <Field label={tr("Действие игрока")}>
                 <input
                   value={o.interaction || ""}
                   onChange={(e) => patch({ interaction: e.target.value })}
@@ -1403,8 +1406,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   setDock("story");
                 }}
               >
-                Ждать в этой реплике
-              </Button>
+                {tr("Ждать в этой реплике")}</Button>
             </Fold>
           )}
           <Button
@@ -1412,8 +1414,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             icon="Plus"
             onClick={() => openAuthoring('action',{target:o.id})}
           >
-            Создать действие с объектом
-          </Button>
+            {tr("Создать действие с объектом")}</Button>
         </>
       );
     }
@@ -1445,11 +1446,11 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             <div>
               <strong>
                 {inspectedAction
-                  ? TYPES[inspectedAction.type].label
+                  ? tr(TYPES[inspectedAction.type].label)
                   : event.name}
               </strong>
               <small>
-                {binding ? "Экземпляр · " + contextBeat.id : "Шаблон события"}
+                {binding ? tr("Экземпляр · ") + contextBeat.id : tr("Шаблон события")}
               </small>
             </div>
           </div>
@@ -1458,7 +1459,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               <Icon name="Link2" size={13} />
               <span>{event.name}</span>
               <Button
-                title="Открыть исходный шаблон"
+                title={tr("Открыть исходный шаблон")}
                 icon="ExternalLink"
                 onClick={() => {
                   setEventContext({ eventId: binding.sourceEventId||event.id });
@@ -1469,8 +1470,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           )}
           {inspectedAction ? (
             <>
-              <Fold title="Параметры действия" icon="SlidersHorizontal">
-                <Field label="Тип">
+              <Fold title={tr("Параметры действия")} icon="SlidersHorizontal">
+                <Field label={tr("Тип")}>
                   <Select
                     value={inspectedAction.type}
                     options={Object.entries(TYPES).map(([id, t]) => [
@@ -1491,8 +1492,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   onChange={(v) => patchAction(inspectedAction.id, v)}
                 />
               </Fold>
-              <Fold title="Конфликты и завершение" icon="Shield">
-                <Field label="Если объект занят">
+              <Fold title={tr("Конфликты и завершение")} icon="Shield">
+                <Field label={tr("Если объект занят")}>
                   <Select
                     value={inspectedAction.conflict}
                     options={[
@@ -1508,18 +1509,18 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 <div className="resource-note">
                   {project.objects.find((o) => o.id === inspectedAction.target)
                     ?.name || inspectedAction.target}{" "}
-                  / {TYPES[inspectedAction.type].domain || "Условие"}
+                  / {tr(TYPES[inspectedAction.type].domain) || tr("Условие")}
                 </div>
               </Fold>
             </>
           ) : (
             <Fold
-              title={binding ? "Параметры размещения" : "Свойства события"}
+              title={binding ? tr("Параметры размещения") : tr("Свойства события")}
               icon="Layers"
             >
               {binding ? (
                 <>
-                  <Field label="Момент запуска">
+                  <Field label={tr("Момент запуска")}>
                     <Select
                       value={binding.hook}
                       options={PHASES.map((p) => [p.id, p.label])}
@@ -1534,7 +1535,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                       }
                     />
                   </Field>
-                  <Field label="Когда идти дальше">
+                  <Field label={tr("Когда идти дальше")}>
                     <Select
                       value={binding.join}
                       options={Object.entries(JOIN_LABELS)}
@@ -1561,18 +1562,17 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                       })
                     }
                   >
-                    Сбросить изменения здесь
-                  </Button>
+                    {tr("Сбросить изменения здесь")}</Button>
                 </>
               ) : (
                 <>
-                  <Field label="Название">
+                  <Field label={tr("Название")}>
                     <input
                       value={event.name}
                       onChange={(e) => patchEvent({ name: e.target.value })}
                     />
                   </Field>
-                  <Field label="После действий">
+                  <Field label={tr("После действий")}>
                     <Select
                       value={event.retention}
                       options={[
@@ -1588,7 +1588,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                       }
                     />
                   </Field>
-                  <Field label="Живёт в пределах">
+                  <Field label={tr("Живёт в пределах")}>
                     <Select
                       value={event.owner}
                       options={[
@@ -1606,13 +1606,12 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                       openStaging(beat.id);
                     }}
                   >
-                    Добавить в реплику
-                  </Button>
+                    {tr("Добавить в реплику")}</Button>
                 </>
               )}
             </Fold>
           )}
-          <Fold title="Полное редактирование события" icon="ListOrdered">
+          <Fold title={tr("Полное редактирование события")} icon="ListOrdered">
             <EventInspector event={event} project={project} binding={binding} sceneId={sceneFor(project,contextBeat.id).id}
               onAction={patchAction} onPickPosition={id=>{editScene();setPositionPick({id,context:{...eventContext}});setNotice('Нажмите на место в 3D-сцене. Escape — отмена.');}}
               onEdit={fn=>{
@@ -1628,7 +1627,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 if(nextId!==event.id)setEventContext(c=>({...c,eventId:nextId}));
               }}/>
           </Fold>
-          {binding&&<Button icon="Trash2" onClick={()=>{mutate(p=>{removeEventBinding(p,contextBeat.id,binding.id);});setEventContext(null);setSelection({kind:'beat',id:contextBeat.id});}}>Удалить событие из реплики</Button>}
+          {binding&&<Button icon="Trash2" onClick={()=>{mutate(p=>{removeEventBinding(p,contextBeat.id,binding.id);});setEventContext(null);setSelection({kind:'beat',id:contextBeat.id});}}>{tr("Удалить событие из реплики")}</Button>}
           <Button
             className="inspector-add"
             icon="Maximize2"
@@ -1638,8 +1637,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               setMaximized(null);
             }}
           >
-            Открыть событие в отдельном окне
-          </Button>
+            {tr("Открыть событие в отдельном окне")}</Button>
         </>
       );
     }
@@ -1661,36 +1659,36 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           <div>
             <strong>
               {beat.kind === "choice"
-                ? "Выбор игрока"
+                ? tr("Выбор игрока")
                 : beat.kind === "gate"
-                  ? "Ожидание игрока"
-                  : beat.kind==='branch'?'Проверка' : (beat.text?.trim() ? "Реплика · " + beat.text.trim().split(/\s+/).slice(0,3).join(" ") + (beat.text.trim().split(/\s+/).length>3 ? "…" : "") : "Пустая реплика")}
+                  ? tr("Ожидание игрока")
+                  : beat.kind==='branch'?tr("Проверка") : (beat.text?.trim() ? tr("Реплика · ") + beat.text.trim().split(/\s+/).slice(0,3).join(" ") + (beat.text.trim().split(/\s+/).length>3 ? "…" : "") : tr("Пустая реплика"))}
             </strong>
             <small>{chapter.name}</small>
           </div>
-          <span className="subtle">{beat.bindings.length} событий</span>
+          <span className="subtle">{beat.bindings.length} {tr("событий")}</span>
         </div>
-        {beat.kind!=='branch'&&<Fold title="Диалог" icon="MessageSquare">
-          <Field label="Говорит">
-            <EditorSelect label="Говорит" value={beat.speaker}
-              options={[["Рассказчик","Рассказчик"],...project.objects.filter(o=>o.type==='Персонаж').map(o=>[o.name,o.name]),['__create_character__','＋ Создать персонажа…']]}
+        {beat.kind!=='branch'&&<Fold title={tr("Диалог")} icon="MessageSquare">
+          <Field label={tr("Говорит")}>
+            <EditorSelect label={tr("Говорит")} value={beat.speaker}
+              options={[["Рассказчик","Рассказчик"],...project.objects.filter(o=>o.type==='Персонаж').map(o=>[o.name,literalLabel(o.name)]),['__create_character__','＋ Создать персонажа…']]}
               onChange={speaker=>speaker==='__create_character__'?setCharacterDraft(''):patchBeat({speaker})}/>
           </Field>
           {characterDraft!==null&&<div className="speaker-create">
-            <Field label="Имя нового персонажа"><input autoFocus aria-label="Имя нового персонажа" value={characterDraft} onChange={e=>setCharacterDraft(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();createSpeaker();}if(e.key==='Escape'){e.stopPropagation();setCharacterDraft(null);}}}/></Field>
-            <Button icon="UserPlus" disabled={!characterDraft.trim()||running} onClick={createSpeaker}>Создать и выбрать</Button>
-            <Button onClick={()=>setCharacterDraft(null)}>Отмена</Button>
+            <Field label={tr("Имя нового персонажа")}><input autoFocus aria-label={tr("Имя нового персонажа")} value={characterDraft} onChange={e=>setCharacterDraft(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();createSpeaker();}if(e.key==='Escape'){e.stopPropagation();setCharacterDraft(null);}}}/></Field>
+            <Button icon="UserPlus" disabled={!characterDraft.trim()||running} onClick={createSpeaker}>{tr("Создать и выбрать")}</Button>
+            <Button onClick={()=>setCharacterDraft(null)}>{tr("Отмена")}</Button>
           </div>}
           <textarea
             className="dialogue-text-field"
-            aria-label="Текст выбранной реплики"
+            aria-label={tr("Текст выбранной реплики")}
             value={beat.text}
             rows={4}
             onChange={(e) => patchBeat({ text: e.target.value })}
           />
           {nodeKindField()}
         </Fold>
-        }<Fold title="Постановка реплики" icon="Clapperboard">
+        }<Fold title={tr("Постановка реплики")} icon="Clapperboard">
           {PHASES.map((p) => (
             <button
               className="phase-inspector-row"
@@ -1707,29 +1705,21 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 }
                 size={14}
               />
-              <span>{p.label}</span>
+              <span>{tr(p.label)}</span>
               <b>{beat.bindings.filter((b) => b.hook === p.id).length}</b>
               <Icon name="ChevronRight" size={13} />
             </button>
           ))}
           <Button icon="Workflow" onClick={() => openStaging(beat.id)}>
-            Показать реплику в потоке
-          </Button>
+            {tr("Показать реплику в потоке")}</Button>
         </Fold>
+        <Fold title={tr("Контексты ввода")} icon="Gamepad2"><InputContextSettings project={project} beat={beat} onChange={patchBeat} disabled={running} onOpen={()=>{setDock('input');setCompactPanel('workspace');}}/></Fold>
         {beat.kind === "choice" ? (
-          <Fold title="Ответы игрока" icon="GitFork"><p>Текст ответа, результат и вход доступности редактируются прямо в ноде выбора. Подключите результат сравнения к круглому входу ответа.</p><Button icon="Focus" onClick={()=>graphApi.current?.focus(beat.id)}>К ноде выбора</Button></Fold>
+          <Fold title={tr("Ответы игрока")} icon="GitFork"><p>{tr("Текст ответа, результат и вход доступности редактируются прямо в ноде выбора. Подключите результат сравнения к круглому входу ответа.")}</p><Button icon="Focus" onClick={()=>graphApi.current?.focus(beat.id)}>{tr("К ноде выбора")}</Button></Fold>
         ) : beat.kind==='branch' ? null : beat.kind === "gate" ? (
-          <Fold title="Ждать взаимодействие" icon="MousePointerClick">
-            <Field label="Объект">
-              <Select
-                value={beat.signal}
-                options={project.objects
-                  .filter((o) => o.type === "Активный меш")
-                  .map((o) => [o.id, o.name])}
-                onChange={(signal) => patchBeat({ signal })}
-              />
-            </Field>
-            <Field label="Подсказка через, сек">
+          <Fold title={tr("Ждать взаимодействие")} icon="MousePointerClick">
+            <InteractionInspector beat={beat} project={project} scene={scene} onChange={patchBeat}/>
+            <Field label={tr("Подсказка через, сек")}>
               <input
                 type="number"
                 value={beat.timeout || 30}
@@ -1739,7 +1729,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           </Fold>
         ) : null}
         {!["choice", "branch", "end"].includes(beat.kind) && (
-          <Fold title="Продолжение" icon="Route">
+          <Fold title={tr("Продолжение")} icon="Route">
             <Select
               value={beat.next || ""}
               options={[
@@ -1754,12 +1744,13 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             <div className="resource-note">
               {beat.next
                 ? sceneFor(project, beat.next).location === scene.location
-                  ? "В этой же локации"
-                  : "Переход в другую сабсцену"
-                : "Без последовательного продолжения"}
+                  ? tr("В этой же локации")
+                  : tr("Переход в другую сабсцену")
+                : tr("Без последовательного продолжения")}
             </div>
           </Fold>
         )}
+        {['dialogue','choice','gate','end'].includes(beat.kind)&&<Fold title={tr("Виджет диалогового окна")} icon="PanelsTopLeft"><WidgetAssignment project={project} beat={beat} onCustomize={()=>customizeWidget({beatId:beat.id})} onChange={widgetId=>patchBeat({widgetId})} onEdit={openWidgets} disabled={running}/></Fold>}
       </>
     );
   };
@@ -1776,7 +1767,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     return (
       <div className="project-browser">
         <div className="asset-folders">
-            <button onClick={()=>{setDock('create');setMaximized('graph');}}><Icon name="MousePointer2" size={15}/>Действия и группы</button>
+            <button onClick={()=>{setDock('create');setMaximized('graph');}}><Icon name="MousePointer2" size={15}/>{tr("Действия и группы")}</button>
           {[
             ["scenes", "PanelsTopLeft", "Сабсцены"],
             ["events", "Layers", "События"],
@@ -1789,25 +1780,24 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               onClick={() => setAssetCategory(id)}
             >
               <Icon name={icon} size={15} />
-              {label}
+              {tr(label)}
             </button>
           ))}
         </div>
         <div className="asset-content">
           <div className="asset-path">
-            Проект <Icon name="ChevronRight" size={12} />{" "}
+            {tr("Проект ")}<Icon name="ChevronRight" size={12} />{" "}
             {assetCategory === "events"
-              ? "События"
+              ? tr("События")
               : assetCategory === "audio"
-                ? "Звук"
+                ? tr("Звук")
                 : assetCategory === "scenes"
-                  ? "Сабсцены"
-                  : "Объекты"}
+                  ? tr("Сабсцены")
+                  : tr("Объекты")}
             <span />
             {assetCategory === "events" && (
               <Button icon="Plus" onClick={createEvent}>
-                Событие
-              </Button>
+                {tr("Событие")}</Button>
             )}
           </div>
           <div className="asset-grid">
@@ -1870,7 +1860,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                     {assetCategory === "events" && (
                       <small>
                         {a.groups.length}{" "}
-                        {a.groups.length === 1 ? "группа" : "группы"}
+                        {a.groups.length === 1 ? tr("группа") : tr("группы")}
                       </small>
                     )}
                   </span>
@@ -1902,13 +1892,13 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           },
         };
     return (
-      <div className="active-table" data-help-title="Звук и окружение" data-help="Здесь показано, что звучит и какие эффекты действуют сейчас. Начальные погоду и освещение задайте в сабсцене, изменения по ходу истории — в постановке.">
-        <div className="workspace-guide"><h2>Звук и окружение</h2><p>Музыка, озвучка и состояние мира в выбранной сабсцене. Во время запуска здесь можно приостановить или завершить эффект.</p><div><Button icon="Music2" onClick={()=>setDock('sound')}>Звуковые файлы и озвучка</Button><Button icon="CloudSun" onClick={()=>openSubscenes()}>Начальное окружение</Button><Button icon="Clapperboard" onClick={()=>openStaging(beat.id)}>Изменения в сценарии</Button></div><p>{running?'Управление ниже действует на текущий предпросмотр.':'Предпросмотр остановлен. Ниже — начальные состояния сабсцены; для проверки нажмите «Запуск».'}</p></div>
+      <div className="active-table" data-help-title={tr("Звук и окружение")} data-help={tr("Здесь показано, что звучит и какие эффекты действуют сейчас. Начальные погоду и освещение задайте в сабсцене, изменения по ходу истории — в постановке.")}>
+        <div className="workspace-guide"><h2>{tr("Звук и окружение")}</h2><p>{tr("Музыка, озвучка и состояние мира в выбранной сабсцене. Во время запуска здесь можно приостановить или завершить эффект.")}</p><div><Button icon="Music2" onClick={()=>setDock('sound')}>{tr("Звуковые файлы и озвучка")}</Button><Button icon="CloudSun" onClick={()=>openSubscenes()}>{tr("Начальное окружение")}</Button><Button icon="Clapperboard" onClick={()=>openStaging(beat.id)}>{tr("Изменения в сценарии")}</Button></div><p>{running?tr("Управление ниже действует на текущий предпросмотр."):tr("Предпросмотр остановлен. Ниже — начальные состояния сабсцены; для проверки нажмите «Запуск».")}</p></div>
         <div className="table-header">
-          <span>Событие / эффект</span>
-          <span>Состояние</span>
-          <span>Где действует</span>
-          <span>Управление</span>
+          <span>{tr("Событие / эффект")}</span>
+          <span>{tr("Состояние")}</span>
+          <span>{tr("Где действует")}</span>
+          <span>{tr("Управление")}</span>
         </div>
         {Object.entries(effects).map(([key, e]) => (
           <div className="active-row" key={key}>
@@ -1924,26 +1914,26 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 size={17}
               />
               <strong>{e.target ? (project.objects.find(o=>o.id===e.target)?.name||e.target)+' · ' : ''}{e.name}</strong>
-              <small>{e.origin}</small>
+              <small>{message(e.origin)}</small>
             </span>
             <span className={"effect-status " + e.status}>
-              {!running ? "Задано в сабсцене" : e.status === "paused"
-                ? "На паузе"
+              {!running ? tr("Задано в сабсцене") : e.status === "paused"
+                ? tr("На паузе")
                 : e.status === "stopped"
-                  ? "Завершено"
-                  : "Действует"}
+                  ? tr("Завершено")
+                  : tr("Действует")}
             </span>
             <span>
               {{
-                Scene: "Вся сцена",
-                SubScene: "Сабсцена",
-                GameSession: "Вся игра",
+                Scene: tr("Вся сцена"),
+                SubScene: tr("Сабсцена"),
+                GameSession: tr("Вся игра"),
               }[e.owner] || e.owner}
             </span>
             <div>
               <Button
                 disabled={!running}
-                title={e.status === "paused" ? "Продолжить" : "Пауза"}
+                title={e.status === "paused" ? tr("Продолжить") : tr("Пауза")}
                 icon={e.status === "paused" ? "Play" : "Pause"}
                 onClick={() =>
                   rt.controlEffect(
@@ -1954,7 +1944,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               />
               <Button
                 disabled={!running}
-                title="Остановить этот эффект"
+                title={tr("Остановить этот эффект")}
                 icon="Square"
                 onClick={() => rt.controlEffect(key, "stop")}
               />
@@ -1973,24 +1963,24 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 </span>
                 <span>
                   {i.status === "paused"
-                    ? "На паузе"
+                    ? tr("На паузе")
                     : i.status === "running"
-                      ? "Выполняется"
-                      : "Готово · удерживается"}
+                      ? tr("Выполняется")
+                      : tr("Готово · удерживается")}
                 </span>
                 <span>
                   {{
-                    Scene: "Вся сцена",
-                    SubScene: "Сабсцена",
-                    GameSession: "Вся игра",
+                    Scene: tr("Вся сцена"),
+                    SubScene: tr("Сабсцена"),
+                    GameSession: tr("Вся игра"),
                   }[i.owner] || i.owner}
                 </span>
                 <div>
                   <Button
                     title={
                       i.status === "paused"
-                        ? "Продолжить событие"
-                        : "Приостановить событие"
+                        ? tr("Продолжить событие")
+                        : tr("Приостановить событие")
                     }
                     icon={i.status === "paused" ? "Play" : "Pause"}
                     onClick={() =>
@@ -2002,7 +1992,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   />
                   <Button
                     icon="Square"
-                    title="Завершить событие целиком"
+                    title={tr("Завершить событие целиком")}
                     onClick={() => rt.controlInstance(i.id, "stop")}
                   />
                 </div>
@@ -2010,8 +2000,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             ))}
         <div className="runtime-caption">
           {running
-            ? "Событие может закончить свои шаги и продолжать жить в фоне."
-            : "Начальное состояние. Запустите сцену, чтобы увидеть реальные экземпляры событий."}
+            ? tr("Событие может закончить свои шаги и продолжать жить в фоне.")
+            : tr("Начальное состояние. Запустите сцену, чтобы увидеть реальные экземпляры событий.")}
         </div>
       </div>
     );
@@ -2034,18 +2024,18 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       if(type==='flow')return [['dialogue','Реплика'],['choice','Выбор игрока'],['branch','If · Если'],['set-variable','Задать переменную'],...(fromSource?[['end','Концовка']]:[])].map(([kind,label])=>({label,action:()=>add(kind)}));
       const items=[];
       if(type==='number')for(const [operator,op] of Object.entries(MATH_OPERATIONS))items.push({label:op.label,icon:'Calculator',action:()=>add('math',{operator})});
-      if(!fromSource&&type==='boolean')for(const operator of ['eq','gt','gte','lt','lte'])items.push({label:'Сравнение · '+compareSymbols[operator],action:()=>add('compare',{operator,valueType:'number'})});
+      if(!fromSource&&type==='boolean')for(const operator of ['eq','gt','gte','lt','lte'])items.push({label:tr('Сравнение · ')+compareSymbols[operator],action:()=>add('compare',{operator,valueType:'number'})});
       if(type==='boolean')for(const [kind,label]of [['and','И'],['or','ИЛИ'],['not','НЕ']])items.push({label,icon:'Binary',action:()=>add(kind)});
       if(fromSource){
-        if(type!=='any')for(const operator of type==='number'?Object.keys(compareSymbols):['eq','ne'])items.push({label:'Сравнить · '+compareSymbols[operator],icon:'Binary',action:()=>add('compare',{operator})});
-        for(const [valueType,label]of [['number','число'],['boolean','Да / нет'],['string','текст']])items.push({label:'Преобразовать в '+label,icon:'RefreshCw',action:()=>add('convert',{valueType,inputType:type==='any'?'string':type})});
+        if(type!=='any')for(const operator of type==='number'?Object.keys(compareSymbols):['eq','ne'])items.push({label:tr('Сравнить · ')+compareSymbols[operator],icon:'Binary',action:()=>add('compare',{operator})});
+        for(const [valueType,label]of [['number','число'],['boolean','Да / нет'],['string','текст']])items.push({label:tr('Преобразовать в ')+tr(label),icon:'RefreshCw',action:()=>add('convert',{valueType,inputType:type==='any'?'string':type})});
         for(const item of variablePalette(project).filter(i=>i.kind==='set-variable'&&logicType(project,{kind:'variable',variable:i.variable})===type))items.push({label:item.label,icon:'Database',action:()=>add('set-variable',{variable:item.variable})});
         if(type==='boolean')items.push({label:'If · Если',icon:'GitFork',action:()=>add('branch')});
       }else{
-        if(type==='any')for(const valueType of ['string','number','boolean'])items.push({label:'Значение · '+valueType,action:()=>add('literal',{valueType})});
-        else items.unshift({label:'Значение · '+type,action:()=>add('literal')});
+        if(type==='any')for(const valueType of ['string','number','boolean'])items.push({label:tr('Значение · ')+tr(valueType),action:()=>add('literal',{valueType})});
+        else items.unshift({label:tr('Значение · ')+tr(type),action:()=>add('literal')});
         for(const item of variablePalette(project).filter(i=>i.kind==='variable'&&(type==='any'||logicType(project,{kind:'variable',variable:i.variable})===type)))items.push({label:item.label,action:()=>add('variable',{variable:item.variable})});
-        if(type!=='any')items.push({label:'Конвертация в '+type,icon:'RefreshCw',action:()=>add('convert')});
+        if(type!=='any')items.push({label:tr('Конвертация в ')+tr(type),icon:'RefreshCw',action:()=>add('convert')});
       }
       return items;
     }
@@ -2056,6 +2046,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       {label:'Интерактивный предмет',icon:'MousePointer2',group:'Добавить объект',action:()=>addObject('Активный меш')},
       {label:'Объект',icon:'Box',group:'Добавить объект',children:LOCATION_PRIMITIVES.map(([shape,label,icon])=>({label,icon,action:()=>addObject('Меш',shape)}))},
       {label:'Источник освещения',icon:'Lightbulb',group:'Добавить объект',action:()=>addObject('Источник света')},
+      {label:'Точка постановки здесь',icon:'MapPin',group:'Добавить объект',action:addStagingPoint},
+      {label:'Звуковое событие',icon:'Volume2',group:'Добавить объект',action:addSoundEvent},
       {label:'Камера из текущего вида',icon:'Video',group:'Добавить объект',action:()=>createCamera()},
       {label:'Приблизить выделение',icon:'Focus',group:'Выделение',shortcut:'F',disabled:!objectSelectionIds.length,action:()=>setFocusRequest({nonce:uid('focus')})},
       {label:'Сгруппировать выделение',icon:'FolderPlus',group:'Выделение',disabled:objectSelectionIds.length<2,action:createSelectionGroup},
@@ -2071,7 +2063,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       {label:'Переменные проекта',icon:'Database',children:variablePalette(project).map(item=>({...item,icon:item.kind==='variable'?'Database':'Pencil',action:()=>addBeat(item.kind,{...contextMenu,variable:item.variable})}))},
       {label:'Математические операции',icon:'Calculator',children:Object.entries(MATH_OPERATIONS).map(([operator,op])=>({label:op.label,action:()=>addBeat('math',{...contextMenu,operator})}))},
       {label:'Конвертации',icon:'RefreshCw',children:[['number','В число'],['boolean','В Да / нет'],['string','В текст']].map(([valueType,label])=>({label,action:()=>addBeat('convert',{...contextMenu,valueType})}))},
-      {label:'Сравнения',icon:'Binary',children:['eq','ne','gte','lte','gt','lt'].map(operator=>({label:compareSymbols[operator]+' · '+({eq:'Равно',ne:'Не равно',gte:'Больше или равно',lte:'Меньше или равно',gt:'Больше',lt:'Меньше'})[operator],icon:'Binary',action:()=>addBeat('compare',{...contextMenu,operator})}))},
+      {label:'Сравнения',icon:'Binary',children:['eq','ne','gte','lte','gt','lt'].map(operator=>({label:compareSymbols[operator]+' · '+tr(({eq:'Равно',ne:'Не равно',gte:'Больше или равно',lte:'Меньше или равно',gt:'Больше',lt:'Меньше'})[operator]),icon:'Binary',action:()=>addBeat('compare',{...contextMenu,operator})}))},
       ...[['variable','Database','Переменная · получить'],['set-variable','Database','Переменная · задать'],['literal','Binary','Значение'],['and','Binary','И · оба условия'],['or','Binary','ИЛИ · любое условие'],['not','Binary','НЕ · инверсия условия']].map(([kind,icon,label])=>({label,icon,group:'Значения и переменные',action:()=>addBeat(kind,contextMenu)})),
       ...[['dialogue','MessageSquare','Реплика'],['choice','GitFork','Выбор игрока'],['branch','GitFork','If · Если'],['gate','MousePointerClick','Ждать взаимодействие'],['merge','Merge','Схождение веток'],['end','Flag','Концовка']].map(([kind,icon,label])=>({label,icon,group:'Добавить ноду',action:()=>addBeat(kind,contextMenu)})),
       {label:'Добавить событие к выбранной реплике…',icon:'Layers',group:'События',action:()=>setPicker({kind:'event',phase:phase==='ALL'?'ON_START':phase})},
@@ -2107,7 +2099,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   onContext={point=>{if(!rt.running)setContextMenu({...point,kind:graphMode});}}
 
                 />);
-  const renderHistory = () => (<div className="history-window-content"><input aria-label="Поиск реплик" placeholder="Найти реплику…" value={historyQuery} onChange={e=>setHistoryQuery(e.target.value)}/>{project.subscenes.map((s) => (
+  const renderHistory = () => (<div className="history-window-content"><input aria-label={tr("Поиск реплик")} placeholder={tr("Найти реплику…")} value={historyQuery} onChange={e=>setHistoryQuery(e.target.value)}/>{project.subscenes.map((s) => (
                 <details key={s.id} open={!!historyQuery || (layout.treeOpen?.['history:'+s.id]??s.id===scene.id)}>
                   <summary onClick={e=>{e.preventDefault();setLayout(l=>({...l,treeOpen:{...l.treeOpen,['history:'+s.id]:!(l.treeOpen?.['history:'+s.id]??s.id===scene.id)}}));}}>
                     <Icon name="ChevronRight" size={12} />
@@ -2191,7 +2183,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               setMenu(menu === m ? null : m);
             }}
           >
-            {m}
+            {tr(m)}
           </button>
         ))}
         <div className="flex-space" />
@@ -2205,22 +2197,22 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             icon={running ? "Square" : "Play"}
             title={
               running
-                ? "Остановить предпросмотр"
-                : "Запустить с начала текущей сабсцены"
+                ? tr("Остановить предпросмотр")
+                : tr("Запустить с начала текущей сабсцены")
             }
             onClick={() => (running ? rt.stop() : start())}
-          >{running ? "Стоп" : "Запуск"}</Button>
-          <Button icon="Play" title="Проверить историю с выделенной реплики" disabled={running} onClick={()=>start(true)}>С реплики</Button>
+          >{running ? tr("Стоп") : tr("Запуск")}</Button>
+          <Button icon="Play" title={tr("Проверить историю с выделенной реплики")} disabled={running} onClick={()=>start(true)}>{tr("С реплики")}</Button>
           <Button
             icon="Pause"
-            title="Пауза / продолжить"
+            title={tr("Пауза / продолжить")}
             className={preview?.paused ? "active" : ""}
             disabled={!running || preview.phase === "FINISHED"}
             onClick={() => rt.togglePause()}
           />
           <Button
             icon="StepForward"
-            title="Следующая реплика"
+            title={tr("Следующая реплика")}
             disabled={
               !running ||
               !preview.ready ||
@@ -2234,12 +2226,12 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           <span className="play-label" hidden={!running}>
             {running
               ? preview.paused
-                ? "На паузе"
-                : "Предпросмотр"
-              : "Редактирование"}
+                ? tr("На паузе")
+                : tr("Предпросмотр")
+              : tr("Редактирование")}
           </span>
           <Select
-            aria-label="Раскладка редактора"
+            aria-label={tr("Раскладка редактора")}
             value={maximized || "balanced"}
             onChange={(v) => setMaximized(v === "balanced" ? null : v)}
             options={[
@@ -2251,43 +2243,44 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             ]}
           />
         </div>
-        {onHome&&<Button icon="FolderOpen" disabled={projectFileBusy} onClick={()=>runFileOperation(async()=>{rt.stop();await onHome(project);})}>Главное меню</Button>}
-        {user&&<button onClick={()=>onLogout(project)} title={`Выйти из аккаунта ${user.login}`}>{user.login} · Выйти</button>}
+        {onHome&&<Button icon="FolderOpen" disabled={projectFileBusy} onClick={()=>runFileOperation(async()=>{rt.stop();await onHome(project);})}>{tr("Главное меню")}</Button>}
+        {user&&<button onClick={()=>onLogout(project)} title={tr("Выйти из аккаунта {0}", [user.login])}>{user.login} {tr("· Выйти")}</button>}
+        <LanguagePicker onOpen={() => setMenu(null)} />
         <ThemePicker onOpen={() => setMenu(null)} />
       </header>
       <div className={'editor-workspace compact-'+compactPanel+(layout.hiddenHierarchy?' hierarchy-hidden':'')+(layout.hiddenInspector?' inspector-hidden':'')+(['scene','graph'].includes(maximized)?' focus-center':maximized==='hierarchy'?' focus-hierarchy':maximized==='inspector'?' focus-inspector':'')}>
-        <nav className="compact-panel-tabs" aria-label="Панели редактора">
-          {[['hierarchy','ListTree','Объекты сцены'],['workspace','PanelsTopLeft','Рабочая область'],['inspector','Settings2','Свойства']].map(([id,icon,label])=><button key={id} aria-pressed={compactPanel===id} onClick={()=>{if(['hierarchy','inspector'].includes(maximized))setMaximized(null);setCompactPanel(id);}}><Icon name={icon} size={13}/>{label}</button>)}
+        <nav className="compact-panel-tabs" aria-label={tr("Панели редактора")}>
+          {[['hierarchy','ListTree','Объекты сцены'],['workspace','PanelsTopLeft','Рабочая область'],['inspector','Settings2','Свойства']].map(([id,icon,label])=><button key={id} aria-pressed={compactPanel===id} onClick={()=>{if(['hierarchy','inspector'].includes(maximized))setMaximized(null);setCompactPanel(id);}}><Icon name={icon} size={13}/>{tr(label)}</button>)}
         </nav>
         <aside className="hierarchy-panel">
-          <button className="panel-restore" aria-label="Показать иерархию" title="Показать иерархию" onClick={()=>setLayout(l=>({...l,hiddenHierarchy:false}))}><Icon name="PanelLeftOpen" size={18}/><span>Иерархия</span></button>
+          <button className="panel-restore" aria-label={tr("Показать иерархию")} title={tr("Показать иерархию")} onClick={()=>setLayout(l=>({...l,hiddenHierarchy:false}))}><Icon name="PanelLeftOpen" size={18}/><span>{tr("Иерархия")}</span></button>
           <div className="panel-tabs">
-            <button className="active">Иерархия</button>
+            <button className="active">{tr("Иерархия")}</button>
             <div className="flex-space" />
             <Button
               icon="Plus"
-              title="Создать объект"
+              title={tr("Создать объект")}
               onClick={() => setPicker({ kind: "object" })}
             />
-            <Button icon={maximized==='hierarchy'?'Minimize2':'Maximize2'} title={maximized==='hierarchy'?'Восстановить иерархию':'Развернуть иерархию'} onClick={()=>setMaximized(v=>v==='hierarchy'?null:'hierarchy')}/>
-            <Button icon="PanelLeftClose" title="Свернуть иерархию" onClick={()=>{setMaximized(null);setLayout(l=>({...l,hiddenHierarchy:true}));setCompactPanel('workspace');}}/>
+            <Button icon={maximized==='hierarchy'?'Minimize2':'Maximize2'} title={maximized==='hierarchy'?tr("Восстановить иерархию"):tr("Развернуть иерархию")} onClick={()=>setMaximized(v=>v==='hierarchy'?null:'hierarchy')}/>
+            <Button icon="PanelLeftClose" title={tr("Свернуть иерархию")} onClick={()=>{setMaximized(null);setLayout(l=>({...l,hiddenHierarchy:true}));setCompactPanel('workspace');}}/>
           </div>
           <div className="panel-search">
             <Icon name="Search" size={13} />
             <input
-              aria-label="Поиск объектов"
-              placeholder="Найти объект…"
+              aria-label={tr("Поиск объектов")}
+              placeholder={tr("Найти объект…")}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
           </div>
           <div className="hierarchy-tree">
-              <HierarchyTree groups={sceneObjectGroups(project,displayScene.id,objects)} disabled={running} onCreateGroup={createSelectionGroup} onSelectGroup={group=>{if(rt.running)return;setMode('scene');setSelection({kind:'object',id:group.objectIds[0],ids:group.objectIds,groupId:group.id});openObjectTransform();}} onGroupDrop={(groupId,ids)=>{if(!rt.running)mutate(p=>addObjectsToGroup(p,groupId,ids));}} scene={displayScene} objects={objects} points={sceneStagingPoints(displayScene,objects)} query={query} selected={selection.id} selectedIds={objectSelectionIds}
+              <HierarchyTree onAddObject={groupId=>setPicker({kind:'object',groupId})} onAddPoint={addStagingPoint} onAddSound={addSoundEvent} onCreateEmptyGroup={addEmptyGroup} onRootDrop={ids=>{if(!rt.running)mutate(p=>removeObjectsFromGroups(p,displayScene.id,ids));}} groups={sceneObjectGroups(project,displayScene.id,objects)} disabled={running} onCreateGroup={createSelectionGroup} onSelectGroup={group=>{if(rt.running)return;setMode('scene');setSelection(group.objectIds.length?{kind:'object',id:group.objectIds[0],ids:group.objectIds,groupId:group.id}:{kind:'group',id:group.id});openObjectTransform();}} onGroupDrop={(groupId,ids)=>{if(!rt.running)mutate(p=>addObjectsToGroup(p,groupId,ids));}} scene={displayScene} objects={objects} points={sceneStagingPoints(displayScene,objects)} query={query} selected={selection.id} selectedIds={objectSelectionIds}
                 expanded={layout.treeOpen||{}} onExpanded={treeOpen=>setLayout(l=>({...l,treeOpen}))}
                 onSelectObject={(id,options)=>{if(!running){setMode('scene');setCameraPilotId(null);setCameraPreviewId(null);}selectObject(id,options);}}
                 onFrameObject={id=>{editScene();setSelection({kind:'object',id});setFocusRequest({nonce:uid('focus')});}}
                 onVisibility={id=>mutate(p=>{const o=p.objects.find(o=>o.id===id);o.active=o.active===false;})}
-                onPoint={point=>{editScene();if(point.objectId)setSelection({kind:'object',id:point.objectId});setFocusRequest({nonce:uid('focus'),position:point.position,objectId:point.objectId});}}
+                onPoint={point=>{editScene();setSelection({kind:'point',id:point.id});openObjectTransform();setFocusRequest({nonce:uid('focus'),position:point.position,objectId:point.objectId});}}
                 onSelectCamera={selectCamera} onCameras={openCameras} showCameras={showCameras} onShowCameras={()=>setShowCameras(v=>!v)}
                 showDialogue={showDialogue} onShowDialogue={()=>setShowDialogue(v=>!v)} onStory={()=>{setDock('story');setDetailEditor(false);setMaximized(null);}}
                 onAudio={()=>{setDock('active');setDetailEditor(false);setMaximized(null);}}/>
@@ -2295,15 +2288,13 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           </div>
           <div className="hierarchy-footer">
             <Icon name="Layers" size={13} />
-            {objects.length} объектов
-            <span />
-            {nodes.length} блоков
-          </div>
+            {objects.length} {tr("объектов")}<span />
+            {nodes.length} {tr("блоков")}</div>
           <InfoView />
         </aside>
         <ResizeBar
           axis="x"
-          label="Ширина иерархии"
+          label={tr("Ширина иерархии")}
           onMove={(d) => resize("left", d)}
           onReset={() => setLayout((l) => ({ ...l, left: 210 }))}
         />
@@ -2320,36 +2311,36 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           <section className="viewport-panel">
             <div className="panel-tabs viewport-tabs">
               <button
-                aria-label="Редактор локации"
+                aria-label={tr("Редактор локации")}
                 aria-pressed={mode === "scene"}
                 className={mode === "scene" ? "active" : ""}
                 onClick={editScene}
               >
                 <Icon name="Box" size={14} />
-                Локация
-              </button>
+                {tr("Локация")}</button>
               <button
                 aria-pressed={mode === "game"}
                 className={mode === "game" ? "active" : ""}
                 onClick={() => setMode("game")}
               >
                 <Icon name="Gamepad2" size={15} />
-                Игра
-              </button>
+                {tr("Игра")}</button>
               <div className="toolbar-project">
-          <span className="toolbar-context-label">Сабсцена</span>
+          <span className="toolbar-context-label">{tr("Сабсцена")}</span>
           <EditorSelect
-            label="Текущая сабсцена"
+            label={tr("Текущая сабсцена")}
             value={displayScene.id}
             onChange={(id) =>
               openSubscenes('edit',id)
             }
-            options={project.subscenes.map((s) => [s.id, s.name])}
+            options={project.subscenes.map((s) => [s.id,literalLabel(s.name)])}
           />
         </div>
               <div className="flex-space" />
+              <Button icon="PanelsTopLeft" title={tr("Редактор интерфейса игры")} onClick={()=>openWidgets(resolveWidget(project,'dialogue',beat).id)}/>
+              {mode==='game'&&<Button icon="Menu" title={tr("Главное меню игры")} onClick={()=>{rt.stop();setGameMenu('mainMenu');setPreviewWidgetId(null);}}>{tr("Меню")}</Button>}
               <button
-                title="Диалог в игровом кадре"
+                title={tr("Диалог в игровом кадре")}
                 hidden={mode !== "game"}
                 aria-pressed={showDialogue}
                 className={showDialogue ? "toggled" : ""}
@@ -2358,7 +2349,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 <Icon name="PanelBottom" size={14} />
               </button>
               <button
-                title={maximized==='scene'?'Восстановить сцену':'Развернуть сцену'}
+                title={maximized==='scene'?tr("Восстановить сцену"):tr("Развернуть сцену")}
                 onClick={() =>
                   setMaximized(maximized === "scene" ? null : "scene")
                 }
@@ -2369,20 +2360,20 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 />
               </button>
             </div>
-            <div className="viewport-commandbar" aria-label="Инструменты сцены">
+            <div className="viewport-commandbar" aria-label={tr("Инструменты сцены")}>
               {mode==='scene'&&!cameraPilotId&&<div className="scene-edit-bar">
-                <button className="scene-edit-add" onClick={()=>setPicker({kind:'object'})}><Icon name="Plus" size={14}/>Добавить объект / примитив</button>
-                {[['select','MousePointer2','Выбор','Q'],['translate','Move','Сдвиг','W'],['rotate','Rotate3D','Поворот','E'],['scale','Scaling','Масштаб','R']].map(([tool,icon,label,key])=><button key={tool} disabled={running||(selection.kind==='camera'&&(tool==='scale'||(tool==='rotate'&&displayScene.cameras?.find(c=>c.id===selection.id)?.mode==='follow')))} title={label+' · '+key} aria-pressed={editTool===tool} className={'transform-tool '+(editTool===tool?'active':'')} onClick={()=>setEditTool(tool)}><Icon name={icon} size={14}/><span className="tool-label">{label} · {key}</span></button>)}
-                <Button icon="Settings2" disabled={selection.kind!=='object'} title="Позиция, вращение и масштаб выбранного объекта" onClick={openObjectTransform}>Положение, поворот, масштаб</Button>
-                <button title="Привязка: 0,25 м / 15° / 0,1×" aria-pressed={snap} className={snap?'active':''} onClick={()=>setSnap(v=>!v)}><Icon name="Magnet" size={14}/></button>
-                <select aria-label="Оси трансформации" value={editSpace} onChange={e=>setEditSpace(e.target.value)}><option value="world">Мир</option><option value="local">Объект</option></select>
-                <Button icon="Video" title="Показать камеры в 3D" aria-pressed={showCameras} className={showCameras?"active":""} onClick={()=>setShowCameras(v=>!v)}/>
-                <Button icon="Grid3X3" title="Сетка сцены" aria-pressed={showGrid} className={showGrid?"active":""} onClick={()=>setShowGrid(v=>!v)}/>
-                <Button icon="Focus" title="Приблизить выбранный объект · F" disabled={selection.kind!=='object'} onClick={()=>setFocusRequest({nonce:uid('focus')})}/>
+                <button className="scene-edit-add" onClick={()=>setPicker({kind:'object'})}><Icon name="Plus" size={14}/>{tr("Добавить объект / примитив")}</button>
+                {[['select','MousePointer2','Выбор','Q'],['translate','Move','Сдвиг','W'],['rotate','Rotate3D','Поворот','E'],['scale','Scaling','Масштаб','R']].map(([tool,icon,label,key])=><button key={tool} disabled={running||(selection.kind==='camera'&&(tool==='scale'||(tool==='rotate'&&displayScene.cameras?.find(c=>c.id===selection.id)?.mode==='follow')))} title={tr(label)+' · '+key} aria-pressed={editTool===tool} className={'transform-tool '+(editTool===tool?'active':'')} onClick={()=>setEditTool(tool)}><Icon name={icon} size={14}/><span className="tool-label">{tr(label)} · {key}</span></button>)}
+                <Button icon="Settings2" disabled={selection.kind!=='object'} title={tr("Позиция, вращение и масштаб выбранного объекта")} onClick={openObjectTransform}>{tr("Положение, поворот, масштаб")}</Button>
+                <button title={tr("Привязка: 0,25 м / 15° / 0,1×")} aria-pressed={snap} className={snap?'active':''} onClick={()=>setSnap(v=>!v)}><Icon name="Magnet" size={14}/></button>
+                <select aria-label={tr("Оси трансформации")} value={editSpace} onChange={e=>setEditSpace(e.target.value)}><option value="world">{tr("Мир")}</option><option value="local">{tr("Объект")}</option></select>
+                <Button icon="Video" title={tr("Показать камеры в 3D")} aria-pressed={showCameras} className={showCameras?"active":""} onClick={()=>setShowCameras(v=>!v)}/>
+                <Button icon="Grid3X3" title={tr("Сетка сцены")} aria-pressed={showGrid} className={showGrid?"active":""} onClick={()=>setShowGrid(v=>!v)}/>
+                <Button icon="Focus" title={tr("Приблизить выбранный объект · F")} disabled={selection.kind!=='object'} onClick={()=>setFocusRequest({nonce:uid('focus')})}/>
               </div>}
-              {cameraPilotId&&mode==='scene'&&<div className="camera-pilot-bar"><Icon name="Video"/><span>Настройка: {displayScene.cameras?.find(c=>c.id===cameraPilotId)?.name}<small>Обзор мышью · правая кнопка — сдвиг · колесо — приближение</small></span><Button icon="Check" onClick={()=>captureCamera(cameraPilotId)}>Сохранить ракурс</Button><Button icon="X" title="Вернуться без сохранения" onClick={()=>setCameraPilotId(null)}/></div>}
-              {mode==='game'&&<div className="camera-view-badge"><Icon name={resolveCamera(displayScene,world,objects,cameraPreviewId).mode==='follow'?'UserRoundCheck':'Video'} size={14}/>{resolveCamera(displayScene,world,objects,cameraPreviewId).name}{cameraPreviewId&&<button onClick={()=>setCameraPreviewId(null)}>По сценарию <Icon name="X" size={12}/></button>}</div>}
-              <details className="viewport-help"><summary title="Управление сценой" aria-label="Управление сценой"><Icon name="CircleHelp" size={15}/></summary><div>W — перемещение · E — вращение<br/>R — масштаб · Q — выбор<br/>Работают и в русской раскладке<br/>Shift + щелчок — мультивыбор<br/>Alt + ЛКМ — орбита · СКМ — панорама<br/>ПКМ + WASD / QE — полёт<br/>F — выделение в кадр<br/>Delete — удалить выделенные объекты<br/>Ctrl+Z — вернуть удалённые объекты</div></details>
+              {cameraPilotId&&mode==='scene'&&<div className="camera-pilot-bar"><Icon name="Video"/><span>{tr("Настройка: ")}{displayScene.cameras?.find(c=>c.id===cameraPilotId)?.name}<small>{tr("Обзор мышью · правая кнопка — сдвиг · колесо — приближение")}</small></span><Button icon="Check" onClick={()=>captureCamera(cameraPilotId)}>{tr("Сохранить ракурс")}</Button><Button icon="X" title={tr("Вернуться без сохранения")} onClick={()=>setCameraPilotId(null)}/></div>}
+              {(mode==='game'||(cameraPreviewId&&!cameraPilotId))&&<div className="camera-view-badge"><Icon name={resolveCamera(displayScene,world,objects,cameraPreviewId).mode==='follow'?'UserRoundCheck':'Video'} size={14}/><span className="camera-view-name">{resolveCamera(displayScene,world,objects,cameraPreviewId).name}</span>{cameraPreviewId&&<button onClick={()=>setCameraPreviewId(null)}>{mode==='game'?tr("По сценарию"):tr("Вернуться к сцене")} <Icon name="X" size={12}/></button>}</div>}
+              <details className="viewport-help"><summary title={tr("Управление сценой")} aria-label={tr("Управление сценой")}><Icon name="CircleHelp" size={15}/></summary><div>{mode==='game'?<>{tr("Кадр показан из активной камеры.")}<br/>{tr("Выберите камеру в иерархии, чтобы посмотреть её ракурс.")}<br/>{tr("«По сценарию» возвращает камеру, выбранную историей.")}<br/>{inputHelp(playProject.input,inputContextsFor(playProject,playBeat),['move','interact','point','advance','pause'])}<br/>{tr("Для настройки ракурса вернитесь в «Локацию».")}</>:<>{tr("W — перемещение · E — вращение")}<br/>{tr("R — масштаб · Q — выбор")}<br/>{tr("Работают и в русской раскладке")}<br/>{tr("Shift + щелчок — мультивыбор")}<br/>{tr("Alt + ЛКМ — орбита · СКМ — панорама")}<br/>{tr("ПКМ + WASD / QE — полёт")}<br/>{tr("F — выделение в кадр")}<br/>{tr("Delete — удалить выделенные объекты")}<br/>{tr("Ctrl+Z — вернуть удалённые объекты")}</>}</div></details>
             </div>
             <div
               className="scene-viewport"
@@ -2392,11 +2383,12 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 if(mode==='scene'&&!running&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!e.shiftKey&&!['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)&&!e.target.isContentEditable&&e.code==='KeyF'){e.preventDefault();setFocusRequest({nonce:uid('focus')});}
                 if (
                   mode === "game" &&
+                  !running && !e.defaultPrevented &&
                   [" ", "Enter"].includes(e.key) &&
                   e.target === e.currentTarget
                 ) {
                   e.preventDefault();
-                  running ? rt.advance() : start();
+                  start();
                 }
               }}
             >
@@ -2411,20 +2403,29 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 selectedIds={objectSelectionIds}
                 mode={mode}
                 showGrid={showGrid}
-                actionPosition={(()=>{const a=inspectedAction||(binding?bindingActions(project,binding):event?.groups.flatMap(g=>g.actions))?.find(a=>a.type==='move');return a?.type==='move'&&Array.isArray(a.value)?a.value:null;})()}
+                actionPosition={(()=>{if(selection.kind==='point')return sceneStagingPoints(displayScene,objects).find(p=>p.id===selection.id)?.position;const a=inspectedAction||(binding?bindingActions(project,binding):event?.groups.flatMap(g=>g.actions))?.find(a=>a.type==='move');return a?.type==='move'&&Array.isArray(a.value)?a.value:null;})()}
                 onPickPosition={positionPick?value=>{
                   const request=positionPick;
                   mutate(p=>{if(request.context.bindingId){const b=allBeats(p).find(b=>b.id===request.context.beatId)?.bindings.find(b=>b.id===request.context.bindingId);if(b){b.actionOverrides||={};b.actionOverrides[request.id]={...b.actionOverrides[request.id],value};}}
                     else {const a=p.events.find(e=>e.id===request.context.eventId)?.groups.flatMap(g=>g.actions).find(a=>a.id===request.id);if(a)a.value=value;}});
-                  setPositionPick(null);setNotice('Координаты выбраны: '+value.join(', '));
+                  setPositionPick(null);setNotice(tr("Координаты выбраны: {0}", [value.join(', ')]));
                 }:undefined}
                 onSelect={selectObject}
                 onContext={point=>{if(!rt.running)setContextMenu({...point,kind:'scene'});}}
+                inputSettings={playProject.input}
+                onInputAction={event=>rt.inputAction(event)}
+                onInputDevices={setInputDevices}
+                onPlayerStep={(direction,dt)=>rt.playerStep(direction,dt)}
+                onPlayerClick={(point,id)=>rt.playerClick(point,id)}
+                onPlayerInteract={()=>rt.playerInteract()}
                 onInteract={interact}
               />
-              {positionPick&&<div className="viewport-caption"><strong>Выберите точку на сцене</strong><Button icon="X" onClick={()=>setPositionPick(null)}>Отмена</Button></div>}
+              {mode==='game'&&<TouchInput settings={playProject.input} contexts={world.inputContexts||[]} active={world.inputActive} playerMode={world.playerControl?.mode} paused={world.paused||!world.inputReady}/>}
+              {positionPick&&<div className="viewport-caption"><strong>{tr("Выберите точку на сцене")}</strong><Button icon="X" onClick={()=>setPositionPick(null)}>{tr("Отмена")}</Button></div>}
               <GameDialogue project={running?rt.project:project}
                 beat={playBeat}
+                onUiAction={widgetAction}
+                widgetOverride={!running?project.widgets.find(w=>w.id===previewWidgetId&&w.kind==='dialogue'):null}
                 preview={preview}
                 running={running}
                 variables={variables}
@@ -2434,32 +2435,34 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   playProject.objects.find((o) => o.id === playBeat.signal)
                     ?.name
                 }
-                show={mode==="game"&&showDialogue&&!preview?.audition}
+                show={mode==="game"&&showDialogue&&!preview?.audition&&!gameMenu&&!preview?.paused}
               />
+              {mode==='game'&&(gameMenu==='mainMenu'||(running&&preview?.paused&&!preview?.audition))&&<WidgetMenu label={gameMenu==='mainMenu'?tr('Главное меню'):tr('Пауза')} widget={project.widgets.find(w=>w.id===previewWidgetId&&w.kind===(gameMenu==='mainMenu'?'mainMenu':'pauseMenu'))||resolveWidget(project,gameMenu==='mainMenu'?'mainMenu':'pauseMenu')}
+                  context={{title:project.title,paused:!!preview?.paused}} onAction={widgetAction}/>}
               {running && !preview.textVisible && !preview.audition && (
                 <div className="scene-preparing">
                   <Icon name="LoaderCircle" size={15} />
-                  {preview.error || "Подготовка сцены перед репликой"}
+                  {message(preview.error) || tr("Подготовка сцены перед репликой")}
                 </div>
               )}
-              {running&&<div className="scene-activity" aria-live="polite">
-                {preview.audition&&<header><Icon name="Clapperboard" size={13}/><strong>Проба · {preview.auditionName}</strong><button title="Закончить пробу" onClick={()=>rt.stop()}><Icon name="X" size={13}/></button></header>}
-                {(preview.activity||[]).slice(-4).map(a=><div className={'activity-item '+a.status} key={a.id}><Icon name={a.status==='running'?'LoaderCircle':'Check'} size={12}/><span>{TYPES[a.type]?.label} <b>{project.objects.find(o=>o.id===a.target)?.name||''} {String(a.value).slice(0,42)}</b></span>{a.status==='running'&&<progress max="1" value={a.progress||0}/>}</div>)}
-                {preview.error&&<span className="error-box">{preview.error}</span>}
+              {running&&!preview.world.playerControl&&<div className="scene-activity" aria-live="polite">
+                {preview.audition&&<header><Icon name="Clapperboard" size={13}/><strong>{tr("Проба · ")}{preview.auditionName}</strong><button title={tr("Закончить пробу")} onClick={()=>rt.stop()}><Icon name="X" size={13}/></button></header>}
+                {(preview.activity||[]).slice(-4).map(a=><div className={'activity-item '+a.status} key={a.id}><Icon name={a.status==='running'?'LoaderCircle':'Check'} size={12}/><span>{tr(TYPES[a.type]?.label)} <b>{project.objects.find(o=>o.id===a.target)?.name||''} {String(a.value).slice(0,42)}</b></span>{a.status==='running'&&<progress max="1" value={a.progress||0}/>}</div>)}
+                {preview.error&&<span className="error-box">{message(preview.error)}</span>}
               </div>}
               {running && <div className="viewport-caption">
                 <Icon name="Video" size={12} />
                 {mode === "game"
-                  ? "Главная камера"
-                  : "Перспектива · вращение мышью"}
+                  ? tr("Главная камера")
+                  : tr("Перспектива · вращение мышью")}
                 <span />
                 {running
                   ? `${playBeat.id} / ${preview.phase}`
-                  : "3D · примитивы"}
+                  : tr("3D · примитивы")}
               </div>}
             </div>
             {(running || [...soundDesk.tracks.values()].some(t=>["playing","error"].includes(t.status))) && <div className="live-strip">
-              <output className="audio-output" title="Измеренный уровень на аудиовыходе" aria-label="Уровень звукового выхода"><Icon name="Volume2" size={13}/><meter min="0" max="1" value={[...soundDesk.tracks.values()].some(t=>t.status==='playing')?(soundDesk.output?.level()||0):0}/><span>{soundDesk.output?.context?.state==='running'?'Аудио включено':'Аудио · нажмите Play'}</span></output>
+              <output className="audio-output" title={tr("Измеренный уровень на аудиовыходе")} aria-label={tr("Уровень звукового выхода")}><Icon name="Volume2" size={13}/><meter min="0" max="1" value={[...soundDesk.tracks.values()].some(t=>t.status==='playing')?(soundDesk.output?.level()||0):0}/><span>{soundDesk.output?.context?.state==='running'?tr("Аудио включено"):tr("Аудио · нажмите Play")}</span></output>
               <button onClick={() => setDock("active")}>
                 <Icon name="Activity" size={13} />
                 {running
@@ -2467,35 +2470,34 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                       (e) => e.status !== "stopped",
                     ).length
                   : "2"}{" "}
-                активных состояния
-              </button>
+                {tr("активных состояния")}</button>
               <span className="live-separator" />
               <span>
                 <Icon name="Music2" size={13} />
                 {soundDesk.get("background")?.status === "playing"
-                  ? "Главная тема · " +
+                  ? tr("Главная тема · ") +
                     clockLabel(soundDesk.get("background").audio.currentTime)
-                  : "Музыка не играет"}
+                  : tr("Музыка не играет")}
               </span>
               <div className="flex-space" />
               {soundDesk.ducks.size > 0 && (
-                <span className="duck-label">Голос → музыка −{normalizeSidechain(project.audioSettings?.sidechain).reductionDb} dB</span>
+                <span className="duck-label">{tr("Голос → музыка −")}{normalizeSidechain(project.audioSettings?.sidechain).reductionDb} dB</span>
               )}
-              {[...soundDesk.tracks.values()].some(t=>t.status==='error')&&<button className="audio-error" onClick={()=>setDock('sound')}>Ошибка аудио · открыть</button>}
+              {[...soundDesk.tracks.values()].some(t=>t.status==='error')&&<button className="audio-error" onClick={()=>setDock('sound')}>{tr("Ошибка аудио · открыть")}</button>}
               <button onClick={() => setDock("active")}>
-                Управление <Icon name="ChevronRight" size={12} />
+                {tr("Управление ")}<Icon name="ChevronRight" size={12} />
               </button>
             </div>}
           </section>
           <ResizeBar
             axis="y"
-            label="Размер сцены и графа"
+            label={tr("Размер сцены и графа")}
             onMove={(d) => resize("height", d)}
             onReset={() =>
               setLayout((l) => ({ ...l, height: defaultSceneHeight() }))
             }
           />
-          <FloatingWindow active={floatingDock} title="Рабочая область" onClose={()=>setFloatingDock(false)}><section className="graph-dock">
+          <FloatingWindow active={floatingDock} title={tr("Рабочая область")} onClose={()=>setFloatingDock(false)}><section className="graph-dock">
             <div className="panel-tabs dock-tabs">
               <DockTools dock={["story","timeline","staging"].includes(dock)?"story":dock} event={event} issueCount={issues.length} onSelect={id => {
                 setDock(id);
@@ -2507,7 +2509,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               <div className="flex-space" />
               <Button
                 icon={maximized === "graph" ? "Minimize2" : "Maximize2"}
-                title={maximized==='graph'?'Восстановить рабочую область':'Развернуть рабочую область'}
+                title={maximized==='graph'?tr("Восстановить рабочую область"):tr("Развернуть рабочую область")}
                 onClick={() =>
                   setMaximized(maximized === "graph" ? null : "graph")
                 }
@@ -2515,9 +2517,9 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             </div>
             {["story", "timeline", "staging", "event"].includes(dock) && !detailEditor && (
               <div className="graph-toolbar">
-                {dock==='event'?<><Button icon="ArrowLeft" title="Вернуться в поток истории" onClick={()=>setDock('story')}/><span className="graph-breadcrumb">{event?.name}</span></>:<><Icon name="Route" size={15}/><span className="flow-toolbar-context">{project.subscenes.length} сабсцены · {nodes.length} реплик · единый поток</span><Button icon="Focus" onClick={()=>graphApi.current?.focus(beat.id)}>К реплике</Button><Button icon="Scan" onClick={()=>graphApi.current?.fit()}>Вся история</Button></>}
+                {dock==='event'?<><Button icon="ArrowLeft" title={tr("Вернуться в поток истории")} onClick={()=>setDock('story')}/><span className="graph-breadcrumb">{event?.name}</span></>:<><Icon name="Route" size={15}/><span className="flow-toolbar-context">{project.subscenes.length} {tr("сабсцены · ")}{nodes.length} {tr("реплик · единый поток")}</span><Button icon="Focus" onClick={()=>graphApi.current?.focus(beat.id)}>{tr("К реплике")}</Button><Button icon="Scan" onClick={()=>graphApi.current?.fit()}>{tr("Вся история")}</Button></>}
                 <div className="flex-space" />
-                <details className="viewport-help graph-help"><summary title="Навигация по графу" aria-label="Навигация по графу"><Icon name="CircleHelp" size={15}/></summary><div>ПКМ — панорама<br/>Колесо — масштаб<br/>Пин → пин — соединить<br/>Alt + щелчок по пину — разорвать связи<br/>Ctrl + перетаскивание пина — перенести связи<br/>Выбрать провод + Delete — разорвать<br/>ЛКМ — выбор и перемещение узла<br/>Двойной щелчок — открыть узел</div></details>
+                <details className="viewport-help graph-help"><summary title={tr("Навигация по графу")} aria-label={tr("Навигация по графу")}><Icon name="CircleHelp" size={15}/></summary><div>{tr("ПКМ — панорама")}<br/>{tr("Колесо — масштаб")}<br/>{tr("Пин → пин — соединить")}<br/>{tr("Alt + щелчок по пину — разорвать связи")}<br/>{tr("Ctrl + перетаскивание пина — перенести связи")}<br/>{tr("Выбрать провод + Delete — разорвать")}<br/>{tr("ЛКМ — выбор и перемещение узла")}<br/>{tr("Двойной щелчок — открыть узел")}</div></details>
                 {dock !== "event" && beat.kind === "choice" && (
                   <Button
                     icon="GitFork"
@@ -2525,12 +2527,11 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                       graphApi.current?.focus(beat.id);
                     }}
                   >
-                    Обзор развилки
-                  </Button>
+                    {tr("Обзор развилки")}</Button>
                 )}
                 {running && (
                   <button
-                    title="Следовать за проигрыванием"
+                    title={tr("Следовать за проигрыванием")}
                     className={follow ? "active" : ""}
                     onClick={() => {
                       setFollow(!follow);
@@ -2542,7 +2543,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 )}
                 <Button
                   icon="AlignHorizontalDistributeCenter"
-                  title="Расположить узлы автоматически"
+                  title={tr("Расположить узлы автоматически")}
                   onClick={() => graphApi.current?.arrange()}
                 />
                 <Button
@@ -2567,10 +2568,10 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   }
                 >
                   {dock !== "event"
-                    ? "Нода"
+                    ? tr("Нода")
                     : dock === "event"
-                      ? "Действие"
-                      : "Событие"}
+                      ? tr("Действие")
+                      : tr("Событие")}
                 </Button>
               </div>
             )}
@@ -2597,8 +2598,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               <AuthoringWorkspace hidden={dock!=='create'} project={project} request={authorRequest} mutate={mutate} beat={beat} onNotice={setNotice}
                 onGraph={id=>{setEventContext({eventId:id});setSelection({kind:'event',id});setDock('event');}}
                 onPreview={draft=>{setCameraPreviewId(null);setCameraPilotId(null);const test=structuredClone(project);const i=test.events.findIndex(e=>e.id===draft.id);if(i<0)test.events.push(draft);else test.events[i]=draft;soundDesk.unlock();rt.stop();setMode('game');setMaximized(null);setFollow(false);rt.previewEvent(test,draft.id,beat.id);}}
-                onPlace={(draft,hook)=>{mutate(p=>addToBatch(p,beat.id,hook,null,draft.id));setPhase(hook);setDock('story');setMaximized(null);setNotice('Добавлено: '+draft.name+' · '+PHASES.find(x=>x.id===hook).label);}}/>
-              {dock==='create'?null:detailEditor && event ? (
+                onPlace={(draft,hook)=>{mutate(p=>addToBatch(p,beat.id,hook,null,draft.id));setPhase(hook);setDock('story');setMaximized(null);setNotice(tr("Добавлено: {0} · {1}", [draft.name, PHASES.find(x=>x.id===hook).label]));}}/>
+              {dock==='create'?null:dock==='input'?<InputWorkspace project={project} onChange={mutate} beat={playBeat} preview={preview} devices={inputDevices} running={running} onStop={()=>rt.stop()}/>:detailEditor && event ? (
                 <EventEditor
                   project={project}
                   event={event}
@@ -2619,17 +2620,18 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   positions={layout.positions['flow:all']||{}} onPositions={positions=>setPositions('flow:all',positions)} onReady={onGraphReady}/>
               ) : dock === 'event' ? renderGraph('event') : dock === 'cameras' ? <CameraWorkspace scene={displayScene} objects={objects} selected={selection.kind==='camera'?selection.id:null} onSelect={selectCamera} onCreate={()=>createCamera()} onFollow={followCharacter} running={running} onEdit={editScene}/> : dock === 'subscenes' ? <SubsceneWorkspace project={project} scene={displayScene} beat={nodes.find(b=>b.id===subsceneDraft?.fromBeatId)||beat} request={subsceneRequest} draft={subsceneDraft} onDraftChange={setSubsceneDraft} running={running}
                 onSaveLocation={async()=>{try{const data=await portableProject(exportLocation(project,displayScene.id));const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download='location.sacura-location.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setNotice('Локация сохранена в файл.');}catch(e){setNotice(e.message);}}}
-                onLoadLocation={async file=>{try{if(rt.running)return;validateImportSize(file);const raw=await file.text(),next=structuredClone(project),created=importLocation(next,raw);mutate(p=>Object.assign(p,next));setSelectedBeat(created.entry);setSelection({kind:'scene',id:created.id});setMode('scene');setMaximized(null);setNotice('Локация загружена: '+created.name);}catch(e){setNotice('Локация не загружена: '+e.message);}}}
+                onLoadLocation={async file=>{try{if(rt.running)return;validateImportSize(file);const raw=await file.text(),next=structuredClone(project),created=importLocation(next,raw);mutate(p=>Object.assign(p,next));setSelectedBeat(created.entry);setSelection({kind:'scene',id:created.id});setMode('scene');setMaximized(null);setNotice(tr("Локация загружена: {0}", [created.name]));}catch(e){setNotice(tr("Локация не загружена: {0}", [e.message]));}}}
                 onStop={()=>rt.stop()} onSelect={id=>openSubscenes('edit',id)} onCreate={draft=>saveNewSubscene(draft)} onDuplicate={id=>saveNewSubscene(null,id)}
                 onPatch={patch=>editSubscene(p=>Object.assign(p.subscenes.find(s=>s.id===scene.id),patch))}
                 onKind={kind=>editSubscene(p=>changeSceneLocation(p,scene.id,kind))} onEntry={(id,reroute)=>editSubscene(p=>setSceneEntry(p,scene.id,id,reroute))}
                 onConnect={(from,choice,to)=>{editSubscene(p=>connectSubscene(p,from,choice,to));setNotice('Переход сохранён. Он виден на карте и работает при запуске.');}}
                 onDisconnect={(from,choice,to)=>{editSubscene(p=>{const b=allBeats(p).find(b=>b.id===from),edge=choice?b?.choices.find(c=>c.id===choice):b;if(edge?.next===to)edge.next=null;});setNotice('Переход убран. Ctrl+Z — вернуть.');}}
                 onOpenBeat={openSubsceneBeat} onScene={editScene} onPrimitive={shape=>addObject("Меш",shape)} onCameras={openCameras} onCreateRequest={()=>openSubscenes('create')}
-                onCancel={()=>setSubsceneRequest({mode:'edit',token:uid('request')})}/> : dock === 'samples' ? <EventPlayground project={project} preview={preview} scene={displayScene} onPreview={audition} onEdit={editSample} onAdd={id=>{mutate(p=>addToBatch(p,beat.id,'ON_START',null,id));setNotice('Событие добавлено: во время реплики '+beat.id);}}/> : dock === "characters" ? <CharacterWorkspace project={project} scene={displayScene} selected={selection.kind==="object"?selection.id:null} running={running} onStop={()=>rt.stop()}
+                onCancel={()=>setSubsceneRequest({mode:'edit',token:uid('request')})}/> : dock === 'samples' ? <EventPlayground project={project} preview={preview} scene={displayScene} onPreview={audition} onEdit={editSample} onAdd={id=>{mutate(p=>addToBatch(p,beat.id,'ON_START',null,id));setNotice(tr("Событие добавлено: во время реплики {0}", [beat.id]));}}/> : dock === "widgets" ? <WidgetWorkspace project={project} onChange={mutate} request={widgetRequest} beat={beat} running={running} onStop={()=>{rt.stop();setGameMenu(null);}}
+                onPreview={widget=>{setMode('game');setFloatingDock(false);setPreviewWidgetId(widget.id);if(widget.kind==='mainMenu'){setGameMenu('mainMenu');}else if(widget.kind==='pauseMenu'){start();setPreviewWidgetId(widget.id);rt.togglePause();}else{setGameMenu(null);setShowDialogue(true);}}}/>: dock === "characters" ? <CharacterWorkspace project={project} scene={displayScene} selected={selection.kind==="object"?selection.id:null} running={running} onStop={()=>rt.stop()}
                 onSelect={id=>{setSelection({kind:"object",id});setCompactPanel("workspace");}}
                 onCreate={name=>{const next=structuredClone(project),character=createCharacter(next,scene.id,name);mutate(p=>Object.assign(p,next));setSelection({kind:"object",id:character.id});setMode("scene");setCompactPanel("workspace");}}
-                onPatch={patchCharacter} onPresence={(id,sceneId,present)=>editSubscene(p=>setCharacterInScene(p,id,sceneId,present))}
+                onCustomizeWidget={id=>customizeWidget({characterId:id})} onEditWidget={openWidgets} onPatch={patchCharacter} onPresence={(id,sceneId,present)=>editSubscene(p=>setCharacterInScene(p,id,sceneId,present))}
                 onTransform={(id,sceneId,value)=>editSubscene(p=>setObjectTransform(p,id,sceneId,value))}
                 onReset={(id,sceneId)=>editSubscene(p=>{const character=p.objects.find(object=>object.id===id);if(character?.transforms)delete character.transforms[sceneId];})}
                 onPlace={(id,sceneId)=>{openSubscenes("edit",sceneId);editScene();setSelection({kind:"object",id});setFocusRequest({nonce:uid("focus")});}}
@@ -2641,7 +2643,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               ) : dock === "assets" ? (
                 renderAssets()
               ) : dock === "sound" ? (
-                <SoundWorkspace project={project} disabled={running} onImport={importProjectAudioFiles} onKindChange={(id,kind)=>mutate(p=>{const file=p.assetFiles?.find(file=>file.id===id);if(file)file.audioKind=kind;})} onAttach={attachSound} onSidechainChange={sidechain=>mutate(p=>{p.audioSettings={...p.audioSettings,sidechain};})} />
+                <SoundWorkspace project={project} onAssetTimingChange={(id,patch)=>mutate(p=>{p.audioSettings??={};p.audioSettings.assets??={};p.audioSettings.assets[id]={...p.audioSettings.assets[id],...patch};})} disabled={running} onImport={importProjectAudioFiles} onKindChange={(id,kind)=>mutate(p=>{const file=p.assetFiles?.find(file=>file.id===id);if(file)file.audioKind=kind;else{p.assetOverrides??={};p.assetOverrides['audio-file:'+id]={...p.assetOverrides['audio-file:'+id],audioKind:kind};}})} onAttach={attachSound} onSidechainChange={sidechain=>mutate(p=>{p.audioSettings={...p.audioSettings,sidechain};})} />
               ) : dock === "active" ? (
                 renderActive()
               ) : (
@@ -2653,10 +2655,10 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                     />
                     <strong>
                       {issues.length
-                        ? issues.length + " проблемы в проекте"
-                        : "Проверки пройдены"}
+                        ? issues.length + tr(" проблемы в проекте")
+                        : tr("Проверки пройдены")}
                     </strong>
-                    <span>Проверено: ресурсы, ожидания, переходы</span>
+                    <span>{tr("Проверено: ресурсы, ожидания, переходы")}</span>
                   </div>
                   {issues.map((i) => (
                     <div className="issue-row" key={i.id}>
@@ -2667,8 +2669,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                           setDock("story");
                         }}
                       >
-                        <strong>{i.title}</strong>
-                        <span>{i.detail}</span>
+                        <strong>{tr(i.title)}</strong>
+                        <span>{message(i.detail)}</span>
                         <small>
                           {i.beatId} · {sceneFor(project, i.beatId).location}
                         </small>
@@ -2676,13 +2678,13 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                       {i.fix && (
                         <Button onClick={() => fix(i)}>
                           {i.fix === "sequence-batch"
-                            ? "Сделать по очереди"
-                            : "Исправить"}
+                            ? tr("Сделать по очереди")
+                            : tr("Исправить")}
                         </Button>
                       )}
                     </div>
                   ))}
-                  <details className="diagnostic-examples"><summary>Примеры диагностики</summary><FailureLab /></details>
+                  <details className="diagnostic-examples"><summary>{tr("Примеры диагностики")}</summary><FailureLab /></details>
                 </div>
               )}
             </div>
@@ -2690,28 +2692,27 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         </section>
         <ResizeBar
           axis="x"
-          label="Ширина инспектора"
+          label={tr("Ширина инспектора")}
           onMove={(d) => resize("right", -d)}
           onReset={() => setLayout((l) => ({ ...l, right: 280 }))}
         />
         <aside className="inspector-panel">
-          <button className="panel-restore" aria-label="Показать инспектор" title="Показать инспектор" onClick={()=>setLayout(l=>({...l,hiddenInspector:false}))}><Icon name="PanelRightOpen" size={18}/><span>Инспектор</span></button>
+          <button className="panel-restore" aria-label={tr("Показать инспектор")} title={tr("Показать инспектор")} onClick={()=>setLayout(l=>({...l,hiddenInspector:false}))}><Icon name="PanelRightOpen" size={18}/><span>{tr("Инспектор")}</span></button>
           <div className="panel-tabs">
-            <button className="active">Инспектор</button>
+            <button className="active">{tr("Инспектор")}</button>
             <button
               onClick={() => openSubscenes()}
             >
-              Сабсцена
-            </button>
+              {tr("Сабсцена")}</button>
             <div className="flex-space" />
             <Button
               icon={inspectorPinned ? "LockKeyhole" : "Pin"}
-              title="Закрепить инспектор"
+              title={tr("Закрепить инспектор")}
               className={inspectorPinned ? "active" : ""}
               onClick={() => setInspectorPinned((v) => !v)}
             />
-            <Button icon={maximized==='inspector'?'Minimize2':'Maximize2'} title={maximized==='inspector'?'Восстановить инспектор':'Развернуть инспектор'} onClick={()=>setMaximized(v=>v==='inspector'?null:'inspector')}/>
-            <Button icon="PanelRightClose" title="Свернуть инспектор" onClick={()=>{setMaximized(null);setLayout(l=>({...l,hiddenInspector:true}));setCompactPanel('workspace');}}/>
+            <Button icon={maximized==='inspector'?'Minimize2':'Maximize2'} title={maximized==='inspector'?tr("Восстановить инспектор"):tr("Развернуть инспектор")} onClick={()=>setMaximized(v=>v==='inspector'?null:'inspector')}/>
+            <Button icon="PanelRightClose" title={tr("Свернуть инспектор")} onClick={()=>{setMaximized(null);setLayout(l=>({...l,hiddenInspector:true}));setCompactPanel('workspace');}}/>
           </div>
           <div className="inspector-scroll">
             {selection.kind === "scene" ? (
@@ -2720,12 +2721,12 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   <Icon name="PanelsTopLeft" size={25} />
                   <strong>{scene.name}</strong>
                 </div>
-                <Fold title="Сабсцена" icon="MapPin">
-                  <p>{scene.location} · {scene.weather} · {scene.time}</p>
+                <Fold title={tr("Сабсцена")} icon="MapPin">
+                  <p>{scene.location} · {tr(scene.weather)} · {tr(scene.time)}</p>
                   {scene.description && <p>{scene.description}</p>}
-                  <Button icon="Settings2" onClick={() => openSubscenes()}>Открыть редактор сабсцены</Button>
-                  <Button icon="Box" onClick={editScene}>Редактировать 3D-сцену</Button>
-                  <Button icon="Workflow" onClick={() => openSubsceneBeat(scene.entry)}>Открыть сценарий</Button>
+                  <Button icon="Settings2" onClick={() => openSubscenes()}>{tr("Открыть редактор сабсцены")}</Button>
+                  <Button icon="Box" onClick={editScene}>{tr("Редактировать 3D-сцену")}</Button>
+                  <Button icon="Workflow" onClick={() => openSubsceneBeat(scene.entry)}>{tr("Открыть сценарий")}</Button>
                 </Fold>
               </>
             ) : (
@@ -2736,8 +2737,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           {running && (
             <div className="inspector-play-note">
               <Icon name="Info" size={13} />
-              Изменения — для следующего запуска
-            </div>
+              {tr("Изменения — для следующего запуска")}</div>
           )}
         </aside>
       </div>
@@ -2747,23 +2747,23 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             name={issues.length ? "TriangleAlert" : "CheckCheck"}
             size={13}
           />
-          Диагностика · {issues.length}
+          {tr("Диагностика · ")}{issues.length}
         </button>
         <span className="status-divider" />
-        <span data-help-title="Хранение проекта" data-help={serverStorageEnabled?"Автосохранение записывает проект в серверную БД, модели — в S3. Ctrl+S сохраняет сразу. Серверные проекты доступны через меню «Файл». Для переносимой копии используйте экспорт JSON.":"Автосохранение хранит последний проект в браузере. Ctrl+S сохраняет файл JSON."}>{saveError || notice || (serverStorageEnabled?"Сохранено на сервере · Ctrl+S":"Автосохранение в браузере · файл: Ctrl+S")}</span>
+        <span data-help-title={tr("Хранение проекта")} data-help={serverStorageEnabled?tr("Автосохранение записывает проект в серверную БД, модели — в S3. Ctrl+S сохраняет сразу. Серверные проекты доступны через меню «Файл». Для переносимой копии используйте экспорт JSON."):tr("Автосохранение хранит последний проект в браузере. Ctrl+S сохраняет файл JSON.")}>{saveError || notice || (serverStorageEnabled?tr("Сохранено на сервере · Ctrl+S"):tr("Автосохранение в браузере · файл: Ctrl+S"))}</span>
         <div className="flex-space" />
         <span>
-          Выделено:{" "}
+          {tr("Выделено:")}{" "}
           {selection.kind === "object" ? inspectedObject?.name : beatPreview(beat)}
         </span>
 
       </footer>
-      {serverProjects&&<FloatingWindow active title="Проекты на сервере" onClose={()=>setServerProjects(null)}>
-        {!serverProjects.length&&<p>Сохранённых проектов пока нет.</p>}
-        {serverProjects.map(item=><button key={item.id} disabled={projectFileBusy} onClick={()=>selectServerProject(item.id)}>{item.title} · {new Date(item.updatedAt).toLocaleString('ru-RU')}</button>)}
-        {projectFileError&&<p role="alert">{projectFileError}</p>}
+      {serverProjects&&<FloatingWindow active title={tr("Проекты на сервере")} onClose={()=>setServerProjects(null)}>
+        {!serverProjects.length&&<p>{tr("Сохранённых проектов пока нет.")}</p>}
+        {serverProjects.map(item=><button key={item.id} disabled={projectFileBusy} onClick={()=>selectServerProject(item.id)}>{item.title} · {new Date(item.updatedAt).toLocaleString(localeTag())}</button>)}
+        {projectFileError&&<p role="alert">{message(projectFileError)}</p>}
       </FloatingWindow>}
-      {historyOpen && <FloatingWindow active title="История" onClose={()=>setHistoryOpen(false)}>{renderHistory()}</FloatingWindow>}
+      {historyOpen && <FloatingWindow active title={tr("История")} onClose={()=>setHistoryOpen(false)}>{renderHistory()}</FloatingWindow>}
       {menu && (
         <div
           className="editor-menu"
@@ -2771,24 +2771,22 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         >
           {menu === "Файл" ? (
             <>
-              <button disabled={projectFileBusy} onClick={()=>openProjectDialog('new')}><Icon name="FilePlus2"/>Новый пустой проект…</button>
-              {serverStorageEnabled&&<button disabled={projectFileBusy} onClick={showServerProjects}><Icon name="Database"/>Открыть с сервера…</button>}
+              <button disabled={projectFileBusy} onClick={()=>openProjectDialog('new')}><Icon name="FilePlus2"/>{tr("Новый пустой проект…")}</button>
+              {serverStorageEnabled&&<button disabled={projectFileBusy} onClick={showServerProjects}><Icon name="Database"/>{tr("Открыть с сервера…")}</button>}
               <button disabled={projectFileBusy} onClick={openProjectFile}>
                 <Icon name="FolderOpen" />
-                Открыть проект…
-              </button>
-              <button disabled={projectFileBusy} onClick={saveProject}><Icon name="Save"/>Сохранить проект <kbd>Ctrl S</kbd></button>
-              <button disabled={projectFileBusy} onClick={()=>openProjectDialog('saveAs')}><Icon name="SaveAll"/>Сохранить проект как… <kbd>Ctrl Shift S</kbd></button>
-              <button disabled={projectFileBusy} onClick={()=>openProjectDialog('template')}><Icon name="BookCopy"/>Записать проект как шаблон…</button>
-              <button disabled={projectFileBusy} onClick={()=>runFileOperation(async()=>{downloadFile(JSON.stringify(createProjectTemplate(await portableProject(project),project.title),null,2),projectFilename(project.title,true));setMenu(null);})}><Icon name="FileDown"/>Экспортировать шаблон…</button>
+                {tr("Открыть проект…")}</button>
+              <button disabled={projectFileBusy} onClick={saveProject}><Icon name="Save"/>{tr("Сохранить проект ")}<kbd>Ctrl S</kbd></button>
+              <button disabled={projectFileBusy} onClick={()=>openProjectDialog('saveAs')}><Icon name="SaveAll"/>{tr("Сохранить проект как… ")}<kbd>Ctrl Shift S</kbd></button>
+              <button disabled={projectFileBusy} onClick={()=>openProjectDialog('template')}><Icon name="BookCopy"/>{tr("Записать проект как шаблон…")}</button>
+              <button disabled={projectFileBusy} onClick={()=>runFileOperation(async()=>{downloadFile(JSON.stringify(createProjectTemplate(await portableProject(project),project.title),null,2),projectFilename(project.title,true));setMenu(null);})}><Icon name="FileDown"/>{tr("Экспортировать шаблон…")}</button>
               <button onClick={exportProject}>
                 <Icon name="Download" />
-                Экспортировать JSON
-              </button>
-              <button disabled={projectFileBusy} onClick={restorePreviousProject}><Icon name="History"/>Восстановить предыдущий проект</button>
+                {tr("Экспортировать JSON")}</button>
+              <button disabled={projectFileBusy} onClick={restorePreviousProject}><Icon name="History"/>{tr("Восстановить предыдущий проект")}</button>
             </>
           ) : menu === "Правка" ? (
-            <><button disabled={running} onClick={()=>editClipboard('copy')}><Icon name="Copy"/>Копировать <kbd>Ctrl C</kbd></button><button disabled={running||!clipboard.current} onClick={()=>editClipboard('paste')}><Icon name="ClipboardPaste"/>Вставить <kbd>Ctrl V</kbd></button><button onClick={resetLayout}><Icon name="PanelsTopLeft"/>Восстановить раскладку</button><button
+            <><button disabled={running} onClick={()=>editClipboard('copy')}><Icon name="Copy"/>{tr("Копировать ")}<kbd>Ctrl C</kbd></button><button disabled={running||!clipboard.current} onClick={()=>editClipboard('paste')}><Icon name="ClipboardPaste"/>{tr("Вставить ")}<kbd>Ctrl V</kbd></button><button onClick={resetLayout}><Icon name="PanelsTopLeft"/>{tr("Восстановить раскладку")}</button><button
               disabled={!history.length}
               onClick={() => {
                 undo();
@@ -2796,13 +2794,13 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               }}
             >
               <Icon name="Undo2" />
-              Отменить <kbd>Ctrl Z</kbd>
+              {tr("Отменить ")}<kbd>Ctrl Z</kbd>
             </button></>
           ) : menu === "Создать" ? (
             <>
-              <button onClick={()=>openSubscenes('create')}><Icon name="PanelsTopLeft"/>Сабсцена</button>
-              <button onClick={()=>openAuthoring('action')}><Icon name="MousePointer2"/>Действие</button>
-              <button onClick={()=>openAuthoring('group')}><Icon name="Columns2"/>Группа действий</button>
+              <button onClick={()=>openSubscenes('create')}><Icon name="PanelsTopLeft"/>{tr("Сабсцена")}</button>
+              <button onClick={()=>openAuthoring('action')}><Icon name="MousePointer2"/>{tr("Действие")}</button>
+              <button onClick={()=>openAuthoring('group')}><Icon name="Columns2"/>{tr("Группа действий")}</button>
               <button
                 onClick={() => {
                   setMenu(null);
@@ -2810,8 +2808,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 }}
               >
                 <Icon name="MessageSquare" />
-                Блок сценария
-              </button>
+                {tr("Блок сценария")}</button>
               <button
                 onClick={() => {
                   setMenu(null);
@@ -2819,8 +2816,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 }}
               >
                 <Icon name="Layers" />
-                Событие
-              </button>
+                {tr("Событие")}</button>
               <button
                 onClick={() => {
                   setMenu(null);
@@ -2828,15 +2824,14 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 }}
               >
                 <Icon name="Box" />
-                Объект
-              </button>
+                {tr("Объект")}</button>
             </>
           ) : (
             <>
-              <button onClick={()=>{setMaximized(null);setLayout(l=>({...l,hiddenHierarchy:hierarchyVisible}));setCompactPanel(hierarchyVisible?'workspace':'hierarchy');setMenu(null);}}><Icon name="PanelLeft"/>{hierarchyVisible?'Свернуть':'Показать'} иерархию</button>
-              <button onClick={()=>{setMaximized(null);setLayout(l=>({...l,hiddenInspector:inspectorVisible}));setCompactPanel(inspectorVisible?'workspace':'inspector');setMenu(null);}}><Icon name="PanelRight"/>{inspectorVisible?'Свернуть':'Показать'} инспектор</button>
-              <button onClick={()=>{setHistoryOpen(true);setMenu(null);}}><Icon name="BookOpen"/>История · отдельное окно</button>
-              {dockTools.map(([id,label])=><button key={id} disabled={id==='event'&&!event} onClick={()=>{setDock(id);setDetailEditor(false);setMaximized(null);setFloatingDock(true);setMenu(null);}}><Icon name="AppWindow"/>{label}</button>)}
+              <button onClick={()=>{setMaximized(null);setLayout(l=>({...l,hiddenHierarchy:hierarchyVisible}));setCompactPanel(hierarchyVisible?'workspace':'hierarchy');setMenu(null);}}><Icon name="PanelLeft"/>{hierarchyVisible?tr("Свернуть"):tr("Показать")} {tr("иерархию")}</button>
+              <button onClick={()=>{setMaximized(null);setLayout(l=>({...l,hiddenInspector:inspectorVisible}));setCompactPanel(inspectorVisible?'workspace':'inspector');setMenu(null);}}><Icon name="PanelRight"/>{inspectorVisible?tr("Свернуть"):tr("Показать")} {tr("инспектор")}</button>
+              <button onClick={()=>{setHistoryOpen(true);setMenu(null);}}><Icon name="BookOpen"/>{tr("История · отдельное окно")}</button>
+              {dockTools.map(([id,label])=><button key={id} disabled={id==='event'&&!event} onClick={()=>{setDock(id);setDetailEditor(false);setMaximized(null);setFloatingDock(true);setMenu(null);}}><Icon name="AppWindow"/>{tr(label)}</button>)}
               <button
                 onClick={() => {
                   setMaximized("scene");
@@ -2844,8 +2839,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 }}
               >
                 <Icon name="Maximize2" />
-                Развернуть сцену
-              </button>
+                {tr("Развернуть сцену")}</button>
               <button
                 onClick={() => {
                   setMaximized("graph");
@@ -2853,13 +2847,12 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 }}
               >
                 <Icon name="Workflow" />
-                Развернуть граф
-              </button>
+                {tr("Развернуть граф")}</button>
             </>
           )}
         </div>
       )}
-      {contextMenu&&<EditorContextMenu x={contextMenu.x} y={contextMenu.y} title={contextMenu.kind==='scene'?'Сцена':'Добавить ноду'} items={contextItems()} onClose={closeContextMenu}/>}
+      {contextMenu&&<EditorContextMenu x={contextMenu.x} y={contextMenu.y} title={contextMenu.kind==='scene'?tr("Сцена"):tr("Добавить ноду")} items={contextItems()} onClose={closeContextMenu}/>}
       {picker && (
         <div
           className="create-overlay"
@@ -2872,18 +2865,18 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               <Icon name="Plus" size={16} />
               <strong>
                 {picker.kind === "beat"
-                  ? "Добавить ноду"
+                  ? tr("Добавить ноду")
                   : picker.kind === "event"
-                    ? "Добавить событие"
+                    ? tr("Добавить событие")
                     : picker.kind === "object"
-                      ? "Добавить объект"
+                      ? tr("Добавить объект")
                       : picker.kind === "object-action"
-                        ? "Действие с объектом"
-                        : "Добавить действие"}
+                        ? tr("Действие с объектом")
+                        : tr("Добавить действие")}
               </strong>
               <Button
                 icon="X"
-                title="Закрыть"
+                title={tr("Закрыть")}
                 onClick={() => setPicker(null)}
               />
             </div>
@@ -2891,10 +2884,10 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               <>
                 {beat.kind === "choice" && (
                   <div className="create-phase">
-                    <Field label="Продолжить ответ">
+                    <Field label={tr("Продолжить ответ")}>
                       <Select
                         value={picker.choiceId || beat.choices[0]?.id}
-                        options={beat.choices.map((c) => [c.id, c.label])}
+                        options={beat.choices.map((c) => [c.id, literalLabel(c.label)])}
                         onChange={(choiceId) =>
                           setPicker((p) => ({ ...p, choiceId }))
                         }
@@ -2933,7 +2926,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                     <button key={kind} onClick={() => kind.startsWith("math:")?addBeat("math",{operator:kind.split(":")[1]}):kind.startsWith("convert:")?addBeat("convert",{valueType:kind.split(":")[1]}):kind.startsWith("compare:")?addBeat("compare",{operator:kind.split(":")[1]}):addBeat(kind)}>
                       <Icon name={icon} size={22} />
                       <span>
-                        <strong>{title}</strong>
+                        <strong>{tr(title)}</strong>
                         <small>{desc}</small>
                       </span>
                       <Icon name="ChevronRight" size={15} />
@@ -2942,13 +2935,16 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 </div>
               </>
             ) : picker.kind === "object" ? (
+              <><p>{tr("Создать в: ")}{project.objectGroups?.find(g=>g.id===(picker?.groupId||selection.groupId||(selection.kind==='group'?selection.id:null)))?.name||tr("Объекты сцены")}</p>
               <div className="create-options">
-                {[['Персонаж','box','PersonStanding','Персонаж','Участвует в диалогах и постановке'],['Активный меш','box','MousePointer2','Интерактивный предмет','Клик игрока запускает продолжение'],['Меш','box','Box','Куб','Декорация · размеры меняются мышью'],['Меш','sphere','Circle','Сфера','Простой объёмный объект'],['Меш','cylinder','Cylinder','Цилиндр','Колонна, ваза или временный объект'],['Источник света','box','Lightbulb','Источник освещения','Точечный свет с настройкой цвета и интенсивности']].map(([type,shape,icon,name,hint])=><button key={name} onClick={()=>addObject(type,shape)}><Icon name={icon} size={23}/><span><strong>{name}</strong><small>{hint}</small></span></button>)}
-              </div>
+                <button onClick={addStagingPoint}><Icon name="MapPin" size={23}/><span><strong>{tr("Точка постановки")}</strong><small>{tr("Место назначения для движения персонажа")}</small></span></button>
+                <button onClick={addSoundEvent}><Icon name="Volume2" size={23}/><span><strong>{tr("Звуковое событие")}</strong><small>{tr("Аудиофайл, громкость, fade in и fade out")}</small></span></button>
+                {[['Персонаж','box','PersonStanding','Персонаж','Участвует в диалогах и постановке'],['Активный меш','box','MousePointer2','Интерактивный предмет','Клик игрока запускает продолжение'],['Меш','box','Box','Куб','Декорация · размеры меняются мышью'],['Меш','sphere','Circle','Сфера','Простой объёмный объект'],['Меш','cylinder','Cylinder','Цилиндр','Колонна, ваза или временный объект'],['Источник света','box','Lightbulb','Источник освещения','Точечный свет с настройкой цвета и интенсивности']].map(([type,shape,icon,name,hint])=><button key={name} onClick={()=>addObject(type,shape)}><Icon name={icon} size={23}/><span><strong>{tr(name)}</strong><small>{tr(hint)}</small></span></button>)}
+              </div></>
             ) : picker.kind === "event" ? (
               <>
                 <div className="create-phase">
-                  <Field label="Когда запустить">
+                  <Field label={tr("Когда запустить")}>
                     <Select
                       value={picker.phase || "ON_START"}
                       options={PHASES.map((p) => [p.id, p.label])}
@@ -2957,7 +2953,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   </Field>
 
                 </div>
-                <input type="search" aria-label="Поиск событий" placeholder="Найти событие…" value={eventSearch} onChange={e=>setEventSearch(e.target.value)}/>
+                <input type="search" aria-label={tr("Поиск событий")} placeholder={tr("Найти событие…")} value={eventSearch} onChange={e=>setEventSearch(e.target.value)}/>
                 <div className="event-selection-list">
                   {project.events
                     .filter((e) => (!picker.assetId || e.id === picker.assetId)&&e.name.toLowerCase().includes(eventSearch.toLowerCase()))
@@ -2990,18 +2986,16 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                         <span>
                           <strong>{e.name}</strong>
                           <small>
-                            {e.groups.length} группы ·{" "}
+                            {e.groups.length} {tr("группы ·")}{" "}
                             {e.groups.reduce((n, g) => n + g.actions.length, 0)}{" "}
-                            действия
-                          </small>
+                            {tr("действия")}</small>
                         </span>
                         <Icon name="Plus" size={15} />
                       </button>
                     ))}
                 </div>
                   <Button icon="Plus" onClick={createEvent}>
-                    Добавить событие
-                  </Button>
+                    {tr("Добавить событие")}</Button>
               </>
             ) : (
               <div className="create-options action-type-picker">
@@ -3062,8 +3056,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                     >
                       <Icon name={t.icon} size={20} />
                       <span>
-                        <strong>{t.label}</strong>
-                        <small>{t.domain || "Условие"}</small>
+                        <strong>{tr(t.label)}</strong>
+                        <small>{tr(t.domain) || tr("Условие")}</small>
                       </span>
                     </button>
                   ))}
@@ -3072,7 +3066,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           </div>
         </div>
       )}
-      {projectDialog&&<ProjectDialog key={projectDialog} mode={projectDialog} project={project} templates={projectTemplates} busy={projectFileBusy} error={projectFileError} onSubmit={submitProjectDialog} onClose={()=>setProjectDialog(null)}/>}
+      {projectDialog&&<ProjectDialog key={projectDialog} mode={projectDialog} project={project} templates={projectTemplates} busy={projectFileBusy} error={message(projectFileError)} onSubmit={submitProjectDialog} onClose={()=>setProjectDialog(null)}/>}
       <input
         hidden
         type="file"

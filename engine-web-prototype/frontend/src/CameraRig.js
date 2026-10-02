@@ -4,7 +4,7 @@ import {cameraPose,cameraFromView,resolveCamera} from './cameraModel.js';
 
 export function createCameraRig(scene,view,orbit,canvas,getLive){
  const markers=new Map(),control=new TransformControls(view,canvas),gizmo=control.getHelper();scene.add(gizmo);control.setSize(.75);
- let lastKey,editorView,ignoreUntil=0,pending,previousPilotData,dialogueKey,dialogueElapsed=0;
+ let lastKey,editorView,ignoreUntil=0,pending,previousPilotData,previousPreviewData,requestedPreview,dialogueKey,dialogueElapsed=0;
  const freeLimits={min:orbit.minPolarAngle,max:orbit.maxPolarAngle};
  const capture=()=>({position:view.position.toArray(),target:orbit.target.toArray(),fov:view.fov});
  const apply=(pose,k=1)=>{view.position.lerp(new THREE.Vector3(...pose.position),k);orbit.target.lerp(new THREE.Vector3(...pose.target),k);view.fov=THREE.MathUtils.lerp(view.fov,pose.fov||58,k);view.updateProjectionMatrix();view.lookAt(orbit.target);};
@@ -28,24 +28,28 @@ export function createCameraRig(scene,view,orbit,canvas,getLive){
  });
  return {
   capture,
+  preview(id){requestedPreview=id;},
   get dragging(){return control.dragging;},
   blocksClick(){return control.dragging||!!control.axis||performance.now()<ignoreUntil||(getLive().mode==='scene'&&!!getLive().cameraPilotId);},
   pick(ray){const live=getLive();if(live.mode!=='scene'||live.cameraPilotId)return null;const hit=ray.intersectObjects([...markers.values()].filter(m=>m.body.visible).map(m=>m.body),true)[0];let o=hit?.object;while(o&&!o.userData.cameraId)o=o.parent;return o?.userData.cameraId||null;},
   update(dt,objectDragging=false){
-   const live=getLive(),definition=live.cameraScene||{kind:live.kind,cameras:[]},cameras=definition.cameras||[],pilot=cameras.find(c=>c.id===live.cameraPilotId),key=live.sceneId+'|'+live.mode+'|'+(pilot?.id||'')+'|'+(live.cameraPreviewId||'');
+   const live=getLive(),definition=live.cameraScene||{kind:live.kind,cameras:[]},cameras=definition.cameras||[],pilot=cameras.find(c=>c.id===live.cameraPilotId),preview=live.mode==='scene'&&!pilot?cameras.find(c=>c.id===live.cameraPreviewId):null,key=live.sceneId+'|'+live.mode+'|'+(pilot?.id||'')+'|'+(live.cameraPreviewId||'');
    if(dialogueKey!==live.state.dialogue?.key){dialogueKey=live.state.dialogue?.key;dialogueElapsed=0;}
-   orbit.minPolarAngle=pilot?0:freeLimits.min;orbit.maxPolarAngle=pilot?Math.PI:freeLimits.max;
+   orbit.minPolarAngle=pilot||preview?0:freeLimits.min;orbit.maxPolarAngle=pilot||preview?Math.PI:freeLimits.max;
    if(key!==lastKey){
     const changedScene=lastKey&&lastKey.split('|')[0]!==live.sceneId;
     if(changedScene)editorView=null;
-    else if(lastKey?.split('|')[1]==='scene'&&!lastKey?.split('|')[2])editorView=capture();
+    else if(lastKey?.split('|')[1]==='scene'&&!lastKey?.split('|')[2]&&!lastKey?.split('|')[3])editorView=capture();
     if(live.mode==='scene'&&!pilot&&!editorView&&!live.objects.length)apply({position:[6,4.5,6],target:[0,0,0],fov:58});
     else if(changedScene&&live.mode==='scene'&&!pilot)apply(resolveCamera(definition,live.state,live.objects));
     if(live.mode==='scene'&&!pilot&&editorView)apply(editorView);
+    if(preview)apply(cameraPose(preview,live.state,live.objects,live.kind));
     if(live.mode==='scene'&&pilot)apply(cameraPose(pilot,live.state,live.objects,live.kind));
     if(live.mode==='game')apply(resolveCamera(definition,live.state,live.objects,live.cameraPreviewId));
-    previousPilotData=pilot?JSON.stringify(pilot):null;lastKey=key;
+    previousPilotData=pilot?JSON.stringify(pilot):null;previousPreviewData=preview?JSON.stringify(preview):null;lastKey=key;
    }
+   if(preview&&(requestedPreview===preview.id||JSON.stringify(preview)!==previousPreviewData)){apply(cameraPose(preview,live.state,live.objects,live.kind));previousPreviewData=JSON.stringify(preview);}
+   requestedPreview=null;
    if(pilot&&live.mode==='scene'&&JSON.stringify(pilot)!==previousPilotData){apply(cameraPose(pilot,live.state,live.objects,live.kind));previousPilotData=JSON.stringify(pilot);}
    if(live.mode==='game'&&!live.state.paused){
     const pose=resolveCamera(definition,live.state,live.objects,live.cameraPreviewId,dialogueElapsed);

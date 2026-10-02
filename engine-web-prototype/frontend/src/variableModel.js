@@ -9,6 +9,7 @@ export function variableReferences(p,id){
   if(b.variable===id||b.resultVariable===id||(b.test?.rules||[]).some(r=>r.variable===id)||(b.choices||[]).some(c=>c.condition===id||c.availability?.rules?.some(r=>r.variable===id))||(b.bindings||[]).some(bind=>bind.condition===id||Object.values(bind.actionOverrides||{}).some(a=>a.target===id)))refs.push(b.id);
  }
  for(const event of p.events||[])if(event.groups?.some(g=>g.actions.some(a=>a.type==='variable'&&a.target===id)))refs.push(event.id);
+ for(const action of p.input?.actions||[])if(['variable','variableX','variableY'].some(field=>action[field]===id))refs.push(action.id);
  return [...new Set(refs)];
 }
 export function editVariable(p,id,patch){
@@ -27,6 +28,7 @@ export function editVariable(p,id,patch){
    for(const bind of b.bindings||[]){if(bind.condition===id)bind.condition=name;for(const a of Object.values(bind.actionOverrides||{}))if(a.target===id)a.target=name;}
   }
   for(const e of p.events||[])for(const g of e.groups||[])for(const a of g.actions||[])if(a.type==='variable'&&a.target===id)a.target=name;
+  for(const action of p.input?.actions||[])for(const field of ['variable','variableX','variableY'])if(action[field]===id)action[field]=name;
  }
  p.variableTypes??={};if(patch.type)p.variableTypes[name]=patch.type;
  p.variables[name]=variableValue(p,name,'value'in patch?patch.value:p.variables[name]);

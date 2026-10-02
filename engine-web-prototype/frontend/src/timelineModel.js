@@ -1,15 +1,16 @@
+import {t as tr} from './i18n.js';
 import {isPureNode} from './logicModel.js';
 import {storyPorts,availabilityOf,conditionSummary,ANSWER_VARIABLE,variableName} from './choiceModel.js';
 // The story has no authored duration. This is an ordered flow of subscene
 // fragments, not a seconds-based ruler. Contract only unambiguous linear runs:
 // merging an entire scene would invent paths between unrelated entrances/exits.
 export const timelineVariableName = variableName;
-export const timelineVariableValue = value => value === undefined ? 'не задано' : typeof value === 'boolean' ? (value ? 'да' : 'нет') : String(value);
+export const timelineVariableValue = value => value === undefined ? tr('не задано') : typeof value === 'boolean' ? (value ? tr('да') : tr('нет')) : String(value);
 export function timelineCondition(choice) {
   if(choice.availability)return conditionSummary(choice.availability);
-  if (!choice.condition || choice.condition === 'always') return 'Без условия';
-  if (choice.condition === 'trust') return `Доверие ≥ ${choice.threshold ?? 3}`;
-  return `${timelineVariableName(choice.condition)} = да`;
+  if (!choice.condition || choice.condition === 'always') return tr('Без условия');
+  if (choice.condition === 'trust') return tr('Доверие ≥ {0}',[choice.threshold??3]);
+  return `${timelineVariableName(choice.condition)} = ${tr('да')}`;
 }
 
 export function buildTimelineModel(project) {
@@ -56,6 +57,7 @@ export function buildTimelineModel(project) {
     }
     nodes.push({
       id, kind:['choice','branch'].includes(first.kind) ? 'choice' : first.kind === 'end' ? 'ending' : 'subscene',
+      choicesAreSystem:first.kind==='branch',systemTitle:first.kind==='branch'||!scene||(first.kind==='end'&&!first.ending),
       sceneId:scene?.id, sceneName:scene?.name || 'Без сабсцены', color:scene?.color || '#bd94a9',
       location:scene?.location || '', entryBeatId:first.id, beatIds:members.map(beat => beat.id),
       text:first.kind==='branch'?conditionSummary(first.test):first.text || '', title:first.kind === 'end' ? first.ending || 'Концовка без названия' : first.kind==='branch'?'Проверка':scene?.name || 'Без сабсцены',
@@ -80,7 +82,7 @@ export function buildTimelineModel(project) {
       target = `missing:${edge.id}`;
       const source = nodes.find(node => node.id === beatToNode[edge.from]);
       nodes.push({id:target,kind:'missing',sceneId:source?.sceneId,sceneName:source?.sceneName,
-        title:edge.to ? 'Реплика не найдена' : 'Нет продолжения',text:edge.to || 'Назначьте продолжение ответа',
+        systemTitle:true,title:edge.to ? 'Реплика не найдена' : 'Нет продолжения',text:edge.to || 'Назначьте продолжение ответа',
         entryBeatId:edge.from,beatIds:[],choices:[]});
     }
     return {...edge,source:beatToNode[edge.from],target,crossScene:!!edge.to && sceneByBeat.get(edge.from)?.id !== sceneByBeat.get(edge.to)?.id,isReturn:false};
