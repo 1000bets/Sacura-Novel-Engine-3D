@@ -3,17 +3,20 @@ import {Flower2,Plus,BookOpen,FolderOpen,ArrowRight,LogOut,Upload} from 'lucide-
 import Editor from './Editor.jsx';
 import ThemePicker from './ThemePicker.jsx';
 import {accountStorage} from './accountStorage.js';
-import {serverStorageEnabled,listServerProjects,openServerProject,saveServerProject,flushServerSaves} from './serverStorage.js';
+import {serverStorageEnabled,listServerProjects,listOtherServerProjects,openServerProject,saveServerProject,flushServerSaves} from './serverStorage.js';
 import {createEmptyProject,createStandardProject,listLocalProjects,rememberLocalProject,parseProjectFile} from './projectLifecycle.js';
 import {readProject} from './projectFiles.js';
 import './projectHome.css';
 
 export default function ProjectHome({user=null,onLogout}) {
- const [active,setActive]=useState(null),[projects,setProjects]=useState([]),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[creating,setCreating]=useState(false),[name,setName]=useState('Новый проект');
+ const [active,setActive]=useState(null),[projects,setProjects]=useState([]),[otherProjects,setOtherProjects]=useState([]),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[creating,setCreating]=useState(false),[name,setName]=useState('Новый проект');
  const operation=useRef(false),fileInput=useRef(null),newButton=useRef(null);
  async function refresh(){
   setLoading(true);setError('');
-  try{setProjects(serverStorageEnabled?await listServerProjects():listLocalProjects(accountStorage));}
+  try{
+   const [own,others]=await Promise.all([serverStorageEnabled?listServerProjects():listLocalProjects(accountStorage),serverStorageEnabled&&user?.login==='syper'?listOtherServerProjects():[]]);
+   setProjects(own);setOtherProjects(others);
+  }
   catch(err){setError(err.message);}
   finally{setLoading(false);}
  }
@@ -26,7 +29,7 @@ export default function ProjectHome({user=null,onLogout}) {
  }
  async function open(project,{save=false}={}){
   let next=readProject(project);
-  if(save&&serverStorageEnabled)next=await saveServerProject(next);
+  if(save&&serverStorageEnabled)next=await saveServerProject(next,null);
   if(!serverStorageEnabled)rememberLocalProject(accountStorage,next);
   setCreating(false);setActive(next);
  }
@@ -52,6 +55,9 @@ export default function ProjectHome({user=null,onLogout}) {
     {loading?<p role="status">Загрузка проектов…</p>:projects.length?<div className="project-home-list">{projects.map(project=><button key={project.id} disabled={busy} onClick={()=>run(async()=>open(serverStorageEnabled?await openServerProject(project.id):project.project))}><FolderOpen aria-hidden="true" size={20}/><span><strong>{project.title}</strong><small>{project.updatedAt?'Сохранён '+new Date(project.updatedAt).toLocaleString('ru-RU'):'Сохранён в этом браузере'}</small></span><span className="project-home-open">Открыть <ArrowRight aria-hidden="true" size={16}/></span></button>)}</div>:<p className="project-home-empty">Пока нет сохранённых проектов. Создайте новый или начните со стандартного шаблона.</p>}
     <input ref={fileInput} type="file" hidden accept="application/json,.json" onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(file)run(async()=>open(parseProjectFile(await file.text()).project,{save:true}));}}/><button className="project-home-import" disabled={busy} onClick={()=>fileInput.current?.click()}><Upload aria-hidden="true" size={16}/>Загрузить проект из файла</button>
    </section>
+   {serverStorageEnabled&&user?.login==='syper'&&<section className="project-home-recent" aria-labelledby="other-projects-title"><div className="project-home-section-heading"><h2 id="other-projects-title">Чужие проекты</h2></div>
+    {loading?<p role="status">Загрузка проектов…</p>:otherProjects.length?<div className="project-home-list">{otherProjects.map(project=><button key={project.ownerId+':'+project.id} disabled={busy} onClick={()=>run(async()=>open(await openServerProject(project.id,project.ownerId)))}><FolderOpen aria-hidden="true" size={20}/><span><strong>{project.title}</strong><small>Автор: {project.ownerLogin}</small><small>Сохранён {new Date(project.updatedAt).toLocaleString('ru-RU')}</small></span><span className="project-home-open">Открыть <ArrowRight aria-hidden="true" size={16}/></span></button>)}</div>:<p className="project-home-empty">У других пользователей пока нет сохранённых проектов.</p>}
+   </section>}
   </div>
  </main>;
 }

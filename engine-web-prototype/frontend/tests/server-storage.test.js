@@ -41,3 +41,40 @@ test('server client migrates shared models once, restores projects, exports port
   await assert.rejects(storage.saveServerProject(saved),/conflict/);
  }finally{globalThis.fetch=previousFetch;globalThis.localStorage=previousStorage;}
 });
+
+test('owner context isolates revisions and queued saves for identical project IDs',async()=>{
+ let source=(await readFile(new URL('../src/serverStorage.js',import.meta.url),'utf8')).replace("import.meta.env?.VITE_SERVER_STORAGE==='true'",'true');
+ source=source.replace(/from '(\.\/[^']+)'/g,(_,path)=>`from '${new URL(path,new URL('../src/serverStorage.js',import.meta.url)).href}'`);
+ const previousFetch=globalThis.fetch,previousStorage=globalThis.localStorage;
+ const values=new Map(),writes=[],uploads=[];
+ const projects=new Map([['own',{project:{id:'same',title:'Свой',objects:[]},revision:3}],['alice',{project:{id:'same',title:'Алиса',objects:[]},revision:7}],['bob',{project:{id:'same',title:'Боб',objects:[]},revision:2}]]);
+ globalThis.localStorage={getItem:key=>values.get(key),setItem:(key,value)=>values.set(key,value)};
+ const response=(value,status=200)=>new Response(JSON.stringify(value),{status});
+ globalThis.fetch=async(path,options={})=>{
+  const url=new URL(path,'http://localhost'),owner=url.searchParams.get('ownerId')||'own';
+  if(url.pathname==='/api/admin/projects')return response([{id:'same',ownerId:'alice',ownerLogin:'alice'}]);
+  if(url.pathname==='/api/meshes'){
+   uploads.push(owner);return response({src:'/api/meshes/'+'a'.repeat(64)+'.obj',format:'obj'});
+  }
+  const current=projects.get(owner);
+  if(options.method==='PUT'){
+   const body=JSON.parse(options.body);assert.equal(body.expectedRevision,current.revision);
+   writes.push(owner);const saved={project:body.project,revision:current.revision+1};projects.set(owner,saved);return response(saved);
+  }
+  return response(current);
+ };
+ try{
+  const storage=await import('data:text/javascript;base64,'+Buffer.from(source+'\n// owner test').toString('base64'));
+  assert.equal((await storage.listOtherServerProjects())[0].ownerLogin,'alice');
+  const alice=await storage.openServerProject('same','alice');
+  assert.equal(values.size,0,'foreign project never replaces own active project');
+  const savedAlice=storage.saveServerProject({...alice,title:'Правка Алисы',objects:[{model:{src:'v 0 0 0\n',format:'obj'}}]});
+  const bob=await storage.openServerProject('same','bob');
+  const savedBob=storage.saveServerProject({...bob,title:'Правка Боба'});
+  await Promise.all([savedAlice,savedBob]);
+  const own=await storage.openServerProject('same');await storage.saveServerProject({...own,title:'Правка своего'});
+  assert.deepEqual(writes,['alice','bob','own']);assert.deepEqual(uploads,['alice']);
+  assert.equal(projects.get('alice').revision,8);assert.equal(projects.get('bob').revision,3);assert.equal(projects.get('own').revision,4);
+  storage.resetServerStorage();
+ }finally{globalThis.fetch=previousFetch;globalThis.localStorage=previousStorage;}
+});

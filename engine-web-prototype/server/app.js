@@ -32,16 +32,32 @@ export function createApp(storage,{secureCookies=false}={}){
   next();
  });
  app.get('/api/auth',(req,res)=>res.json({user:req.user}));
+ const requireProjectAdmin=req=>{
+  if(req.user.login!=='syper')throw httpError(403,'Чужие проекты доступны только syper.');
+ };
+ const projectOwner=req=>{
+  const owner=req.query.ownerId;
+  if(owner===undefined)return req.user.id;
+  if(typeof owner!=='string'||!owner)throw httpError(400,'Некорректный владелец проекта.');
+  if(owner!==req.user.id){
+   requireProjectAdmin(req);
+   if(!storage.db.prepare('SELECT id FROM users WHERE id=?').get(owner))throw httpError(404,'Пользователь не найден.');
+  }
+  return owner;
+ };
+ app.get('/api/admin/projects',(req,res)=>{requireProjectAdmin(req);res.json(storage.listOthers(req.user.id));});
  app.get('/api/projects',(req,res)=>res.json(storage.list(req.user.id)));
- app.get('/api/projects/:id',(req,res)=>res.json(storage.get(req.user.id,req.params.id)));
+ app.get('/api/projects/:id',(req,res)=>res.json(storage.get(projectOwner(req),req.params.id)));
  app.put('/api/projects/:id',express.json({limit:'256mb'}),(req,res)=>{
   if(!/^[\w-]{1,120}$/.test(req.params.id))throw httpError(400,'Некорректный ID.');
-  res.json(storage.save(req.user.id,req.params.id,req.body.project,req.body.expectedRevision));
+  const owner=projectOwner(req);
+  if(owner!==req.user.id)storage.get(owner,req.params.id);
+  res.json(storage.save(owner,req.params.id,req.body.project,req.body.expectedRevision));
  });
- app.post('/api/meshes',express.raw({type:'application/octet-stream',limit:MESH_LIMIT}),async(req,res)=>res.status(201).json(await storage.upload(req.user.id,req.body,req.query.format)));
+ app.post('/api/meshes',express.raw({type:'application/octet-stream',limit:MESH_LIMIT}),async(req,res)=>res.status(201).json(await storage.upload(projectOwner(req),req.body,req.query.format)));
  app.get('/api/meshes/:key',async(req,res)=>{
   if(!/^[a-f0-9]{64}\.(glb|obj)$/.test(req.params.key))throw httpError(404,'Модель не найдена.');
-  const object=await storage.mesh(req.user.id,req.params.key);
+  const object=await storage.mesh(req.user.id,req.params.key,{allowOthers:req.user.login==='syper'});
   res.set('Content-Type',req.params.key.endsWith('.glb')?'model/gltf-binary':'text/plain; charset=utf-8');
   res.set('X-Content-Type-Options','nosniff');
   res.set('Cache-Control','no-store');
