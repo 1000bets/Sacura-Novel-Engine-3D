@@ -1,0 +1,82 @@
+.story-flow {height:100%;width:100%;position:relative;background:var(--bg);}
+.story-moment {background:var(--panel);border:1px solid var(--line);border-radius:7px;overflow:visible;color:var(--text-secondary);font-size:12px;box-shadow:0 4px 18px #0002;}
+.story-moment.selected {border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);}
+.story-moment.playing {border-color:var(--success);}
+.moment-grab {display:flex;align-items:center;gap:8px;padding:12px;background:var(--line);border-radius:6px 6px 0 0;cursor:grab;}
+.moment-grab span {flex:1;font-weight:600;}.moment-grab small {color:var(--muted);}
+.moment-environment {display:flex;gap:7px;align-items:center;width:100%;padding:9px 12px;border-bottom:1px solid var(--line);font-size:11px;color:var(--accent);}
+.moment-phase {padding:7px 12px;border-bottom:1px solid var(--line);}
+.moment-phase-label {display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.06em;}
+.moment-phase-label button {padding:3px 5px;}
+.moment-batch {border-left:2px solid var(--line);padding-left:8px;margin:6px 0;}
+.moment-batch-order {display:flex;align-items:center;gap:5px;color:var(--muted);}
+.moment-batch-order select {font-size:10px;border:0;background:transparent;max-width:190px;padding:3px;}
+.moment-event {display:block;text-align:left;width:100%;padding:8px;margin:5px 0;background:var(--bg);border:1px solid var(--line);border-radius:4px;}
+.moment-event.selected {border-color:var(--accent);}.moment-event>span {display:flex;gap:6px;align-items:center;margin-bottom:5px;}.moment-event strong {font-size:12px;}
+.moment-event small {display:block;font-size:10px;line-height:1.6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.moment-event em {display:block;color:var(--muted);font-size:10px;font-style:normal;margin-top:5px;}
+.moment-dialogue {padding:16px 14px;background:color-mix(in srgb,var(--accent) 8%,var(--panel));cursor:pointer;}
+.moment-dialogue strong {color:var(--accent);}.moment-dialogue p {font-size:14px;line-height:1.6;margin:8px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;}
+.moment-input {display:flex;align-items:center;gap:6px;padding:9px 12px;color:var(--muted);font-size:11px;border-bottom:1px solid var(--line);}
+.story-moment footer {padding:5px 0;}.moment-route {position:relative;min-height:42px;display:flex;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line);}.moment-route:last-child {border:0;}.moment-route small {display:block;color:var(--muted);font-size:10px;margin-top:3px;}.story-moment footer>strong {display:flex;gap:7px;padding:10px 14px;}
+.story-flow-navigation {position:absolute;bottom:13px;left:55px;display:flex;gap:4px;background:var(--panel);padding:3px;border:1px solid var(--line);border-radius:4px;z-index:5;}.story-flow-navigation button{padding:5px;}
+.story-moment.missing {padding:16px;border-color:var(--warning);}
+.flow-toolbar-context {font-size:11px;color:var(--muted);white-space:nowrap;}
+.moment-batch-order button {padding:3px;color:var(--muted);}.moment-batch-order select {flex:1;}.moment-issue {display:flex;gap:6px;padding:8px 12px;font-size:11px;color:var(--warning);border-bottom:1px solid var(--line);}
+.story-flow .react-flow__handle {width:16px !important;height:16px !important;border:2px solid var(--text-secondary) !important;border-radius:3px !important;background:var(--panel) !important;cursor:crosshair;z-index:4;}
+.story-flow .react-flow__handle::after {content:'';position:absolute;inset:3px;background:var(--text-secondary);clip-path:polygon(0 0,100% 50%,0 100%);}
+.story-flow .react-flow__handle:hover,.story-flow .react-flow__handle.valid {border-color:var(--accent) !important;box-shadow:0 0 0 5px color-mix(in srgb,var(--accent) 25%,transparent);}
+.story-flow .react-flow__edge-path {stroke-width:2;}.story-flow .react-flow__edge:hover .react-flow__edge-path {stroke:var(--accent);stroke-width:3;}
+.story-wire-help {position:absolute;right:10px;bottom:12px;max-width:55%;padding:6px 9px;background:var(--panel);border:1px solid var(--line);border-radius:4px;font-size:10px;color:var(--text-secondary);pointer-events:none;}
+.story-wire-transfer {position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:8;}.story-wire-transfer path {stroke:var(--accent);stroke-width:3;stroke-dasharray:7 4;fill:none;}
+.story-moment .moment-route.disconnected {color:var(--warning);}
+.story-moment .moment-route.disconnected small {color:var(--warning);}
+
+.story-flow .react-flow__handle.data-pin {width:12px !important;height:12px !important;border-radius:50% !important;background:var(--info) !important;border-color:var(--panel) !important;}
+.story-flow .react-flow__handle.data-pin::after {display:none;}
+
+/* Branches have a distinct silhouette and labelled outcomes, independent of theme colour. */
+.story-flow .logic-if {border:2px solid var(--warning);border-left-width:5px;box-shadow:0 4px 20px #0004;}
+.story-flow .logic-if.selected {outline:2px solid var(--accent);outline-offset:3px;}
+.story-flow .logic-if .moment-grab {padding:15px 12px;background:color-mix(in srgb,var(--warning) 22%,var(--panel));color:var(--warning);border-bottom:1px solid var(--warning);}
+.logic-if .moment-grab>strong {font-size:18px;white-space:nowrap;}
+.logic-if-badge {font-size:9px;font-weight:700;letter-spacing:.08em;margin-left:auto;padding:4px 5px;border:1px solid currentColor;border-radius:3px;}
+.logic-if .logic-body {padding:16px 14px;}
+.logic-if-route {min-height:58px;}
+.logic-if-route>span {display:grid;grid-template-columns:18px 1fr;gap:2px 8px;align-items:center;}
+.logic-if-route small {grid-column:2;}
+.logic-if-true {background:color-mix(in srgb,var(--success) 10%,var(--panel));color:var(--success);}
+.logic-if-false {background:color-mix(in srgb,var(--warning) 8%,var(--panel));color:var(--warning);}
+.story-flow .logic-if-true .react-flow__handle {border-color:var(--success) !important;}
+.story-flow .logic-if-true .react-flow__handle::after {background:var(--success);}
+.story-flow .logic-if-false .react-flow__handle {border-color:var(--warning) !important;}
+.story-flow .logic-if-false .react-flow__handle::after {background:var(--warning);}
+.story-route {gap:12px;flex-wrap:wrap;}
+.story-route-label {font-size:12px;}
+.story-flow .story-destination {display:inline-flex;align-items:center;justify-content:flex-start;gap:6px;min-height:28px;min-width:0;max-width:100%;padding:4px 7px;border:1px solid var(--line);background:var(--bg);border-radius:5px;font-size:12px;color:var(--text-secondary);text-align:left;}
+.story-destination>span {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.story-destination>svg:last-child {margin-left:auto;color:var(--muted);}
+.story-flow .story-destination:hover,.story-flow .story-destination:focus-visible {border-color:var(--accent);color:var(--text-primary);background:var(--accent-bg);}
+.story-destination-empty {display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);}
+.story-destination-empty.broken {color:var(--warning);}
+.story-traced-node>.story-moment {outline:2px solid var(--accent);outline-offset:4px;box-shadow:0 0 0 6px var(--accent-bg);}
+.node-answer-route>span>.story-destination {display:flex;margin-top:5px;width:100%;}
+.logic-if-route>span {min-width:0;width:100%;}
+.logic-if-route .story-destination {display:flex;margin-top:6px;}
+.logic-if-route .story-destination,.logic-if-route .story-destination-empty {grid-column:2;}
+
+/* Keep answers compact; place their handles on the card border. */
+.choice-result-output {position:relative;padding:10px 16px;border-top:1px solid var(--line);color:var(--info);font-size:12px;}
+.story-flow .node-answers {gap:8px;padding:10px;}
+.story-flow .node-answer {gap:6px;padding:8px;}
+.node-answer-text textarea {min-height:36px!important;}
+.story-flow .node-answer-enabled {min-height:24px;padding:2px 0;}
+.story-flow .node-answer-enabled>.data-pin {left:-25px!important;}
+.story-flow .node-answer-route {min-height:24px;padding:4px 0;color:var(--muted);font-size:10px;}
+.story-flow .node-answer-route>.react-flow__handle {right:-19px!important;}
+.story-flow .node-answer-settings {padding-top:4px;}
+.story-flow .node-answer-settings>summary {min-height:20px;padding:0;}
+.node-answer-settings p {font-size:10px;}
+.story-route {min-height:32px;}
+
+.moment-event.draggable{cursor:grab;touch-action:none}.moment-event.draggable:active{cursor:grabbing}.moment-phase{min-height:40px}

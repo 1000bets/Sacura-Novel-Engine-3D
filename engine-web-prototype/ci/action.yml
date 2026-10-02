@@ -1,0 +1,74 @@
+name: Verify web prototype
+description: Test and build the editor, API and container deployment
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 24
+        cache: npm
+        cache-dependency-path: |
+          engine-web-prototype/server/package-lock.json
+          engine-web-prototype/frontend/package-lock.json
+    - run: npm ci --prefix server
+      shell: bash
+      working-directory: ${{ github.workspace }}/engine-web-prototype
+    - run: npm ci --prefix frontend
+      shell: bash
+      working-directory: ${{ github.workspace }}/engine-web-prototype
+    - run: npm test --prefix server
+      shell: bash
+      working-directory: ${{ github.workspace }}/engine-web-prototype
+    - run: npm test --prefix frontend
+      shell: bash
+      working-directory: ${{ github.workspace }}/engine-web-prototype
+    - run: npm run build --prefix frontend
+      shell: bash
+      working-directory: ${{ github.workspace }}/engine-web-prototype
+      env:
+        VITE_SERVER_STORAGE: "true"
+    - name: Configure isolated test storage
+      shell: bash
+      working-directory: ${{ github.workspace }}/engine-web-prototype
+      run: |
+        cp .env.example .env
+        printf '\nS3_SECRET_KEY=%s\n' "$(openssl rand -hex 32)" >> .env
+    - run: docker compose config --quiet
+      shell: bash
+      working-directory: ${{ github.workspace }}/engine-web-prototype
+    - name: Validate Ubuntu production deployment configuration
+      run: bash deploy/production.sh check
+      shell: bash
+      working-directory: ${{ github.workspace }}/engine-web-prototype
+      env:
+        DOMAIN: editor.example.com
+        ACME_EMAIL: ops@example.com
+    - run: docker compose up -d --build --wait --wait-timeout 180
+      shell: bash
+      working-directory: ${{ github.workspace }}/engine-web-prototype
+    - run: node deploy/smoke.mjs
+      shell: bash
+      working-directory: ${{ github.workspace }}/engine-web-prototype
+      env:
+        SACURA_SMOKE_STATE: /tmp/sacura-smoke-state.json
+    - run: docker compose restart api minio
+      shell: bash
+      working-directory: ${{ github.workspace }}/engine-web-prototype
+    - run: docker compose up -d --wait --wait-timeout 180
+      shell: bash
+      working-directory: ${{ github.workspace }}/engine-web-prototype
+    - run: node deploy/smoke.mjs
+      shell: bash
+      working-directory: ${{ github.workspace }}/engine-web-prototype
+      env:
+        SACURA_SMOKE_STATE: /tmp/sacura-smoke-state.json
+    - name: Logs
+      if: failure()
+      run: docker compose logs --tail=100
+      shell: bash
+      working-directory: ${{ github.workspace }}/engine-web-prototype
+    - name: Clean up isolated test deployment
+      if: always()
+      run: docker compose down -v
+      shell: bash
+      working-directory: ${{ github.workspace }}/engine-web-prototype

@@ -1,0 +1,7 @@
+.mesh-inspector{min-width:0;margin:12px 0;padding:12px;border:1px solid var(--border, #514854);border-radius:8px;display:grid;gap:10px}
+.mesh-inspector legend{padding:0 5px;font-weight:600}
+.mesh-inspector small{display:block;line-height:1.5;color:var(--text-muted, #b4a9b7);overflow-wrap:anywhere}
+.mesh-import{display:grid;gap:8px;min-width:0}
+.mesh-import strong{overflow-wrap:anywhere}
+.mesh-inspector input[type=range]{width:100%}
+.mesh-inspector input[type=color]{width:100%;height:30px}

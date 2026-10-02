@@ -1,0 +1,11 @@
+services:
+  web:
+    image: sacura-web:${SACURA_RELEASE:?Set SACURA_RELEASE to the commit SHA}
+    build:
+      args:
+        VITE_BUILD_SHA: ${SACURA_RELEASE}
+        VITE_DEPLOY_ENV: staging
+  api:
+    image: sacura-api:${SACURA_RELEASE}
+  minio:
+    image: sacura-minio:${SACURA_RELEASE}
