@@ -1,4 +1,5 @@
 import {t as tr, useLocale} from './i18n.jsx';
+import {createGameVisuals} from './GameVisuals.js';
 import {createGameControls,gameSceneHit} from './GameControls.js';
 import {createScenePhysics} from './scenePhysics.js';
 import {createMeshObject,updateMeshVisual,disposeMeshVisual,applyMaterialAssignments,disposeMaterialAssignments} from './meshVisual.js';
@@ -194,6 +195,7 @@ export default function Scene({
     const viewport=createRendererViewport(renderer,camera,element);
     const gizmo=createSceneGizmo(scene,camera,renderer.domElement,controls,()=>callbacks.current,()=>pickables);
     const physics=createScenePhysics(scene,()=>callbacks.current,()=>pickables);if(physicsApi)physicsApi.current=physics;
+    const gameVisuals=createGameVisuals(scene);
     const gameControls=createGameControls(camera,renderer.domElement,()=>callbacks.current);
     const cameraRig=createCameraRig(scene,camera,controls,renderer.domElement,()=>callbacks.current);if(cameraApi)cameraApi.current=cameraRig;
     const destinationMarker=new THREE.Mesh(new THREE.SphereGeometry(.09,16,12),new THREE.MeshBasicMaterial({color:0xffca68,depthTest:false}));destinationMarker.renderOrder=1000;destinationMarker.visible=false;scene.add(destinationMarker);
@@ -260,9 +262,9 @@ export default function Scene({
       const now=performance.now(),dt=Math.min(.05,(now-previous)/1000);previous=now;
 
       const live = callbacks.current.state;
-      gameControls.tick(dt);
+      gameControls.tick(dt);gameVisuals.update(callbacks.current.state.game);
       animTime=updateAtmosphere(live,dt);
-      pickables.forEach(mesh=>{const o=callbacks.current.objects.find(o=>o.id===mesh.userData.id);if(!o){disposeCharacterVisual(mesh);disposeMeshVisual(mesh);mesh.visible=false;return;}mesh.visible=o.active&&live.visible?.[o.id]!==false;
+      pickables.forEach(mesh=>{const o=callbacks.current.objects.find(o=>o.id===mesh.userData.id);if(!o){disposeCharacterVisual(mesh);disposeMeshVisual(mesh);mesh.visible=false;return;}mesh.visible=o.active&&live.visible?.[o.id]!==false&&!(live.game?.active&&live.game.preset==='fps'&&live.playerControl?.characterId===o.id);
         gizmo.apply(mesh,o,resolvedPosition(o,live,'living'));
         updateLightObject(mesh,o,callbacks.current.mode==='scene');
         updateMeshVisual(mesh,o);if(o.type!=='Персонаж'&&o.type!=='Источник света'&&!mesh.userData.placeholder)applyMaterialAssignments(mesh,o);
@@ -289,7 +291,7 @@ export default function Scene({
       if(cameraApi?.current===cameraRig)cameraApi.current=null;
       if(physicsApi?.current===physics)physicsApi.current=null;
       physics.dispose();
-      gameControls.dispose();
+      gameVisuals.dispose();gameControls.dispose();
       cameraRig.dispose();
       gizmo.dispose();
       controls.dispose();

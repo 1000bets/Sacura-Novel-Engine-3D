@@ -1,8 +1,8 @@
 // Shared authoring/runtime RectTransform model. Coordinates use the widget's reference resolution.
-export const WIDGET_KINDS={dialogue:'Диалог',mainMenu:'Главное меню',pauseMenu:'Меню паузы'};
-export const ELEMENT_TYPES={panel:'Панель',text:'Текст',button:'Кнопка',image:'Изображение',choices:'Ответы игрока'};
+export const WIDGET_KINDS={dialogue:'Диалог',mainMenu:'Главное меню',pauseMenu:'Меню паузы',hud:'Игровой HUD'};
+export const ELEMENT_TYPES={progress:'Шкала',inventory:'Инвентарь',panel:'Панель',text:'Текст',button:'Кнопка',image:'Изображение',choices:'Ответы игрока'};
 export const WIDGET_ROLES={none:'Без привязки',speaker:'Имя персонажа',dialogueText:'Текст реплики',choices:'Ответы игрока',status:'Подсказка',title:'Название игры'};
-export const MENU_ACTIONS={none:'Без действия',advance:'Продолжить диалог',start:'Начать игру',resume:'Снять паузу',restart:'Начать заново',mainMenu:'В главное меню'};
+export const MENU_ACTIONS={event:'Запустить событие',gameplay:'Игровая команда',save:'Сохранить прохождение',load:'Загрузить прохождение',none:'Без действия',advance:'Продолжить диалог',start:'Начать игру',resume:'Снять паузу',restart:'Начать заново',mainMenu:'В главное меню'};
 const finite=(v,fallback=0)=>Number.isFinite(Number(v))?Number(v):fallback;
 export const rectTransform=(patch={})=>({anchorMin:[.5,.5],anchorMax:[.5,.5],pivot:[.5,.5],x:0,y:0,width:360,height:80,...patch});
 export function createWidgetElement(id,type='panel',patch={}){
@@ -11,7 +11,13 @@ export function createWidgetElement(id,type='panel',patch={}){
 export function createWidget(id,kind='dialogue',name=WIDGET_KINDS[kind]){
  const element=(key,type,patch)=>createWidgetElement(id+'-'+key,type,patch),root=id+'-panel';
  let elements;
- if(kind==='dialogue')elements=[
+ if(kind==='hud')elements=[
+ element('hp','text',{name:'Здоровье',text:'HP',style:{fontSize:24,padding:0},binding:{source:'variable',path:'hp',format:'HP: {value}'},layout:rectTransform({anchorMin:[0,0],anchorMax:[0,0],pivot:[0,0],x:24,y:22,width:200,height:42})}),
+ element('health','progress',{name:'Шкала здоровья',binding:{source:'variable',path:'hp'},maxVariable:'maxHp',min:0,max:100,layout:rectTransform({anchorMin:[0,0],anchorMax:[0,0],pivot:[0,0],x:24,y:68,width:220,height:16})}),
+ element('ammo','text',{name:'Патроны',style:{fontSize:24,padding:0},binding:{source:'variable',path:'ammo',format:'Ammo: {value}'},layout:rectTransform({anchorMin:[0,0],anchorMax:[0,0],pivot:[0,0],x:24,y:98,width:220,height:40})}),
+ element('inventory','inventory',{name:'Инвентарь',layout:rectTransform({anchorMin:[1,1],anchorMax:[1,1],pivot:[1,1],x:-24,y:-24,width:440,height:130})}),
+ ];
+ else if(kind==='dialogue')elements=[
   element('panel','panel',{name:'Диалоговое окно',layout:rectTransform({anchorMin:[0,1],anchorMax:[1,1],pivot:[.5,1],x:0,y:-34,width:-100,height:205}),style:{background:'#211c29',color:'#fff4f8',opacity:.96,borderRadius:16,borderWidth:1,borderColor:'#ad849d',padding:0}}),
   element('speaker','text',{name:'Имя персонажа',parentId:root,role:'speaker',layout:rectTransform({anchorMin:[0,0],anchorMax:[1,0],pivot:[0,0],x:28,y:18,width:-56,height:32}),style:{background:'transparent',color:'#e2b8d1',fontSize:23,fontWeight:600,padding:0}}),
   element('text','text',{name:'Текст реплики',parentId:root,role:'dialogueText',layout:rectTransform({anchorMin:[0,0],anchorMax:[1,1],pivot:[0,0],x:28,y:60,width:-88,height:-105}),style:{background:'transparent',color:'#fff4f8',fontSize:24,padding:0}}),
@@ -116,6 +122,7 @@ export function validateWidgets(project){
    if(!e||typeof e!=='object'){bad('Некорректный элемент.');continue;}
    if(typeof e.id!=='string'||!e.id)bad('Отсутствует ID элемента.');
    if(elementIds.has(e.id))bad('Повторяющийся ID элемента.');elementIds.add(e.id);
+   if(e.binding&&(!['variable','game'].includes(e.binding.source)||typeof e.binding.path!=='string'))bad('Повреждена привязка значения.');if(e.action==='event'&&e.eventId&&!project.events?.some(x=>x.id===e.eventId))bad('Событие кнопки удалено.');
    if(!ELEMENT_TYPES[e.type])bad('Неизвестный тип элемента.');
    const l=e.layout;
    if(!l||['anchorMin','anchorMax','pivot'].some(k=>!Array.isArray(l[k])||l[k].length!==2||l[k].some(v=>!Number.isFinite(v)||v<0||v>1))||['x','y','width','height'].some(k=>!Number.isFinite(l[k]))||l.anchorMin.some((v,i)=>v>l.anchorMax[i]))bad('Некорректные анкеры или размер элемента «'+e.name+'».');

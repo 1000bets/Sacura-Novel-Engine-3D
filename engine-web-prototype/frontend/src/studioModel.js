@@ -1,3 +1,5 @@
+import {ensureGameplay,validateGameplay} from './gameplayModel.js';
+import {validateFunctions} from './blueprintFunctions.js';
 import {ensureInputSettings,validateInputSettings} from './inputModel.js';
 import {ensureWidgets,validateWidgets} from './widgetModel.js';
 import {interactionTargets,playerControls} from './interactionModel.js';
@@ -40,7 +42,7 @@ export function removeEventBinding(p,beatId,bindingId){
 }
 export function newEvent(type='move',target,value,name){return {id:uid('event'),name:name||TYPES[type].label,description:'',retention:TYPES[type].completion==='CONTINUOUS'?'HOLD_UNTIL_STOPPED':'AUTO_CLOSE_ON_FLOW_END',owner:'SubScene',groups:[{id:uid('group'),name:'Основное действие',actions:[makeAction(type,target,value)]}]};}
 export function upgradeProject(source){
- const p=ensureInputSettings(ensureAudioSettings(structuredClone(source||createProject())));if(p.version===2){allBeats(p).forEach(normalizeBatches);return ensureWidgets(ensureCameras(ensureSceneEditing(ensureCreationLibrary(extendVisualExamples(p)))));}
+ const p=ensureGameplay(ensureInputSettings(ensureAudioSettings(structuredClone(source||createProject()))));if(p.version===2){allBeats(p).forEach(normalizeBatches);return ensureWidgets(ensureCameras(ensureSceneEditing(ensureCreationLibrary(extendVisualExamples(p)))));}
  const original=structuredClone(p);p.version=2;p.revision=2;p.audioAssets=AUDIO_ASSETS;p.subscenes=[
  {id:'living',name:'Вечер в гостиной',location:'Гостиная',kind:'living',entry:'a1',sceneId:'chapter1',weather:'Дождь',time:'Закат',color:'#afa1e2'},
  {id:'garden',name:'Следы в саду',location:'Старый сад',kind:'garden',entry:'garden-entry',sceneId:'chapter1',weather:'Гроза',time:'Ночь',color:'#8ec2ab'},
@@ -105,6 +107,7 @@ export function validateStudio(p){
   for(const port of dataTargets(b)){const source=getInput(b,port);if(source&&!allBeats(p).some(n=>n.id===source&&isDataSource(n)))issues.push({id:`logic-source-${b.id}-${port}`,beatId:b.id,level:'error',title:'Источник значения удалён',detail:'Переподключите круглый вход.'});}
   if(b.kind==='set-variable'&&!Object.hasOwn(p.variables||{},b.variable))issues.push({id:`set-variable-${b.id}`,beatId:b.id,level:'error',title:'Переменная не создана',detail:'Введите имя в ноде переменной.'});
   const location=sceneFor(p,b.id);
+  if(b.kind==='gameplay'&&(!p.gameplay?.enabled||!p.objects.some(o=>o.id===p.gameplay.playerId&&o.active!==false&&isObjectInScene(o,location))))issues.push({id:'game-player-'+b.id,beatId:b.id,level:'error',title:'Подготовьте игровую сцену',detail:'Выберите режим и доступного героя во вкладке «Игровые механики».'});
   if(b.kind==='gate'){
     for(const id of interactionTargets(b)){const object=p.objects.find(o=>o.id===id);if(object&&!isObjectInScene(object,location))issues.push({id:`gate-location-${b.id}${interactionTargets(b).length>1?'-'+id:''}`,beatId:b.id,level:'error',title:'Предмет ожидания отсутствует в сабсцене',detail:object.name});}
     const controls=playerControls(b),character=p.objects.find(o=>o.id===controls.characterId);
@@ -144,7 +147,7 @@ export function validateStudio(p){
   }
   for(const edge of edgesFor(p,b))if(edge.to&&!allBeats(p).some(n=>n.id===edge.to))issues.push({id:`edge-${b.id}-${edge.to}`,beatId:b.id,level:'error',title:'Переход ведёт в удалённую реплику',detail:edge.to});
  }
- issues.push(...validateWidgets(p),...validateInputSettings(p));
+ issues.push(...validateWidgets(p),...validateInputSettings(p),...validateGameplay(p),...validateFunctions(p));
  return [...new Map(issues.map(i=>[i.id,i])).values()];
 }
 export function fixStudio(p,i){const n=structuredClone(p);if(i.fix==='wait-previous'){allBeats(n).find(b=>b.id===i.beatId).bindings.find(b=>b.id===i.bindingId).join='EVENT_END';return n;}if(i.fix==='reset-overrides'){allBeats(n).find(b=>b.id===i.beatId).bindings.filter(b=>b.eventId===i.eventId).forEach(b=>{b.overrides={};b.actionOverrides={};});return n;}if(i.fix==='sequence-batch'){const b=allBeats(n).find(b=>b.id===i.beatId),g=b.batches[i.phase].find(g=>g.id===i.batchId);g.mode='SEQUENTIAL';g.bindingIds.forEach(id=>{const binding=b.bindings.find(x=>x.id===id);binding.join=n.events.find(e=>e.id===binding.eventId)?.retention==='AUTO_CLOSE_ON_FLOW_END'?'EVENT_END':'FLOW_END';});return n;}return null;}

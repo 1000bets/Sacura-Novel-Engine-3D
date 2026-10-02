@@ -2,7 +2,7 @@ import {t} from './i18n.js';
 import {runtimeVariableType} from './variableModel.js';
 export const INPUT_TYPES={boolean:'Кнопка',axis1d:'Ось 1D',axis2d:'Оси 2D'};
 export const INPUT_TRIGGERS={pressed:'Нажатие',released:'Отпускание',hold:'Удержание',continuous:'Пока активно'};
-export const INPUT_BEHAVIORS={event:'Событие движка',move:'Движение персонажа',interact:'Осмотреть предмет',point:'Идти / осмотреть по указателю',advance:'Продолжить диалог',pause:'Пауза / продолжить',choiceNext:'Следующий ответ',choicePrevious:'Предыдущий ответ'};
+export const INPUT_BEHAVIORS={shoot:'Стрелять',reload:'Перезарядить',jump:'Прыгнуть',look:'Смотреть',saveGame:'Сохранить прохождение',loadGame:'Загрузить прохождение',event:'Событие движка',move:'Движение персонажа',interact:'Осмотреть предмет',point:'Идти / осмотреть по указателю',advance:'Продолжить диалог',pause:'Пауза / продолжить',choiceNext:'Следующий ответ',choicePrevious:'Предыдущий ответ'};
 export const INPUT_DEVICES={keyboard:'Клавиатура',pointer:'Мышь / касание сцены', 'gamepad-axis':'Ось геймпада','gamepad-button':'Кнопка геймпада',touch:'Экранное управление',external:'Другой источник'};
 export function defaultInputSettings(){
  const action=(id,name,valueType,behavior,trigger='pressed')=>({id,name,valueType,behavior,trigger,holdSeconds:.4,consume:true});
@@ -18,7 +18,7 @@ export function defaultInputSettings(){
 }
 export function ensureInputSettings(project){project.input??=defaultInputSettings();return project;}
 export function inputContextsFor(project,beat){
- return [...new Set(['system',...(beat?.inputContexts??(beat?.kind==='gate'?['gameplay']:['dialogue']))])].filter(id=>project.input?.contexts?.some(c=>c.id===id));
+ return [...new Set(['system',...(project.gameplay?.enabled&&beat?.kind==='gameplay'?['gameplay','game-mechanics']:[]),...(beat?.inputContexts??(beat?.kind==='gate'?['gameplay']:['dialogue']))])].filter(id=>project.input?.contexts?.some(c=>c.id===id));
 }
 export function inputHelp(settings,contexts,behaviors){
  if(!settings)return '';

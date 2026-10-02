@@ -6,11 +6,11 @@ import {readProject} from '../src/projectFiles.js';
 import {createEmptyProject} from '../src/projectLifecycle.js';
 import {createCharacter} from '../src/characterModel.js';
 
-test('legacy migration adds all three widgets and is idempotent',()=>{
- const p=upgradeProject();assert.equal(p.widgets.length,3);assert.deepEqual(validateWidgets(p),[]);
+test('legacy migration adds menus, dialogue and HUD and is idempotent',()=>{
+ const p=upgradeProject();assert.equal(p.widgets.length,4);assert.deepEqual(validateWidgets(p),[]);
  const saved=JSON.stringify(p.widgets);assert.equal(JSON.stringify(upgradeProject(p).widgets),saved);
  for(const c of p.objects.filter(o=>o.type==='Персонаж'))assert.equal(c.dialogueWidgetId,null);
- const empty=createEmptyProject();assert.equal(empty.widgets.length,3);
+ const empty=createEmptyProject();assert.equal(empty.widgets.length,4);
  const c=createCharacter(empty,empty.subscenes[0].id,'Сакура');assert.equal(c.dialogueWidgetId,null);
 });
 test('dialogue overrides beat > character > project and ignores missing or wrong kinds',()=>{

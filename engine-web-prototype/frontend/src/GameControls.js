@@ -17,6 +17,7 @@ export function createGameControls(camera,canvas,getLive){
  };
  const sync=()=>{
   const live=getLive(),config=live.inputSettings||defaults;
+  if(globalThis.document?.pointerLockElement===canvas&&(!enabled()||live.state.paused||!live.state.game?.active))globalThis.document.exitPointerLock?.();
   if(settings!==config){system?.dispose();settings=config;system=new InputSystem(settings,action);move=[0,0];}
   system.setContexts(!enabled()?[]:live.state.paused||live.state.inputReady===false?['system']:live.state.inputContexts||['system','gameplay']);
   return enabled();
@@ -29,7 +30,8 @@ export function createGameControls(camera,canvas,getLive){
   system.feed('keyboard',e.code,1);system.tick(0);
  };
  const keyup=e=>{system?.feed('keyboard',e.code,0);system?.tick(0);};
- const pointerDown=e=>{if(e.target!==canvas||!sync())return;const code='button'+e.button;if(uses('pointer',code)){system.feed('pointer',code,1);system.tick(0);}};
+ const pointerDown=e=>{if(e.target!==canvas||!sync())return;if(getLive().state.game?.active&&['fps','thirdPerson'].includes(getLive().state.game.preset)&&!getLive().state.paused&&globalThis.document?.pointerLockElement!==canvas)canvas.requestPointerLock?.()?.catch?.(()=>{});const code='button'+e.button;if(uses('pointer',code)){system.feed('pointer',code,1);system.tick(0);}};
+ const pointerMove=e=>{if(!sync()||getLive().state.paused||globalThis.document?.pointerLockElement!==canvas)return;if(uses('pointer','delta')){system.feed('pointer','delta',[e.movementX,e.movementY],{payload:{delta:[e.movementX,e.movementY]}});system.tick(0);system.feed('pointer','delta',[0,0]);}};
  const pointerUp=e=>{system?.feed('pointer','button'+e.button,0);system?.tick(0);};
  const visibility=()=>{if(globalThis.document?.hidden)clear();};
  const external=e=>{if(!sync())return;const d=e.detail||{};if(typeof d.control!=='string')return;
@@ -49,7 +51,7 @@ export function createGameControls(camera,canvas,getLive){
   }
   for(const id of padIds)if(!current.has(id))system.removeSource(id,{cancel:true});padIds=current;
  };
- viewport.addEventListener('keydown',keydown);viewport.addEventListener('pointerdown',pointerDown);win?.addEventListener('pointerup',pointerUp);globalThis.document?.addEventListener('visibilitychange',visibility);win?.addEventListener('keyup',keyup);win?.addEventListener('blur',clear);viewport.addEventListener('blur',clear,true);viewport.addEventListener('sacura-input',external);
+ win?.addEventListener('pointermove',pointerMove);viewport.addEventListener('keydown',keydown);viewport.addEventListener('pointerdown',pointerDown);win?.addEventListener('pointerup',pointerUp);globalThis.document?.addEventListener('visibilitychange',visibility);win?.addEventListener('keyup',keyup);win?.addEventListener('blur',clear);viewport.addEventListener('blur',clear,true);viewport.addEventListener('sacura-input',external);
  sync();
  return {tick(dt){if(!sync()){clear();return;}pollPads();system.tick(dt);
   const c=getLive().state.playerControl;if(!c||getLive().state.paused)return;
@@ -57,6 +59,6 @@ export function createGameControls(camera,canvas,getLive){
   const forward=camera.getWorldDirection(new THREE.Vector3());forward.y=0;if(forward.lengthSq()<.001)forward.set(0,0,-1);forward.normalize();const right=new THREE.Vector3(-forward.z,0,forward.x),direction=forward.multiplyScalar(z).add(right.multiplyScalar(x));
   getLive().onPlayerStep?.(direction.toArray(),dt);
  },click(ray,id){if(!sync()||getLive().state.paused)return false;if(!uses('pointer','primary'))return getLive().state.inputActive===true;
-  const ground=ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0),new THREE.Vector3());system.pulse('pointer','primary',{point:ground?.toArray(),id});return true;
- },feed(device,control,value,options){if(sync()){system.feed(device,control,value,options);system.tick(0);}},get input(){return system;},dispose(){clear();system?.dispose();viewport.removeEventListener('keydown',keydown);viewport.removeEventListener('pointerdown',pointerDown);win?.removeEventListener('pointerup',pointerUp);globalThis.document?.removeEventListener('visibilitychange',visibility);win?.removeEventListener('keyup',keyup);win?.removeEventListener('blur',clear);viewport.removeEventListener('blur',clear,true);viewport.removeEventListener('sacura-input',external);}};
+  const shot=getLive().state.game?.active&&['fps','thirdPerson'].includes(getLive().state.game.preset)?{origin:camera.getWorldPosition(new THREE.Vector3()).toArray(),direction:camera.getWorldDirection(new THREE.Vector3()).toArray()}:{origin:ray.ray.origin.toArray(),direction:ray.ray.direction.toArray()};const ground=ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0),new THREE.Vector3());system.pulse('pointer','primary',{point:ground?.toArray(),id,...shot});return true;
+ },feed(device,control,value,options){if(sync()){system.feed(device,control,value,options);system.tick(0);}},get input(){return system;},dispose(){clear();system?.dispose();if(globalThis.document?.pointerLockElement===canvas)globalThis.document?.exitPointerLock?.();win?.removeEventListener('pointermove',pointerMove);viewport.removeEventListener('keydown',keydown);viewport.removeEventListener('pointerdown',pointerDown);win?.removeEventListener('pointerup',pointerUp);globalThis.document?.removeEventListener('visibilitychange',visibility);win?.removeEventListener('keyup',keyup);win?.removeEventListener('blur',clear);viewport.removeEventListener('blur',clear,true);viewport.removeEventListener('sacura-input',external);}};
 }

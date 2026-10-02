@@ -1,0 +1,4947 @@
+{
+  "format": "sacura-project-template",
+  "version": 1,
+  "id": "template-shooter",
+  "name": "Шутер · Последний рубеж",
+  "createdAt": "2026-10-02T14:00:00.000Z",
+  "project": {
+    "version": 2,
+    "id": "project-shooter-arena",
+    "title": "Шутер — Последний рубеж",
+    "revision": 2,
+    "visualExamplesVersion": 1,
+    "sceneEditingVersion": 2,
+    "variables": {
+      "hp": 100,
+      "maxHp": 100,
+      "ammo": 8,
+      "reserve": 40,
+      "kills": 0,
+      "inventory": [],
+      "score": 0,
+      "medkits": 1,
+      "weaponName": "Пистолет",
+      "lowHealth": false,
+      "hudMessage": "Щёлкните по сцене для обзора мышью. Уничтожьте пять противников.",
+      "results": {
+        "defeated": []
+      }
+    },
+    "objects": [
+      {
+        "id": "shooter-arena-floor",
+        "name": "Бетонный пол",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#53616a",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              0,
+              -0.15,
+              0
+            ],
+            "scale": [
+              32,
+              0.6,
+              40
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "wall-north",
+        "name": "Северная стена",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#253841",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              0,
+              2,
+              -10
+            ],
+            "scale": [
+              32,
+              8,
+              0.8
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        }
+      },
+      {
+        "id": "wall-west",
+        "name": "Западная стена",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#2f424b",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              -8,
+              2,
+              0
+            ],
+            "scale": [
+              0.8,
+              8,
+              40
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        }
+      },
+      {
+        "id": "wall-east",
+        "name": "Восточная стена",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#2f424b",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              8,
+              2,
+              0
+            ],
+            "scale": [
+              0.8,
+              8,
+              40
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        }
+      },
+      {
+        "id": "wall-south",
+        "name": "Южная стена",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#253841",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              0,
+              2,
+              10
+            ],
+            "scale": [
+              32,
+              8,
+              0.8
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        }
+      },
+      {
+        "id": "shooter-hero",
+        "name": "Боец",
+        "type": "Персонаж",
+        "dialogueWidgetId": null,
+        "color": "#729fb5",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "description": "Игрок: 100 HP. WASD, обзор мышью, прыжок. Коллайдер соответствует фигуре.",
+        "idleAnimation": "стоит",
+        "enabledAnimations": [
+          "стоит",
+          "ходит",
+          "сидит",
+          "машет",
+          "улыбка",
+          "задумчивость",
+          "танец",
+          "грусть"
+        ],
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              0,
+              0,
+              6
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "walkAnimation": "ходит",
+        "collision": {
+          "enabled": true,
+          "custom": true,
+          "size": [
+            0.45,
+            1.6,
+            0.45
+          ],
+          "offset": [
+            0,
+            0.8,
+            0
+          ]
+        }
+      },
+      {
+        "id": "enemy-1",
+        "name": "Штурмовик · центр",
+        "type": "Персонаж",
+        "dialogueWidgetId": null,
+        "color": "#bd665e",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "description": "50 HP · скорость 0.8 · урон 10. Преследует героя и атакует вблизи.",
+        "idleAnimation": "ходит",
+        "enabledAnimations": [
+          "стоит",
+          "ходит",
+          "сидит",
+          "машет",
+          "улыбка",
+          "задумчивость",
+          "танец",
+          "грусть"
+        ],
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              0,
+              0,
+              -2
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "walkAnimation": "ходит",
+        "collision": {
+          "enabled": true,
+          "custom": true,
+          "size": [
+            0.45,
+            1.6,
+            0.45
+          ],
+          "offset": [
+            0,
+            0.8,
+            0
+          ]
+        }
+      },
+      {
+        "id": "enemy-2",
+        "name": "Штурмовик · слева",
+        "type": "Персонаж",
+        "dialogueWidgetId": null,
+        "color": "#bd665e",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "description": "50 HP · скорость 0.9 · урон 10. Преследует героя и атакует вблизи.",
+        "idleAnimation": "ходит",
+        "enabledAnimations": [
+          "стоит",
+          "ходит",
+          "сидит",
+          "машет",
+          "улыбка",
+          "задумчивость",
+          "танец",
+          "грусть"
+        ],
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              -4.5,
+              0,
+              -4
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "walkAnimation": "ходит",
+        "collision": {
+          "enabled": true,
+          "custom": true,
+          "size": [
+            0.45,
+            1.6,
+            0.45
+          ],
+          "offset": [
+            0,
+            0.8,
+            0
+          ]
+        }
+      },
+      {
+        "id": "enemy-3",
+        "name": "Штурмовик · справа",
+        "type": "Персонаж",
+        "dialogueWidgetId": null,
+        "color": "#bd665e",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "description": "50 HP · скорость 0.9 · урон 10. Преследует героя и атакует вблизи.",
+        "idleAnimation": "ходит",
+        "enabledAnimations": [
+          "стоит",
+          "ходит",
+          "сидит",
+          "машет",
+          "улыбка",
+          "задумчивость",
+          "танец",
+          "грусть"
+        ],
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              4.5,
+              0,
+              -4
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "walkAnimation": "ходит",
+        "collision": {
+          "enabled": true,
+          "custom": true,
+          "size": [
+            0.45,
+            1.6,
+            0.45
+          ],
+          "offset": [
+            0,
+            0.8,
+            0
+          ]
+        }
+      },
+      {
+        "id": "enemy-4",
+        "name": "Разведчик · быстрый",
+        "type": "Персонаж",
+        "dialogueWidgetId": null,
+        "color": "#e1a459",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "description": "50 HP · скорость 1.35 · урон 8. Преследует героя и атакует вблизи.",
+        "idleAnimation": "ходит",
+        "enabledAnimations": [
+          "стоит",
+          "ходит",
+          "сидит",
+          "машет",
+          "улыбка",
+          "задумчивость",
+          "танец",
+          "грусть"
+        ],
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              -2,
+              0,
+              -8
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "walkAnimation": "ходит",
+        "collision": {
+          "enabled": true,
+          "custom": true,
+          "size": [
+            0.45,
+            1.6,
+            0.45
+          ],
+          "offset": [
+            0,
+            0.8,
+            0
+          ]
+        }
+      },
+      {
+        "id": "enemy-5",
+        "name": "Тяжёлый боец",
+        "type": "Персонаж",
+        "dialogueWidgetId": null,
+        "color": "#843f48",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "description": "100 HP · скорость 0.65 · урон 16. Преследует героя и атакует вблизи.",
+        "idleAnimation": "ходит",
+        "enabledAnimations": [
+          "стоит",
+          "ходит",
+          "сидит",
+          "машет",
+          "улыбка",
+          "задумчивость",
+          "танец",
+          "грусть"
+        ],
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              2,
+              0,
+              -8
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "walkAnimation": "ходит",
+        "collision": {
+          "enabled": true,
+          "custom": true,
+          "size": [
+            0.45,
+            1.6,
+            0.45
+          ],
+          "offset": [
+            0,
+            0.8,
+            0
+          ]
+        }
+      },
+      {
+        "id": "cover-west",
+        "name": "Укрытие слева",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#6c827a",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              -5,
+              0.7,
+              1
+            ],
+            "scale": [
+              4,
+              2.8,
+              2.6
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        }
+      },
+      {
+        "id": "cover-east",
+        "name": "Укрытие справа",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#6c827a",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              5,
+              0.7,
+              1
+            ],
+            "scale": [
+              4,
+              2.8,
+              2.6
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        }
+      },
+      {
+        "id": "cover-back-west",
+        "name": "Грузовой ящик слева",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#58656a",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              -6,
+              1.2,
+              -7
+            ],
+            "scale": [
+              4.4,
+              4.8,
+              4
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        }
+      },
+      {
+        "id": "cover-back-east",
+        "name": "Грузовой ящик справа",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#58656a",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              6,
+              1.2,
+              -7
+            ],
+            "scale": [
+              4.4,
+              4.8,
+              4
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        }
+      },
+      {
+        "id": "gate",
+        "name": "Ворота рубежа",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#18252c",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              0,
+              1.65,
+              -9.74
+            ],
+            "scale": [
+              7.6,
+              6.6,
+              0.3
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "gate-stripe",
+        "name": "Сигнал ворот",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#d5a55c",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              0,
+              3.45,
+              -9.6
+            ],
+            "scale": [
+              7.6,
+              0.24,
+              0.24
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "arena-medkit",
+        "name": "Аптечка · E — подобрать",
+        "type": "Активный меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#68c6a0",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              -5,
+              0.25,
+              3
+            ],
+            "scale": [
+              1.1,
+              1,
+              1.1
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        },
+        "interaction": "Подобрать аптечку"
+      },
+      {
+        "id": "medkit-cross-horizontal",
+        "name": "Метка аптечки",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#e5f5ee",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              -5,
+              0.515,
+              3
+            ],
+            "scale": [
+              0.72,
+              0.024,
+              0.2
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "medkit-cross-vertical",
+        "name": "Метка аптечки",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#e5f5ee",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              -5,
+              0.52,
+              3
+            ],
+            "scale": [
+              0.2,
+              0.024,
+              0.72
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "lane-0",
+        "name": "Разметка прохода 1",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#c6aa66",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              0,
+              0.006,
+              -5
+            ],
+            "scale": [
+              0.24,
+              0.024,
+              2.8
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "lane-1",
+        "name": "Разметка прохода 2",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#c6aa66",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              0,
+              0.006,
+              -1
+            ],
+            "scale": [
+              0.24,
+              0.024,
+              2.8
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "lane-2",
+        "name": "Разметка прохода 3",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#c6aa66",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              0,
+              0.006,
+              3
+            ],
+            "scale": [
+              0.24,
+              0.024,
+              2.8
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "lane-3",
+        "name": "Разметка прохода 4",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#c6aa66",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              0,
+              0.006,
+              7
+            ],
+            "scale": [
+              0.24,
+              0.024,
+              2.8
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "wall-band-0-0",
+        "name": "Сигнальная полоса 0/0",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#b69b64",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              -7.72,
+              2.8,
+              -6
+            ],
+            "scale": [
+              0.1,
+              0.4,
+              4
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "wall-band-0-1",
+        "name": "Сигнальная полоса 0/1",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#b69b64",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              -7.72,
+              2.8,
+              0
+            ],
+            "scale": [
+              0.1,
+              0.4,
+              4
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "wall-band-0-2",
+        "name": "Сигнальная полоса 0/2",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#b69b64",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              -7.72,
+              2.8,
+              6
+            ],
+            "scale": [
+              0.1,
+              0.4,
+              4
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "wall-band-1-0",
+        "name": "Сигнальная полоса 1/0",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#b69b64",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              7.72,
+              2.8,
+              -6
+            ],
+            "scale": [
+              0.1,
+              0.4,
+              4
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "wall-band-1-1",
+        "name": "Сигнальная полоса 1/1",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#b69b64",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              7.72,
+              2.8,
+              0
+            ],
+            "scale": [
+              0.1,
+              0.4,
+              4
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "wall-band-1-2",
+        "name": "Сигнальная полоса 1/2",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#b69b64",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              7.72,
+              2.8,
+              6
+            ],
+            "scale": [
+              0.1,
+              0.4,
+              4
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      }
+    ],
+    "events": [
+      {
+        "id": "shooter-death",
+        "name": "Смерть героя → финал",
+        "owner": "SubScene",
+        "retention": "AUTO_CLOSE_ON_FLOW_END",
+        "groups": [
+          {
+            "id": "shooter-death-group-0",
+            "name": "Основное действие",
+            "actions": [
+              {
+                "id": "hero-death-pose",
+                "type": "pose",
+                "target": "shooter-hero",
+                "value": "грусть",
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "duration": 2,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "equip-pistol",
+        "name": "Взять Пистолет",
+        "owner": "SubScene",
+        "retention": "AUTO_CLOSE_ON_FLOW_END",
+        "groups": [
+          {
+            "id": "equip-pistol-group-0",
+            "name": "Оружие и HUD вместе",
+            "actions": [
+              {
+                "id": "equip-pistol-action",
+                "type": "gameplay",
+                "target": "world",
+                "value": {
+                  "itemId": "pistol-item"
+                },
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "command": "equip",
+                "duration": 2,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние"
+              },
+              {
+                "id": "name-pistol",
+                "type": "variable",
+                "target": "weaponName",
+                "value": "Пистолет",
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "duration": 2,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние",
+                "operation": "set",
+                "valueType": "string"
+              },
+              {
+                "id": "notice-pistol",
+                "type": "variable",
+                "target": "hudMessage",
+                "value": "Пистолет готов. ЛКМ — огонь; R — перезарядка.",
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "duration": 2,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние",
+                "operation": "set",
+                "valueType": "string"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "equip-launcher",
+        "name": "Взять Гранатомёт",
+        "owner": "SubScene",
+        "retention": "AUTO_CLOSE_ON_FLOW_END",
+        "groups": [
+          {
+            "id": "equip-launcher-group-0",
+            "name": "Оружие и HUD вместе",
+            "actions": [
+              {
+                "id": "equip-launcher-action",
+                "type": "gameplay",
+                "target": "world",
+                "value": {
+                  "itemId": "launcher-item"
+                },
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "command": "equip",
+                "duration": 2,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние"
+              },
+              {
+                "id": "name-launcher",
+                "type": "variable",
+                "target": "weaponName",
+                "value": "Гранатомёт",
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "duration": 2,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние",
+                "operation": "set",
+                "valueType": "string"
+              },
+              {
+                "id": "notice-launcher",
+                "type": "variable",
+                "target": "hudMessage",
+                "value": "Гранатомёт готов. ЛКМ — огонь; R — перезарядка.",
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "duration": 2,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние",
+                "operation": "set",
+                "valueType": "string"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "heal-player",
+        "name": "Использовать аптечку (H)",
+        "owner": "SubScene",
+        "retention": "AUTO_CLOSE_ON_FLOW_END",
+        "groups": [
+          {
+            "id": "heal-player-group-0",
+            "name": "Основное действие",
+            "actions": [
+              {
+                "id": "heal-player-action",
+                "type": "gameplay",
+                "target": "world",
+                "value": {
+                  "functionId": "use-medkit",
+                  "args": {}
+                },
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "command": "callFunction",
+                "duration": 2,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "medkit-picked-up",
+        "name": "Скрыть метку подобранной аптечки",
+        "owner": "SubScene",
+        "retention": "AUTO_CLOSE_ON_FLOW_END",
+        "groups": [
+          {
+            "id": "medkit-picked-up-group-0",
+            "name": "Основное действие",
+            "actions": [
+              {
+                "id": "hide-cross-h",
+                "type": "visibility",
+                "target": "medkit-cross-horizontal",
+                "value": "Скрыть",
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "duration": 2,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние"
+              },
+              {
+                "id": "hide-cross-v",
+                "type": "visibility",
+                "target": "medkit-cross-vertical",
+                "value": "Скрыть",
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "duration": 2,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "audioAssets": [],
+    "actionTemplates": [],
+    "groupTemplates": [],
+    "scene": {
+      "location": "shooter-arena",
+      "weather": "Ясно",
+      "time": "День",
+      "camera": "Общий план"
+    },
+    "subscenes": [
+      {
+        "id": "shooter-arena",
+        "name": "Арена · Последний рубеж",
+        "description": "Пять противников в открытом проходе; укрытия и аптечка на флангах. Победа — уничтожить всех.",
+        "location": "Шутер — Последний рубеж",
+        "kind": "empty",
+        "entry": "shooter-intro",
+        "sceneId": "chapter1",
+        "weather": "Ясно",
+        "time": "День",
+        "color": "#96b9ba",
+        "stagingPoints": [],
+        "navMesh": {
+          "enabled": true,
+          "show": false,
+          "center": [
+            0,
+            0,
+            0
+          ],
+          "size": [
+            15,
+            19
+          ],
+          "cellSize": 0.25
+        },
+        "cameras": [
+          {
+            "id": "shooter-arena-camera",
+            "name": "Обзор арены · вступление и финал",
+            "mode": "fixed",
+            "position": [
+              0,
+              5.5,
+              9
+            ],
+            "target": [
+              0,
+              0,
+              -3
+            ],
+            "fov": 64,
+            "smoothing": 0.15
+          }
+        ],
+        "defaultCameraId": "shooter-arena-camera"
+      }
+    ],
+    "chapters": [
+      {
+        "id": "shooter-arena-chapter",
+        "name": "Игровая логика",
+        "subsceneId": "shooter-arena",
+        "beats": [
+          {
+            "id": "shooter-intro",
+            "kind": "dialogue",
+            "text": "Удержите рубеж: уничтожьте 5 противников. WASD — движение; мышь — обзор; ЛКМ — огонь. 1 / 2 — оружие; R — перезарядка; H — аптечка; E — подбор; пробел — прыжок. Щёлкните по сцене для захвата мыши, Esc — пауза.",
+            "speaker": "Задание",
+            "next": "shooter-combat",
+            "bindings": [],
+            "mode": "SEQUENTIAL",
+            "batches": {
+              "BEFORE": [],
+              "ON_START": [],
+              "AFTER": []
+            }
+          },
+          {
+            "id": "shooter-combat",
+            "kind": "gameplay",
+            "text": "ЛКМ — огонь · Esc — пауза",
+            "speaker": "",
+            "next": null,
+            "bindings": [],
+            "mode": "SEQUENTIAL",
+            "batches": {
+              "BEFORE": [],
+              "ON_START": [],
+              "AFTER": []
+            }
+          },
+          {
+            "id": "shooter-game-over",
+            "kind": "end",
+            "text": "Рубеж потерян. Попробуйте снова: держите дистанцию и используйте аптечки.",
+            "speaker": "",
+            "next": null,
+            "bindings": [],
+            "mode": "SEQUENTIAL",
+            "batches": {
+              "BEFORE": [],
+              "ON_START": [],
+              "AFTER": []
+            },
+            "ending": "Game Over — рубеж потерян",
+            "widgetId": "shooter-gameover"
+          },
+          {
+            "id": "shooter-win",
+            "kind": "end",
+            "text": "Все пять противников уничтожены. Рубеж удержан.",
+            "speaker": "",
+            "next": null,
+            "bindings": [],
+            "mode": "SEQUENTIAL",
+            "batches": {
+              "BEFORE": [],
+              "ON_START": [],
+              "AFTER": []
+            },
+            "ending": "Победа — рубеж удержан",
+            "widgetId": "shooter-victory"
+          }
+        ]
+      }
+    ],
+    "audioSettings": {
+      "sidechain": {
+        "reductionDb": 4,
+        "attack": 0.6,
+        "release": 0.9
+      }
+    },
+    "input": {
+      "version": 1,
+      "touchMode": "off",
+      "actions": [
+        {
+          "id": "move",
+          "name": "Двигаться",
+          "valueType": "axis2d",
+          "behavior": "move",
+          "trigger": "continuous",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "interact",
+          "name": "Осмотреть",
+          "valueType": "boolean",
+          "behavior": "interact",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "point",
+          "name": "Идти по указателю",
+          "valueType": "boolean",
+          "behavior": "point",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "advance",
+          "name": "Дальше",
+          "valueType": "boolean",
+          "behavior": "advance",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "pause",
+          "name": "Пауза",
+          "valueType": "boolean",
+          "behavior": "pause",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "choiceNext",
+          "name": "Следующий ответ",
+          "valueType": "boolean",
+          "behavior": "choiceNext",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "choicePrevious",
+          "name": "Предыдущий ответ",
+          "valueType": "boolean",
+          "behavior": "choicePrevious",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "fire",
+          "name": "Стрелять",
+          "behavior": "shoot",
+          "valueType": "boolean",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "reload",
+          "name": "Перезарядить",
+          "behavior": "reload",
+          "valueType": "boolean",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "jump",
+          "name": "Прыгнуть",
+          "behavior": "jump",
+          "valueType": "boolean",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "look",
+          "name": "Смотреть",
+          "behavior": "look",
+          "valueType": "axis2d",
+          "trigger": "continuous",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "saveGame",
+          "name": "Сохранить прохождение",
+          "behavior": "saveGame",
+          "valueType": "boolean",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "loadGame",
+          "name": "Загрузить прохождение",
+          "behavior": "loadGame",
+          "valueType": "boolean",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "pistol-select",
+          "name": "Взять пистолет",
+          "eventId": "equip-pistol",
+          "behavior": "event",
+          "valueType": "boolean",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "launcher-select",
+          "name": "Взять гранатомёт",
+          "eventId": "equip-launcher",
+          "behavior": "event",
+          "valueType": "boolean",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "medkit-use",
+          "name": "Использовать аптечку",
+          "eventId": "heal-player",
+          "behavior": "event",
+          "valueType": "boolean",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        }
+      ],
+      "contexts": [
+        {
+          "id": "system",
+          "name": "Система",
+          "priority": 100,
+          "bindings": [
+            {
+              "actionId": "pause",
+              "device": "keyboard",
+              "control": "Escape",
+              "scale": 1,
+              "id": "system-0"
+            },
+            {
+              "actionId": "pause",
+              "device": "gamepad-button",
+              "control": "9",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "system-1"
+            },
+            {
+              "actionId": "pause",
+              "device": "touch",
+              "control": "pause",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "system-2"
+            }
+          ]
+        },
+        {
+          "id": "dialogue",
+          "name": "Диалог",
+          "priority": 10,
+          "bindings": [
+            {
+              "actionId": "advance",
+              "device": "keyboard",
+              "control": "Enter",
+              "scale": 1,
+              "id": "dialogue-0"
+            },
+            {
+              "actionId": "advance",
+              "device": "keyboard",
+              "control": "Space",
+              "scale": 1,
+              "id": "dialogue-1"
+            },
+            {
+              "actionId": "advance",
+              "device": "gamepad-button",
+              "control": "0",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "dialogue-2"
+            },
+            {
+              "actionId": "advance",
+              "device": "touch",
+              "control": "advance",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "dialogue-3"
+            },
+            {
+              "actionId": "choiceNext",
+              "device": "keyboard",
+              "control": "ArrowDown",
+              "scale": 1,
+              "id": "dialogue-4"
+            },
+            {
+              "actionId": "choicePrevious",
+              "device": "keyboard",
+              "control": "ArrowUp",
+              "scale": 1,
+              "id": "dialogue-5"
+            },
+            {
+              "actionId": "choiceNext",
+              "device": "gamepad-button",
+              "control": "13",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "dialogue-6"
+            },
+            {
+              "actionId": "choicePrevious",
+              "device": "gamepad-button",
+              "control": "12",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "dialogue-7"
+            }
+          ]
+        },
+        {
+          "id": "gameplay",
+          "name": "Ходьба и взаимодействие",
+          "priority": 20,
+          "bindings": [
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "KeyW",
+              "scale": [
+                0,
+                1
+              ],
+              "id": "gameplay-0"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "ArrowUp",
+              "scale": [
+                0,
+                1
+              ],
+              "id": "gameplay-1"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "KeyS",
+              "scale": [
+                0,
+                -1
+              ],
+              "id": "gameplay-2"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "ArrowDown",
+              "scale": [
+                0,
+                -1
+              ],
+              "id": "gameplay-3"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "KeyA",
+              "scale": [
+                -1,
+                0
+              ],
+              "id": "gameplay-4"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "ArrowLeft",
+              "scale": [
+                -1,
+                0
+              ],
+              "id": "gameplay-5"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "KeyD",
+              "scale": [
+                1,
+                0
+              ],
+              "id": "gameplay-6"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "ArrowRight",
+              "scale": [
+                1,
+                0
+              ],
+              "id": "gameplay-7"
+            },
+            {
+              "actionId": "interact",
+              "device": "keyboard",
+              "control": "KeyE",
+              "scale": 1,
+              "id": "gameplay-8"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-axis",
+              "control": "0",
+              "scale": [
+                1,
+                0
+              ],
+              "deadZone": 0.18,
+              "id": "gameplay-9"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-axis",
+              "control": "1",
+              "scale": [
+                0,
+                -1
+              ],
+              "deadZone": 0.18,
+              "id": "gameplay-10"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-button",
+              "control": "12",
+              "scale": [
+                0,
+                1
+              ],
+              "deadZone": 0,
+              "id": "gameplay-11"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-button",
+              "control": "13",
+              "scale": [
+                0,
+                -1
+              ],
+              "deadZone": 0,
+              "id": "gameplay-12"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-button",
+              "control": "14",
+              "scale": [
+                -1,
+                0
+              ],
+              "deadZone": 0,
+              "id": "gameplay-13"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-button",
+              "control": "15",
+              "scale": [
+                1,
+                0
+              ],
+              "deadZone": 0,
+              "id": "gameplay-14"
+            },
+            {
+              "actionId": "interact",
+              "device": "gamepad-button",
+              "control": "0",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "gameplay-15"
+            },
+            {
+              "actionId": "point",
+              "device": "pointer",
+              "control": "primary",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "gameplay-16"
+            },
+            {
+              "actionId": "move",
+              "device": "touch",
+              "control": "move",
+              "scale": [
+                1,
+                1
+              ],
+              "deadZone": 0,
+              "id": "gameplay-17"
+            },
+            {
+              "actionId": "interact",
+              "device": "touch",
+              "control": "interact",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "gameplay-18"
+            }
+          ]
+        },
+        {
+          "id": "game-mechanics",
+          "name": "Игровые механики",
+          "priority": 40,
+          "bindings": [
+            {
+              "id": "game-action-0",
+              "actionId": "fire",
+              "device": "pointer",
+              "control": "primary",
+              "scale": 1,
+              "deadZone": 0
+            },
+            {
+              "id": "game-action-1",
+              "actionId": "reload",
+              "device": "keyboard",
+              "control": "KeyR",
+              "scale": 1,
+              "deadZone": 0
+            },
+            {
+              "id": "game-action-2",
+              "actionId": "jump",
+              "device": "keyboard",
+              "control": "Space",
+              "scale": 1,
+              "deadZone": 0
+            },
+            {
+              "id": "game-action-3",
+              "actionId": "saveGame",
+              "device": "keyboard",
+              "control": "F5",
+              "scale": 1,
+              "deadZone": 0
+            },
+            {
+              "id": "game-action-4",
+              "actionId": "loadGame",
+              "device": "keyboard",
+              "control": "F9",
+              "scale": 1,
+              "deadZone": 0
+            },
+            {
+              "id": "game-action-5",
+              "actionId": "look",
+              "device": "pointer",
+              "control": "delta",
+              "scale": [
+                1,
+                1
+              ],
+              "deadZone": 0
+            },
+            {
+              "id": "game-action-6",
+              "actionId": "look",
+              "device": "gamepad-axis",
+              "control": "2",
+              "scale": [
+                1,
+                0
+              ],
+              "deadZone": 0.18
+            },
+            {
+              "id": "game-action-7",
+              "actionId": "look",
+              "device": "gamepad-axis",
+              "control": "3",
+              "scale": [
+                0,
+                1
+              ],
+              "deadZone": 0.18
+            },
+            {
+              "id": "game-action-8",
+              "actionId": "fire",
+              "device": "gamepad-button",
+              "control": "7",
+              "scale": 1,
+              "deadZone": 0
+            },
+            {
+              "id": "game-action-9",
+              "actionId": "reload",
+              "device": "gamepad-button",
+              "control": "2",
+              "scale": 1,
+              "deadZone": 0
+            },
+            {
+              "id": "game-action-10",
+              "actionId": "jump",
+              "device": "gamepad-button",
+              "control": "0",
+              "scale": 1,
+              "deadZone": 0
+            },
+            {
+              "id": "pistol-select-key",
+              "actionId": "pistol-select",
+              "device": "keyboard",
+              "control": "Digit1",
+              "scale": 1,
+              "deadZone": 0
+            },
+            {
+              "id": "launcher-select-key",
+              "actionId": "launcher-select",
+              "device": "keyboard",
+              "control": "Digit2",
+              "scale": 1,
+              "deadZone": 0
+            },
+            {
+              "id": "medkit-use-key",
+              "actionId": "medkit-use",
+              "device": "keyboard",
+              "control": "KeyH",
+              "scale": 1,
+              "deadZone": 0
+            }
+          ]
+        }
+      ]
+    },
+    "standardEventsVersion": 1,
+    "widgets": [
+      {
+        "id": "shooter-mainmenu",
+        "name": "Главное меню · шутер",
+        "kind": "mainMenu",
+        "referenceSize": [
+          1280,
+          720
+        ],
+        "elements": [
+          {
+            "id": "shooter-mainmenu-panel",
+            "name": "panel",
+            "type": "panel",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0.5
+              ],
+              "anchorMax": [
+                0.5,
+                0.5
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 0,
+              "width": 650,
+              "height": 570
+            },
+            "style": {
+              "background": "#14242ddd",
+              "color": "#edf4f5",
+              "fontSize": 24,
+              "fontWeight": 500,
+              "padding": 0,
+              "borderRadius": 8,
+              "borderWidth": 1,
+              "borderColor": "#4f707b",
+              "opacity": 1,
+              "textAlign": "left"
+            }
+          },
+          {
+            "id": "shooter-mainmenu-kicker",
+            "name": "SACURA / FPS",
+            "type": "text",
+            "parentId": "shooter-mainmenu-panel",
+            "role": "none",
+            "text": "SACURA / FPS",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 28,
+              "width": 578,
+              "height": 28
+            },
+            "style": {
+              "color": "#dda95f",
+              "fontSize": 18,
+              "padding": 0,
+              "fontWeight": 600
+            }
+          },
+          {
+            "id": "shooter-mainmenu-title",
+            "name": "ПОСЛЕДНИЙ РУБЕЖ",
+            "type": "text",
+            "parentId": "shooter-mainmenu-panel",
+            "role": "none",
+            "text": "ПОСЛЕДНИЙ РУБЕЖ",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 78,
+              "width": 578,
+              "height": 60
+            },
+            "style": {
+              "color": "#edf4f5",
+              "fontSize": 38,
+              "fontWeight": 700,
+              "padding": 0
+            }
+          },
+          {
+            "id": "shooter-mainmenu-subtitle",
+            "name": "5 противников. Два оружия. Один рубеж.\nУдержите позицию и вернитесь живым.",
+            "type": "text",
+            "parentId": "shooter-mainmenu-panel",
+            "role": "none",
+            "text": "5 противников. Два оружия. Один рубеж.\nУдержите позицию и вернитесь живым.",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 151,
+              "width": 578,
+              "height": 90
+            },
+            "style": {
+              "color": "#a9c1c8",
+              "fontSize": 23,
+              "padding": 0
+            }
+          },
+          {
+            "id": "shooter-mainmenu-button-0",
+            "name": "Начать бой",
+            "type": "button",
+            "parentId": "shooter-mainmenu-panel",
+            "role": "none",
+            "text": "Начать бой",
+            "action": "start",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 270,
+              "width": 578,
+              "height": 52
+            },
+            "style": {
+              "background": "#ba8646",
+              "color": "#14242d",
+              "fontSize": 24,
+              "fontWeight": 600,
+              "textAlign": "center",
+              "padding": 0,
+              "borderRadius": 8
+            }
+          },
+          {
+            "id": "shooter-mainmenu-button-1",
+            "name": "Загрузить прохождение",
+            "type": "button",
+            "parentId": "shooter-mainmenu-panel",
+            "role": "none",
+            "text": "Загрузить прохождение",
+            "action": "load",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 334,
+              "width": 578,
+              "height": 52
+            },
+            "style": {
+              "background": "#315967",
+              "color": "#edf4f5",
+              "fontSize": 24,
+              "fontWeight": 600,
+              "textAlign": "center",
+              "padding": 0,
+              "borderRadius": 8
+            }
+          }
+        ],
+        "css": ".widget-text { line-height: 1.25; overflow: hidden; } .widget-button:focus-visible { outline: 3px solid #f0bf76; outline-offset: 2px; }"
+      },
+      {
+        "id": "shooter-pause",
+        "name": "Пауза · шутер",
+        "kind": "pauseMenu",
+        "referenceSize": [
+          1280,
+          720
+        ],
+        "elements": [
+          {
+            "id": "shooter-pause-panel",
+            "name": "panel",
+            "type": "panel",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0.5
+              ],
+              "anchorMax": [
+                0.5,
+                0.5
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 0,
+              "width": 650,
+              "height": 640
+            },
+            "style": {
+              "background": "#14242ddd",
+              "color": "#edf4f5",
+              "fontSize": 24,
+              "fontWeight": 500,
+              "padding": 0,
+              "borderRadius": 8,
+              "borderWidth": 1,
+              "borderColor": "#4f707b",
+              "opacity": 1,
+              "textAlign": "left"
+            }
+          },
+          {
+            "id": "shooter-pause-kicker",
+            "name": "SACURA / FPS",
+            "type": "text",
+            "parentId": "shooter-pause-panel",
+            "role": "none",
+            "text": "SACURA / FPS",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 28,
+              "width": 578,
+              "height": 28
+            },
+            "style": {
+              "color": "#dda95f",
+              "fontSize": 18,
+              "padding": 0,
+              "fontWeight": 600
+            }
+          },
+          {
+            "id": "shooter-pause-title",
+            "name": "ПАУЗА",
+            "type": "text",
+            "parentId": "shooter-pause-panel",
+            "role": "none",
+            "text": "ПАУЗА",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 78,
+              "width": 578,
+              "height": 60
+            },
+            "style": {
+              "color": "#edf4f5",
+              "fontSize": 38,
+              "fontWeight": 700,
+              "padding": 0
+            }
+          },
+          {
+            "id": "shooter-pause-subtitle",
+            "name": "Бой остановлен. F5 — сохранить, F9 — загрузить.\n1/2 — оружие; H — аптечка; Esc — продолжить.",
+            "type": "text",
+            "parentId": "shooter-pause-panel",
+            "role": "none",
+            "text": "Бой остановлен. Сохранение и загрузка — кнопки ниже.\nEsc — продолжить.",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 151,
+              "width": 578,
+              "height": 90
+            },
+            "style": {
+              "color": "#a9c1c8",
+              "fontSize": 23,
+              "padding": 0
+            }
+          },
+          {
+            "id": "shooter-pause-button-0",
+            "name": "Продолжить",
+            "type": "button",
+            "parentId": "shooter-pause-panel",
+            "role": "none",
+            "text": "Продолжить",
+            "action": "resume",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 260,
+              "width": 578,
+              "height": 52
+            },
+            "style": {
+              "background": "#ba8646",
+              "color": "#14242d",
+              "fontSize": 24,
+              "fontWeight": 600,
+              "textAlign": "center",
+              "padding": 0,
+              "borderRadius": 8
+            }
+          },
+          {
+            "id": "shooter-pause-button-1",
+            "name": "Сохранить",
+            "type": "button",
+            "parentId": "shooter-pause-panel",
+            "role": "none",
+            "text": "Сохранить",
+            "action": "save",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 326,
+              "width": 578,
+              "height": 52
+            },
+            "style": {
+              "background": "#315967",
+              "color": "#edf4f5",
+              "fontSize": 24,
+              "fontWeight": 600,
+              "textAlign": "center",
+              "padding": 0,
+              "borderRadius": 8
+            }
+          },
+          {
+            "id": "shooter-pause-button-2",
+            "name": "Загрузить",
+            "type": "button",
+            "parentId": "shooter-pause-panel",
+            "role": "none",
+            "text": "Загрузить",
+            "action": "load",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 392,
+              "width": 578,
+              "height": 52
+            },
+            "style": {
+              "background": "#315967",
+              "color": "#edf4f5",
+              "fontSize": 24,
+              "fontWeight": 600,
+              "textAlign": "center",
+              "padding": 0,
+              "borderRadius": 8
+            }
+          },
+          {
+            "id": "shooter-pause-button-3",
+            "name": "Начать заново",
+            "type": "button",
+            "parentId": "shooter-pause-panel",
+            "role": "none",
+            "text": "Начать заново",
+            "action": "restart",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 458,
+              "width": 578,
+              "height": 52
+            },
+            "style": {
+              "background": "#315967",
+              "color": "#edf4f5",
+              "fontSize": 24,
+              "fontWeight": 600,
+              "textAlign": "center",
+              "padding": 0,
+              "borderRadius": 8
+            }
+          },
+          {
+            "id": "shooter-pause-button-4",
+            "name": "Главное меню",
+            "type": "button",
+            "parentId": "shooter-pause-panel",
+            "role": "none",
+            "text": "Главное меню",
+            "action": "mainMenu",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 524,
+              "width": 578,
+              "height": 52
+            },
+            "style": {
+              "background": "#315967",
+              "color": "#edf4f5",
+              "fontSize": 24,
+              "fontWeight": 600,
+              "textAlign": "center",
+              "padding": 0,
+              "borderRadius": 8
+            }
+          }
+        ],
+        "css": ".widget-text { line-height: 1.25; overflow: hidden; } .widget-button:focus-visible { outline: 3px solid #f0bf76; outline-offset: 2px; }"
+      },
+      {
+        "id": "shooter-gameover",
+        "name": "Game Over · шутер",
+        "kind": "dialogue",
+        "referenceSize": [
+          1280,
+          720
+        ],
+        "elements": [
+          {
+            "id": "shooter-gameover-panel",
+            "name": "panel",
+            "type": "panel",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0.5
+              ],
+              "anchorMax": [
+                0.5,
+                0.5
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 0,
+              "width": 650,
+              "height": 570
+            },
+            "style": {
+              "background": "#14242ddd",
+              "color": "#edf4f5",
+              "fontSize": 24,
+              "fontWeight": 500,
+              "padding": 0,
+              "borderRadius": 8,
+              "borderWidth": 1,
+              "borderColor": "#4f707b",
+              "opacity": 1,
+              "textAlign": "left"
+            }
+          },
+          {
+            "id": "shooter-gameover-kicker",
+            "name": "SACURA / FPS",
+            "type": "text",
+            "parentId": "shooter-gameover-panel",
+            "role": "none",
+            "text": "SACURA / FPS",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 28,
+              "width": 578,
+              "height": 28
+            },
+            "style": {
+              "color": "#dda95f",
+              "fontSize": 18,
+              "padding": 0,
+              "fontWeight": 600
+            }
+          },
+          {
+            "id": "shooter-gameover-title",
+            "name": "GAME OVER",
+            "type": "text",
+            "parentId": "shooter-gameover-panel",
+            "role": "none",
+            "text": "GAME OVER",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 78,
+              "width": 578,
+              "height": 60
+            },
+            "style": {
+              "color": "#edf4f5",
+              "fontSize": 38,
+              "fontWeight": 700,
+              "padding": 0
+            }
+          },
+          {
+            "id": "shooter-gameover-subtitle",
+            "name": "Рубеж потерян. Держите дистанцию,\nперезаряжайтесь и пользуйтесь аптечками.",
+            "type": "text",
+            "parentId": "shooter-gameover-panel",
+            "role": "none",
+            "text": "Рубеж потерян. Держите дистанцию,\nперезаряжайтесь и пользуйтесь аптечками.",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 151,
+              "width": 578,
+              "height": 90
+            },
+            "style": {
+              "color": "#a9c1c8",
+              "fontSize": 23,
+              "padding": 0
+            }
+          },
+          {
+            "id": "shooter-gameover-button-0",
+            "name": "Начать заново",
+            "type": "button",
+            "parentId": "shooter-gameover-panel",
+            "role": "none",
+            "text": "Начать заново",
+            "action": "restart",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 370,
+              "width": 578,
+              "height": 52
+            },
+            "style": {
+              "background": "#ba8646",
+              "color": "#14242d",
+              "fontSize": 24,
+              "fontWeight": 600,
+              "textAlign": "center",
+              "padding": 0,
+              "borderRadius": 8
+            }
+          },
+          {
+            "id": "shooter-gameover-button-1",
+            "name": "Главное меню",
+            "type": "button",
+            "parentId": "shooter-gameover-panel",
+            "role": "none",
+            "text": "Главное меню",
+            "action": "mainMenu",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 442,
+              "width": 578,
+              "height": 52
+            },
+            "style": {
+              "background": "#315967",
+              "color": "#edf4f5",
+              "fontSize": 24,
+              "fontWeight": 600,
+              "textAlign": "center",
+              "padding": 0,
+              "borderRadius": 8
+            }
+          },
+          {
+            "id": "shooter-gameover-result",
+            "name": "Результат",
+            "type": "text",
+            "parentId": "shooter-gameover-panel",
+            "role": "none",
+            "text": "Результат",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 235,
+              "width": 578,
+              "height": 30
+            },
+            "style": {
+              "color": "#dda95f",
+              "fontSize": 22,
+              "padding": 0
+            },
+            "binding": {
+              "source": "variable",
+              "path": "kills",
+              "format": "ПОБЕЖДЕНО  {value} / 5"
+            }
+          },
+          {
+            "id": "shooter-gameover-score",
+            "name": "Очки",
+            "type": "text",
+            "parentId": "shooter-gameover-panel",
+            "role": "none",
+            "text": "Очки",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 285,
+              "width": 578,
+              "height": 30
+            },
+            "style": {
+              "color": "#edf4f5",
+              "fontSize": 22,
+              "padding": 0
+            },
+            "binding": {
+              "source": "variable",
+              "path": "score",
+              "format": "ОЧКИ  {value}"
+            }
+          }
+        ],
+        "css": ".widget-text { line-height: 1.25; overflow: hidden; } .widget-button:focus-visible { outline: 3px solid #f0bf76; outline-offset: 2px; }"
+      },
+      {
+        "id": "shooter-victory",
+        "name": "Победа · шутер",
+        "kind": "dialogue",
+        "referenceSize": [
+          1280,
+          720
+        ],
+        "elements": [
+          {
+            "id": "shooter-victory-panel",
+            "name": "panel",
+            "type": "panel",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0.5
+              ],
+              "anchorMax": [
+                0.5,
+                0.5
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 0,
+              "width": 650,
+              "height": 570
+            },
+            "style": {
+              "background": "#14242ddd",
+              "color": "#edf4f5",
+              "fontSize": 24,
+              "fontWeight": 500,
+              "padding": 0,
+              "borderRadius": 8,
+              "borderWidth": 1,
+              "borderColor": "#4f707b",
+              "opacity": 1,
+              "textAlign": "left"
+            }
+          },
+          {
+            "id": "shooter-victory-kicker",
+            "name": "SACURA / FPS",
+            "type": "text",
+            "parentId": "shooter-victory-panel",
+            "role": "none",
+            "text": "SACURA / FPS",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 28,
+              "width": 578,
+              "height": 28
+            },
+            "style": {
+              "color": "#dda95f",
+              "fontSize": 18,
+              "padding": 0,
+              "fontWeight": 600
+            }
+          },
+          {
+            "id": "shooter-victory-title",
+            "name": "РУБЕЖ УДЕРЖАН",
+            "type": "text",
+            "parentId": "shooter-victory-panel",
+            "role": "none",
+            "text": "РУБЕЖ УДЕРЖАН",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 78,
+              "width": 578,
+              "height": 60
+            },
+            "style": {
+              "color": "#edf4f5",
+              "fontSize": 38,
+              "fontWeight": 700,
+              "padding": 0
+            }
+          },
+          {
+            "id": "shooter-victory-subtitle",
+            "name": "Все противники уничтожены.\nЗадание выполнено.",
+            "type": "text",
+            "parentId": "shooter-victory-panel",
+            "role": "none",
+            "text": "Все противники уничтожены.\nЗадание выполнено.",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 151,
+              "width": 578,
+              "height": 90
+            },
+            "style": {
+              "color": "#a9c1c8",
+              "fontSize": 23,
+              "padding": 0
+            }
+          },
+          {
+            "id": "shooter-victory-button-0",
+            "name": "Начать заново",
+            "type": "button",
+            "parentId": "shooter-victory-panel",
+            "role": "none",
+            "text": "Начать заново",
+            "action": "restart",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 370,
+              "width": 578,
+              "height": 52
+            },
+            "style": {
+              "background": "#ba8646",
+              "color": "#14242d",
+              "fontSize": 24,
+              "fontWeight": 600,
+              "textAlign": "center",
+              "padding": 0,
+              "borderRadius": 8
+            }
+          },
+          {
+            "id": "shooter-victory-button-1",
+            "name": "Главное меню",
+            "type": "button",
+            "parentId": "shooter-victory-panel",
+            "role": "none",
+            "text": "Главное меню",
+            "action": "mainMenu",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 442,
+              "width": 578,
+              "height": 52
+            },
+            "style": {
+              "background": "#315967",
+              "color": "#edf4f5",
+              "fontSize": 24,
+              "fontWeight": 600,
+              "textAlign": "center",
+              "padding": 0,
+              "borderRadius": 8
+            }
+          },
+          {
+            "id": "shooter-victory-result",
+            "name": "Результат",
+            "type": "text",
+            "parentId": "shooter-victory-panel",
+            "role": "none",
+            "text": "Результат",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 235,
+              "width": 578,
+              "height": 30
+            },
+            "style": {
+              "color": "#dda95f",
+              "fontSize": 22,
+              "padding": 0
+            },
+            "binding": {
+              "source": "variable",
+              "path": "kills",
+              "format": "ПОБЕЖДЕНО  {value} / 5"
+            }
+          },
+          {
+            "id": "shooter-victory-score",
+            "name": "Очки",
+            "type": "text",
+            "parentId": "shooter-victory-panel",
+            "role": "none",
+            "text": "Очки",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 285,
+              "width": 578,
+              "height": 30
+            },
+            "style": {
+              "color": "#edf4f5",
+              "fontSize": 22,
+              "padding": 0
+            },
+            "binding": {
+              "source": "variable",
+              "path": "score",
+              "format": "ОЧКИ  {value}"
+            }
+          }
+        ],
+        "css": ".widget-text { line-height: 1.25; overflow: hidden; } .widget-button:focus-visible { outline: 3px solid #f0bf76; outline-offset: 2px; }"
+      },
+      {
+        "id": "shooter-hud",
+        "name": "Шутер · здоровье, оружие, аптечки и счёт",
+        "kind": "hud",
+        "referenceSize": [
+          1280,
+          720
+        ],
+        "elements": [
+          {
+            "id": "shooter-hud-health-panel",
+            "name": "health-panel",
+            "type": "panel",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 24,
+              "y": 24,
+              "width": 258,
+              "height": 110
+            },
+            "style": {
+              "background": "#14242ddd",
+              "color": "#edf4f5",
+              "fontSize": 24,
+              "fontWeight": 500,
+              "padding": 0,
+              "borderRadius": 8,
+              "borderWidth": 1,
+              "borderColor": "#4f707b",
+              "opacity": 1,
+              "textAlign": "left"
+            }
+          },
+          {
+            "id": "shooter-hud-hp",
+            "name": "Здоровье",
+            "type": "text",
+            "parentId": null,
+            "role": "none",
+            "text": "Здоровье",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 40,
+              "y": 35,
+              "width": 224,
+              "height": 40
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#edf4f5",
+              "fontSize": 24,
+              "fontWeight": 500,
+              "padding": 0,
+              "borderRadius": 8,
+              "borderWidth": 0,
+              "borderColor": "#4f707b",
+              "opacity": 1,
+              "textAlign": "left"
+            },
+            "binding": {
+              "source": "variable",
+              "path": "hp",
+              "format": "HP  {value} / 100"
+            }
+          },
+          {
+            "id": "shooter-hud-health",
+            "name": "Шкала здоровья",
+            "type": "progress",
+            "parentId": null,
+            "role": "none",
+            "text": "Шкала здоровья",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 40,
+              "y": 89,
+              "width": 224,
+              "height": 18
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#edf4f5",
+              "fontSize": 24,
+              "fontWeight": 500,
+              "padding": 0,
+              "borderRadius": 8,
+              "borderWidth": 0,
+              "borderColor": "#4f707b",
+              "opacity": 1,
+              "textAlign": "left"
+            },
+            "binding": {
+              "source": "variable",
+              "path": "hp"
+            },
+            "min": 0,
+            "max": 100,
+            "maxVariable": "maxHp"
+          },
+          {
+            "id": "shooter-hud-objective-panel",
+            "name": "objective-panel",
+            "type": "panel",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                1,
+                0
+              ],
+              "anchorMax": [
+                1,
+                0
+              ],
+              "pivot": [
+                1,
+                0
+              ],
+              "x": -24,
+              "y": 24,
+              "width": 294,
+              "height": 112
+            },
+            "style": {
+              "background": "#14242ddd",
+              "color": "#edf4f5",
+              "fontSize": 24,
+              "fontWeight": 500,
+              "padding": 0,
+              "borderRadius": 8,
+              "borderWidth": 1,
+              "borderColor": "#4f707b",
+              "opacity": 1,
+              "textAlign": "left"
+            }
+          },
+          {
+            "id": "shooter-hud-kills",
+            "name": "Противники",
+            "type": "text",
+            "parentId": null,
+            "role": "none",
+            "text": "Противники",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                1,
+                0
+              ],
+              "anchorMax": [
+                1,
+                0
+              ],
+              "pivot": [
+                1,
+                0
+              ],
+              "x": -40,
+              "y": 36,
+              "width": 262,
+              "height": 36
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#edf4f5",
+              "fontSize": 24,
+              "fontWeight": 500,
+              "padding": 0,
+              "borderRadius": 8,
+              "borderWidth": 0,
+              "borderColor": "#4f707b",
+              "opacity": 1,
+              "textAlign": "left"
+            },
+            "binding": {
+              "source": "variable",
+              "path": "kills",
+              "format": "ПРОТИВНИКИ  {value} / 5"
+            }
+          },
+          {
+            "id": "shooter-hud-score",
+            "name": "Очки",
+            "type": "text",
+            "parentId": null,
+            "role": "none",
+            "text": "Очки",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                1,
+                0
+              ],
+              "anchorMax": [
+                1,
+                0
+              ],
+              "pivot": [
+                1,
+                0
+              ],
+              "x": -40,
+              "y": 86,
+              "width": 262,
+              "height": 30
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#edf4f5",
+              "fontSize": 24,
+              "fontWeight": 500,
+              "padding": 0,
+              "borderRadius": 8,
+              "borderWidth": 0,
+              "borderColor": "#4f707b",
+              "opacity": 1,
+              "textAlign": "left"
+            },
+            "binding": {
+              "source": "variable",
+              "path": "score",
+              "format": "ОЧКИ  {value}"
+            }
+          },
+          {
+            "id": "shooter-hud-ammo-panel",
+            "name": "ammo-panel",
+            "type": "panel",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 24,
+              "y": 150,
+              "width": 278,
+              "height": 130
+            },
+            "style": {
+              "background": "#14242ddd",
+              "color": "#edf4f5",
+              "fontSize": 24,
+              "fontWeight": 500,
+              "padding": 0,
+              "borderRadius": 8,
+              "borderWidth": 1,
+              "borderColor": "#4f707b",
+              "opacity": 1,
+              "textAlign": "left"
+            }
+          },
+          {
+            "id": "shooter-hud-weapon",
+            "name": "Оружие",
+            "type": "text",
+            "parentId": null,
+            "role": "none",
+            "text": "Оружие",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 40,
+              "y": 163,
+              "width": 246,
+              "height": 30
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#edf4f5",
+              "fontSize": 24,
+              "fontWeight": 500,
+              "padding": 0,
+              "borderRadius": 8,
+              "borderWidth": 0,
+              "borderColor": "#4f707b",
+              "opacity": 1,
+              "textAlign": "left"
+            },
+            "binding": {
+              "source": "variable",
+              "path": "weaponName"
+            }
+          },
+          {
+            "id": "shooter-hud-ammo",
+            "name": "Магазин",
+            "type": "text",
+            "parentId": null,
+            "role": "none",
+            "text": "Магазин",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 40,
+              "y": 201,
+              "width": 130,
+              "height": 34
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#edf4f5",
+              "fontSize": 24,
+              "fontWeight": 500,
+              "padding": 0,
+              "borderRadius": 8,
+              "borderWidth": 0,
+              "borderColor": "#4f707b",
+              "opacity": 1,
+              "textAlign": "left"
+            },
+            "binding": {
+              "source": "variable",
+              "path": "ammo",
+              "format": "{value}  /"
+            }
+          },
+          {
+            "id": "shooter-hud-reserve",
+            "name": "Запас патронов",
+            "type": "text",
+            "parentId": null,
+            "role": "none",
+            "text": "Запас",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 160,
+              "y": 201,
+              "width": 124,
+              "height": 34
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#edf4f5",
+              "fontSize": 24,
+              "fontWeight": 500,
+              "padding": 0,
+              "borderRadius": 8,
+              "borderWidth": 0,
+              "borderColor": "#4f707b",
+              "opacity": 1,
+              "textAlign": "left"
+            },
+            "binding": {
+              "source": "variable",
+              "path": "reserve",
+              "format": "{value}"
+            }
+          },
+          {
+            "id": "shooter-hud-medkits",
+            "name": "Аптечки",
+            "type": "text",
+            "parentId": null,
+            "role": "none",
+            "text": "Аптечки",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 40,
+              "y": 244,
+              "width": 245,
+              "height": 26
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#edf4f5",
+              "fontSize": 24,
+              "fontWeight": 500,
+              "padding": 0,
+              "borderRadius": 8,
+              "borderWidth": 0,
+              "borderColor": "#4f707b",
+              "opacity": 1,
+              "textAlign": "left"
+            },
+            "binding": {
+              "source": "variable",
+              "path": "medkits",
+              "format": "АПТЕЧКИ  {value}  ·  H"
+            }
+          },
+          {
+            "id": "shooter-hud-pistol",
+            "name": "1  Пистолет",
+            "type": "button",
+            "parentId": null,
+            "role": "none",
+            "text": "1  Пистолет",
+            "action": "event",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                1,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                1,
+                1
+              ],
+              "x": -220,
+              "y": -96,
+              "width": 184,
+              "height": 52
+            },
+            "style": {
+              "background": "#315967",
+              "color": "#edf4f5",
+              "fontSize": 24,
+              "fontWeight": 500,
+              "padding": 0,
+              "borderRadius": 8,
+              "borderWidth": 0,
+              "borderColor": "#4f707b",
+              "opacity": 1,
+              "textAlign": "left"
+            },
+            "eventId": "equip-pistol"
+          },
+          {
+            "id": "shooter-hud-launcher",
+            "name": "2  Гранатомёт",
+            "type": "button",
+            "parentId": null,
+            "role": "none",
+            "text": "2  Гранатомёт",
+            "action": "event",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                1,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                1,
+                1
+              ],
+              "x": -24,
+              "y": -96,
+              "width": 184,
+              "height": 52
+            },
+            "style": {
+              "background": "#315967",
+              "color": "#edf4f5",
+              "fontSize": 24,
+              "fontWeight": 500,
+              "padding": 0,
+              "borderRadius": 8,
+              "borderWidth": 0,
+              "borderColor": "#4f707b",
+              "opacity": 1,
+              "textAlign": "left"
+            },
+            "eventId": "equip-launcher"
+          },
+          {
+            "id": "shooter-hud-medkit",
+            "name": "H  Аптечка",
+            "type": "button",
+            "parentId": null,
+            "role": "none",
+            "text": "H  Аптечка",
+            "action": "event",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                1,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                1,
+                1
+              ],
+              "x": -220,
+              "y": -32,
+              "width": 184,
+              "height": 52
+            },
+            "style": {
+              "background": "#315967",
+              "color": "#edf4f5",
+              "fontSize": 24,
+              "fontWeight": 500,
+              "padding": 0,
+              "borderRadius": 8,
+              "borderWidth": 0,
+              "borderColor": "#4f707b",
+              "opacity": 1,
+              "textAlign": "left"
+            },
+            "eventId": "heal-player"
+          },
+          {
+            "id": "shooter-hud-reload",
+            "name": "R  Перезарядка",
+            "type": "button",
+            "parentId": null,
+            "role": "none",
+            "text": "R  Зарядить",
+            "action": "gameplay",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                1,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                1,
+                1
+              ],
+              "x": -24,
+              "y": -32,
+              "width": 184,
+              "height": 52
+            },
+            "style": {
+              "background": "#315967",
+              "color": "#edf4f5",
+              "fontSize": 24,
+              "fontWeight": 500,
+              "padding": 0,
+              "borderRadius": 8,
+              "borderWidth": 0,
+              "borderColor": "#4f707b",
+              "opacity": 1,
+              "textAlign": "left"
+            },
+            "command": "reload",
+            "value": {}
+          },
+          {
+            "id": "shooter-hud-danger",
+            "name": "МАЛО HP · H — аптечка",
+            "type": "text",
+            "parentId": null,
+            "role": "none",
+            "text": "МАЛО HP · H — аптечка",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0
+              ],
+              "anchorMax": [
+                0.5,
+                0
+              ],
+              "pivot": [
+                0.5,
+                0
+              ],
+              "x": 0,
+              "y": 24,
+              "width": 380,
+              "height": 44
+            },
+            "style": {
+              "background": "#712f36e8",
+              "color": "#fff0e5",
+              "fontSize": 24,
+              "fontWeight": 600,
+              "padding": 7,
+              "borderRadius": 8,
+              "textAlign": "center"
+            },
+            "showIf": {
+              "source": "variable",
+              "path": "lowHealth"
+            }
+          },
+          {
+            "id": "shooter-hud-notice",
+            "name": "Подсказка",
+            "type": "text",
+            "parentId": null,
+            "role": "none",
+            "text": "Подсказка",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                1
+              ],
+              "anchorMax": [
+                0.5,
+                1
+              ],
+              "pivot": [
+                0.5,
+                1
+              ],
+              "x": 0,
+              "y": -185,
+              "width": 720,
+              "height": 40
+            },
+            "style": {
+              "background": "#14242dba",
+              "color": "#edf4f5",
+              "fontSize": 19,
+              "padding": 7,
+              "borderRadius": 6,
+              "textAlign": "center"
+            },
+            "binding": {
+              "source": "variable",
+              "path": "hudMessage"
+            }
+          },
+          {
+            "id": "shooter-hud-gun-root",
+            "name": "gun-root",
+            "type": "panel",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.6,
+                1
+              ],
+              "anchorMax": [
+                0.6,
+                1
+              ],
+              "pivot": [
+                0.5,
+                1
+              ],
+              "x": 0,
+              "y": -24,
+              "width": 170,
+              "height": 125
+            },
+            "style": {
+              "background": "transparent",
+              "padding": 0,
+              "borderWidth": 0
+            }
+          },
+          {
+            "id": "shooter-hud-gun-body",
+            "name": "gun-body",
+            "type": "panel",
+            "parentId": "shooter-hud-gun-root",
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 26,
+              "y": 26,
+              "width": 108,
+              "height": 46
+            },
+            "style": {
+              "background": "#2c3942",
+              "borderColor": "#7c969e",
+              "borderWidth": 2,
+              "borderRadius": 4,
+              "padding": 0
+            }
+          },
+          {
+            "id": "shooter-hud-gun-barrel",
+            "name": "gun-barrel",
+            "type": "panel",
+            "parentId": "shooter-hud-gun-root",
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 38,
+              "y": 4,
+              "width": 83,
+              "height": 34
+            },
+            "style": {
+              "background": "#586c76",
+              "borderRadius": 3,
+              "borderWidth": 0,
+              "padding": 0
+            }
+          },
+          {
+            "id": "shooter-hud-gun-grip",
+            "name": "gun-grip",
+            "type": "panel",
+            "parentId": "shooter-hud-gun-root",
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 76,
+              "y": 62,
+              "width": 44,
+              "height": 64
+            },
+            "style": {
+              "background": "#17272f",
+              "borderRadius": 4,
+              "borderWidth": 0,
+              "padding": 0
+            }
+          }
+        ],
+        "css": ".widget-text { line-height: 1.25; overflow: hidden; } .widget-button:focus-visible { outline: 3px solid #f0bf76; outline-offset: 2px; }"
+      },
+      {
+        "id": "shooter-dialogue",
+        "name": "Задание · шутер",
+        "kind": "dialogue",
+        "referenceSize": [
+          1280,
+          720
+        ],
+        "elements": [
+          {
+            "id": "shooter-dialogue-panel",
+            "name": "Диалоговое окно",
+            "type": "panel",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                0.5,
+                1
+              ],
+              "x": 0,
+              "y": -34,
+              "width": -100,
+              "height": 205
+            },
+            "style": {
+              "background": "#211c29",
+              "color": "#fff4f8",
+              "opacity": 0.96,
+              "borderRadius": 16,
+              "borderWidth": 1,
+              "borderColor": "#ad849d",
+              "padding": 0
+            }
+          },
+          {
+            "id": "shooter-dialogue-speaker",
+            "name": "Имя персонажа",
+            "type": "text",
+            "parentId": "shooter-dialogue-panel",
+            "role": "speaker",
+            "text": "Новый текст",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 28,
+              "y": 18,
+              "width": -56,
+              "height": 32
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#e2b8d1",
+              "fontSize": 23,
+              "fontWeight": 600,
+              "padding": 0
+            }
+          },
+          {
+            "id": "shooter-dialogue-text",
+            "name": "Текст реплики",
+            "type": "text",
+            "parentId": "shooter-dialogue-panel",
+            "role": "dialogueText",
+            "text": "Новый текст",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 28,
+              "y": 60,
+              "width": -88,
+              "height": -105
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "padding": 0
+            }
+          },
+          {
+            "id": "shooter-dialogue-status",
+            "name": "Подсказка",
+            "type": "text",
+            "parentId": "shooter-dialogue-panel",
+            "role": "status",
+            "text": "Новый текст",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                0,
+                1
+              ],
+              "x": 28,
+              "y": -16,
+              "width": -90,
+              "height": 25
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#d1bfd0",
+              "fontSize": 15,
+              "padding": 0
+            }
+          },
+          {
+            "id": "shooter-dialogue-next",
+            "name": "Продолжить",
+            "type": "button",
+            "parentId": "shooter-dialogue-panel",
+            "role": "none",
+            "text": "›",
+            "action": "advance",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                1,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                1,
+                1
+              ],
+              "x": -20,
+              "y": -14,
+              "width": 44,
+              "height": 44
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 28,
+              "borderRadius": 10,
+              "textAlign": "center",
+              "padding": 0
+            }
+          },
+          {
+            "id": "shooter-dialogue-choices",
+            "name": "Ответы игрока",
+            "type": "choices",
+            "parentId": null,
+            "role": "choices",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                1
+              ],
+              "anchorMax": [
+                0.5,
+                1
+              ],
+              "pivot": [
+                0.5,
+                1
+              ],
+              "x": 0,
+              "y": -255,
+              "width": 620,
+              "height": 190
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 22,
+              "borderRadius": 10,
+              "padding": 4,
+              "gap": 8
+            }
+          }
+        ],
+        "css": ""
+      }
+    ],
+    "ui": {
+      "dialogue": "shooter-dialogue",
+      "mainMenu": "shooter-mainmenu",
+      "pauseMenu": "shooter-pause",
+      "hud": "shooter-hud"
+    },
+    "variableTypes": {
+      "hp": "integer",
+      "maxHp": "integer",
+      "ammo": "integer",
+      "reserve": "integer",
+      "kills": "integer",
+      "inventory": "array",
+      "score": "integer",
+      "medkits": "integer",
+      "weaponName": "string",
+      "lowHealth": "boolean",
+      "hudMessage": "string",
+      "results": "struct"
+    },
+    "objectGroups": [
+      {
+        "id": "object-group-6fe3ee53-a545-4b24-9d29-2feb2a7ec7d8",
+        "sceneId": "shooter-arena",
+        "name": "Противники",
+        "objectIds": [
+          "enemy-1",
+          "enemy-2",
+          "enemy-3"
+        ]
+      },
+      {
+        "id": "object-group-7278c131-cb5d-48ea-8486-79005f627beb",
+        "sceneId": "shooter-arena",
+        "name": "Арена",
+        "objectIds": [
+          "shooter-arena-floor",
+          "shooter-arena-wall",
+          "arena-cover",
+          "target-base-0",
+          "target-base-1",
+          "target-base-2"
+        ]
+      }
+    ],
+    "gameplay": {
+      "version": 1,
+      "enabled": true,
+      "preset": "fps",
+      "playerId": "shooter-hero",
+      "controller": {
+        "mode": "wasd",
+        "speed": 4,
+        "jumpSpeed": 5,
+        "gravity": 16,
+        "eyeHeight": 1.25,
+        "sensitivity": 0.003,
+        "distance": 3,
+        "fov": 70
+      },
+      "actors": {
+        "shooter-hero": {
+          "team": "player",
+          "maxHP": 100
+        },
+        "enemy-1": {
+          "team": "enemy",
+          "maxHP": 50,
+          "ai": {
+            "speed": 0.8,
+            "range": 1.6,
+            "damage": 10,
+            "interval": 2.2,
+            "detection": 24
+          }
+        },
+        "enemy-2": {
+          "team": "enemy",
+          "maxHP": 50,
+          "ai": {
+            "speed": 0.9,
+            "range": 1.6,
+            "damage": 10,
+            "interval": 2.2,
+            "detection": 24
+          }
+        },
+        "enemy-3": {
+          "team": "enemy",
+          "maxHP": 50,
+          "ai": {
+            "speed": 0.9,
+            "range": 1.6,
+            "damage": 10,
+            "interval": 2.2,
+            "detection": 24
+          }
+        },
+        "enemy-4": {
+          "team": "enemy",
+          "maxHP": 50,
+          "ai": {
+            "speed": 1.35,
+            "range": 1.6,
+            "damage": 8,
+            "interval": 2.2,
+            "detection": 24
+          }
+        },
+        "enemy-5": {
+          "team": "enemy",
+          "maxHP": 100,
+          "ai": {
+            "speed": 0.65,
+            "range": 1.6,
+            "damage": 16,
+            "interval": 2.2,
+            "detection": 24
+          }
+        }
+      },
+      "weapons": [
+        {
+          "id": "pistol",
+          "name": "Пистолет",
+          "mode": "hitscan",
+          "damage": 25,
+          "range": 40,
+          "magazine": 8,
+          "reserve": 40,
+          "cooldown": 0.22,
+          "reloadTime": 1.1,
+          "projectileSpeed": 20,
+          "recoil": 0.008
+        },
+        {
+          "id": "launcher",
+          "name": "Гранатомёт",
+          "mode": "projectile",
+          "damage": 100,
+          "range": 40,
+          "magazine": 3,
+          "reserve": 6,
+          "cooldown": 0.65,
+          "reloadTime": 1.5,
+          "projectileSpeed": 18,
+          "recoil": 0.025
+        }
+      ],
+      "items": [
+        {
+          "id": "medkit",
+          "name": "Аптечка",
+          "stackLimit": 3,
+          "slot": "",
+          "weaponId": "",
+          "heal": 40,
+          "consumable": true,
+          "useEventId": "",
+          "worldObjectId": "arena-medkit",
+          "pickupEventId": "medkit-picked-up"
+        },
+        {
+          "id": "pistol-item",
+          "name": "Пистолет",
+          "stackLimit": 1,
+          "slot": "hand",
+          "weaponId": "pistol",
+          "heal": 0,
+          "consumable": false,
+          "useEventId": "",
+          "worldObjectId": ""
+        },
+        {
+          "id": "launcher-item",
+          "name": "Гранатомёт",
+          "stackLimit": 1,
+          "slot": "hand",
+          "weaponId": "launcher",
+          "heal": 0,
+          "consumable": false,
+          "useEventId": "",
+          "worldObjectId": ""
+        }
+      ],
+      "recipes": [],
+      "rules": [
+        {
+          "id": "death-player",
+          "name": "Смерть героя → Game Over",
+          "trigger": "death",
+          "sceneId": "shooter-arena",
+          "objectId": "shooter-hero",
+          "eventId": "shooter-death",
+          "functionId": "",
+          "nextBeatId": "shooter-game-over",
+          "seconds": 2,
+          "repeat": false,
+          "once": true,
+          "enabled": true,
+          "center": [
+            0,
+            0,
+            0
+          ],
+          "size": [
+            3,
+            2,
+            3
+          ]
+        },
+        {
+          "id": "death-enemy",
+          "name": "Противник побеждён → +100 очков",
+          "trigger": "death",
+          "sceneId": "shooter-arena",
+          "objectId": "",
+          "eventId": "",
+          "functionId": "award-kill",
+          "nextBeatId": "",
+          "seconds": 2,
+          "repeat": false,
+          "once": false,
+          "enabled": true,
+          "center": [
+            0,
+            0,
+            0
+          ],
+          "size": [
+            3,
+            2,
+            3
+          ]
+        },
+        {
+          "id": "victory",
+          "name": "Все пять противников побеждены → победа",
+          "trigger": "victory",
+          "sceneId": "shooter-arena",
+          "objectId": "",
+          "eventId": "",
+          "functionId": "",
+          "nextBeatId": "shooter-win",
+          "seconds": 2,
+          "repeat": false,
+          "once": true,
+          "enabled": true,
+          "center": [
+            0,
+            0,
+            0
+          ],
+          "size": [
+            3,
+            2,
+            3
+          ]
+        },
+        {
+          "id": "pickup-medkit-rule",
+          "name": "Подбор аптечки → HUD",
+          "trigger": "pickup",
+          "sceneId": "shooter-arena",
+          "objectId": "arena-medkit",
+          "eventId": "",
+          "functionId": "pickup-medkit",
+          "nextBeatId": "",
+          "seconds": 2,
+          "repeat": false,
+          "once": true,
+          "enabled": true,
+          "center": [
+            0,
+            0,
+            0
+          ],
+          "size": [
+            3,
+            2,
+            3
+          ]
+        },
+        {
+          "id": "player-hit",
+          "name": "Ранение героя → предупреждение",
+          "trigger": "hit",
+          "sceneId": "shooter-arena",
+          "objectId": "shooter-hero",
+          "eventId": "",
+          "functionId": "damage-feedback",
+          "nextBeatId": "",
+          "seconds": 2,
+          "repeat": false,
+          "once": false,
+          "enabled": true,
+          "center": [
+            0,
+            0,
+            0
+          ],
+          "size": [
+            3,
+            2,
+            3
+          ]
+        }
+      ],
+      "inventory": {
+        "slots": 5,
+        "starting": [
+          {
+            "itemId": "medkit",
+            "count": 1
+          },
+          {
+            "itemId": "pistol-item",
+            "count": 1
+          },
+          {
+            "itemId": "launcher-item",
+            "count": 1
+          }
+        ],
+        "equipment": {
+          "hand": "pistol-item"
+        }
+      },
+      "hudWidgetId": "shooter-hud"
+    },
+    "functions": [
+      {
+        "id": "award-kill",
+        "name": "Засчитать только противника",
+        "parameters": [
+          {
+            "name": "objectId",
+            "type": "string",
+            "default": ""
+          }
+        ],
+        "locals": {},
+        "entry": "award-check",
+        "nodes": [
+          {
+            "id": "award-check",
+            "kind": "branch",
+            "name": "Это противник?",
+            "condition": {
+              "op": "ne",
+              "a": {
+                "op": "get",
+                "path": "args.objectId"
+              },
+              "b": "shooter-hero"
+            },
+            "trueNext": "award-list",
+            "falseNext": "award-return"
+          },
+          {
+            "id": "award-list",
+            "kind": "array",
+            "name": "Записать побеждённого",
+            "path": "global.results.defeated",
+            "operation": "push",
+            "value": {
+              "op": "get",
+              "path": "args.objectId"
+            },
+            "next": "award-score"
+          },
+          {
+            "id": "award-score",
+            "kind": "set",
+            "name": "score",
+            "path": "global.score",
+            "value": {
+              "op": "add",
+              "a": {
+                "op": "get",
+                "path": "global.score"
+              },
+              "b": 100
+            },
+            "next": "award-return"
+          },
+          {
+            "id": "award-return",
+            "kind": "return",
+            "name": "Готово",
+            "value": {
+              "op": "get",
+              "path": "global.score"
+            }
+          }
+        ]
+      },
+      {
+        "id": "use-medkit",
+        "name": "Аптечка · проверить, применить, обновить HUD",
+        "parameters": [],
+        "locals": {},
+        "entry": "heal-check",
+        "nodes": [
+          {
+            "id": "heal-check",
+            "kind": "branch",
+            "name": "Есть аптечка и герой ранен?",
+            "condition": {
+              "op": "and",
+              "a": {
+                "op": "gt",
+                "a": {
+                  "op": "get",
+                  "path": "global.medkits"
+                },
+                "b": 0
+              },
+              "b": {
+                "op": "and",
+                "a": {
+                  "op": "gt",
+                  "a": {
+                    "op": "get",
+                    "path": "global.hp"
+                  },
+                  "b": 0
+                },
+                "b": {
+                  "op": "lt",
+                  "a": {
+                    "op": "get",
+                    "path": "global.hp"
+                  },
+                  "b": {
+                    "op": "get",
+                    "path": "global.maxHp"
+                  }
+                }
+              }
+            },
+            "trueNext": "heal-use",
+            "falseNext": "heal-unneeded"
+          },
+          {
+            "id": "heal-use",
+            "kind": "command",
+            "name": "Использовать расходуемую аптечку",
+            "command": {
+              "command": "useItem",
+              "value": {
+                "itemId": "medkit"
+              }
+            },
+            "next": "heal-count"
+          },
+          {
+            "id": "heal-count",
+            "kind": "set",
+            "name": "medkits",
+            "path": "global.medkits",
+            "value": {
+              "op": "sub",
+              "a": {
+                "op": "get",
+                "path": "global.medkits"
+              },
+              "b": 1
+            },
+            "next": "heal-danger"
+          },
+          {
+            "id": "heal-danger",
+            "kind": "set",
+            "name": "lowHealth",
+            "path": "global.lowHealth",
+            "value": {
+              "op": "lte",
+              "a": {
+                "op": "get",
+                "path": "global.hp"
+              },
+              "b": 30
+            },
+            "next": "heal-message"
+          },
+          {
+            "id": "heal-message",
+            "kind": "set",
+            "name": "hudMessage",
+            "path": "global.hudMessage",
+            "value": "Здоровье восстановлено.",
+            "next": "heal-return"
+          },
+          {
+            "id": "heal-unneeded",
+            "kind": "set",
+            "name": "hudMessage",
+            "path": "global.hudMessage",
+            "value": "Аптечка нужна при ранении. Дополнительная лежит слева у укрытия.",
+            "next": "heal-return"
+          },
+          {
+            "id": "heal-return",
+            "kind": "return",
+            "name": "Готово",
+            "value": {
+              "op": "get",
+              "path": "global.hp"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pickup-medkit",
+        "name": "Подбор аптечки · обновить счётчик",
+        "parameters": [],
+        "locals": {},
+        "entry": "pickup-count",
+        "nodes": [
+          {
+            "id": "pickup-count",
+            "kind": "set",
+            "name": "medkits",
+            "path": "global.medkits",
+            "value": {
+              "op": "add",
+              "a": {
+                "op": "get",
+                "path": "global.medkits"
+              },
+              "b": 1
+            },
+            "next": "pickup-message"
+          },
+          {
+            "id": "pickup-message",
+            "kind": "set",
+            "name": "hudMessage",
+            "path": "global.hudMessage",
+            "value": "Аптечка подобрана. H — использовать.",
+            "next": "pickup-return"
+          },
+          {
+            "id": "pickup-return",
+            "kind": "return",
+            "name": "Готово",
+            "value": {
+              "op": "get",
+              "path": "global.medkits"
+            }
+          }
+        ]
+      },
+      {
+        "id": "damage-feedback",
+        "name": "Ранение · предупреждение при 30 HP",
+        "parameters": [],
+        "locals": {},
+        "entry": "damage-health",
+        "nodes": [
+          {
+            "id": "damage-health",
+            "kind": "set",
+            "name": "lowHealth",
+            "path": "global.lowHealth",
+            "value": {
+              "op": "lte",
+              "a": {
+                "op": "get",
+                "path": "global.hp"
+              },
+              "b": 30
+            },
+            "next": "damage-message"
+          },
+          {
+            "id": "damage-message",
+            "kind": "set",
+            "name": "hudMessage",
+            "path": "global.hudMessage",
+            "value": "Вас атакуют. Отойдите, стреляйте или используйте аптечку (H).",
+            "next": "damage-return"
+          },
+          {
+            "id": "damage-return",
+            "kind": "return",
+            "name": "Готово",
+            "value": {
+              "op": "get",
+              "path": "global.hp"
+            }
+          }
+        ]
+      }
+    ],
+    "description": "Законченный FPS-уровень: пять противников, два оружия, укрытия, аптечки, сохранения, победа и Game Over."
+  }
+}

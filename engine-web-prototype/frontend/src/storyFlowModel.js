@@ -1,3 +1,5 @@
+import {GAME_TRIGGERS} from './gameplayModel.js';
+import {isObjectInScene} from './sceneEditing.js';
 import {variableType} from './variableModel.js';
 import {isPureNode,dataTargets,getInput,logicType} from './logicModel.js';
 import {storyPorts} from './choiceModel.js';
@@ -20,6 +22,7 @@ export function buildStoryFlow(project) {
       }))
     }))}));
     const ports=storyPorts(beat);
+    if(beat.kind==='gameplay'&&project.gameplay?.enabled)for(const rule of project.gameplay.rules.filter(r=>r.enabled!==false&&r.nextBeatId&&(!r.sceneId||r.sceneId===scene.id)&&(!r.objectId||project.objects.some(o=>o.id===r.objectId&&isObjectInScene(o,scene)))))ports.push({id:'rule:'+rule.id,label:rule.name||GAME_TRIGGERS[rule.trigger],next:rule.nextBeatId,gameRule:true});
     const eventHeight = phases.reduce((total,phase) => total + phase.batches.reduce((n,b) => n + 34 + b.events.reduce((sum,e) => sum + 76 + Math.min(2,e.actions.length)*18,0),0),0);
     return {id:beat.id,type:'moment',position:{x:0,y:0},width:beat.kind==='variable'?220:beat.kind==='branch'?320:isPureNode(beat)||beat.kind==='set-variable'?300:360,height:beat.kind==='variable'?100:beat.kind==='set-variable'?240:beat.kind==='branch'?310:isPureNode(beat)?280:340+eventHeight+ports.length*95,
       data:{beat,scene,phases,ports,entry:scene?.entry===beat.id}};
@@ -33,9 +36,9 @@ export function buildStoryFlow(project) {
     }
     const target=ids.has(port.next)?port.next:'missing:'+port.next;
     const targetScene=owners.get(port.next),crossScene=targetScene?.id!==node.data.scene?.id;
-    edges.push({id:`${node.id}/${port.id}`,source:node.id,target,sourceHandle:port.id,targetHandle:'in',reconnectable:true,
-      label:[node.data.beat.kind==='choice'?port.label:'',crossScene&&targetScene?`→ ${targetScene.name}`:''].filter(Boolean).join(' · '),
-      data:{crossScene,from:node.id,to:port.next,broken:!ids.has(port.next),branch:node.data.beat.kind==='branch'?port.id:null}});
+    edges.push({id:`${node.id}/${port.id}`,source:node.id,target,sourceHandle:port.id,targetHandle:'in',reconnectable:!port.gameRule,deletable:!port.gameRule,style:port.gameRule?{strokeDasharray:'5 4'}:undefined,
+      label:[port.gameRule||node.data.beat.kind==='choice'?port.label:'',crossScene&&targetScene?`→ ${targetScene.name}`:''].filter(Boolean).join(' · '),
+      data:{gameRule:port.gameRule,crossScene,from:node.id,to:port.next,broken:!ids.has(port.next),branch:node.data.beat.kind==='branch'?port.id:null}});
   }
   for(const node of nodes.filter(n=>n.data.beat))for(const port of dataTargets(node.data.beat)){
     const source=getInput(node.data.beat,port);if(!source)continue;

@@ -1,3 +1,4 @@
+import {GAME_COMMANDS} from './gameplayModel.js';
 import {animationLabel} from './characterPresentation.js';
 import {t as tr,plural} from './i18n.js';
 import {projectAudioAssets} from './audioAssets.js';
@@ -9,9 +10,10 @@ export const ACTION_CATEGORIES = [
   {id:'staging', label:'Персонажи и камера', icon:'Clapperboard', types:['move','pose','camera']},
   {id:'audio', label:'Звук и музыка', icon:'Music2', types:['music','sound','pause','resume','stop','duck']},
   {id:'world', label:'Мир и предметы', icon:'Sun', types:['weather','time','lighting','particles','visibility','door','highlight']},
-  {id:'logic', label:'Логика и паузы', icon:'GitBranch', types:['wait','variable']},
+  {id:'logic', label:'Логика и паузы', icon:'GitBranch', types:['wait','variable','gameplay']},
 ];
 export const ACTION_HINTS = {
+ gameplay:'Здоровье, оружие, предметы, таймеры и функции',
   move:'Отправить героя или предмет к точке', pose:'Выбрать анимацию персонажа', camera:'Показать сцену с другого ракурса',
   music:'Запустить музыку в фоне', sound:'Озвучка или звуковой эффект', pause:'Поставить фоновую музыку на паузу',
   resume:'Вернуть музыку с места остановки', stop:'Завершить фоновую музыку', duck:'Снизить громкость фона',
@@ -52,6 +54,7 @@ export function describeAction(action, project, scene) {
   const point=findStagingPoint(sceneStagingPoints(scene,project.objects),action.value);
   const audio=projectAudioAssets(project).find(asset=>asset.id===action.assetId);
   const value=Array.isArray(action.value)?action.value.join(', '):String(action.value??'');
+  if(action.type==='gameplay')return {subject:tr('Игровая команда'),result:tr(GAME_COMMANDS[action.command]||action.command),detail:JSON.stringify(action.value),icon:'Gamepad2'};
   if(action.type==='move')return {subject:source,result:point?.label||value||tr('Выберите точку'),detail:tr("{0} с", [action.duration??2]),icon:'MapPin'};
   if(action.type==='pose')return {subject:source,result:enabledCharacterAnimations(object).find(a=>a.id===action.value)?.name||value||tr('Выберите анимацию'),detail:tr("Применить позу"),icon:'PersonStanding'};
   if(action.type==='camera')return {subject:tr("Камера"),result:project.subscenes.flatMap(s=>s.cameras||[]).find(c=>c.id===action.cameraId)?.name||value,detail:tr("Сменить ракурс"),icon:'Video'};
@@ -72,6 +75,7 @@ export function actionTiming(action) {
 export function actionCount(count) { return plural(count,'действие','действия','действий','action'); }
 
 export function actionSummary(action, project) {
+ if(action.type==='gameplay')return tr(GAME_COMMANDS[action.command]||'Игровая команда')+' → '+JSON.stringify(action.value);
  const object=project.objects?.find(o=>o.id===action.target);
  const subject=object?.name||tr(TYPES[action.type]?.label)||action.type;
  const clip=action.type==='pose'&&enabledCharacterAnimations(object).find(item=>item.id===action.value);

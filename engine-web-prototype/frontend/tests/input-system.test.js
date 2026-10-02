@@ -103,3 +103,11 @@ test('malformed adapter values cannot produce non-finite axes',()=>{
  const {input,events}=setup(one('continuous','axis2d'),['test']);input.feed('external','fire',[NaN, .5]);input.tick(.01);assert.deepEqual(triggered(events,'test').at(-1).value,[0,.5]);
  input.feed('external','fire',[.2]);input.tick(.01);assert.deepEqual(triggered(events,'test').at(-1).value,[.2,0]);
 });
+
+test('FPS releases mouse capture for pause and game endings so menu buttons remain usable',()=>{
+ const previousWindow=globalThis.window,previousDocument=globalThis.document;globalThis.window=new EventTarget();
+ const viewport=new EventTarget(),canvas={closest:()=>viewport},doc=new EventTarget();doc.activeElement=viewport;doc.pointerLockElement=null;let releases=0;doc.exitPointerLock=()=>{releases++;doc.pointerLockElement=null;};globalThis.document=doc;
+ const camera=new THREE.PerspectiveCamera(),live={mode:'game',state:{inputActive:true,inputReady:true,inputContexts:['system','gameplay'],game:{active:true,preset:'fps'},playerControl:{mode:'wasd'},paused:false}};
+ const controls=createGameControls(camera,canvas,()=>live);
+ try{doc.pointerLockElement=canvas;controls.tick(.02);assert.equal(releases,0);live.state.paused=true;controls.tick(.02);assert.equal(releases,1);live.state.paused=false;doc.pointerLockElement=canvas;live.state.game.active=false;controls.tick(.02);assert.equal(releases,2);live.state.game.active=true;doc.pointerLockElement=canvas;live.mode='scene';controls.tick(.02);assert.equal(releases,3);}finally{controls.dispose();globalThis.window=previousWindow;globalThis.document=previousDocument;}
+});

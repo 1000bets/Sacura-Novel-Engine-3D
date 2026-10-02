@@ -1,5 +1,6 @@
 import {t as tr, useLocale} from './i18n.jsx';
 import React,{useEffect,useId,useRef,useState} from 'react';
+import {boundText,widgetValue,widgetVisible} from './widgetBindings.js';
 import {scopeWidgetCss,widgetRects,isUnmodifiedDefaultWidget} from './widgetModel.js';
 import './widgets.css';
 
@@ -10,15 +11,17 @@ export default function WidgetRenderer({widget,context={},onAction,onChoice,choi
  const rects=widgetRects(widget,size.width,size.height),scale=Math.min(size.width/widget.referenceSize[0],size.height/widget.referenceSize[1]);
  const custom=scopeWidgetCss(widget.css,'.'+scope);
  const standard=isUnmodifiedDefaultWidget(widget);
- const textFor=e=>({speaker:context.speaker,dialogueText:context.text,status:context.status,title:context.title}[e.role]??(standard?tr(e.text):e.text));
+ const textFor=e=>({speaker:context.speaker,dialogueText:context.text,status:context.status,title:context.title}[e.role]??boundText(e,context,(standard?tr(e.text):e.text)));
  return <div ref={ref} className={'widget-surface '+scope+(editing?' widget-editing':'')} style={width&&height?{width,height}:undefined} data-widget={widget.id} onPointerDown={e=>e.stopPropagation()} onPointerUp={e=>e.stopPropagation()}>
   {custom.css&&<style>{custom.css}</style>}
   {widget.elements.map((e,index)=>{
-   const rect=rects[e.id];let parent=widget.elements.find(x=>x.id===e.parentId),hidden=!e.visible,seen=new Set();while(parent&&!seen.has(parent.id)){seen.add(parent.id);hidden||=!parent.visible;parent=widget.elements.find(x=>x.id===parent.parentId);}
+   const rect=rects[e.id];let parent=widget.elements.find(x=>x.id===e.parentId),hidden=!e.visible||!widgetVisible(e,context),seen=new Set();while(parent&&!seen.has(parent.id)){seen.add(parent.id);hidden||=!parent.visible;parent=widget.elements.find(x=>x.id===parent.parentId);}
    if(!rect||hidden||(e.role==='choices'&&!context.choices?.length&&!editing))return null;
    const s=e.style||{},style={left:rect.x,top:rect.y,width:rect.width,height:rect.height,zIndex:index+1,'--we-bg':s.background||'transparent','--we-color':s.color||'#fff4f8','--we-font-size':Math.max(11,(s.fontSize||24)*scale)+'px','--we-font-family':s.fontFamily||'system-ui','--we-font-weight':s.fontWeight||400,'--we-radius':(s.borderRadius||0)*scale+'px','--we-border-width':(s.borderWidth||0)*scale+'px','--we-border-color':s.borderColor||'transparent','--we-padding':(s.padding||0)*scale+'px','--we-opacity':s.opacity??1,'--we-align':s.textAlign||'left','--we-gap':(s.gap??8)*scale+'px'};
    const props={key:e.id,className:'widget-element widget-'+e.type,style,'data-element':e.id,'data-role':e.role};
-   if(e.type==='button')return <button {...props} disabled={!editing&&((e.action==='advance'&&!context.canAdvance)||(e.action==='resume'&&!context.paused))} onClick={()=>!editing&&onAction?.(e.action)}>{textFor(e)}</button>;
+   if(e.type==='button')return <button {...props} disabled={!editing&&((e.action==='advance'&&!context.canAdvance)||(e.action==='resume'&&!context.paused))} onClick={()=>!editing&&onAction?.(e.action,e)}>{textFor(e)}</button>;
+   if(e.type==='progress'){const min=e.min||0,max=Number(context.variables?.[e.maxVariable]??e.max??100),value=Number(widgetValue(context,e.binding)??e.value??0);return <div {...props}><progress aria-label={e.name} max={Math.max(.001,max-min)} value={Math.min(Math.max(0,value-min),Math.max(.001,max-min))}/></div>;}
+   if(e.type==='inventory')return <div {...props}>{(context.game?.inventory||[]).map((slot,i)=>{const item=context.project?.gameplay?.items.find(x=>x.id===slot.itemId);return <div key={i}><span>{item?.name||slot.itemId} × {slot.count}{Object.values(context.game?.equipment||{}).includes(slot.itemId)?' ✓':''}</span>{item?.slot&&<button onClick={()=>onAction?.('gameplay',{command:'equip',value:{itemId:slot.itemId}})}>{tr('Экипировать')}</button>}{(item?.heal||item?.useEventId)&&<button onClick={()=>onAction?.('gameplay',{command:'useItem',value:{itemId:slot.itemId}})}>{tr('Использовать')}</button>}</div>;})}{context.project?.gameplay?.recipes.map(r=><button key={r.id} onClick={()=>onAction?.('gameplay',{command:'combine',value:{recipeId:r.id}})}>{r.name}</button>)}</div>;
    if(e.type==='choices')return <div {...props}>{(context.choices||[{id:'preview',label:tr('Пример ответа')}]).map(choice=><button key={choice.id} className={context.selectedChoiceId===choice.id?'input-selected':undefined} aria-pressed={context.selectedChoiceId===choice.id} disabled={!editing&&(!context.ready||!choiceEnabled(choice))} onClick={()=>!editing&&onChoice?.(choice.id)}>{choice.label}</button>)}</div>;
    if(e.type==='image')return <div {...props}>{e.src?<img src={e.src} alt={e.text||e.name} draggable={false}/>:editing?tr("Изображение"):null}</div>;
    const advance=e.role==='dialogueText'&&context.canAdvance&&!editing;

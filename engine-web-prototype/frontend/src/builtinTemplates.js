@@ -1,0 +1,2 @@
+export const builtinTemplates=[{id:'builtin-quest',name:'Point & click · Квест',builtin:true,path:'point-and-click'},{id:'builtin-shooter',name:'Шутер · FPS, HP и Game Over',builtin:true,path:'shooter'}];
+export async function loadBuiltinTemplate(id){const t=builtinTemplates.find(t=>t.id===id);if(!t)throw new Error('Шаблон не найден.');const response=await fetch(`${import.meta.env?.BASE_URL||'/'}game-templates/${t.path}.sacura-template.json`);if(!response.ok)throw new Error('Не удалось загрузить стандартный шаблон.');return response.json();}

@@ -1,3 +1,5 @@
+import {GameSession} from './GameSession.js';
+import {gameSave,restoreGameSave} from './gameSave.js';
 import {inputContextsFor} from './inputModel.js';
 import {audioActionOptions} from './audioTransitions.js';
 import {interactionTargets,playerControls} from './interactionModel.js';
@@ -100,7 +102,7 @@ export class PreviewRuntime {
     if(!this.running || this.snapshot.audition)return false;
     // Playback owns a snapshot. Never show a newer route beside an older run.
     const routes=p=>JSON.stringify({
-      input:p.input,
+      input:p.input,gameplay:p.gameplay,functions:p.functions,
       scenes:p.subscenes.map(s=>[s.id,s.entry]),
       chapters:p.chapters.map(c=>[c.id,c.subsceneId,c.beats.map(b=>[
         b.id,b.kind,b.inputs,b.variable,b.value,b.operator,b.a,b.b,b.valueType,b.condition,b.next||null,b.signal||null,b.signals,b.controls,b.interactionEvents,b.inputContexts,b.trueNext,b.falseNext,b.test,b.resultVariable,
@@ -129,12 +131,14 @@ export class PreviewRuntime {
       states: {},
       effects: {},
       instances: {},
-      variables: { ...project.variables },choiceResult:null,choiceResults:{},
+      variables: structuredClone(project.variables),choiceResult:null,choiceResults:{},
       history: [],
       activity: [],audition:false,
       world: { positions: {}, poses: {}, visible: {} },
     };
+    this.game=project.gameplay?.enabled?new GameSession(this):null;
     try {
+      this.game?.initialize();
       await this.enter(beatId, token);
     } catch (e) {
       this.handle(e);
@@ -259,10 +263,11 @@ export class PreviewRuntime {
     this.snapshot.phase = "BEFORE";
     this.emit();
     const errors = validateStudio(this.project).filter(
-      (i) => (i.beatId === id || (!i.beatId && i.id?.startsWith('input-'))) && i.level === "error",
+      (i) => (i.beatId === id || (!i.beatId && ['input-','game-','function-','widget-'].some(prefix=>i.id?.startsWith(prefix)))) && i.level === "error",
     );
     if (errors.length) throw new Error(`Реплика «${id}»: `+errors.map((i) => i.title).join(" · "));
     await this.phase(b, "BEFORE", token);
+    if(await this.game?.flushTransition())return;
     if(isPureNode(b))throw new Error('Эта нода вычисляет значение. Запустите реплику или If.');
     if(b.kind==='branch'||b.kind==='set-variable'){
       await this.phase(b,'ON_START',token);await this.phase(b,'AFTER',token);this.assert(token);
@@ -279,9 +284,9 @@ export class PreviewRuntime {
     this.snapshot.phase = "ON_START";
     this.emit();
     await this.phase(b, "ON_START", token);
-    this.assert(token);
+    this.assert(token);if(await this.game?.flushTransition())return;
     this.snapshot.phase =
-      b.kind === "gate"
+      b.kind === "gameplay" ? "PLAYING" : b.kind === "gate"
         ? "WAITING_OBJECT"
         : b.kind === "choice"
           ? "WAITING_CHOICE"
@@ -292,6 +297,7 @@ export class PreviewRuntime {
     this.snapshot.gateElapsed = 0;
     const controls=playerControls(b);
     if(b.kind==='gate'&&controls.characterId&&controls.mode!=='none')this.snapshot.world.playerControl=controls;
+    if(this.game){this.game.state.active=b.kind==='gameplay';if(b.kind==='gameplay')this.game.enter();}
     if(b.kind==='choice')this.snapshot.inputChoiceId=b.choices.find(c=>conditionPass(c,this.snapshot.variables,this.project,this.snapshot.choiceResults))?.id||null;
     this.emit();
     if (b.kind === "gate") {
@@ -393,6 +399,7 @@ export class PreviewRuntime {
       return;
     }
     await work;
+    if(this.snapshot.ready)await this.game?.flushTransition();
     if (
       binding.join === "EVENT_END" &&
       event.retention !== "AUTO_CLOSE_ON_FLOW_END"
@@ -576,6 +583,9 @@ export class PreviewRuntime {
         if(this.project.variableTypes?.[a.target])this.snapshot.variables[a.target]=variableValue(this.project,a.target,this.snapshot.variables[a.target]);
         break;
       }
+      case 'gameplay':
+        if(!this.game)throw new Error('Включите игровые механики проекта.');
+        await this.game.command(a.command,{...a.value,...(a.target!=='world'?{target:a.target}:{})});break;
       case "visibility":
         world.visible = { ...world.visible, [a.target]: a.value !== "Скрыть" };
         break;
@@ -602,6 +612,9 @@ export class PreviewRuntime {
     activity.status=this.snapshot.states[a.id];activity.progress=1;
     this.emit();
   }
+  saveGame(){const storage=this.storage||globalThis.localStorage;if(!storage)throw new Error('Хранилище сохранений недоступно.');storage.setItem('sacura-save:'+this.project.id,JSON.stringify(gameSave(this)));this.snapshot.hint='Прохождение сохранено';this.emit();}
+  async loadGame(){const storage=this.storage||globalThis.localStorage,raw=storage?.getItem('sacura-save:'+this.project.id);if(!raw)throw new Error('Сохранение ещё не создано.');await restoreGameSave(this,JSON.parse(raw));this.snapshot.hint='Прохождение загружено';this.emit();}
+  async uiAction(action,element={}){try{if(action==='event'&&element.eventId)await this.binding({id:'input:widget:'+element.id,eventId:element.eventId,join:'FLOW_END',overrides:{},actionOverrides:{}},this.generation);else if(action==='save')this.saveGame();else if(action==='load')await this.loadGame();else if(action==='gameplay'&&this.game)await this.game.command(element.command,element.value||{});await this.game?.flushTransition();this.emit();}catch(e){this.snapshot.hint=e.message;this.emit();}}
   writeInputValue(action,value){
     this.snapshot.inputValues??={};const changed=JSON.stringify(this.snapshot.inputValues[action.id])!==JSON.stringify(value);this.snapshot.inputValues[action.id]=value;
     const outputs=action.valueType==='axis2d'?[[action.variableX,value?.[0]||0],[action.variableY,value?.[1]||0]]:[[action.variable,action.valueType==='boolean'?Boolean(value):value||0]];
@@ -625,6 +638,7 @@ export class PreviewRuntime {
     if(phase!=='triggered')return;
     if(action.behavior==='pause'){this.togglePause();return;}
     if(this.snapshot.paused||!this.snapshot.ready)return;
+    if(this.game&&['shoot','reload','jump','look','saveGame','loadGame'].includes(action.behavior)){try{if(action.behavior==='look')this.game.look(payload?.delta||value,device);else await this.game.command(({shoot:'shoot',saveGame:'save',loadGame:'load'})[action.behavior]||action.behavior,payload||{});await this.game.flushTransition();this.emit();}catch(e){this.game.error(e);}return;}
     if(action.behavior==='move')return; // The scene adapter converts 2D input to camera-relative movement.
     if(action.behavior==='interact'){if(this.snapshot.world.playerControl)this.playerInteract();else await this.advance(null,interactionTargets(beat).find(id=>!this.snapshot.interacted?.includes(id)));return;}
     if(action.behavior==='point'){if(this.snapshot.world.playerControl)this.playerClick(payload?.point,payload?.id);else await this.advance(null,payload?.id);return;}
@@ -651,6 +665,7 @@ export class PreviewRuntime {
     return {control,scene,object,world:this.snapshot.world,beat:allBeats(this.project).find(b=>b.id===this.snapshot.beatId)};
   }
   playerClick(point,id){
+    if(this.snapshot.phase==='PLAYING'&&this.game){if(id&&this.game.interact(id))return;if(point&&['point-click','both'].includes(this.game.config.controller.mode))this.game.setDestination(point);return;}
     const context=this.playerContext();if(!context)return;
     const {control,world,scene,object,beat}=context;
     const target=interactionTargets(beat).includes(id)&&!this.snapshot.interacted.includes(id)?this.project.objects.find(o=>o.id===id):null;
@@ -670,6 +685,7 @@ export class PreviewRuntime {
     }catch(e){this.snapshot.hint=e.message;this.emit();}
   }
   playerInteract(){
+    if(this.snapshot.phase==='PLAYING'&&this.game){const p=this.game.position(this.game.config.playerId),nearest=this.game.config.items.map(i=>i.worldObjectId).filter(id=>this.game.position(id)&&this.game.world.visible[id]!==false).sort((a,b)=>Math.hypot(...this.game.position(a).map((v,i)=>v-p[i]))-Math.hypot(...this.game.position(b).map((v,i)=>v-p[i])));if(nearest[0])this.game.interact(nearest[0]);return;}
     const c=this.playerContext();if(!c)return;const from=resolvedPosition(c.object,c.world,c.scene.kind);
     const nearest=interactionTargets(c.beat).filter(id=>!this.snapshot.interacted.includes(id)).map(id=>this.project.objects.find(o=>o.id===id)).filter(o=>o&&o.active!==false&&c.world.visible?.[o.id]!==false).map(o=>({o,p:resolvedPosition(o,c.world,c.scene.kind)})).sort((a,b)=>Math.hypot(a.p[0]-from[0],a.p[2]-from[2])-Math.hypot(b.p[0]-from[0],b.p[2]-from[2]));
     if(nearest[0]){
@@ -678,6 +694,7 @@ export class PreviewRuntime {
     }
   }
   playerStep(direction,dt){
+    if(this.game&&this.snapshot.phase==='PLAYING'){this.game.step(direction,dt);return;}
     const c=this.playerContext();if(!c)return;const {object,world,scene,control}=c,from=resolvedPosition(object,world,scene.kind),manual=direction.some(v=>Math.abs(v)>.001);
     if(manual)this.playerDestination=null;
     const route=this.playerDestination;let to=from;
@@ -699,6 +716,7 @@ export class PreviewRuntime {
     if (!this.running || !this.snapshot.ready || this.snapshot.paused) return;
     const b = allBeats(this.project).find((b) => b.id === this.snapshot.beatId),
       token = this.generation;
+    if(b.kind==='gameplay')return;
     if (objectId && b.kind !== "gate") return;
     if (b.kind === "gate" && (!interactionTargets(b).includes(objectId)||this.snapshot.interacted.includes(objectId))) return;
     if (b.kind === "gate") {
@@ -753,6 +771,7 @@ export class PreviewRuntime {
     this.emit();
     try {
       await this.phase(b, "AFTER", token);
+      if(await this.game?.flushTransition())return;
       if (next) await this.enter(next.id, token);
       else {
         this.generation++;

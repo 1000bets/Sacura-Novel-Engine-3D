@@ -1,5 +1,9 @@
 import InputWorkspace,{InputContextSettings} from './InputWorkspace.jsx';
 import TouchInput from './TouchInput.jsx';
+import GameplayWorkspace from './GameplayWorkspace.jsx';
+import GameHUD from './GameHUD.jsx';
+import {exportPlayableGame} from './gameExport.js';
+import {builtinTemplates,loadBuiltinTemplate} from './builtinTemplates.js';
 import {inputContextsFor,inputHelp} from './inputModel.js';
 import LanguagePicker from './LanguagePicker.jsx';
 import WidgetWorkspace from './WidgetWorkspace.jsx';
@@ -207,6 +211,7 @@ function GameDialogue({
   onUiAction,
 }) {
  useLocale();
+  if(beat?.kind==='gameplay')return null;
   if (!show || !beat || (running && !preview.textVisible)) return null;
   if (preview?.phase === "FINISHED" && running)
     return (
@@ -218,7 +223,7 @@ function GameDialogue({
       </div>
     );
   const ready = !running || (preview.ready && !preview.paused);
-  const canAdvance=ready&&!['choice','gate'].includes(beat.kind);
+  const canAdvance=ready&&!['choice','gate','gameplay'].includes(beat.kind);
   const dialogueWidget=widgetOverride||resolveWidget(project,'dialogue',beat);
   if (beat.kind==='gate' && beat.controls?.mode && beat.controls.mode!=='none' && isUnmodifiedDefaultWidget(dialogueWidget)) {
     const help=inputHelp(project.input,inputContextsFor(project,beat),beat.controls.mode==='point-click'?['interact','point']:['move','interact','point']);
@@ -232,15 +237,15 @@ function GameDialogue({
   }
   const status=beat.kind==='gate'?(message(preview?.hint)||(beat.controls?.mode&&beat.controls.mode!=='none'?inputHelp(project.input,inputContextsFor(project,beat),['move','interact','point']):`${tr('Нажмите на объект')} «${objectLabel||beat.signal}»`)):
     !running?tr('Предпросмотр выбранной реплики'):!preview.ready?tr('Выполняются действия'):beat.kind==='choice'?tr('Выберите ответ'):tr('Нажмите, чтобы продолжить');
-  return <WidgetRenderer widget={dialogueWidget} context={{speaker:beat.speaker,text:beat.text,status,title:project.title,choices:beat.kind==='choice'?beat.choices:[],selectedChoiceId:preview?.inputChoiceId,ready,canAdvance}}
-    onAction={action=>{if(action==='advance'&&canAdvance)running?onAdvance():onStart();else if(action!=='advance')onUiAction?.(action);}}
+  return <WidgetRenderer widget={dialogueWidget} context={{project,variables,game:preview?.world.game,speaker:beat.speaker,text:beat.text,status,title:project.title,choices:beat.kind==='choice'?beat.choices:[],selectedChoiceId:preview?.inputChoiceId,ready,canAdvance}}
+    onAction={(action,element)=>{if(action==='advance'&&canAdvance)running?onAdvance():onStart();else if(action!=='advance')onUiAction?.(action,element);}}
     onChoice={id=>running&&onAdvance(id)} choiceEnabled={choice=>conditionPass(choice,variables,project,preview?.choiceResults)}/>;
 }
 
 // Keep everyday workspaces visible; secondary tools remain one click away.
 const dockTools = [
   ["story", "Поток истории"], ["subscenes", "Сабсцены"], ["characters", "Персонажи"],
-  ["widgets", "Виджеты UI"], ["cameras", "Камеры"], ["input", "Ввод"], ["files", "Проводник"], ["active", "Звук и окружение"], ["event", "Событие"],
+  ["widgets", "Виджеты UI"], ["gameplay", "Игровые механики"], ["cameras", "Камеры"], ["input", "Ввод"], ["files", "Проводник"], ["active", "Звук и окружение"], ["event", "Событие"],
   ["create", "Создание"], ["assets", "Проект"], ["sound", "Звук"],
   ["samples", "Эффекты"], ["issues", "Проблемы"],
 ];
@@ -249,7 +254,7 @@ function DockTools({ dock, event, issueCount, onSelect }) {
   const [open, setOpen] = useState(false);
   const [opensUp, setOpensUp] = useState(false);
   const popup = useRef(null), trigger = useRef(null);
-  const secondary = dockTools.slice(5);
+  const secondary = dockTools.slice(6);
   const current = secondary.find(([id]) => id === dock);
   useEffect(() => {
     if (!open) return;
@@ -265,7 +270,7 @@ function DockTools({ dock, event, issueCount, onSelect }) {
     };
   }, [open]);
   return <>
-    {dockTools.slice(0, 5).map(([id, label]) => <button key={id}
+    {dockTools.slice(0, 6).map(([id, label]) => <button key={id}
       aria-pressed={dock === id} className={dock === id ? "active" : ""}
       onClick={() => onSelect(id)}>{tr(label)}</button>)}
     <div className={"dock-more" + (opensUp ? " opens-up" : "")} ref={popup} onBlur={e => {
@@ -706,7 +711,10 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     setShowDialogue(true);
     rt.start(project, startId);
   };
-  const widgetAction=action=>{
+  rt.storage=accountStorage;
+  const widgetAction=async(action,element)=>{
+    if(action==='load'&&!running){setMode('game');setGameMenu(null);await rt.start(project,project.subscenes[0].entry);await rt.uiAction(action,element);return;}
+    if(['event','gameplay','save','load'].includes(action)&&running){rt.storage=accountStorage;rt.uiAction(action,element);}
     if(action==='start'||action==='restart')start(false,project.subscenes[0]?.entry);
     if(action==='resume'&&preview?.paused){setPreviewWidgetId(null);rt.togglePause();}
     if(action==='mainMenu'){rt.stop();setMode('game');setGameMenu('mainMenu');setPreviewWidgetId(null);}
@@ -787,12 +795,12 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   const openProjectDialog = mode => {
     if(fileOperation.current)return;
     setMenu(null);setProjectFileError('');
-    try{if(mode==='new')setProjectTemplates(readTemplates(accountStorage));setProjectDialog(mode);}
+    try{if(mode==='new')setProjectTemplates([...builtinTemplates,...readTemplates(accountStorage)]);setProjectDialog(mode);}
     catch(err){setNotice(err.message);}
   };
   const submitProjectDialog = ({name,templateId}) => runFileOperation(async()=>{
     if(projectDialog==='new'){
-      const template=projectTemplates.find(t=>t.id===templateId);
+      const template=projectTemplates.find(t=>t.id===templateId);if(template?.builtin)template.project=(await loadBuiltinTemplate(template.id)).project;
       const next=template?projectFromTemplate(template,name):createEmptyProject(name);
       replaceProject(next);setNotice(template?tr("Создан проект из шаблона «{0}».", [template.name]):'Создан пустой проект.');
     } else if(projectDialog==='template'){
@@ -2065,7 +2073,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       {label:'Конвертации',icon:'RefreshCw',children:[['number','В число'],['boolean','В Да / нет'],['string','В текст']].map(([valueType,label])=>({label,action:()=>addBeat('convert',{...contextMenu,valueType})}))},
       {label:'Сравнения',icon:'Binary',children:['eq','ne','gte','lte','gt','lt'].map(operator=>({label:compareSymbols[operator]+' · '+tr(({eq:'Равно',ne:'Не равно',gte:'Больше или равно',lte:'Меньше или равно',gt:'Больше',lt:'Меньше'})[operator]),icon:'Binary',action:()=>addBeat('compare',{...contextMenu,operator})}))},
       ...[['variable','Database','Переменная · получить'],['set-variable','Database','Переменная · задать'],['literal','Binary','Значение'],['and','Binary','И · оба условия'],['or','Binary','ИЛИ · любое условие'],['not','Binary','НЕ · инверсия условия']].map(([kind,icon,label])=>({label,icon,group:'Значения и переменные',action:()=>addBeat(kind,contextMenu)})),
-      ...[['dialogue','MessageSquare','Реплика'],['choice','GitFork','Выбор игрока'],['branch','GitFork','If · Если'],['gate','MousePointerClick','Ждать взаимодействие'],['merge','Merge','Схождение веток'],['end','Flag','Концовка']].map(([kind,icon,label])=>({label,icon,group:'Добавить ноду',action:()=>addBeat(kind,contextMenu)})),
+      ...[['dialogue','MessageSquare','Реплика'],['gameplay','Gamepad2','Игровая сцена'],['choice','GitFork','Выбор игрока'],['branch','GitFork','If · Если'],['gate','MousePointerClick','Ждать взаимодействие'],['merge','Merge','Схождение веток'],['end','Flag','Концовка']].map(([kind,icon,label])=>({label,icon,group:'Добавить ноду',action:()=>addBeat(kind,contextMenu)})),
       {label:'Добавить событие к выбранной реплике…',icon:'Layers',group:'События',action:()=>setPicker({kind:'event',phase:phase==='ALL'?'ON_START':phase})},
     ];
   };
@@ -2437,8 +2445,9 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 }
                 show={mode==="game"&&showDialogue&&!preview?.audition&&!gameMenu&&!preview?.paused}
               />
+              {running&&preview?.phase==='PLAYING'&&<GameHUD project={playProject} preview={preview} onAction={widgetAction} text={playBeat.text}/>}
               {mode==='game'&&(gameMenu==='mainMenu'||(running&&preview?.paused&&!preview?.audition))&&<WidgetMenu label={gameMenu==='mainMenu'?tr('Главное меню'):tr('Пауза')} widget={project.widgets.find(w=>w.id===previewWidgetId&&w.kind===(gameMenu==='mainMenu'?'mainMenu':'pauseMenu'))||resolveWidget(project,gameMenu==='mainMenu'?'mainMenu':'pauseMenu')}
-                  context={{title:project.title,paused:!!preview?.paused}} onAction={widgetAction}/>}
+                  context={{project:playProject,variables,game:preview?.world.game,title:project.title,paused:!!preview?.paused}} onAction={widgetAction}/>}
               {running && !preview.textVisible && !preview.audition && (
                 <div className="scene-preparing">
                   <Icon name="LoaderCircle" size={15} />
@@ -2599,7 +2608,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 onGraph={id=>{setEventContext({eventId:id});setSelection({kind:'event',id});setDock('event');}}
                 onPreview={draft=>{setCameraPreviewId(null);setCameraPilotId(null);const test=structuredClone(project);const i=test.events.findIndex(e=>e.id===draft.id);if(i<0)test.events.push(draft);else test.events[i]=draft;soundDesk.unlock();rt.stop();setMode('game');setMaximized(null);setFollow(false);rt.previewEvent(test,draft.id,beat.id);}}
                 onPlace={(draft,hook)=>{mutate(p=>addToBatch(p,beat.id,hook,null,draft.id));setPhase(hook);setDock('story');setMaximized(null);setNotice(tr("Добавлено: {0} · {1}", [draft.name, PHASES.find(x=>x.id===hook).label]));}}/>
-              {dock==='create'?null:dock==='input'?<InputWorkspace project={project} onChange={mutate} beat={playBeat} preview={preview} devices={inputDevices} running={running} onStop={()=>rt.stop()}/>:detailEditor && event ? (
+              {dock==='create'?null:dock==='gameplay'?<GameplayWorkspace project={project} onChange={mutate} sceneId={displayScene.id} running={running} onStop={()=>rt.stop()} onWidgets={()=>{setWidgetRequest({id:project.gameplay.hudWidgetId||project.ui.hud});setDock('widgets');}} onInput={()=>setDock('input')}/>:dock==='input'?<InputWorkspace project={project} onChange={mutate} beat={playBeat} preview={preview} devices={inputDevices} running={running} onStop={()=>rt.stop()}/>:detailEditor && event ? (
                 <EventEditor
                   project={project}
                   event={event}
@@ -2780,6 +2789,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               <button disabled={projectFileBusy} onClick={()=>openProjectDialog('saveAs')}><Icon name="SaveAll"/>{tr("Сохранить проект как… ")}<kbd>Ctrl Shift S</kbd></button>
               <button disabled={projectFileBusy} onClick={()=>openProjectDialog('template')}><Icon name="BookCopy"/>{tr("Записать проект как шаблон…")}</button>
               <button disabled={projectFileBusy} onClick={()=>runFileOperation(async()=>{downloadFile(JSON.stringify(createProjectTemplate(await portableProject(project),project.title),null,2),projectFilename(project.title,true));setMenu(null);})}><Icon name="FileDown"/>{tr("Экспортировать шаблон…")}</button>
+              <button disabled={projectFileBusy} onClick={()=>{setMenu(null);runFileOperation(async()=>{await exportPlayableGame(project);setNotice(tr('Игра экспортирована в HTML. Откройте скачанный файл в браузере.'));});}}>{tr('Экспортировать игру (HTML)…')}</button>
               <button onClick={exportProject}>
                 <Icon name="Download" />
                 {tr("Экспортировать JSON")}</button>
@@ -2897,6 +2907,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 )}
                 <div className="create-options">
                   {[
+                    ["gameplay", "Gamepad2", "Игровая сцена", "Управление персонажем, оружие и игровые правила"],
                     [
                       "dialogue",
                       "MessageSquare",

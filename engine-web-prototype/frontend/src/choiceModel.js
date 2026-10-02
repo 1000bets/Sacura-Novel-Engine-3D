@@ -4,6 +4,7 @@ export const VALUE_TYPES=[['string','Текст'],['number','Число'],['bool
 export const OPERATORS=[['eq','равно'],['ne','не равно'],['gt','больше'],['gte','не меньше'],['lt','меньше'],['lte','не больше']];
 export const variableName=id=>({trust:tr("Доверие"),letter:tr("Письмо найдено"),[ANSWER_VARIABLE]:tr("Последний ответ игрока")}[id]||id);
 export function typedValue(value,type='string'){
+ if(type==='array'||type==='struct'){let v=value===''||value===undefined?(type==='array'?[]:{}):value;try{if(typeof v==='string')v=JSON.parse(v);}catch{throw new Error('Проверьте JSON значения.');}if(type==='array'&&!Array.isArray(v)||type==='struct'&&(!v||typeof v!=='object'||Array.isArray(v)))throw new Error('Значение должно быть '+(type==='array'?'массивом.':'структурой.'));return structuredClone(v);}
  if(type==='boolean')return value===true||value==='true';
  if(type==='number'){const n=Number(value);return Number.isFinite(n)?n:0;}
  return String(value??'');

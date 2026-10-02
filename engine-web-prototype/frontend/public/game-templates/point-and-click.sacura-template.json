@@ -1,0 +1,3269 @@
+{
+  "format": "sacura-project-template",
+  "version": 1,
+  "id": "template-point-and-click",
+  "name": "Point & Click — Ключ от обсерватории",
+  "createdAt": "2026-10-02T14:00:00.000Z",
+  "project": {
+    "version": 2,
+    "id": "project-quest-room",
+    "title": "Point & Click — Ключ от обсерватории",
+    "revision": 2,
+    "visualExamplesVersion": 1,
+    "sceneEditingVersion": 2,
+    "variables": {
+      "hasKey": false,
+      "clueRead": false,
+      "relicFound": false,
+      "doorUnlocked": false,
+      "hp": 100,
+      "maxHp": 100,
+      "ammo": 6,
+      "reserve": 30,
+      "kills": 0,
+      "inventory": [],
+      "journal": []
+    },
+    "objects": [
+      {
+        "id": "quest-room-floor",
+        "name": "Пол локации",
+        "type": "Меш",
+        "primitive": "box",
+        "color": "#726659",
+        "active": true,
+        "subsceneId": "quest-room",
+        "transforms": {
+          "quest-room": {
+            "position": [
+              0,
+              -0.08,
+              0
+            ],
+            "scale": [
+              16,
+              0.3,
+              12
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "id": "quest-room-wall",
+        "name": "Задняя стена",
+        "type": "Меш",
+        "primitive": "box",
+        "color": "#485965",
+        "active": true,
+        "subsceneId": "quest-room",
+        "transforms": {
+          "quest-room": {
+            "position": [
+              0,
+              1.1,
+              -3
+            ],
+            "scale": [
+              16,
+              4.4,
+              0.35
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "id": "quest-yard-floor",
+        "name": "Пол локации",
+        "type": "Меш",
+        "primitive": "box",
+        "color": "#536b61",
+        "active": true,
+        "subsceneId": "quest-yard",
+        "transforms": {
+          "quest-yard": {
+            "position": [
+              0,
+              -0.08,
+              0
+            ],
+            "scale": [
+              16,
+              0.3,
+              12
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "id": "quest-yard-wall",
+        "name": "Задняя стена",
+        "type": "Меш",
+        "primitive": "box",
+        "color": "#485965",
+        "active": true,
+        "subsceneId": "quest-yard",
+        "transforms": {
+          "quest-yard": {
+            "position": [
+              0,
+              1.1,
+              -3
+            ],
+            "scale": [
+              16,
+              4.4,
+              0.35
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "id": "quest-hero",
+        "name": "Исследователь",
+        "type": "Персонаж",
+        "dialogueWidgetId": null,
+        "color": "#d7b47d",
+        "active": true,
+        "subsceneId": "",
+        "description": "",
+        "idleAnimation": "стоит",
+        "enabledAnimations": [
+          "стоит",
+          "ходит",
+          "сидит",
+          "машет",
+          "улыбка",
+          "задумчивость",
+          "танец",
+          "грусть"
+        ],
+        "transforms": {
+          "quest-room": {
+            "position": [
+              -0.4,
+              0,
+              1.4
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "quest-yard": {
+            "position": [
+              -0.4,
+              0,
+              1.4
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        "walkAnimation": "ходит",
+        "collision": {
+          "enabled": true,
+          "custom": true,
+          "size": [
+            0.45,
+            1.6,
+            0.45
+          ],
+          "offset": [
+            0,
+            0.8,
+            0
+          ]
+        }
+      },
+      {
+        "id": "quest-desk",
+        "name": "Стол смотрителя",
+        "type": "Меш",
+        "primitive": "box",
+        "color": "#796047",
+        "active": true,
+        "subsceneId": "quest-room",
+        "transforms": {
+          "quest-room": {
+            "position": [
+              -1.8,
+              0.55,
+              -0.6
+            ],
+            "scale": [
+              3,
+              2.2,
+              1.8
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "id": "quest-key",
+        "name": "Латунный ключ",
+        "type": "Активный меш",
+        "primitive": "box",
+        "color": "#e5c15c",
+        "active": true,
+        "subsceneId": "quest-room",
+        "transforms": {
+          "quest-room": {
+            "position": [
+              -1.8,
+              1.15,
+              -0.6
+            ],
+            "scale": [
+              0.75,
+              0.18,
+              0.42
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "interaction": "Латунный ключ"
+      },
+      {
+        "id": "quest-note",
+        "name": "Записка смотрителя",
+        "type": "Активный меш",
+        "primitive": "box",
+        "color": "#e8dec0",
+        "active": true,
+        "subsceneId": "quest-room",
+        "transforms": {
+          "quest-room": {
+            "position": [
+              1.3,
+              0.08,
+              0.2
+            ],
+            "scale": [
+              1.35,
+              0.12,
+              0.9
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "interaction": "Записка смотрителя"
+      },
+      {
+        "id": "quest-door",
+        "name": "Запертая дверь во двор",
+        "type": "Активный меш",
+        "primitive": "box",
+        "color": "#6b9da0",
+        "active": true,
+        "subsceneId": "quest-room",
+        "transforms": {
+          "quest-room": {
+            "position": [
+              2.7,
+              1,
+              -2.2
+            ],
+            "scale": [
+              2.2,
+              4,
+              0.35
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "interaction": "Запертая дверь во двор"
+      },
+      {
+        "id": "quest-pedestal",
+        "name": "Постамент",
+        "type": "Меш",
+        "primitive": "box",
+        "color": "#a4adb0",
+        "active": true,
+        "subsceneId": "quest-yard",
+        "transforms": {
+          "quest-yard": {
+            "position": [
+              0.5,
+              0.45,
+              -0.8
+            ],
+            "scale": [
+              2,
+              1.8,
+              2
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "id": "quest-relic",
+        "name": "Звёздная линза",
+        "type": "Активный меш",
+        "primitive": "sphere",
+        "color": "#9ebcea",
+        "active": true,
+        "subsceneId": "quest-yard",
+        "transforms": {
+          "quest-yard": {
+            "position": [
+              0.5,
+              1.05,
+              -0.8
+            ],
+            "scale": [
+              0.9,
+              0.9,
+              0.9
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "interaction": "Звёздная линза"
+      }
+    ],
+    "events": [
+      {
+        "id": "quest-collect-key",
+        "name": "Взять ключ",
+        "description": "Инвентарь хранится в hasKey. Предмет исчезает после сбора.",
+        "owner": "SubScene",
+        "retention": "AUTO_CLOSE_ON_FLOW_END",
+        "groups": [
+          {
+            "id": "quest-collect-key-group",
+            "name": "Взять ключ",
+            "actions": [
+              {
+                "id": "action-1",
+                "type": "variable",
+                "target": "hasKey",
+                "value": true,
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "duration": 0.1,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние",
+                "operation": "set",
+                "valueType": "boolean"
+              },
+              {
+                "id": "action-2",
+                "type": "visibility",
+                "target": "quest-key",
+                "value": "Скрыть",
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "duration": 0.1,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "quest-read-note",
+        "name": "Прочитать записку",
+        "description": "",
+        "owner": "SubScene",
+        "retention": "AUTO_CLOSE_ON_FLOW_END",
+        "groups": [
+          {
+            "id": "quest-read-note-group",
+            "name": "Прочитать записку",
+            "actions": [
+              {
+                "id": "action-3",
+                "type": "variable",
+                "target": "clueRead",
+                "value": true,
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "duration": 0.1,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние",
+                "operation": "set",
+                "valueType": "boolean"
+              },
+              {
+                "id": "action-4",
+                "type": "highlight",
+                "target": "quest-note",
+                "value": "Подсветить",
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "duration": 0.1,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "quest-open-door",
+        "name": "Применить ключ и открыть дверь",
+        "description": "",
+        "owner": "SubScene",
+        "retention": "AUTO_CLOSE_ON_FLOW_END",
+        "groups": [
+          {
+            "id": "quest-open-door-group",
+            "name": "Применить ключ и открыть дверь",
+            "actions": [
+              {
+                "id": "action-5",
+                "type": "variable",
+                "target": "hasKey",
+                "value": false,
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "duration": 0.1,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние",
+                "operation": "set",
+                "valueType": "boolean"
+              },
+              {
+                "id": "action-6",
+                "type": "variable",
+                "target": "doorUnlocked",
+                "value": true,
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "duration": 0.1,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние",
+                "operation": "set",
+                "valueType": "boolean"
+              },
+              {
+                "id": "action-7",
+                "type": "door",
+                "target": "quest-door",
+                "value": "Открыть",
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "duration": 0.1,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние"
+              }
+            ]
+          },
+          {
+            "id": "quest-go-yard",
+            "name": "Перейти во двор",
+            "actions": [
+              {
+                "id": "action-765a29ae-9879-487a-9d36-2d0c51e35983",
+                "type": "gameplay",
+                "target": "world",
+                "value": {
+                  "beatId": "quest-yard-intro"
+                },
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "command": "goTo",
+                "duration": 2,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "quest-collect-relic",
+        "name": "Забрать звёздную линзу",
+        "description": "",
+        "owner": "SubScene",
+        "retention": "AUTO_CLOSE_ON_FLOW_END",
+        "groups": [
+          {
+            "id": "quest-collect-relic-group",
+            "name": "Забрать звёздную линзу",
+            "actions": [
+              {
+                "id": "action-8",
+                "type": "variable",
+                "target": "relicFound",
+                "value": true,
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "duration": 0.1,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние",
+                "operation": "set",
+                "valueType": "boolean"
+              },
+              {
+                "id": "action-9",
+                "type": "visibility",
+                "target": "quest-relic",
+                "value": "Скрыть",
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "duration": 0.1,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "audioAssets": [],
+    "actionTemplates": [],
+    "groupTemplates": [],
+    "scene": {
+      "location": "quest-room",
+      "weather": "Ясно",
+      "time": "День",
+      "camera": "Общий план"
+    },
+    "subscenes": [
+      {
+        "id": "quest-room",
+        "name": "Кабинет смотрителя",
+        "description": "Все объекты, события, виджеты и связи редактируются стандартными инструментами Sacura.",
+        "location": "Point & Click — Ключ от обсерватории",
+        "kind": "empty",
+        "entry": "quest-intro",
+        "sceneId": "chapter1",
+        "weather": "Ясно",
+        "time": "День",
+        "color": "#96b9ba",
+        "stagingPoints": [],
+        "navMesh": {
+          "enabled": true,
+          "show": true,
+          "center": [
+            0,
+            0,
+            0
+          ],
+          "size": [
+            8,
+            6
+          ],
+          "cellSize": 0.25
+        },
+        "cameras": [
+          {
+            "id": "quest-room-camera",
+            "name": "Игровой ракурс",
+            "mode": "fixed",
+            "position": [
+              0,
+              5,
+              6.8
+            ],
+            "target": [
+              0,
+              0.3,
+              -0.5
+            ],
+            "fov": 58,
+            "smoothing": 0.15
+          }
+        ],
+        "defaultCameraId": "quest-room-camera"
+      },
+      {
+        "id": "quest-yard",
+        "name": "Двор обсерватории",
+        "description": "Все объекты, события, виджеты и связи редактируются стандартными инструментами Sacura.",
+        "location": "Двор обсерватории",
+        "kind": "empty",
+        "entry": "quest-yard-intro",
+        "sceneId": "chapter1",
+        "weather": "Ясно",
+        "time": "День",
+        "color": "#96b9ba",
+        "stagingPoints": [],
+        "navMesh": {
+          "enabled": true,
+          "show": true,
+          "center": [
+            0,
+            0,
+            0
+          ],
+          "size": [
+            8,
+            6
+          ],
+          "cellSize": 0.25
+        },
+        "cameras": [
+          {
+            "id": "quest-yard-camera",
+            "name": "Игровой ракурс",
+            "mode": "fixed",
+            "position": [
+              0,
+              5,
+              6.8
+            ],
+            "target": [
+              0,
+              0.3,
+              -0.5
+            ],
+            "fov": 58,
+            "smoothing": 0.15
+          }
+        ],
+        "defaultCameraId": "quest-yard-camera"
+      }
+    ],
+    "chapters": [
+      {
+        "id": "quest-room-chapter",
+        "name": "Игровая логика",
+        "subsceneId": "quest-room",
+        "beats": [
+          {
+            "id": "quest-intro",
+            "kind": "dialogue",
+            "text": "Соберите ключ и записку. Щёлкайте по сцене, чтобы ходить. В инвентаре соедините находки, затем используйте ключ с кодом. F5/F9 — сохранение и загрузка.",
+            "speaker": "Рассказчик",
+            "next": "quest-explore",
+            "bindings": [],
+            "mode": "SEQUENTIAL",
+            "batches": {
+              "BEFORE": [],
+              "ON_START": [],
+              "AFTER": []
+            }
+          },
+          {
+            "id": "quest-explore",
+            "kind": "gameplay",
+            "text": "Найдите ключ и записку → соедините их в инвентаре → используйте ключ с кодом.",
+            "speaker": "",
+            "next": null,
+            "bindings": [],
+            "mode": "SEQUENTIAL",
+            "batches": {
+              "BEFORE": [],
+              "ON_START": [],
+              "AFTER": []
+            }
+          }
+        ]
+      },
+      {
+        "id": "quest-yard-chapter",
+        "name": "Находка во дворе",
+        "subsceneId": "quest-yard",
+        "beats": [
+          {
+            "id": "quest-yard-intro",
+            "kind": "dialogue",
+            "text": "Дверь открыта. Во дворе найдите звёздную линзу.",
+            "speaker": "Рассказчик",
+            "next": "quest-relic-gate",
+            "bindings": [],
+            "mode": "SEQUENTIAL",
+            "batches": {
+              "BEFORE": [],
+              "ON_START": [],
+              "AFTER": []
+            }
+          },
+          {
+            "id": "quest-relic-gate",
+            "kind": "gameplay",
+            "text": "Нажмите на звёздную линзу: герой подойдёт и заберёт её.",
+            "speaker": "",
+            "next": null,
+            "bindings": [],
+            "mode": "SEQUENTIAL",
+            "batches": {
+              "BEFORE": [],
+              "ON_START": [],
+              "AFTER": []
+            }
+          },
+          {
+            "id": "quest-win",
+            "kind": "end",
+            "text": "Звёздная линза найдена",
+            "speaker": "",
+            "next": null,
+            "bindings": [],
+            "mode": "SEQUENTIAL",
+            "batches": {
+              "BEFORE": [],
+              "ON_START": [],
+              "AFTER": []
+            },
+            "ending": "Звёздная линза найдена",
+            "widgetId": "quest-victory"
+          }
+        ]
+      }
+    ],
+    "audioSettings": {
+      "sidechain": {
+        "reductionDb": 4,
+        "attack": 0.6,
+        "release": 0.9
+      }
+    },
+    "input": {
+      "version": 1,
+      "touchMode": "auto",
+      "actions": [
+        {
+          "id": "move",
+          "name": "Двигаться",
+          "valueType": "axis2d",
+          "behavior": "move",
+          "trigger": "continuous",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "interact",
+          "name": "Осмотреть",
+          "valueType": "boolean",
+          "behavior": "interact",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "point",
+          "name": "Идти по указателю",
+          "valueType": "boolean",
+          "behavior": "point",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "advance",
+          "name": "Дальше",
+          "valueType": "boolean",
+          "behavior": "advance",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "pause",
+          "name": "Пауза",
+          "valueType": "boolean",
+          "behavior": "pause",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "choiceNext",
+          "name": "Следующий ответ",
+          "valueType": "boolean",
+          "behavior": "choiceNext",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "choicePrevious",
+          "name": "Предыдущий ответ",
+          "valueType": "boolean",
+          "behavior": "choicePrevious",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "fire",
+          "name": "Стрелять",
+          "behavior": "shoot",
+          "valueType": "boolean",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "reload",
+          "name": "Перезарядить",
+          "behavior": "reload",
+          "valueType": "boolean",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "jump",
+          "name": "Прыгнуть",
+          "behavior": "jump",
+          "valueType": "boolean",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "look",
+          "name": "Смотреть",
+          "behavior": "look",
+          "valueType": "axis2d",
+          "trigger": "continuous",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "saveGame",
+          "name": "Сохранить прохождение",
+          "behavior": "saveGame",
+          "valueType": "boolean",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "loadGame",
+          "name": "Загрузить прохождение",
+          "behavior": "loadGame",
+          "valueType": "boolean",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        }
+      ],
+      "contexts": [
+        {
+          "id": "system",
+          "name": "Система",
+          "priority": 100,
+          "bindings": [
+            {
+              "actionId": "pause",
+              "device": "keyboard",
+              "control": "Escape",
+              "scale": 1,
+              "id": "system-0"
+            },
+            {
+              "actionId": "pause",
+              "device": "gamepad-button",
+              "control": "9",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "system-1"
+            },
+            {
+              "actionId": "pause",
+              "device": "touch",
+              "control": "pause",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "system-2"
+            }
+          ]
+        },
+        {
+          "id": "dialogue",
+          "name": "Диалог",
+          "priority": 10,
+          "bindings": [
+            {
+              "actionId": "advance",
+              "device": "keyboard",
+              "control": "Enter",
+              "scale": 1,
+              "id": "dialogue-0"
+            },
+            {
+              "actionId": "advance",
+              "device": "keyboard",
+              "control": "Space",
+              "scale": 1,
+              "id": "dialogue-1"
+            },
+            {
+              "actionId": "advance",
+              "device": "gamepad-button",
+              "control": "0",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "dialogue-2"
+            },
+            {
+              "actionId": "advance",
+              "device": "touch",
+              "control": "advance",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "dialogue-3"
+            },
+            {
+              "actionId": "choiceNext",
+              "device": "keyboard",
+              "control": "ArrowDown",
+              "scale": 1,
+              "id": "dialogue-4"
+            },
+            {
+              "actionId": "choicePrevious",
+              "device": "keyboard",
+              "control": "ArrowUp",
+              "scale": 1,
+              "id": "dialogue-5"
+            },
+            {
+              "actionId": "choiceNext",
+              "device": "gamepad-button",
+              "control": "13",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "dialogue-6"
+            },
+            {
+              "actionId": "choicePrevious",
+              "device": "gamepad-button",
+              "control": "12",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "dialogue-7"
+            }
+          ]
+        },
+        {
+          "id": "gameplay",
+          "name": "Ходьба и взаимодействие",
+          "priority": 20,
+          "bindings": [
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "KeyW",
+              "scale": [
+                0,
+                1
+              ],
+              "id": "gameplay-0"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "ArrowUp",
+              "scale": [
+                0,
+                1
+              ],
+              "id": "gameplay-1"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "KeyS",
+              "scale": [
+                0,
+                -1
+              ],
+              "id": "gameplay-2"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "ArrowDown",
+              "scale": [
+                0,
+                -1
+              ],
+              "id": "gameplay-3"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "KeyA",
+              "scale": [
+                -1,
+                0
+              ],
+              "id": "gameplay-4"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "ArrowLeft",
+              "scale": [
+                -1,
+                0
+              ],
+              "id": "gameplay-5"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "KeyD",
+              "scale": [
+                1,
+                0
+              ],
+              "id": "gameplay-6"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "ArrowRight",
+              "scale": [
+                1,
+                0
+              ],
+              "id": "gameplay-7"
+            },
+            {
+              "actionId": "interact",
+              "device": "keyboard",
+              "control": "KeyE",
+              "scale": 1,
+              "id": "gameplay-8"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-axis",
+              "control": "0",
+              "scale": [
+                1,
+                0
+              ],
+              "deadZone": 0.18,
+              "id": "gameplay-9"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-axis",
+              "control": "1",
+              "scale": [
+                0,
+                -1
+              ],
+              "deadZone": 0.18,
+              "id": "gameplay-10"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-button",
+              "control": "12",
+              "scale": [
+                0,
+                1
+              ],
+              "deadZone": 0,
+              "id": "gameplay-11"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-button",
+              "control": "13",
+              "scale": [
+                0,
+                -1
+              ],
+              "deadZone": 0,
+              "id": "gameplay-12"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-button",
+              "control": "14",
+              "scale": [
+                -1,
+                0
+              ],
+              "deadZone": 0,
+              "id": "gameplay-13"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-button",
+              "control": "15",
+              "scale": [
+                1,
+                0
+              ],
+              "deadZone": 0,
+              "id": "gameplay-14"
+            },
+            {
+              "actionId": "interact",
+              "device": "gamepad-button",
+              "control": "0",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "gameplay-15"
+            },
+            {
+              "actionId": "point",
+              "device": "pointer",
+              "control": "primary",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "gameplay-16"
+            },
+            {
+              "actionId": "move",
+              "device": "touch",
+              "control": "move",
+              "scale": [
+                1,
+                1
+              ],
+              "deadZone": 0,
+              "id": "gameplay-17"
+            },
+            {
+              "actionId": "interact",
+              "device": "touch",
+              "control": "interact",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "gameplay-18"
+            }
+          ]
+        },
+        {
+          "id": "quest-hints",
+          "name": "Подсказки игры",
+          "priority": 30,
+          "bindings": []
+        },
+        {
+          "id": "yard-hints",
+          "name": "Подсказка во дворе",
+          "priority": 30,
+          "bindings": []
+        },
+        {
+          "id": "game-mechanics",
+          "name": "Игровые механики",
+          "priority": 40,
+          "bindings": [
+            {
+              "id": "game-action-3",
+              "actionId": "saveGame",
+              "device": "keyboard",
+              "control": "F5",
+              "scale": 1,
+              "deadZone": 0
+            },
+            {
+              "id": "game-action-4",
+              "actionId": "loadGame",
+              "device": "keyboard",
+              "control": "F9",
+              "scale": 1,
+              "deadZone": 0
+            }
+          ]
+        }
+      ]
+    },
+    "standardEventsVersion": 1,
+    "widgets": [
+      {
+        "id": "quest-dialogue",
+        "name": "Квест · диалог и задания",
+        "kind": "dialogue",
+        "referenceSize": [
+          1280,
+          720
+        ],
+        "elements": [
+          {
+            "id": "quest-dialogue-panel",
+            "name": "Диалоговое окно",
+            "type": "panel",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                0.5,
+                1
+              ],
+              "x": 0,
+              "y": -24,
+              "width": -100,
+              "height": 175
+            },
+            "style": {
+              "background": "#17242d",
+              "color": "#fff4f8",
+              "opacity": 0.96,
+              "borderRadius": 16,
+              "borderWidth": 1,
+              "borderColor": "#dbb972",
+              "padding": 0
+            }
+          },
+          {
+            "id": "quest-dialogue-speaker",
+            "name": "Имя персонажа",
+            "type": "text",
+            "parentId": "quest-dialogue-panel",
+            "role": "speaker",
+            "text": "Новый текст",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 28,
+              "y": 18,
+              "width": -56,
+              "height": 32
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#dbb972",
+              "fontSize": 20,
+              "fontWeight": 600,
+              "padding": 0
+            }
+          },
+          {
+            "id": "quest-dialogue-text",
+            "name": "Текст реплики",
+            "type": "text",
+            "parentId": "quest-dialogue-panel",
+            "role": "dialogueText",
+            "text": "Новый текст",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 28,
+              "y": 60,
+              "width": -88,
+              "height": -88
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 23,
+              "padding": 0
+            }
+          },
+          {
+            "id": "quest-dialogue-status",
+            "name": "Подсказка",
+            "type": "text",
+            "parentId": "quest-dialogue-panel",
+            "role": "status",
+            "text": "Новый текст",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                0,
+                1
+              ],
+              "x": 28,
+              "y": -16,
+              "width": -90,
+              "height": 25
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#d1bfd0",
+              "fontSize": 15,
+              "padding": 0
+            }
+          },
+          {
+            "id": "quest-dialogue-next",
+            "name": "Продолжить",
+            "type": "button",
+            "parentId": "quest-dialogue-panel",
+            "role": "none",
+            "text": "›",
+            "action": "advance",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                1,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                1,
+                1
+              ],
+              "x": -20,
+              "y": -14,
+              "width": 44,
+              "height": 44
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 28,
+              "borderRadius": 10,
+              "textAlign": "center",
+              "padding": 0
+            }
+          },
+          {
+            "id": "quest-dialogue-choices",
+            "name": "Ответы игрока",
+            "type": "choices",
+            "parentId": null,
+            "role": "choices",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                1
+              ],
+              "anchorMax": [
+                0.5,
+                1
+              ],
+              "pivot": [
+                0.5,
+                1
+              ],
+              "x": 0,
+              "y": -220,
+              "width": 660,
+              "height": 220
+            },
+            "style": {
+              "background": "#17242d",
+              "color": "#fff4f8",
+              "fontSize": 22,
+              "borderRadius": 10,
+              "padding": 4,
+              "gap": 8
+            }
+          },
+          {
+            "id": "quest-dialogue-inventory",
+            "name": "Инвентарь и цель",
+            "type": "text",
+            "parentId": null,
+            "role": "none",
+            "text": "Цель: найти ключ и записку  •  H — подсветить предметы",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 24,
+              "y": 20,
+              "width": -48,
+              "height": 50
+            },
+            "style": {
+              "background": "#17242d",
+              "color": "#dbb972",
+              "fontSize": 22,
+              "padding": 12,
+              "borderRadius": 10
+            }
+          }
+        ],
+        "css": ""
+      },
+      {
+        "id": "quest-inventory",
+        "name": "Квест · инвентарь",
+        "kind": "dialogue",
+        "referenceSize": [
+          1280,
+          720
+        ],
+        "elements": [
+          {
+            "id": "quest-inventory-panel",
+            "name": "Диалоговое окно",
+            "type": "panel",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                0.5,
+                1
+              ],
+              "x": 0,
+              "y": -24,
+              "width": -100,
+              "height": 175
+            },
+            "style": {
+              "background": "#17242d",
+              "color": "#fff4f8",
+              "opacity": 0.96,
+              "borderRadius": 16,
+              "borderWidth": 1,
+              "borderColor": "#dbb972",
+              "padding": 0
+            }
+          },
+          {
+            "id": "quest-inventory-speaker",
+            "name": "Имя персонажа",
+            "type": "text",
+            "parentId": "quest-inventory-panel",
+            "role": "speaker",
+            "text": "Новый текст",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 28,
+              "y": 18,
+              "width": -56,
+              "height": 32
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#dbb972",
+              "fontSize": 20,
+              "fontWeight": 600,
+              "padding": 0
+            }
+          },
+          {
+            "id": "quest-inventory-text",
+            "name": "Текст реплики",
+            "type": "text",
+            "parentId": "quest-inventory-panel",
+            "role": "dialogueText",
+            "text": "Новый текст",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 28,
+              "y": 60,
+              "width": -88,
+              "height": -88
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 23,
+              "padding": 0
+            }
+          },
+          {
+            "id": "quest-inventory-status",
+            "name": "Подсказка",
+            "type": "text",
+            "parentId": "quest-inventory-panel",
+            "role": "status",
+            "text": "Новый текст",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                0,
+                1
+              ],
+              "x": 28,
+              "y": -16,
+              "width": -90,
+              "height": 25
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#d1bfd0",
+              "fontSize": 15,
+              "padding": 0
+            }
+          },
+          {
+            "id": "quest-inventory-next",
+            "name": "Продолжить",
+            "type": "button",
+            "parentId": "quest-inventory-panel",
+            "role": "none",
+            "text": "›",
+            "action": "advance",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                1,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                1,
+                1
+              ],
+              "x": -20,
+              "y": -14,
+              "width": 44,
+              "height": 44
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 28,
+              "borderRadius": 10,
+              "textAlign": "center",
+              "padding": 0
+            }
+          },
+          {
+            "id": "quest-inventory-choices",
+            "name": "Ответы игрока",
+            "type": "choices",
+            "parentId": null,
+            "role": "choices",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                1
+              ],
+              "anchorMax": [
+                0.5,
+                1
+              ],
+              "pivot": [
+                0.5,
+                1
+              ],
+              "x": 0,
+              "y": -220,
+              "width": 660,
+              "height": 220
+            },
+            "style": {
+              "background": "#17242d",
+              "color": "#fff4f8",
+              "fontSize": 22,
+              "borderRadius": 10,
+              "padding": 4,
+              "gap": 8
+            }
+          },
+          {
+            "id": "quest-inventory-inventory",
+            "name": "Инвентарь и цель",
+            "type": "text",
+            "parentId": null,
+            "role": "none",
+            "text": "Инвентарь: латунный ключ  •  Записка: линза во дворе",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 24,
+              "y": 20,
+              "width": -48,
+              "height": 50
+            },
+            "style": {
+              "background": "#17242d",
+              "color": "#dbb972",
+              "fontSize": 22,
+              "padding": 12,
+              "borderRadius": 10
+            }
+          }
+        ],
+        "css": ""
+      },
+      {
+        "id": "quest-used-key",
+        "name": "Квест · ключ применён",
+        "kind": "dialogue",
+        "referenceSize": [
+          1280,
+          720
+        ],
+        "elements": [
+          {
+            "id": "quest-used-key-panel",
+            "name": "Диалоговое окно",
+            "type": "panel",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                0.5,
+                1
+              ],
+              "x": 0,
+              "y": -24,
+              "width": -100,
+              "height": 175
+            },
+            "style": {
+              "background": "#17242d",
+              "color": "#fff4f8",
+              "opacity": 0.96,
+              "borderRadius": 16,
+              "borderWidth": 1,
+              "borderColor": "#dbb972",
+              "padding": 0
+            }
+          },
+          {
+            "id": "quest-used-key-speaker",
+            "name": "Имя персонажа",
+            "type": "text",
+            "parentId": "quest-used-key-panel",
+            "role": "speaker",
+            "text": "Новый текст",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 28,
+              "y": 18,
+              "width": -56,
+              "height": 32
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#dbb972",
+              "fontSize": 20,
+              "fontWeight": 600,
+              "padding": 0
+            }
+          },
+          {
+            "id": "quest-used-key-text",
+            "name": "Текст реплики",
+            "type": "text",
+            "parentId": "quest-used-key-panel",
+            "role": "dialogueText",
+            "text": "Новый текст",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 28,
+              "y": 60,
+              "width": -88,
+              "height": -88
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 23,
+              "padding": 0
+            }
+          },
+          {
+            "id": "quest-used-key-status",
+            "name": "Подсказка",
+            "type": "text",
+            "parentId": "quest-used-key-panel",
+            "role": "status",
+            "text": "Новый текст",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                0,
+                1
+              ],
+              "x": 28,
+              "y": -16,
+              "width": -90,
+              "height": 25
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#d1bfd0",
+              "fontSize": 15,
+              "padding": 0
+            }
+          },
+          {
+            "id": "quest-used-key-next",
+            "name": "Продолжить",
+            "type": "button",
+            "parentId": "quest-used-key-panel",
+            "role": "none",
+            "text": "›",
+            "action": "advance",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                1,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                1,
+                1
+              ],
+              "x": -20,
+              "y": -14,
+              "width": 44,
+              "height": 44
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 28,
+              "borderRadius": 10,
+              "textAlign": "center",
+              "padding": 0
+            }
+          },
+          {
+            "id": "quest-used-key-choices",
+            "name": "Ответы игрока",
+            "type": "choices",
+            "parentId": null,
+            "role": "choices",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                1
+              ],
+              "anchorMax": [
+                0.5,
+                1
+              ],
+              "pivot": [
+                0.5,
+                1
+              ],
+              "x": 0,
+              "y": -220,
+              "width": 660,
+              "height": 220
+            },
+            "style": {
+              "background": "#17242d",
+              "color": "#fff4f8",
+              "fontSize": 22,
+              "borderRadius": 10,
+              "padding": 4,
+              "gap": 8
+            }
+          },
+          {
+            "id": "quest-used-key-inventory",
+            "name": "Инвентарь и цель",
+            "type": "text",
+            "parentId": null,
+            "role": "none",
+            "text": "Ключ использован  •  Цель: найти звёздную линзу",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 24,
+              "y": 20,
+              "width": -48,
+              "height": 50
+            },
+            "style": {
+              "background": "#17242d",
+              "color": "#dbb972",
+              "fontSize": 22,
+              "padding": 12,
+              "borderRadius": 10
+            }
+          }
+        ],
+        "css": ""
+      },
+      {
+        "id": "quest-victory",
+        "name": "Квест · завершение",
+        "kind": "dialogue",
+        "referenceSize": [
+          1280,
+          720
+        ],
+        "elements": [
+          {
+            "id": "quest-victory-panel",
+            "name": "Диалоговое окно",
+            "type": "panel",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0.5
+              ],
+              "anchorMax": [
+                0.5,
+                0.5
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 0,
+              "width": 710,
+              "height": 330
+            },
+            "style": {
+              "background": "#17242d",
+              "color": "#fff4f8",
+              "opacity": 0.96,
+              "borderRadius": 16,
+              "borderWidth": 1,
+              "borderColor": "#dbb972",
+              "padding": 0
+            }
+          },
+          {
+            "id": "quest-victory-speaker",
+            "name": "Имя персонажа",
+            "type": "text",
+            "parentId": "quest-victory-panel",
+            "role": "none",
+            "text": "ОБСЕРВАТОРИЯ ОТКРЫТА",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 30,
+              "y": 20,
+              "width": -60,
+              "height": 42
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#dbb972",
+              "fontSize": 32,
+              "fontWeight": 600,
+              "padding": 0
+            }
+          },
+          {
+            "id": "quest-victory-text",
+            "name": "Текст реплики",
+            "type": "text",
+            "parentId": "quest-victory-panel",
+            "role": "dialogueText",
+            "text": "Новый текст",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 30,
+              "y": 60,
+              "width": -60,
+              "height": 100
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 23,
+              "padding": 0
+            }
+          },
+          {
+            "id": "quest-victory-status",
+            "name": "Подсказка",
+            "type": "text",
+            "parentId": "quest-victory-panel",
+            "role": "status",
+            "text": "Новый текст",
+            "action": "none",
+            "visible": false,
+            "layout": {
+              "anchorMin": [
+                0,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                0,
+                1
+              ],
+              "x": 28,
+              "y": -16,
+              "width": -90,
+              "height": 25
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#d1bfd0",
+              "fontSize": 15,
+              "padding": 0
+            }
+          },
+          {
+            "id": "quest-victory-choices",
+            "name": "Ответы игрока",
+            "type": "choices",
+            "parentId": null,
+            "role": "choices",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                1
+              ],
+              "anchorMax": [
+                0.5,
+                1
+              ],
+              "pivot": [
+                0.5,
+                1
+              ],
+              "x": 0,
+              "y": -220,
+              "width": 660,
+              "height": 220
+            },
+            "style": {
+              "background": "#17242d",
+              "color": "#fff4f8",
+              "fontSize": 22,
+              "borderRadius": 10,
+              "padding": 4,
+              "gap": 8
+            }
+          },
+          {
+            "id": "quest-victory-inventory",
+            "name": "Инвентарь и цель",
+            "type": "text",
+            "parentId": null,
+            "role": "none",
+            "text": "Коллекция: звёздная линза",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 24,
+              "y": 20,
+              "width": -48,
+              "height": 50
+            },
+            "style": {
+              "background": "#17242d",
+              "color": "#dbb972",
+              "fontSize": 22,
+              "padding": 12,
+              "borderRadius": 10
+            }
+          },
+          {
+            "id": "quest-victory-restart",
+            "name": "Начать заново",
+            "type": "button",
+            "parentId": "quest-victory-panel",
+            "role": "none",
+            "text": "Начать заново",
+            "action": "restart",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0
+              ],
+              "anchorMax": [
+                0.5,
+                0
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 200,
+              "width": 400,
+              "height": 55
+            },
+            "style": {
+              "background": "#dbb972",
+              "color": "#101a22",
+              "fontSize": 23,
+              "textAlign": "center",
+              "borderRadius": 8,
+              "padding": 8
+            }
+          },
+          {
+            "id": "quest-victory-mainMenu",
+            "name": "Главное меню",
+            "type": "button",
+            "parentId": "quest-victory-panel",
+            "role": "none",
+            "text": "Главное меню",
+            "action": "mainMenu",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0
+              ],
+              "anchorMax": [
+                0.5,
+                0
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 270,
+              "width": 400,
+              "height": 55
+            },
+            "style": {
+              "background": "#dbb972",
+              "color": "#101a22",
+              "fontSize": 23,
+              "textAlign": "center",
+              "borderRadius": 8,
+              "padding": 8
+            }
+          }
+        ],
+        "css": ""
+      },
+      {
+        "id": "project-quest-room-mainMenu",
+        "name": "Главное меню",
+        "kind": "mainMenu",
+        "referenceSize": [
+          1280,
+          720
+        ],
+        "elements": [
+          {
+            "id": "project-quest-room-mainMenu-panel",
+            "name": "Панель меню",
+            "type": "panel",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0.5
+              ],
+              "anchorMax": [
+                0.5,
+                0.5
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 0,
+              "width": 510,
+              "height": 440
+            },
+            "style": {
+              "background": "#17242d",
+              "color": "#fff4f8",
+              "opacity": 0.98,
+              "borderRadius": 20,
+              "borderWidth": 1,
+              "borderColor": "#ad849d",
+              "padding": 0
+            }
+          },
+          {
+            "id": "project-quest-room-mainMenu-title",
+            "name": "Заголовок",
+            "type": "text",
+            "parentId": "project-quest-room-mainMenu-panel",
+            "role": "title",
+            "text": "Пауза",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 30,
+              "y": 35,
+              "width": -60,
+              "height": 90
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 36,
+              "fontWeight": 600,
+              "textAlign": "center",
+              "padding": 0
+            }
+          },
+          {
+            "id": "project-quest-room-mainMenu-start",
+            "name": "Начать игру",
+            "type": "button",
+            "parentId": "project-quest-room-mainMenu-panel",
+            "role": "none",
+            "text": "Начать игру",
+            "action": "start",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0
+              ],
+              "anchorMax": [
+                0.5,
+                0
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 160,
+              "width": 380,
+              "height": 60
+            },
+            "style": {
+              "background": "#c6aa74",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "textAlign": "center",
+              "borderRadius": 10,
+              "padding": 8
+            }
+          },
+          {
+            "id": "project-quest-room-mainMenu-restart",
+            "name": "Начать заново",
+            "type": "button",
+            "parentId": "project-quest-room-mainMenu-panel",
+            "role": "none",
+            "text": "Начать заново",
+            "action": "restart",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0
+              ],
+              "anchorMax": [
+                0.5,
+                0
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 240,
+              "width": 380,
+              "height": 60
+            },
+            "style": {
+              "background": "#c6aa74",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "textAlign": "center",
+              "borderRadius": 10,
+              "padding": 8
+            }
+          },
+          {
+            "id": "mainMenu-load",
+            "name": "Загрузить прохождение",
+            "type": "button",
+            "parentId": null,
+            "role": "none",
+            "text": "Загрузить прохождение",
+            "action": "load",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                1
+              ],
+              "anchorMax": [
+                0.5,
+                1
+              ],
+              "pivot": [
+                0.5,
+                1
+              ],
+              "x": 0,
+              "y": -20,
+              "width": 280,
+              "height": 48
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "fontFamily": "system-ui",
+              "fontWeight": 400,
+              "borderColor": "#ad849d",
+              "borderWidth": 0,
+              "borderRadius": 12,
+              "padding": 12,
+              "opacity": 1,
+              "textAlign": "left",
+              "gap": 8
+            }
+          }
+        ],
+        "css": ""
+      },
+      {
+        "id": "project-quest-room-pauseMenu",
+        "name": "Пауза",
+        "kind": "pauseMenu",
+        "referenceSize": [
+          1280,
+          720
+        ],
+        "elements": [
+          {
+            "id": "project-quest-room-pauseMenu-panel",
+            "name": "Панель меню",
+            "type": "panel",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0.5
+              ],
+              "anchorMax": [
+                0.5,
+                0.5
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 0,
+              "width": 510,
+              "height": 440
+            },
+            "style": {
+              "background": "#17242d",
+              "color": "#fff4f8",
+              "opacity": 0.98,
+              "borderRadius": 20,
+              "borderWidth": 1,
+              "borderColor": "#ad849d",
+              "padding": 0
+            }
+          },
+          {
+            "id": "project-quest-room-pauseMenu-title",
+            "name": "Заголовок",
+            "type": "text",
+            "parentId": "project-quest-room-pauseMenu-panel",
+            "role": "none",
+            "text": "Пауза",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 30,
+              "y": 35,
+              "width": -60,
+              "height": 90
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 36,
+              "fontWeight": 600,
+              "textAlign": "center",
+              "padding": 0
+            }
+          },
+          {
+            "id": "project-quest-room-pauseMenu-resume",
+            "name": "Продолжить",
+            "type": "button",
+            "parentId": "project-quest-room-pauseMenu-panel",
+            "role": "none",
+            "text": "Продолжить",
+            "action": "resume",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0
+              ],
+              "anchorMax": [
+                0.5,
+                0
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 160,
+              "width": 380,
+              "height": 60
+            },
+            "style": {
+              "background": "#c6aa74",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "textAlign": "center",
+              "borderRadius": 10,
+              "padding": 8
+            }
+          },
+          {
+            "id": "project-quest-room-pauseMenu-restart",
+            "name": "Начать заново",
+            "type": "button",
+            "parentId": "project-quest-room-pauseMenu-panel",
+            "role": "none",
+            "text": "Начать заново",
+            "action": "restart",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0
+              ],
+              "anchorMax": [
+                0.5,
+                0
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 240,
+              "width": 380,
+              "height": 60
+            },
+            "style": {
+              "background": "#c6aa74",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "textAlign": "center",
+              "borderRadius": 10,
+              "padding": 8
+            }
+          },
+          {
+            "id": "project-quest-room-pauseMenu-mainMenu",
+            "name": "Главное меню",
+            "type": "button",
+            "parentId": "project-quest-room-pauseMenu-panel",
+            "role": "none",
+            "text": "Главное меню",
+            "action": "mainMenu",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0
+              ],
+              "anchorMax": [
+                0.5,
+                0
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 320,
+              "width": 380,
+              "height": 60
+            },
+            "style": {
+              "background": "#c6aa74",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "textAlign": "center",
+              "borderRadius": 10,
+              "padding": 8
+            }
+          },
+          {
+            "id": "pauseMenu-load",
+            "name": "Загрузить прохождение",
+            "type": "button",
+            "parentId": null,
+            "role": "none",
+            "text": "Загрузить прохождение",
+            "action": "load",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                1
+              ],
+              "anchorMax": [
+                0.5,
+                1
+              ],
+              "pivot": [
+                0.5,
+                1
+              ],
+              "x": 0,
+              "y": -20,
+              "width": 280,
+              "height": 48
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "fontFamily": "system-ui",
+              "fontWeight": 400,
+              "borderColor": "#ad849d",
+              "borderWidth": 0,
+              "borderRadius": 12,
+              "padding": 12,
+              "opacity": 1,
+              "textAlign": "left",
+              "gap": 8
+            }
+          }
+        ],
+        "css": ""
+      },
+      {
+        "id": "widget-default-hud",
+        "name": "Игровой HUD",
+        "kind": "hud",
+        "referenceSize": [
+          1280,
+          720
+        ],
+        "elements": [
+          {
+            "id": "widget-default-hud-hp",
+            "name": "Здоровье",
+            "type": "text",
+            "parentId": null,
+            "role": "none",
+            "text": "HP",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 24,
+              "y": 22,
+              "width": 200,
+              "height": 42
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "fontFamily": "system-ui",
+              "fontWeight": 400,
+              "borderColor": "#ad849d",
+              "borderWidth": 0,
+              "borderRadius": 12,
+              "padding": 0,
+              "opacity": 1,
+              "textAlign": "left",
+              "gap": 8
+            },
+            "binding": {
+              "source": "variable",
+              "path": "hp",
+              "format": "HP: {value}"
+            }
+          },
+          {
+            "id": "widget-default-hud-health",
+            "name": "Шкала здоровья",
+            "type": "progress",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 24,
+              "y": 68,
+              "width": 220,
+              "height": 16
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "fontFamily": "system-ui",
+              "fontWeight": 400,
+              "borderColor": "#ad849d",
+              "borderWidth": 0,
+              "borderRadius": 12,
+              "padding": 12,
+              "opacity": 1,
+              "textAlign": "left",
+              "gap": 8
+            },
+            "binding": {
+              "source": "variable",
+              "path": "hp"
+            },
+            "maxVariable": "maxHp",
+            "min": 0,
+            "max": 100
+          },
+          {
+            "id": "widget-default-hud-ammo",
+            "name": "Патроны",
+            "type": "text",
+            "parentId": null,
+            "role": "none",
+            "text": "Новый текст",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 24,
+              "y": 98,
+              "width": 220,
+              "height": 40
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "fontFamily": "system-ui",
+              "fontWeight": 400,
+              "borderColor": "#ad849d",
+              "borderWidth": 0,
+              "borderRadius": 12,
+              "padding": 0,
+              "opacity": 1,
+              "textAlign": "left",
+              "gap": 8
+            },
+            "binding": {
+              "source": "variable",
+              "path": "ammo",
+              "format": "Ammo: {value}"
+            }
+          },
+          {
+            "id": "widget-default-hud-inventory",
+            "name": "Инвентарь",
+            "type": "inventory",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                1,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                1,
+                1
+              ],
+              "x": -24,
+              "y": -24,
+              "width": 440,
+              "height": 130
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "fontFamily": "system-ui",
+              "fontWeight": 400,
+              "borderColor": "#ad849d",
+              "borderWidth": 0,
+              "borderRadius": 12,
+              "padding": 12,
+              "opacity": 1,
+              "textAlign": "left",
+              "gap": 8
+            }
+          }
+        ],
+        "css": ""
+      },
+      {
+        "id": "quest-hud",
+        "name": "Инвентарь квеста",
+        "kind": "hud",
+        "referenceSize": [
+          1280,
+          720
+        ],
+        "elements": [
+          {
+            "id": "quest-hud-inventory",
+            "name": "Инвентарь",
+            "type": "inventory",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                1,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                1,
+                1
+              ],
+              "x": -20,
+              "y": -20,
+              "width": 540,
+              "height": 140
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "fontFamily": "system-ui",
+              "fontWeight": 400,
+              "borderColor": "#ad849d",
+              "borderWidth": 0,
+              "borderRadius": 12,
+              "padding": 12,
+              "opacity": 1,
+              "textAlign": "left",
+              "gap": 8
+            }
+          }
+        ],
+        "css": ""
+      }
+    ],
+    "ui": {
+      "dialogue": "quest-dialogue",
+      "mainMenu": "project-quest-room-mainMenu",
+      "pauseMenu": "project-quest-room-pauseMenu",
+      "hud": "quest-hud"
+    },
+    "objectGroups": [
+      {
+        "id": "object-group-982dd646-ed15-4ed4-8571-b0041c7f44f6",
+        "sceneId": "quest-room",
+        "name": "Интерактивные предметы",
+        "objectIds": [
+          "quest-key",
+          "quest-note",
+          "quest-door"
+        ]
+      },
+      {
+        "id": "object-group-c613bfed-9310-422e-9e07-c04c07d72a79",
+        "sceneId": "quest-yard",
+        "name": "Интерактивные предметы",
+        "objectIds": [
+          "quest-relic"
+        ]
+      }
+    ],
+    "gameplay": {
+      "version": 1,
+      "enabled": true,
+      "preset": "quest",
+      "playerId": "quest-hero",
+      "controller": {
+        "mode": "point-click",
+        "speed": 3.5,
+        "jumpSpeed": 5,
+        "gravity": 16,
+        "eyeHeight": 1.5,
+        "sensitivity": 0.003,
+        "distance": 3,
+        "fov": 70
+      },
+      "actors": {
+        "quest-hero": {
+          "team": "player",
+          "maxHP": 100
+        }
+      },
+      "weapons": [],
+      "items": [
+        {
+          "id": "key",
+          "name": "Старый ключ",
+          "stackLimit": 10,
+          "slot": "",
+          "weaponId": "",
+          "heal": 0,
+          "consumable": false,
+          "useEventId": "",
+          "worldObjectId": "quest-key",
+          "pickupEventId": "quest-collect-key"
+        },
+        {
+          "id": "note",
+          "name": "Записка",
+          "stackLimit": 10,
+          "slot": "",
+          "weaponId": "",
+          "heal": 0,
+          "consumable": false,
+          "useEventId": "",
+          "worldObjectId": "quest-note",
+          "pickupEventId": "quest-read-note"
+        },
+        {
+          "id": "prepared-key",
+          "name": "Ключ с кодом",
+          "stackLimit": 10,
+          "slot": "",
+          "weaponId": "",
+          "heal": 0,
+          "consumable": true,
+          "useEventId": "quest-open-door",
+          "worldObjectId": ""
+        },
+        {
+          "id": "lens",
+          "name": "Звёздная линза",
+          "stackLimit": 10,
+          "slot": "",
+          "weaponId": "",
+          "heal": 0,
+          "consumable": false,
+          "useEventId": "",
+          "worldObjectId": "quest-relic",
+          "pickupEventId": "quest-collect-relic"
+        }
+      ],
+      "recipes": [
+        {
+          "id": "prepare-key",
+          "name": "Соединить ключ и записку",
+          "ingredients": [
+            {
+              "itemId": "key",
+              "count": 1
+            },
+            {
+              "itemId": "note",
+              "count": 1
+            }
+          ],
+          "resultId": "prepared-key",
+          "count": 1
+        }
+      ],
+      "rules": [
+        {
+          "id": "quest-log-rule",
+          "name": "Предмет → журнал находок",
+          "trigger": "pickup",
+          "objectId": "",
+          "eventId": "",
+          "functionId": "quest-log",
+          "nextBeatId": "",
+          "seconds": 2,
+          "repeat": false,
+          "once": false,
+          "enabled": true,
+          "center": [
+            0,
+            0,
+            0
+          ],
+          "size": [
+            3,
+            2,
+            3
+          ]
+        },
+        {
+          "id": "quest-pickup-lens",
+          "name": "Линза найдена → финал",
+          "trigger": "pickup",
+          "objectId": "quest-relic",
+          "eventId": "",
+          "functionId": "",
+          "nextBeatId": "quest-win",
+          "seconds": 2,
+          "repeat": false,
+          "once": true,
+          "enabled": true,
+          "center": [
+            0,
+            0,
+            0
+          ],
+          "size": [
+            3,
+            2,
+            3
+          ]
+        }
+      ],
+      "inventory": {
+        "slots": 12,
+        "starting": [],
+        "equipment": {}
+      },
+      "hudWidgetId": "quest-hud"
+    },
+    "functions": [
+      {
+        "id": "quest-log",
+        "name": "Записать найденный предмет",
+        "parameters": [
+          {
+            "name": "itemId",
+            "type": "string",
+            "default": ""
+          }
+        ],
+        "locals": {},
+        "entry": "quest-log-add",
+        "nodes": [
+          {
+            "id": "quest-log-add",
+            "kind": "array",
+            "name": "Добавить в журнал",
+            "path": "global.journal",
+            "operation": "push",
+            "value": {
+              "op": "get",
+              "path": "args.itemId"
+            },
+            "next": "quest-log-result"
+          },
+          {
+            "id": "quest-log-result",
+            "kind": "return",
+            "name": "Всего находок",
+            "value": {
+              "op": "length",
+              "a": {
+                "op": "get",
+                "path": "global.journal"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "variableTypes": {
+      "hp": "number",
+      "maxHp": "number",
+      "ammo": "number",
+      "reserve": "number",
+      "kills": "integer",
+      "inventory": "array",
+      "journal": "array"
+    }
+  }
+}

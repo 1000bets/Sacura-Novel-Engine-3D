@@ -1,5 +1,6 @@
 import {t as tr, useLocale} from './i18n.jsx';
 import React from 'react';
+import {JsonValue} from './GameplayCommandFields.jsx';
 import {Button,Field,Select,Icon} from './StudioParts.jsx';
 import {uid} from './studioModel.js';
 import {ANSWER_VARIABLE,VALUE_TYPES,OPERATORS,variableName,availabilityOf,conditionSummary,typedValue,newChoice} from './choiceModel.js';
@@ -7,6 +8,7 @@ import './choiceInspector.css';
 
 export function ValueField({value,type,onChange,label='Значение'}){
  useLocale();
+ if(type==='array'||type==='struct')return <JsonValue label={label} value={value??(type==='array'?[]:{})} onChange={value=>onChange(typedValue(value,type))}/>;
  return type==='boolean'?<Select aria-label={tr(label)} value={String(typedValue(value,type))} options={[["true","Да"],["false","Нет"]]} onChange={v=>onChange(v==='true')}/>:<input aria-label={tr(label)} type={type==='number'?'number':'text'} step={type==='number'?'any':undefined} value={value??''} onChange={e=>onChange(type==='number'?Number(e.target.value):e.target.value)}/>;
 }
 export function ConditionFields({condition,onChange,variables,label='Условие'}){

@@ -1,4 +1,5 @@
 import {t as tr, useLocale} from './i18n.jsx';
+import {createGameVisuals} from './GameVisuals.js';
 import {createGameControls,gameSceneHit} from './GameControls.js';
 import {createScenePhysics} from './scenePhysics.js';
 import {createMeshObject,updateMeshVisual,disposeMeshVisual,applyMaterialAssignments,disposeMaterialAssignments} from './meshVisual.js';
@@ -179,6 +180,7 @@ function Exterior({
     const viewport=createRendererViewport(renderer,camera,element);
     const gizmo=createSceneGizmo(scene,camera,renderer.domElement,controls,()=>live.current,()=>picks);
     const physics=createScenePhysics(scene,()=>live.current,()=>picks);if(physicsApi)physicsApi.current=physics;
+    const gameVisuals=createGameVisuals(scene);
     const gameControls=createGameControls(camera,renderer.domElement,()=>live.current);
     const cameraRig=createCameraRig(scene,camera,controls,renderer.domElement,()=>live.current);if(cameraApi)cameraApi.current=cameraRig;
     let down;
@@ -220,7 +222,7 @@ function Exterior({
       const destination=live.current.actionPosition;destinationMarker.visible=Array.isArray(destination)&&destination.length===3&&live.current.mode==='scene';if(destinationMarker.visible)destinationMarker.position.set(...destination);
       const { state, mode, showGrid,objects } = live.current;
       const now=performance.now(),dt=Math.min(.05,(now-previous)/1000);previous=now;const animTime=updateAtmosphere(state,dt);
-      gameControls.tick(dt);
+      gameControls.tick(dt);gameVisuals.update(live.current.state.game);
       grid.visible = showGrid && mode === "scene";
       const anchors = {
         камин: [-2, 0, 0.3],
@@ -234,7 +236,7 @@ function Exterior({
           disposeCharacterVisual(mesh);disposeMeshVisual(mesh);mesh.visible = false;
           return;
         }
-        mesh.visible = o.active && state.visible?.[o.id] !== false;
+        mesh.visible = o.active && state.visible?.[o.id] !== false && !(state.game?.active&&state.game.preset==='fps'&&state.playerControl?.characterId===o.id);
         if(mesh.userData.marker)mesh.userData.marker.visible=(state.interactionTarget===o.id||state.interactionTargets?.includes(o.id))||state.highlights?.[o.id];
         gizmo.apply(mesh,o,resolvedPosition(o,state,kind));
         updateLightObject(mesh,o,live.current.mode==='scene');
@@ -257,7 +259,7 @@ function Exterior({
       if(cameraApi?.current===cameraRig)cameraApi.current=null;
       if(physicsApi?.current===physics)physicsApi.current=null;
       physics.dispose();
-      gameControls.dispose();
+      gameVisuals.dispose();gameControls.dispose();
       cameraRig.dispose();
       gizmo.dispose();
       controls.dispose();
