@@ -40,6 +40,7 @@ export function createStorage({filename,s3,bucket}){
   db,
   async ready(){db.prepare('SELECT 1').get();await s3.send(new HeadBucketCommand({Bucket:bucket}));},
   list(owner){return db.prepare('SELECT id,title,revision,updated_at AS updatedAt FROM projects WHERE owner_id=? ORDER BY updated_at DESC,id').all(owner);},
+  listOthers(owner){return db.prepare('SELECT projects.id,projects.title,projects.revision,projects.updated_at AS updatedAt,users.id AS ownerId,users.login AS ownerLogin FROM projects JOIN users ON users.id=projects.owner_id WHERE projects.owner_id<>? ORDER BY projects.updated_at DESC,users.login,projects.id').all(owner);},
   get(owner,id){const row=db.prepare('SELECT json,revision,updated_at AS updatedAt FROM projects WHERE owner_id=? AND id=?').get(owner,id);if(!row)throw httpError(404,'Проект не найден.');return {project:JSON.parse(row.json),revision:row.revision,updatedAt:row.updatedAt};},
   save(owner,id,project,expectedRevision){
    if(!project||project.id!==id||![1,2].includes(project.version)||typeof project.title!=='string'||!project.title.trim()||project.title.length>120||!Array.isArray(project.objects)||!Array.isArray(project.chapters)||!project.chapters.length||!Array.isArray(project.events))throw httpError(400,'Некорректный проект.');
@@ -76,7 +77,7 @@ export function createStorage({filename,s3,bucket}){
    db.prepare('INSERT OR IGNORE INTO user_meshes VALUES(?,?)').run(owner,key);
    return {src:`/api/meshes/${key}`,bytes:body.length,format};
   },
-  async mesh(owner,key){if(!db.prepare('SELECT key FROM user_meshes WHERE user_id=? AND key=?').get(owner,key))throw httpError(404,'Модель не найдена.');return s3.send(new GetObjectCommand({Bucket:bucket,Key:`meshes/${key}`}));}
+  async mesh(owner,key,{allowOthers=false}={}){if(!(allowOthers?db.prepare('SELECT key FROM user_meshes WHERE key=?').get(key):db.prepare('SELECT key FROM user_meshes WHERE user_id=? AND key=?').get(owner,key)))throw httpError(404,'Модель не найдена.');return s3.send(new GetObjectCommand({Bucket:bucket,Key:`meshes/${key}`}));}
  };
 }
 export async function connectStorage(env=process.env){

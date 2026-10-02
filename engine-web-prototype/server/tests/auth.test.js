@@ -4,6 +4,7 @@ import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
+import {Readable} from 'node:stream';
 import {createStorage} from '../storage.js';
 import {createApp} from '../app.js';
 import {createAuth} from '../auth.js';
@@ -59,4 +60,56 @@ test('legacy projects preserved, assigned only to configured previous owner, res
   storage.save(owner.id,'same-id',project('Обновлён'),1);storage.db.close();
   storage=createStorage({filename,s3:{},bucket:'test'});assert.equal(storage.get(owner.id,'same-id').revision,2);
  }finally{storage?.db.close();rmSync(dir,{recursive:true});}
+});
+
+test('only authenticated syper can list, read and edit other owners without changing ownership',async t=>{
+ const dir=mkdtempSync(join(tmpdir(),'sacura-admin-'));
+ const storage=createStorage({filename:join(dir,'db.sqlite'),s3:{send:async()=>({Body:Readable.from([Buffer.from('v 0 0 0\n')])})},bucket:'test'});
+ const auth=createAuth(storage.db);
+ const users={};
+ for(const login of ['syper','alice','bob','Syper']){
+  const user=await auth.register({login,password:'test'});
+  users[login]={...user,cookie:'sacura_session='+auth.session(user)};
+ }
+ const server=createApp(storage).listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));
+ t.after(async()=>{await new Promise(resolve=>server.close(resolve));storage.db.close();rmSync(dir,{recursive:true});});
+ const base=`http://127.0.0.1:${server.address().port}/api`;
+ const request=async(path,user,body)=>{
+  const response=await fetch(base+path,{method:body?'PUT':'GET',headers:{...(user?{Cookie:user.cookie}:{}),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
+  return {status:response.status,data:await response.json()};
+ };
+ storage.save(users.syper.id,'same-id',project('Свой'),0);
+ const mesh=await storage.upload(users.alice.id,Buffer.from('v 0 0 0\n'),'obj');
+ const aliceProject=project('Алиса');aliceProject.objects=[{model:{src:mesh.src}}];
+ storage.save(users.alice.id,'same-id',aliceProject,0);
+ storage.save(users.bob.id,'same-id',project('Боб'),0);
+ const path='/projects/same-id?ownerId='+users.alice.id;
+ assert.equal((await request('/admin/projects')).status,401);
+ for(const login of ['alice','bob','Syper']){
+  assert.equal((await request('/admin/projects',users[login])).status,403);
+  assert.equal((await request(path,users[login])).status,login==='alice'?200:403);
+  if(login!=='alice')assert.equal((await request(path,users[login],{project:project('Взлом'),expectedRevision:1})).status,403);
+ }
+ const others=(await request('/admin/projects',users.syper)).data;
+ assert.equal(others.length,2);
+ assert.deepEqual(others.map(p=>p.ownerLogin).sort(),['alice','bob']);
+ assert.ok(others.every(p=>p.ownerId&&p.id==='same-id'&&!p.project));
+ assert.equal((await request('/projects',users.syper)).data.length,1);
+ const opened=await request(path,users.syper);assert.equal(opened.data.project.title,'Алиса');
+ const meshResponse=await fetch(base+mesh.src.slice(4),{headers:{Cookie:users.syper.cookie}});
+ assert.equal(meshResponse.status,200);assert.equal(await meshResponse.text(),'v 0 0 0\n');
+ const uploaded=await fetch(base+'/meshes?format=obj&ownerId='+users.alice.id,{method:'POST',headers:{Cookie:users.syper.cookie,'Content-Type':'application/octet-stream'},body:'v 1 2 3\n'});
+ assert.equal(uploaded.status,201);
+ const uploadedMesh=await uploaded.json();
+ const edited={...opened.data.project,title:'Правка syper',objects:[...opened.data.project.objects,{model:{src:uploadedMesh.src}}]};
+ assert.equal((await request(path,users.syper,{project:edited,expectedRevision:1})).status,200);
+ assert.equal(storage.get(users.alice.id,'same-id').project.title,'Правка syper');
+ assert.equal(storage.get(users.syper.id,'same-id').project.title,'Свой');
+ assert.equal(storage.get(users.bob.id,'same-id').project.title,'Боб');
+ assert.equal(storage.db.prepare('SELECT COUNT(*) AS n FROM project_versions WHERE owner_id=?').get(users.alice.id).n,2);
+ assert.equal((await request(path,users.syper,{project:edited,expectedRevision:1})).status,409);
+ assert.equal((await request('/projects/missing?ownerId='+users.alice.id,users.syper,{project:{...project(),id:'missing'},expectedRevision:0})).status,404);
+ assert.equal((await request('/projects/same-id?ownerId=unknown',users.syper)).status,404);
+ const forbiddenUpload=await fetch(base+'/meshes?format=obj&ownerId='+users.alice.id,{method:'POST',headers:{Cookie:users.bob.cookie,'Content-Type':'application/octet-stream'},body:'v 1 2 3\n'});
+ assert.equal(forbiddenUpload.status,403);
 });

@@ -1,7 +1,9 @@
 import {accountStorage,currentStorageUser} from './accountStorage.js';
 import {createEmptyProject} from './projectLifecycle.js';
 export const serverStorageEnabled=import.meta.env?.VITE_SERVER_STORAGE==='true';
-const revisions=new Map(),uploads=new Map();
+const revisions=new Map(),uploads=new Map(),owners=new Map();
+const projectKey=(id,ownerId)=>JSON.stringify([ownerId,id]);
+const ownerQuery=ownerId=>ownerId?'?ownerId='+encodeURIComponent(ownerId):'';
 let queue=Promise.resolve();
 const activeKey='sacura-server-active-project';
 async function request(path,options={}){
@@ -10,10 +12,12 @@ async function request(path,options={}){
  return response.json();
 }
 export const listServerProjects=()=>request('/api/projects');
-export async function openServerProject(id){
+export const listOtherServerProjects=()=>request('/api/admin/projects');
+export async function openServerProject(id,ownerId=null){
  await queue.catch(()=>{});
- const result=await request('/api/projects/'+encodeURIComponent(id));
- revisions.set(id,result.revision);accountStorage.setItem(activeKey,id);return result.project;
+ const result=await request('/api/projects/'+encodeURIComponent(id)+ownerQuery(ownerId));
+ owners.set(id,ownerId);revisions.set(projectKey(id,ownerId),result.revision);
+ if(!ownerId)accountStorage.setItem(activeKey,id);return result.project;
 }
 export async function bootstrapServerProject(){
  if(!serverStorageEnabled)return null;
@@ -22,35 +26,36 @@ export async function bootstrapServerProject(){
  const active=projects.find(p=>p.id===accountStorage.getItem(activeKey))||projects[0];
  return openServerProject(active.id);
 }
-export async function persistModel(model){
+export async function persistModel(model,ownerId=null){
  if(!serverStorageEnabled||model.src.startsWith('/api/meshes/'))return model;
  const format=model.format||(/\.obj$/i.test(model.name||'')?'obj':'glb');
- const key=format+':'+model.src;
+ const key=JSON.stringify([ownerId,format,model.src]);
  if(!uploads.has(key))uploads.set(key,(async()=>{
   const body=format==='obj'?new TextEncoder().encode(model.src):await (await fetch(model.src)).arrayBuffer();
-  return request('/api/meshes?format='+format,{method:'POST',headers:{'Content-Type':'application/octet-stream'},body});
+  return request('/api/meshes?format='+format+(ownerId?'&ownerId='+encodeURIComponent(ownerId):''),{method:'POST',headers:{'Content-Type':'application/octet-stream'},body});
  })().catch(error=>{uploads.delete(key);throw error;}));
  return {...model,...await uploads.get(key)};
 }
-export async function prepareServerProject(project){
+export async function prepareServerProject(project,ownerId=owners.get(project.id)||null){
  const copy=structuredClone(project),sources=new Map();
  async function visit(value){
   if(!value||typeof value!=='object')return;
-  if(value.model?.src){const model=await persistModel(value.model);sources.set(value.model.src,model.src);value.model=model;}
-  if(value.kind==='model'&&value.src&&!value.model){const model=await persistModel(value);sources.set(value.src,model.src);value.src=model.src;}
+  if(value.model?.src){const model=await persistModel(value.model,ownerId);sources.set(value.model.src,model.src);value.model=model;}
+  if(value.kind==='model'&&value.src&&!value.model){const model=await persistModel(value,ownerId);sources.set(value.src,model.src);value.src=model.src;}
   for(const child of Object.values(value))if(child&&typeof child==='object')await visit(child);
  }
  await visit(copy);
  function replace(value){for(const [key,child]of Object.entries(value)){if(typeof child==='string'&&sources.has(child))value[key]=sources.get(child);else if(child&&typeof child==='object')replace(child);}}
  replace(copy);return copy;
 }
-export function saveServerProject(project){
+export function saveServerProject(project,ownerId=owners.get(project.id)||null){
+ owners.set(project.id,ownerId);
  // Serializing writes also prevents a late autosave from overwriting Ctrl+S.
  const snapshot=structuredClone(project);
  const operation=queue.catch(()=>{}).then(async()=>{
-  const prepared=await prepareServerProject(snapshot);
-  const result=await request('/api/projects/'+encodeURIComponent(prepared.id),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({project:prepared,expectedRevision:revisions.get(prepared.id)||0})});
-  revisions.set(prepared.id,result.revision);accountStorage.setItem(activeKey,prepared.id);return prepared;
+  const prepared=await prepareServerProject(snapshot,ownerId);
+  const result=await request('/api/projects/'+encodeURIComponent(prepared.id)+ownerQuery(ownerId),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({project:prepared,expectedRevision:revisions.get(projectKey(prepared.id,ownerId))||0})});
+  revisions.set(projectKey(prepared.id,ownerId),result.revision);if(!ownerId)accountStorage.setItem(activeKey,prepared.id);return prepared;
  });queue=operation;return operation;
 }
 export async function portableProject(project){
@@ -70,5 +75,5 @@ export async function portableProject(project){
  await visit(copy);return copy;
 }
 
-export function resetServerStorage(){revisions.clear();uploads.clear();queue=Promise.resolve();}
+export function resetServerStorage(){revisions.clear();uploads.clear();owners.clear();queue=Promise.resolve();}
 export async function flushServerSaves(){await queue.catch(()=>{});}
