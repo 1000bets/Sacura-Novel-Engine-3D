@@ -1,3 +1,8 @@
+import {GameSession} from './GameSession.js';
+import {gameSave,restoreGameSave} from './gameSave.js';
+import {inputContextsFor} from './inputModel.js';
+import {audioActionOptions} from './audioTransitions.js';
+import {interactionTargets,playerControls} from './interactionModel.js';
 import {navMeshSettings,collisionSettings,samplePath,pathSection} from './scenePhysics.js';
 import {projectAudioAssets} from './audioAssets.js';
 import {variableValue,runtimeVariableType} from './variableModel.js';
@@ -74,6 +79,19 @@ export class PreviewRuntime {
     if (runId && this.snapshot.instances[runId]?.status === "stopped")
       throw new Error("INSTANCE_STOPPED");
   }
+  async closeEventAudio(instance){
+    if(!instance)return;
+    const commands=instance.endAudioCommands||[];instance.endAudioCommands=[];
+    await Promise.all(commands.map(async request=>{
+      if(!request.track||this.audio.get(request.key)!==request.track)return;
+      await this.audio[request.command](request.key,{...request.options,endMode:'marker'});
+      if(request.effect&&this.audio.get(request.key)===request.track&&this.snapshot.effects.music===request.effect){request.effect.status=request.command==='pause'?'paused':'stopped';this.emit();}
+    }));
+  }
+  deferAudioEnd(event,command,options){
+    const instance=this.snapshot.instances[event.runId];instance.endAudioCommands??=[];
+    instance.endAudioCommands.push({key:'background',track:this.audio.get('background'),effect:this.snapshot.effects.music,command,options});
+  }
   ownsAudio(key,runId){return this.audio.get?.(key)?.runId===runId;}
   setSidechain(settings){
     const sidechain=normalizeSidechain(settings);
@@ -84,9 +102,10 @@ export class PreviewRuntime {
     if(!this.running || this.snapshot.audition)return false;
     // Playback owns a snapshot. Never show a newer route beside an older run.
     const routes=p=>JSON.stringify({
+      input:p.input,gameplay:p.gameplay,functions:p.functions,
       scenes:p.subscenes.map(s=>[s.id,s.entry]),
       chapters:p.chapters.map(c=>[c.id,c.subsceneId,c.beats.map(b=>[
-        b.id,b.kind,b.inputs,b.variable,b.value,b.operator,b.a,b.b,b.valueType,b.condition,b.next||null,b.signal||null,b.trueNext,b.falseNext,b.test,b.resultVariable,
+        b.id,b.kind,b.inputs,b.variable,b.value,b.operator,b.a,b.b,b.valueType,b.condition,b.next||null,b.signal||null,b.signals,b.controls,b.interactionEvents,b.inputContexts,b.trueNext,b.falseNext,b.test,b.resultVariable,
         (b.choices||[]).map(choice=>[choice.id,choice.next||null,choice.condition,choice.threshold,choice.availability,choice.enabledSource,choice.result]),
       ])]),
     });
@@ -112,12 +131,14 @@ export class PreviewRuntime {
       states: {},
       effects: {},
       instances: {},
-      variables: { ...project.variables },choiceResult:null,choiceResults:{},
+      variables: structuredClone(project.variables),choiceResult:null,choiceResults:{},
       history: [],
       activity: [],audition:false,
       world: { positions: {}, poses: {}, visible: {} },
     };
+    this.game=project.gameplay?.enabled?new GameSession(this):null;
     try {
+      this.game?.initialize();
       await this.enter(beatId, token);
     } catch (e) {
       this.handle(e);
@@ -130,6 +151,7 @@ export class PreviewRuntime {
       this.snapshot={...this.snapshot,beatId,phase:'EVENT_PREVIEW',audition:true,paused:false,ready:false,textVisible:false,error:null,activity:[],variables:{...project.variables},choiceResults:{},world:{location:scene.id,weather:scene.weather,time:scene.time,camera:'Общий план',cameraId:null,positions:{},poses:{},visible:{},motions:{},stagingPoints:sceneStagingPoints(scene,project.objects)}};
       for(const type of ['weather','time'])this.snapshot.effects[type]={key:type,type,name:scene[type],status:'held',owner:'SubScene',origin:scene.name};
     }else {this.project.events=structuredClone(project.events);}
+    this.audio.setAssets?.(projectAudioAssets(project));
     this.setSidechain(project.audioSettings?.sidechain);
     this.snapshot.auditionName=this.project.events.find(e=>e.id===eventId)?.name;this.snapshot.error=null;this.emit();
     const token=this.generation,b={id:'audition-'+eventId,eventId,hook:'ON_START',join:'FLOW_END',overrides:{},actionOverrides:{}};
@@ -141,9 +163,13 @@ export class PreviewRuntime {
       await this.binding(b,token);}catch(e){this.handle(e);}
   }
   stop() {
+    this.resetInputValues();
     this.generation++;
     this.running = false;
     this.audio.stopAll();
+    this.playerDestination=null;
+    this.inputFlights=new Set();
+    if(this.snapshot.world){this.snapshot.world.playerControl=null;for(const [id,motion]of Object.entries(this.snapshot.world.motions||{}))if(motion.player)delete this.snapshot.world.motions[id];}
     this.snapshot = {
       ...this.snapshot,
       phase: "EDIT",
@@ -174,6 +200,7 @@ export class PreviewRuntime {
   async enter(id, token, automaticDepth=0) {
     if(automaticDepth>100)throw new Error("Проверки образовали бесконечный цикл. Подключите выход к реплике или концовке.");
     this.assert(token);
+    for(const instance of Object.values(this.snapshot.instances||{}))if(instance.bindingId?.startsWith('input:')&&instance.beatId!==id&&['running','paused'].includes(instance.status)){instance.status='stopped';this.closeEventAudio(instance);instance.audioKeys.forEach(key=>{if(this.ownsAudio(key,instance.id))this.audio.stop(key);});}
     const b = allBeats(this.project).find((b) => b.id === id);
     if (!b) throw new Error("Реплика назначения удалена");
     const scene = sceneFor(this.project, id),
@@ -183,7 +210,7 @@ export class PreviewRuntime {
       for (const i of Object.values(this.snapshot.instances || {}))
         if (i.owner === "SubScene" && i.sceneId !== scene.id) {
           i.audioKeys.forEach((k) => {if(this.ownsAudio(k,i.id))this.audio.stop(k);});
-          i.status = "stopped";
+          this.closeEventAudio(i);i.status = "stopped";
         }
       for (const [key, e] of Object.entries(this.snapshot.effects))
         if (e.owner === "SubScene") {
@@ -221,6 +248,10 @@ export class PreviewRuntime {
         };
     }
     this.snapshot.world.stagingPoints=sceneStagingPoints(scene,this.project.objects);
+    this.playerDestination=null;
+    this.snapshot.world.playerControl=null;
+    this.snapshot.interacted=[];
+    this.resetInputValues();this.snapshot.lastInput=null;this.snapshot.inputChoiceId=null;
     this.snapshot.beatId = id;
     this.snapshot.hint=null;
     if(id==='a1'&&!this.snapshot.history.length&&!this.project.objects.find(o=>o.id==='alice')?.transforms?.[scene.id])this.snapshot.world.positions.alice='вход';
@@ -232,10 +263,11 @@ export class PreviewRuntime {
     this.snapshot.phase = "BEFORE";
     this.emit();
     const errors = validateStudio(this.project).filter(
-      (i) => i.beatId === id && i.level === "error",
+      (i) => (i.beatId === id || (!i.beatId && ['input-','game-','function-','widget-'].some(prefix=>i.id?.startsWith(prefix)))) && i.level === "error",
     );
     if (errors.length) throw new Error(`Реплика «${id}»: `+errors.map((i) => i.title).join(" · "));
     await this.phase(b, "BEFORE", token);
+    if(await this.game?.flushTransition())return;
     if(isPureNode(b))throw new Error('Эта нода вычисляет значение. Запустите реплику или If.');
     if(b.kind==='branch'||b.kind==='set-variable'){
       await this.phase(b,'ON_START',token);await this.phase(b,'AFTER',token);this.assert(token);
@@ -252,9 +284,9 @@ export class PreviewRuntime {
     this.snapshot.phase = "ON_START";
     this.emit();
     await this.phase(b, "ON_START", token);
-    this.assert(token);
+    this.assert(token);if(await this.game?.flushTransition())return;
     this.snapshot.phase =
-      b.kind === "gate"
+      b.kind === "gameplay" ? "PLAYING" : b.kind === "gate"
         ? "WAITING_OBJECT"
         : b.kind === "choice"
           ? "WAITING_CHOICE"
@@ -263,6 +295,10 @@ export class PreviewRuntime {
             : "WAITING_INPUT";
     this.snapshot.ready = true;
     this.snapshot.gateElapsed = 0;
+    const controls=playerControls(b);
+    if(b.kind==='gate'&&controls.characterId&&controls.mode!=='none')this.snapshot.world.playerControl=controls;
+    if(this.game){this.game.state.active=b.kind==='gameplay';if(b.kind==='gameplay')this.game.enter();}
+    if(b.kind==='choice')this.snapshot.inputChoiceId=b.choices.find(c=>conditionPass(c,this.snapshot.variables,this.project,this.snapshot.choiceResults))?.id||null;
     this.emit();
     if (b.kind === "gate") {
       const timeout = Number(b.timeout || 30);
@@ -274,7 +310,7 @@ export class PreviewRuntime {
           ) {
             this.snapshot.gateElapsed = timeout;
             this.snapshot.hint =
-              "Подсказка: нажмите на выделенный объект в превью. Ожидание можно отменить кнопкой «Стоп».";
+              'Осталось осмотреть: '+interactionTargets(b).filter(id=>!this.snapshot.interacted.includes(id)).map(id=>this.project.objects.find(o=>o.id===id)?.name||id).join(', ')+'.';
             this.emit();
           }
         })
@@ -339,6 +375,9 @@ export class PreviewRuntime {
         );
       }
       await this.delay(0, token, event.runId);
+      if(event.retention==='AUTO_CLOSE_ON_FLOW_END')await this.closeEventAudio(this.snapshot.instances[event.runId]);
+      if(event.retention==='AUTO_CLOSE_ON_FLOW_END')await Promise.all(this.snapshot.instances[event.runId].audioKeys.map(key=>{const track=this.audio.get?.(key);if(this.ownsAudio(key,event.runId)&&track.endMode==='event')return this.audio.stop(key,{endMode:'marker',fadeOut:track.fadeOut});}));
+      this.assert(token,event.runId);
       this.snapshot.states[binding.id] =
         event.retention === "AUTO_CLOSE_ON_FLOW_END" ? "done" : "held";
       this.snapshot.instances[event.runId].status =
@@ -360,6 +399,7 @@ export class PreviewRuntime {
       return;
     }
     await work;
+    if(this.snapshot.ready)await this.game?.flushTransition();
     if (
       binding.join === "EVENT_END" &&
       event.retention !== "AUTO_CLOSE_ON_FLOW_END"
@@ -459,12 +499,13 @@ export class PreviewRuntime {
         effect("time", a.value);
         break;
       case "music":
+        if(this.audio.get('background')){await this.audio.stop('background',audioActionOptions(a));this.assert(token,event.runId);}
         this.snapshot.instances[event.runId].audioKeys.push("background");
         this.audio.play(a.assetId || "music-main", {
           key: "background",
           volume: a.volume ?? 0.42,
           loop: a.loop !== false,
-          fade: a.fade ?? 1,
+          ...audioActionOptions(a),
         });
         if(this.audio.get('background'))this.audio.get('background').runId=event.runId;
         effect("music", a.value, "background");
@@ -472,28 +513,34 @@ export class PreviewRuntime {
         this.assert(token,event.runId);
         if(this.audio.get('background')?.error)throw new Error(this.audio.get('background').error);
         break;
-      case "pause":
-        this.audio.pause("background");
-        if (this.snapshot.effects.music)
+      case "pause": {
+        if(a.endMode==='event'){this.deferAudioEnd(event,'pause',audioActionOptions(a));break;}
+        const track=this.audio.get('background');
+        await this.audio.pause("background",audioActionOptions(a));
+        this.assert(token,event.runId);
+        if (this.audio.get('background')===track&&this.snapshot.effects.music)
           this.snapshot.effects.music.status = "paused";
         break;
+      }
       case "resume":
-        if (this.audio.get("background")) this.audio.resume("background");
+        if (this.audio.get("background")) await this.audio.resume("background",audioActionOptions(a));
         else
           this.audio.play("music-main", {
             key: "background",
             volume: 0.42,
             loop: true,
+            ...audioActionOptions(a),
           });
         if(this.audio.get('background'))this.audio.get('background').runId=event.runId;
         this.snapshot.instances[event.runId].audioKeys.push('background');
         effect("music", "Главная тема", "background");
         break;
       case "stop": {
+        if(a.endMode==='event'){this.deferAudioEnd(event,'stop',audioActionOptions(a));break;}
         const track=this.audio.get('background');
-        await this.audio.fade("background", 0, Number(a.duration || 2));
-        await this.delay(1, token, event.runId);
-        if(this.audio.get('background')===track){this.audio.stop("background");
+        await this.audio.stop("background",audioActionOptions(a));
+        this.assert(token,event.runId);
+        if(this.audio.get('background')===track){
           if (this.snapshot.effects.music)this.snapshot.effects.music.status = "stopped";}
         break;
       }
@@ -505,9 +552,10 @@ export class PreviewRuntime {
             key,
             volume: a.volume ?? 1,
             duck: a.duck !== false,
+            ...audioActionOptions(a),
           });
           if(this.audio.get(key))this.audio.get(key).runId=event.runId;
-          await done;
+          if(a.endMode==='event'){await this.audio.get(key)?.started;done.catch(e=>this.handle(e));}else await done;
           this.assert(token, event.runId);
           if (this.audio.get(key)?.error)
             throw new Error(this.audio.get(key).error);
@@ -535,6 +583,9 @@ export class PreviewRuntime {
         if(this.project.variableTypes?.[a.target])this.snapshot.variables[a.target]=variableValue(this.project,a.target,this.snapshot.variables[a.target]);
         break;
       }
+      case 'gameplay':
+        if(!this.game)throw new Error('Включите игровые механики проекта.');
+        await this.game.command(a.command,{...a.value,...(a.target!=='world'?{target:a.target}:{})});break;
       case "visibility":
         world.visible = { ...world.visible, [a.target]: a.value !== "Скрыть" };
         break;
@@ -561,17 +612,131 @@ export class PreviewRuntime {
     activity.status=this.snapshot.states[a.id];activity.progress=1;
     this.emit();
   }
+  saveGame(){const storage=this.storage||globalThis.localStorage;if(!storage)throw new Error('Хранилище сохранений недоступно.');storage.setItem('sacura-save:'+this.project.id,JSON.stringify(gameSave(this)));this.snapshot.hint='Прохождение сохранено';this.emit();}
+  async loadGame(){const storage=this.storage||globalThis.localStorage,raw=storage?.getItem('sacura-save:'+this.project.id);if(!raw)throw new Error('Сохранение ещё не создано.');await restoreGameSave(this,JSON.parse(raw));this.snapshot.hint='Прохождение загружено';this.emit();}
+  async uiAction(action,element={}){try{if(action==='event'&&element.eventId)await this.binding({id:'input:widget:'+element.id,eventId:element.eventId,join:'FLOW_END',overrides:{},actionOverrides:{}},this.generation);else if(action==='save')this.saveGame();else if(action==='load')await this.loadGame();else if(action==='gameplay'&&this.game)await this.game.command(element.command,element.value||{});await this.game?.flushTransition();this.emit();}catch(e){this.snapshot.hint=e.message;this.emit();}}
+  writeInputValue(action,value){
+    this.snapshot.inputValues??={};const changed=JSON.stringify(this.snapshot.inputValues[action.id])!==JSON.stringify(value);this.snapshot.inputValues[action.id]=value;
+    const outputs=action.valueType==='axis2d'?[[action.variableX,value?.[0]||0],[action.variableY,value?.[1]||0]]:[[action.variable,action.valueType==='boolean'?Boolean(value):value||0]];
+    for(const [id,v]of outputs)if(id&&Object.hasOwn(this.project.variables,id))this.snapshot.variables[id]=variableValue(this.project,id,v);
+    return changed;
+  }
+  resetInputValues(){
+    for(const id of Object.keys(this.snapshot.inputValues||{})){const action=this.project?.input?.actions.find(a=>a.id===id);if(action)this.writeInputValue(action,action.valueType==='axis2d'?[0,0]:0);}
+    this.snapshot.inputValues={};
+  }
+  async inputAction({actionId,phase,value,payload,device}){
+    if(!this.running||this.snapshot.audition)return;
+    const action=this.project.input?.actions.find(a=>a.id===actionId);if(!action)return;
+    if(['completed','canceled'].includes(phase)){this.writeInputValue(action,action.valueType==='axis2d'?[0,0]:0);this.snapshot.lastInput={actionId,name:action.name,phase,value,device};this.emit();return;}
+    const beat=allBeats(this.project).find(b=>b.id===this.snapshot.beatId);
+    const contexts=this.snapshot.paused||!this.snapshot.ready?['system']:inputContextsFor(this.project,beat);
+    if(!this.project.input.contexts.some(c=>contexts.includes(c.id)&&c.bindings.some(b=>b.actionId===actionId)))return;
+    const changed=this.writeInputValue(action,value);
+    this.snapshot.lastInput={actionId,name:action.name,phase,value,device};
+    if(changed||phase==='started')this.emit();
+    if(phase!=='triggered')return;
+    if(action.behavior==='pause'){this.togglePause();return;}
+    if(this.snapshot.paused||!this.snapshot.ready)return;
+    if(this.game&&['shoot','reload','jump','look','saveGame','loadGame'].includes(action.behavior)){try{if(action.behavior==='look')this.game.look(payload?.delta||value,device);else await this.game.command(({shoot:'shoot',saveGame:'save',loadGame:'load'})[action.behavior]||action.behavior,payload||{});await this.game.flushTransition();this.emit();}catch(e){this.game.error(e);}return;}
+    if(action.behavior==='move')return; // The scene adapter converts 2D input to camera-relative movement.
+    if(action.behavior==='interact'){if(this.snapshot.world.playerControl)this.playerInteract();else await this.advance(null,interactionTargets(beat).find(id=>!this.snapshot.interacted?.includes(id)));return;}
+    if(action.behavior==='point'){if(this.snapshot.world.playerControl)this.playerClick(payload?.point,payload?.id);else await this.advance(null,payload?.id);return;}
+    if(action.behavior==='advance'){
+      const choices=beat?.choices?.filter(c=>conditionPass(c,this.snapshot.variables,this.project,this.snapshot.choiceResults));
+      await this.advance(beat?.kind==='choice'?(this.snapshot.inputChoiceId||choices?.[0]?.id):undefined);return;
+    }
+    if(['choiceNext','choicePrevious'].includes(action.behavior)&&beat?.kind==='choice'){
+      const choices=beat.choices.filter(c=>conditionPass(c,this.snapshot.variables,this.project,this.snapshot.choiceResults));if(!choices.length)return;
+      const index=Math.max(0,choices.findIndex(c=>c.id===this.snapshot.inputChoiceId));
+      this.snapshot.inputChoiceId=choices[(index+(action.behavior==='choiceNext'?1:choices.length-1))%choices.length].id;this.emit();return;
+    }
+    if(action.behavior==='event'&&action.eventId){
+      const token=this.generation,key=token+':'+this.snapshot.history.length+':'+actionId;
+      this.inputFlights??=new Set();if(this.inputFlights.has(key))return;this.inputFlights.add(key);
+      try{await this.binding({id:'input:'+key,eventId:action.eventId,join:'FLOW_END',overrides:{},actionOverrides:{}},token);}catch(e){this.handle(e);}finally{this.inputFlights.delete(key);}
+    }
+  }
+  playerContext(){
+    if(!this.running||this.snapshot.paused||!this.snapshot.ready||this.snapshot.phase!=='WAITING_OBJECT')return null;
+    const control=this.snapshot.world.playerControl;if(!control)return null;
+    const scene=sceneFor(this.project,this.snapshot.beatId),object=this.project.objects.find(o=>o.id===control.characterId);
+    if(!object||object.active===false||!isObjectInScene(object,scene)||this.snapshot.world.visible?.[object.id]===false)return null;
+    return {control,scene,object,world:this.snapshot.world,beat:allBeats(this.project).find(b=>b.id===this.snapshot.beatId)};
+  }
+  playerClick(point,id){
+    if(this.snapshot.phase==='PLAYING'&&this.game){if(id&&this.game.interact(id))return;if(point&&['point-click','both'].includes(this.game.config.controller.mode))this.game.setDestination(point);return;}
+    const context=this.playerContext();if(!context)return;
+    const {control,world,scene,object,beat}=context;
+    const target=interactionTargets(beat).includes(id)&&!this.snapshot.interacted.includes(id)?this.project.objects.find(o=>o.id===id):null;
+    if(target){
+      const to=resolvedPosition(target,world,scene.kind),from=resolvedPosition(object,world,scene.kind);
+      if(!control.radius||Math.hypot(to[0]-from[0],to[2]-from[2])<=control.radius){this.advance(null,id);return;}
+      if(!['both','point-click'].includes(control.mode)){this.snapshot.hint='Подойдите ближе и выполните действие «Осмотреть» или нажмите на предмет.';this.emit();return;}
+      point=[to[0],from[1],to[2]];
+      // Stop within reach rather than trying to enter the prop collider.
+      const distance=Math.hypot(point[0]-from[0],point[2]-from[2]),ratio=Math.max(0,(distance-control.radius*.85)/distance);
+      point=from.map((v,i)=>i===1?v:v+(point[i]-v)*ratio);
+    }
+    if(!point||!['both','point-click'].includes(control.mode))return;
+    const from=resolvedPosition(object,world,scene.kind),physics=this.physicsApi?.current;
+    try{const path=physics?.sceneId()===scene.id?physics.planMotion(object,from,[point[0],from[1],point[2]]):navMeshSettings(scene).enabled?null:[from,[point[0],from[1],point[2]]];
+      if(!path)throw new Error('Дождитесь загрузки области ходьбы.');this.playerDestination={path,distance:path.slice(1).reduce((sum,p,i)=>sum+Math.hypot(...p.map((v,j)=>v-path[i][j])),0),progress:0,targetId:target?.id};this.snapshot.hint=null;
+    }catch(e){this.snapshot.hint=e.message;this.emit();}
+  }
+  playerInteract(){
+    if(this.snapshot.phase==='PLAYING'&&this.game){const p=this.game.position(this.game.config.playerId),nearest=this.game.config.items.map(i=>i.worldObjectId).filter(id=>this.game.position(id)&&this.game.world.visible[id]!==false).sort((a,b)=>Math.hypot(...this.game.position(a).map((v,i)=>v-p[i]))-Math.hypot(...this.game.position(b).map((v,i)=>v-p[i])));if(nearest[0])this.game.interact(nearest[0]);return;}
+    const c=this.playerContext();if(!c)return;const from=resolvedPosition(c.object,c.world,c.scene.kind);
+    const nearest=interactionTargets(c.beat).filter(id=>!this.snapshot.interacted.includes(id)).map(id=>this.project.objects.find(o=>o.id===id)).filter(o=>o&&o.active!==false&&c.world.visible?.[o.id]!==false).map(o=>({o,p:resolvedPosition(o,c.world,c.scene.kind)})).sort((a,b)=>Math.hypot(a.p[0]-from[0],a.p[2]-from[2])-Math.hypot(b.p[0]-from[0],b.p[2]-from[2]));
+    if(nearest[0]){
+      if(c.control.radius&&Math.hypot(nearest[0].p[0]-from[0],nearest[0].p[2]-from[2])>c.control.radius){this.snapshot.hint='Подойдите ближе к предмету с помощью управления движением или щелчком по сцене.';this.emit();return;}
+      this.playerClick(null,nearest[0].o.id);
+    }
+  }
+  playerStep(direction,dt){
+    if(this.game&&this.snapshot.phase==='PLAYING'){this.game.step(direction,dt);return;}
+    const c=this.playerContext();if(!c)return;const {object,world,scene,control}=c,from=resolvedPosition(object,world,scene.kind),manual=direction.some(v=>Math.abs(v)>.001);
+    if(manual)this.playerDestination=null;
+    const route=this.playerDestination;let to=from;
+    const step=Math.max(0,Math.min(.05,dt))*control.speed;
+    if(manual)to=[from[0]+direction[0]*step,from[1],from[2]+direction[2]*step];
+    else if(route){route.progress=Math.min(1,route.progress+step/Math.max(.001,route.distance));to=samplePath(route.path,route.progress);}
+    else {if(world.motions?.[object.id]?.player){delete world.motions[object.id];this.emit();}return;}
+    try{
+      const nav=navMeshSettings(scene);if(nav.enabled&&(Math.abs(to[0]-nav.center[0])>nav.size[0]/2||Math.abs(to[2]-nav.center[2])>nav.size[1]/2))throw new Error('Край области ходьбы');
+      const physics=this.physicsApi?.current;if((nav.enabled||collisionSettings(object).enabled)&&physics?.sceneId()!==scene.id)return;
+      physics?.validateStep(object,from,to);
+      world.positions[object.id]=to;world.motions||={};world.motions[object.id]={player:true,position:to,progress:0};this.snapshot.hint=null;
+      if(route?.progress===1){this.playerDestination=null;delete world.motions[object.id];if(route.targetId)this.advance(null,route.targetId);}
+      this.emit();
+    }catch(e){this.playerDestination=null;delete world.motions?.[object.id];this.snapshot.hint=e.message;this.emit();}
+  }
   async advance(choiceId, objectId) {
     this.audio.unlock?.().catch(()=>{});
     if (!this.running || !this.snapshot.ready || this.snapshot.paused) return;
     const b = allBeats(this.project).find((b) => b.id === this.snapshot.beatId),
       token = this.generation;
+    if(b.kind==='gameplay')return;
     if (objectId && b.kind !== "gate") return;
-    if (b.kind === "gate" && objectId !== b.signal) return;
+    if (b.kind === "gate" && (!interactionTargets(b).includes(objectId)||this.snapshot.interacted.includes(objectId))) return;
     if (b.kind === "gate") {
-      this.snapshot.variables[b.signal] = true;
-      const item=this.project.objects.find(o=>o.id===b.signal);
-      if ((item?.builtin||item?.id) === "letter") this.snapshot.variables.letter = true;
+      const item=this.project.objects.find(o=>o.id===objectId),scene=sceneFor(this.project,b.id);
+      if(!item||item.active===false||!isObjectInScene(item,scene)||this.snapshot.world.visible?.[item.id]===false)return;
+      const control=this.snapshot.world.playerControl,character=control&&this.project.objects.find(o=>o.id===control.characterId);
+      if(control?.radius&&character){const from=resolvedPosition(character,this.snapshot.world,scene.kind),to=resolvedPosition(item,this.snapshot.world,scene.kind);if(Math.hypot(to[0]-from[0],to[2]-from[2])>control.radius)return;}
+      this.snapshot.ready=false;
+      this.playerDestination=null;
+      if(this.snapshot.world.playerControl)delete this.snapshot.world.motions?.[this.snapshot.world.playerControl.characterId];
+      try {
+        const eventId=b.interactionEvents?.[objectId];
+        if(eventId)await this.binding({id:'interact:'+b.id+':'+objectId,eventId,join:'FLOW_END',overrides:{},actionOverrides:{}},token);
+        this.assert(token);
+      }catch(e){this.handle(e);return;}
+      this.snapshot.interacted.push(objectId);
+      this.snapshot.variables[objectId]=true;
+      if ((item.builtin||item.id) === "letter") this.snapshot.variables.letter = true;
+      if(!interactionTargets(b).every(id=>this.snapshot.interacted.includes(id))){this.snapshot.ready=true;this.snapshot.hint=null;this.emit();return;}
+      this.snapshot.world.playerControl=null;
     }
     let selectedChoice;
     if(b.kind==='choice'){
@@ -606,13 +771,16 @@ export class PreviewRuntime {
     this.emit();
     try {
       await this.phase(b, "AFTER", token);
+      if(await this.game?.flushTransition())return;
       if (next) await this.enter(next.id, token);
       else {
         this.generation++;
         this.audio.stopAll();
         this.snapshot.effects = {};
-        for (const i of Object.values(this.snapshot.instances))
+        for (const i of Object.values(this.snapshot.instances)) {
+          this.closeEventAudio(i);
           i.status = "stopped";
+        }
         this.snapshot.phase = "FINISHED";
         this.snapshot.ending = b.ending || "Конец истории";
         this.emit();
@@ -625,6 +793,7 @@ export class PreviewRuntime {
     if (!this.running) return;
     this.snapshot.paused = !this.snapshot.paused;
     if (this.snapshot.paused) {
+      this.resetInputValues();
       this.pausedAudio = [...this.audio.tracks.values()]
         .filter((t) => ['playing','loading'].includes(t.status));
       this.pausedAudio.forEach((t) => this.audio.pause(t.key));
@@ -638,7 +807,7 @@ export class PreviewRuntime {
       i.resumeStatus = i.status;
       i.status = "paused";
     } else if (command === "resume") i.status = i.resumeStatus || "running";
-    else i.status = "stopped";
+    else {i.status = "stopped";this.closeEventAudio(i);}
     for(const m of Object.values(this.snapshot.world.motions||{}))if(m.runId===id){m.paused=command==='pause';if(command==='stop')m.stopped=true;}
     for(const a of this.snapshot.activity||[])if(a.runId===id&&a.status==='running'&&command==='stop')a.status='stopped';
     // A shared music output may already belong to a newer instance.
@@ -671,7 +840,12 @@ export class PreviewRuntime {
           : command === "resume"
             ? "held"
             : "stopped";
-      if (e.audioKey) this.audio[command](e.audioKey);
+      if (e.audioKey){
+        const track=this.audio.get(e.audioKey),result=this.audio[command](e.audioKey);
+        if(command==='stop'&&track?.pending){
+          e.status='stopping';Promise.resolve(result).then(()=>{if(this.snapshot.effects[key]===e&&this.audio.get(e.audioKey)===track){e.status='stopped';this.emit();}});
+        }
+      }
       if (key === "weather" && command === "stop")
         this.snapshot.world.weather = "Ясно";
       if (key === "time" && command === "stop")

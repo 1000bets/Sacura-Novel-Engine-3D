@@ -28,6 +28,7 @@ export function cameraFromView(camera,view,state,objects,kind){
  return cleanCamera(c);
 }
 export function resolveCamera(scene,state,objects,previewId,elapsed=0){
+ const g=state.game;if(!previewId&&g?.active&&['fps','thirdPerson'].includes(g.preset)){const id=state.playerControl?.characterId,o=objects.find(o=>o.id===id);if(o){const p=resolvedPosition(o,state,scene.kind),c=g.controller,forward=[-Math.sin(g.yaw)*Math.cos(g.pitch),Math.sin(g.pitch),-Math.cos(g.yaw)*Math.cos(g.pitch)],eye=[p[0],p[1]+c.eyeHeight,p[2]],position=g.preset==='fps'?eye:eye.map((v,i)=>v-forward[i]*c.distance);return {position,target:eye.map((v,i)=>v+forward[i]*5),fov:c.fov,smoothing:0,mode:'gameplay'};}}
  const cameras=scene.cameras||[],explicit=cameras.find(c=>c.id===(previewId||state.cameraId));
  if(!previewId&&state.interactionTarget){const [position,target]=gameCamera(scene.kind,state,objects);return {position,target,fov:58,smoothing:.14,name:'Осмотр предмета',temporary:true};}
  if(explicit)return cameraPose(explicit,state,objects,scene.kind);

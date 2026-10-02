@@ -1,3 +1,4 @@
+import {t as tr, useLocale} from './i18n.jsx';
 import React, {useEffect, useRef, useState} from 'react';
 import {Icon, Button} from './StudioParts.jsx';
 
@@ -23,7 +24,9 @@ const areas=[
  ['.subscene-workspace','Сабсцены','Настройте локацию, начальную погоду, время суток и точку входа. Переходы связывают сабсцены в историю.'],
 ];
 export function InfoView(){
+ const language=useLocale();
  const [info,setInfo]=useState(fallback),[collapsed,setCollapsed]=useState(false);
+ useEffect(()=>setInfo(fallback),[language]);
  useEffect(()=>{
   const update=e=>{
    const target=e.target instanceof Element?e.target:null;
@@ -32,22 +35,24 @@ export function InfoView(){
    const help=target.closest('[data-help]');
    const name=control?.getAttribute('aria-label')||control?.closest('label')?.querySelector('span')?.textContent?.trim()||control?.textContent?.trim()||control?.getAttribute('title');
    const area=areas.find(([selector])=>target.closest(selector));
-   const next=descriptions[name]?{title:name,body:descriptions[name]}:help?{title:name||help.dataset.helpTitle||'Подсказка',body:help.dataset.help}:area?{title:name||area[1],body:control?.getAttribute('title')||area[2]}:name?{title:name,body:control?.disabled?'Сейчас недоступно. Остановите предпросмотр или выберите подходящий элемент.':control?.getAttribute('title')||'Дополнительная справка для этого элемента пока не задана.'}:fallback;
+   const description=Object.entries(descriptions).find(([key])=>tr(key)===name)?.[1];
+   const next=description?{title:name,body:description}:help?{title:name||help.dataset.helpTitle||'Подсказка',body:help.dataset.help}:area?{title:name||area[1],body:control?.getAttribute('title')||area[2]}:name?{title:name,body:control?.disabled?'Сейчас недоступно. Остановите предпросмотр или выберите подходящий элемент.':control?.getAttribute('title')||'Дополнительная справка для этого элемента пока не задана.'}:fallback;
    setInfo(old=>old.title===next.title&&old.body===next.body?old:next);
   };
   document.addEventListener('click',update,true);
   return()=>{document.removeEventListener('click',update,true);};
  },[]);
- return <section className={'info-view'+(collapsed?' collapsed':'')} aria-label="Контекстная справка"><button className="info-heading" aria-expanded={!collapsed} onClick={()=>setCollapsed(v=>!v)}><Icon name="Info" size={15}/>Подсказки<Icon name={collapsed?'ChevronUp':'ChevronDown'} size={13}/></button>{!collapsed&&<div><strong>{info.title}</strong><p>{info.body}</p></div>}</section>;
+ return <section className={'info-view'+(collapsed?' collapsed':'')} aria-label={tr("Контекстная справка")}><button className="info-heading" aria-expanded={!collapsed} onClick={()=>setCollapsed(v=>!v)}><Icon name="Info" size={15}/>{tr("Подсказки")}<Icon name={collapsed?'ChevronUp':'ChevronDown'} size={13}/></button>{!collapsed&&<div><strong>{tr(info.title)}</strong><p>{tr(info.body)}</p></div>}</section>;
 }
 
 export function FloatingWindow({active,title,onClose,children}){
+ useLocale();
  const [position,setPosition]=useState({x:Math.min(260,window.innerWidth*.12),y:90});
  const drag=useRef(null),panel=useRef(null);
  useEffect(()=>{if(!active)return;const clamp=()=>setPosition(p=>({x:Math.max(0,Math.min(p.x,window.innerWidth-160)),y:Math.max(0,Math.min(p.y,window.innerHeight-60))}));window.addEventListener('resize',clamp);return()=>window.removeEventListener('resize',clamp);},[active]);
  if(!active)return children;
- return <section ref={panel} className="floating-editor-window" role="dialog" aria-label={title} style={{left:position.x,top:position.y}} onKeyDown={e=>{if(e.key==='Escape'){e.stopPropagation();onClose();}}}>
-  <header onPointerDown={e=>{if(e.target.closest('button'))return;drag.current={x:e.clientX-position.x,y:e.clientY-position.y};e.currentTarget.setPointerCapture(e.pointerId);}} onPointerMove={e=>{if(drag.current)setPosition({x:Math.max(0,Math.min(window.innerWidth-160,e.clientX-drag.current.x)),y:Math.max(0,Math.min(window.innerHeight-60,e.clientY-drag.current.y))});}} onPointerUp={()=>{drag.current=null;}} onLostPointerCapture={()=>{drag.current=null;}}><Icon name="AppWindow" size={15}/><strong>{title}</strong><span>Перетащите за заголовок</span><Button icon="X" title="Закрыть окно / вернуть рабочую область на место" onClick={onClose}/></header>
+ return <section ref={panel} className="floating-editor-window" role="dialog" aria-label={tr(title)} style={{left:position.x,top:position.y}} onKeyDown={e=>{if(e.key==='Escape'){e.stopPropagation();onClose();}}}>
+  <header onPointerDown={e=>{if(e.target.closest('button'))return;drag.current={x:e.clientX-position.x,y:e.clientY-position.y};e.currentTarget.setPointerCapture(e.pointerId);}} onPointerMove={e=>{if(drag.current)setPosition({x:Math.max(0,Math.min(window.innerWidth-160,e.clientX-drag.current.x)),y:Math.max(0,Math.min(window.innerHeight-60,e.clientY-drag.current.y))});}} onPointerUp={()=>{drag.current=null;}} onLostPointerCapture={()=>{drag.current=null;}}><Icon name="AppWindow" size={15}/><strong>{tr(title)}</strong><span>{tr("Перетащите за заголовок")}</span><Button icon="X" title={tr("Закрыть окно / вернуть рабочую область на место")} onClick={onClose}/></header>
   <div className="floating-window-body">{children}</div>
  </section>;
 }

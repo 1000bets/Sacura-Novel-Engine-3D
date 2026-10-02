@@ -48,7 +48,7 @@ test('camera controller preserves free view and FOV across pilot, preview and pa
  live.cameraPilotId=null;rig.update(.016);assert.deepEqual(rig.capture(),free);
  live.mode='game';rig.update(.016);assert.equal(view.fov,35);const frozen=rig.capture();live.state={...state,paused:true};s.cameras[0].position=[9,9,9];rig.update(1);assert.deepEqual(rig.capture(),frozen);
  const other=newCamera({position:[3,2,1],target:[0,1,0],fov:44},'Другой кадр');s.cameras.push(other);live.cameraPreviewId=other.id;rig.update(.016);assert.equal(view.fov,44);assert.deepEqual(view.position.toArray(),other.position);
- live.mode='scene';rig.update(.016);assert.deepEqual(rig.capture(),free);rig.dispose();assert.equal(scene.children.length,0);
+ live.mode='scene';live.cameraPreviewId=null;rig.update(.016);assert.deepEqual(rig.capture(),free);rig.dispose();assert.equal(scene.children.length,0);
 });
 
 test('piloting preserves an upward-looking camera and restores free limits',()=>{
@@ -146,4 +146,26 @@ test('dialogue camera changes glide and pausing freezes both the view and its tr
   assert.ok(Math.hypot(...next.position.map((v,i)=>v-previous.position[i]))<.2);
   assert.notDeepEqual(next.position,previous.position);
  }finally{a.rig.dispose();b.rig.dispose();}
+});
+
+
+test('selecting a scene camera previews its exact lens, allows navigation and restores the free view',()=>{
+ const canvas=new EventTarget();canvas.style={};canvas.getRootNode=()=>canvas;
+ const scene=new THREE.Scene(),view=new THREE.PerspectiveCamera(58,1,.05,100);view.position.set(6,4.5,6);
+ const orbit=new OrbitControls(view,canvas);orbit.target.set(0,0,0);orbit.maxPolarAngle=Math.PI*.47;
+ const a=newCamera({position:[0,1,3],target:[0,2,0],fov:35},'Вверх');
+ const b=newCamera({position:[-4,2,5],target:[1,1,0],fov:72},'Вторая');
+ const definition={id:'custom',kind:'living',cameras:[a,b],defaultCameraId:a.id};
+ const live={sceneId:definition.id,kind:definition.kind,cameraScene:definition,state:{},objects:[],mode:'scene',editing:true,editTool:'select'};
+ const rig=createCameraRig(scene,view,orbit,canvas,()=>live);
+ const matches=c=>{assert.ok(view.position.distanceTo(new THREE.Vector3(...c.position))<1e-9);assert.ok(orbit.target.distanceTo(new THREE.Vector3(...c.target))<1e-9);assert.equal(view.fov,c.fov);};
+ try{
+  rig.update(.016);const free=rig.capture(),original=structuredClone(a);
+  live.cameraPreviewId=a.id;rig.update(.016);matches(a);assert.equal(orbit.enabled,true);
+  view.position.x+=2;rig.update(.016);assert.ok(view.position.x>1);assert.deepEqual(a,original,'navigation never changes the authored camera');
+  rig.preview(a.id);rig.update(.016);matches(a);
+  a.fov=42;a.position=[0,3,5];rig.update(.016);matches(a);
+  live.cameraPreviewId=b.id;rig.update(.016);matches(b);
+  live.cameraPreviewId=null;rig.update(.016);assert.ok(view.position.distanceTo(new THREE.Vector3(...free.position))<1e-9);assert.equal(view.fov,free.fov);assert.equal(orbit.maxPolarAngle,Math.PI*.47);
+ }finally{rig.dispose();orbit.dispose();}
 });

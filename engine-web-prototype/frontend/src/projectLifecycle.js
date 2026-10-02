@@ -1,3 +1,4 @@
+import {makeAction} from './model.js';
 import {upgradeProject, uid} from './studioModel.js';
 import {readProject} from './projectFiles.js';
 
@@ -79,6 +80,17 @@ export function createStandardProject(name='Письма после дождя')
   door.bindings.push({id:uid('binding'),eventId:'visual-open',hook:'ON_START',join:'EVENT_END',overrides:{}});
   door.batches={};
   project.events=project.events.filter(e=>!['wait-a','wait-b'].includes(e.id));
+  const scene=project.subscenes.find(s=>s.id==='living');
+  scene.navMesh={enabled:true,show:true,center:[0,0,0],size:[8.2,5.8]};
+  const clue={id:'rain-keepsake',name:'Шкатулка с воспоминаниями',type:'Активный меш',active:true,subsceneId:scene.id,color:'#ba9560',primitive:'box',interaction:'Осмотреть шкатулку',transforms:{[scene.id]:{position:[1.3,.25,-1.2],rotation:[0,0,0],scale:[.5,.5,.5]}}};
+  project.objects.push(clue);
+  const chapter=project.chapters.find(c=>c.beats.some(b=>b.id==='a5')),before=chapter.beats.find(b=>b.id==='a5');
+  const camera={id:'rain-explore-camera',name:'Осмотр гостиной',mode:'fixed',position:[-.5,2.7,3.1],target:[-.1,.5,-.45],fov:72,smoothing:.2};scene.cameras.push(camera);
+  const event={id:'rain-explore-view',name:'Камера для свободной ходьбы',owner:'SubScene',retention:'AUTO_CLOSE_ON_FLOW_END',groups:[{id:'rain-explore-view-group',name:'Показать гостиную',actions:[{...makeAction('camera','camera','Общий план'),cameraId:camera.id}]}]};
+  const examined={id:'rain-examine-keepsake',name:'Осмотреть шкатулку',description:'Пример действия игрока: изменить переменную после осмотра предмета.',owner:'SubScene',retention:'AUTO_CLOSE_ON_FLOW_END',groups:[{id:'rain-examine-keepsake-group',name:'Запомнить находку',actions:[{...makeAction('variable','keepsakeFound',true),operation:'set',valueType:'boolean'}]}]};
+  project.variables.keepsakeFound=false;project.events.push(event,examined);
+  chapter.beats.splice(chapter.beats.indexOf(before)+1,0,{id:'rain-explore',kind:'gate',speaker:'Рассказчик',text:'Осмотрите письмо и шкатулку в любом порядке. Алиса может ходить по гостиной.',signal:'letter',signals:['letter',clue.id],controls:{characterId:'alice',mode:'both',speed:2.4,radius:1.5},interactionEvents:{[clue.id]:examined.id},timeout:30,next:before.next,mode:'SEQUENTIAL',bindings:[{id:'rain-explore-view-binding',eventId:event.id,hook:'ON_START',join:'EVENT_END',overrides:{}}]});
+  before.next='rain-explore';
   return upgradeProject(project);
 }
 

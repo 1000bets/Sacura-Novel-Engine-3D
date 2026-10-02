@@ -1,7 +1,9 @@
+import {interactionTargets} from './interactionModel.js';
 import {choiceAvailable,availabilityOf} from './choiceModel.js';
 import {SIDECHAIN} from './audioSettings.js';
 export const uid = (prefix='id') => `${prefix}-${globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)}`;
 export const TYPES = {
+ gameplay:{label:'Игровая команда',icon:'Gamepad2',domain:null,completion:'INSTANT'},
  move: {label:'Переместить',icon:'Footprints',domain:'Положение',completion:'FINITE'},
  pose: {label:'Изменить позу',icon:'PersonStanding',domain:'Анимация',completion:'INSTANT'},
  camera:{label:'Сменить план',icon:'Video',domain:'Камера',completion:'INSTANT'},
@@ -21,8 +23,8 @@ export const TYPES = {
  door:{label:'Открыть / закрыть дверь',icon:'DoorOpen',domain:'Дверь',completion:'INSTANT'},
  highlight:{label:'Подсветить предмет',icon:'Scan',domain:'Подсказка',completion:'INSTANT'},
 };
-const actionDefaults={move:['alice','окно'],pose:['alice','улыбка'],camera:['camera','Общий план'],music:['audio','Главная тема'],pause:['audio','Пауза'],resume:['audio','Продолжить'],stop:['audio','Остановить'],duck:['audio','Под голос'],weather:['world','Дождь'],time:['world','Ночь'],sound:['world','Звук'],wait:['world','Пауза'],variable:['trust','+1'],visibility:['letter','Показать'],lighting:['world','Тёплый свет'],particles:['world','Светлячки'],door:['door','Открыть'],highlight:['letter','Подсветить']};
-export const makeAction = (type='move',target,value) => ({id:uid('action'),type,target:target??actionDefaults[type][0],value:value??actionDefaults[type][1],wait:TYPES[type].completion==='CONTINUOUS'?'STARTED':'COMPLETED',scope:TYPES[type].completion==='CONTINUOUS'?'EVENT':'SELF',conflict:['camera','music','weather'].includes(type)?'REPLACE_CURRENT':'FAIL_NEW',...(type==='move'?{footstepAssetId:'',footstepVolume:1}:{}),duration:2,queueTimeout:10,startTimeout:5,executionTimeout:30,stopTimeout:3,onFailure:'Остановить событие',finalState:'Сохранить результат',fallback:'Безопасное исходное состояние'});
+const actionDefaults={gameplay:['world',{}],move:['alice','окно'],pose:['alice','улыбка'],camera:['camera','Общий план'],music:['audio','Главная тема'],pause:['audio','Пауза'],resume:['audio','Продолжить'],stop:['audio','Остановить'],duck:['audio','Под голос'],weather:['world','Дождь'],time:['world','Ночь'],sound:['world','Звук'],wait:['world','Пауза'],variable:['trust','+1'],visibility:['letter','Показать'],lighting:['world','Тёплый свет'],particles:['world','Светлячки'],door:['door','Открыть'],highlight:['letter','Подсветить']};
+export const makeAction = (type='move',target,value) => ({id:uid('action'),type,target:target??actionDefaults[type][0],value:value??actionDefaults[type][1],wait:TYPES[type].completion==='CONTINUOUS'?'STARTED':'COMPLETED',scope:TYPES[type].completion==='CONTINUOUS'?'EVENT':'SELF',conflict:['camera','music','weather'].includes(type)?'REPLACE_CURRENT':'FAIL_NEW',...(type==='gameplay'?{command:'damage',value:{amount:25}}:{}),...(type==='move'?{footstepAssetId:'',footstepVolume:1}:{}),...(['music','sound','pause','resume','stop'].includes(type)?{fadeInEnabled:type==='music',fadeIn:type==='music'?1:0,fadeOutEnabled:type==='stop',fadeOut:type==='stop'?2:0,endMode:['music','sound','stop','pause'].includes(type)?'marker':'immediate'}:{}),duration:2,queueTimeout:10,startTimeout:5,executionTimeout:30,stopTimeout:3,onFailure:'Остановить событие',finalState:'Сохранить результат',fallback:'Безопасное исходное состояние'});
 const event = (id,name,actions,more={})=>({id,name,description:'Готовая постановка для повторного использования',groups:[{id:`${id}-g1`,name:'Основное действие',actions}],retention:'AUTO_CLOSE_ON_FLOW_END',owner:'SubScene',...more});
 const bind=(eventId,extra={})=>({id:uid('binding'),eventId,hook:'ON_START',join:'EVENT_END',overrides:{},...extra});
 export function createProject(){
@@ -130,7 +132,7 @@ export function validate(p){
   }
   if(b.kind==='choice'&&!b.choices.some(c=>!availabilityOf(c)))add(`choice-${b.id}`,'Игрок может остаться без ответа','У каждого ответа есть условие. Добавьте вариант, доступный всегда.',b.id,null,'fallback');
   if(b.kind==='choice')for(const c of b.choices){if(c.next&&!allBeats(p).some(n=>n.id===c.next))add(`edge-${c.id}`,'Ответ ведёт в удалённый блок','Выберите существующий блок или общий путь.',b.id,null,'edge');}
-  if(b.kind==='gate'&&!p.objects.some(o=>o.id===b.signal&&o.active&&o.type==='Активный меш'))add(`gate-${b.id}`,'Игрок не может выполнить ожидание','Объект для взаимодействия удалён, выключен или не является активным мешем.',b.id,null,'gate');
+  if(b.kind==='gate'&&(!interactionTargets(b).length||interactionTargets(b).some(id=>!p.objects.some(o=>o.id===id&&o.active&&o.type==='Активный меш'))))add(`gate-${b.id}`,'Игрок не может выполнить ожидание','Объект для взаимодействия удалён, выключен или не является активным мешем.',b.id,null,'gate');
   for(const binding of b.bindings)for(const a of resolvedActions(p,binding)){if(!validActionTarget(p,a))add(`binding-target-${binding.id}`,a.type==='variable'?'Переменная не найдена':'В размещении выбран удалённый объект','Измените локальную цель события.',b.id,binding.eventId,'binding-target');}
   for(const binding of b.bindings){if(!Object.keys(binding.overrides).length&&!Object.keys(binding.actionOverrides||{}).length)continue;const claims=new Set();for(const a of resolvedActions(p,binding)){const key=`${a.groupId}/${resource(a)}`;if(resource(a)&&a.type!=='sound'&&claims.has(key))add(`local-group-${binding.id}-${key}`,'Локальная настройка создаёт конфликт действий','После изменения объекта два действия одного шага управляют одним свойством. Верните параметры шаблона.',b.id,binding.eventId,'reset-overrides');claims.add(key);}}
  }

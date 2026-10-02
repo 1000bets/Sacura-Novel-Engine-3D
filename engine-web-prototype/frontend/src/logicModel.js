@@ -1,3 +1,4 @@
+import {t as tr} from './i18n.js';
 import {runtimeVariableType} from './variableModel.js';
 import {typedValue,availabilityOf,ANSWER_VARIABLE,variableName,choiceResultType} from './choiceModel.js';
 export const MATH_OPERATIONS={add:{label:'Сложить · +',arity:2},sub:{label:'Вычесть · −',arity:2},mul:{label:'Умножить · ×',arity:2},div:{label:'Разделить · ÷',arity:2},mod:{label:'Остаток · %',arity:2},pow:{label:'Степень',arity:2},min:{label:'Минимум',arity:2},max:{label:'Максимум',arity:2},negate:{label:'Сменить знак',arity:1},abs:{label:'Модуль',arity:1},round:{label:'Округлить',arity:1},floor:{label:'Округлить вниз',arity:1},ceil:{label:'Округлить вверх',arity:1},sqrt:{label:'Квадратный корень',arity:1}};
@@ -89,7 +90,7 @@ export function migrateLogicGraph(p){
 // Palette entries reference the existing variable; adding a getter never changes its value.
 export function variablePalette(project){
  return [...(logicNodes(project).some(n=>n.variable===ANSWER_VARIABLE)?[ANSWER_VARIABLE]:[]),...Object.keys(project.variables||{}).filter(id=>id!==ANSWER_VARIABLE)].flatMap(variable=>(variable===ANSWER_VARIABLE?['variable']:['variable','set-variable']).map(kind=>({
-  id:kind+':'+variable,variable,kind,label:(kind==='variable'?'Получить · ':'Задать · ')+variableName(variable),searchText:variable+' '+variableName(variable)+' переменная '+(kind==='variable'?'get получить':'set задать'),
+  id:kind+':'+variable,variable,kind,label:tr(kind==='variable'?'Получить · ':'Задать · ')+variableName(variable),searchText:variable+' '+variableName(variable)+' переменная '+(kind==='variable'?'get получить':'set задать'),
  })));
 }
 export function initializeVariableNode(project,node,variable){

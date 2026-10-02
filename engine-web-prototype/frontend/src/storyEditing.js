@@ -1,7 +1,7 @@
 import {isPureNode,dataTargets,getInput,setInput} from './logicModel.js';
 import {allBeats,sceneFor,uid} from './studioModel.js';
 
-export const STORY_NODE_KINDS=[['dialogue','Реплика'],['choice','Выбор'],['branch','If · Если'],['gate','Взаимодействие'],['merge','Схождение'],['end','Концовка']];
+export const STORY_NODE_KINDS=[['dialogue','Реплика'],['gameplay','Игровая сцена'],['choice','Выбор'],['branch','If · Если'],['gate','Взаимодействие'],['merge','Схождение'],['end','Концовка']];
 
 export function changeStoryNodeKind(node,kind){
  if(!STORY_NODE_KINDS.some(([id])=>id===kind))return;

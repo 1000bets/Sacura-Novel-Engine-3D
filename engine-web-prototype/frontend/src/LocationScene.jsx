@@ -1,3 +1,6 @@
+import {t as tr, useLocale} from './i18n.jsx';
+import {createGameVisuals} from './GameVisuals.js';
+import {createGameControls,gameSceneHit} from './GameControls.js';
 import {createScenePhysics} from './scenePhysics.js';
 import {createMeshObject,updateMeshVisual,disposeMeshVisual,applyMaterialAssignments,disposeMaterialAssignments} from './meshVisual.js';
 import {createRendererViewport} from './rendererViewport.js';
@@ -19,20 +22,24 @@ function Exterior({
   objects,
   state,
   onSelect, onContext, onPickPosition, actionPosition,
-  onInteract,
+  onInteract, onPlayerStep, onPlayerClick, onPlayerInteract, inputSettings, onInputAction, onInputDevices,
   mode = "scene",
   showGrid = true, selected, selectedIds, sceneId, editTool, editSpace, snap, onTransform, onTransforms, focusRequest, editing=true, cameraScene, selectedCameraId, cameraPreviewId, cameraPilotId, onCameraChange, onCameraSelect, cameraApi, physicsApi, showCameras=true,
 }) {
+ const language=useLocale();
+ const webglFailed=useRef(false);
+ useEffect(()=>{if(webglFailed.current&&host.current)host.current.textContent=tr('3D недоступно · используйте кнопки объектов ниже');},[language]);
   const host = useRef(),
     live = useRef();
-  live.current = { state, onSelect, onContext, onPickPosition, actionPosition, onInteract, mode, showGrid,objects,selected,selectedIds,sceneId,kind,editTool,editSpace,snap,onTransform,onTransforms,focusRequest,editing,cameraScene,selectedCameraId,cameraPreviewId,cameraPilotId,onCameraChange,onCameraSelect,showCameras };
+  live.current = { state, onSelect, onContext, onPickPosition, actionPosition, onInteract, onPlayerStep, onPlayerClick, onPlayerInteract, inputSettings, onInputAction, onInputDevices, mode, showGrid,objects,selected,selectedIds,sceneId,kind,editTool,editSpace,snap,onTransform,onTransforms,focusRequest,editing,cameraScene,selectedCameraId,cameraPreviewId,cameraPilotId,onCameraChange,onCameraSelect,showCameras };
   useEffect(() => {
     let renderer;
     try {
       renderer = new THREE.WebGLRenderer({ antialias: true });
     } catch {
+      webglFailed.current=true;
       host.current.textContent =
-        "3D недоступно · используйте кнопки объектов ниже";
+        tr('3D недоступно · используйте кнопки объектов ниже');
       return;
     }
     const element = host.current;
@@ -89,7 +96,7 @@ function Exterior({
       box(2, 0.65, 0.12, 2, 1, 0.16, "#887861");
       for (const x of [1.25, 2.75]) box(0.12, 0.6, 0.4, x, 0.3, 0.5, "#6c6b68");
       picks.push(groupObjects(scene,scene.children.slice(benchStart),"garden-bench",BUILTIN_TRANSFORMS["garden-bench"]));
-      decoratePaper(box(0.4, 0.018, 0.25, 2, 0.77, 0.4, "#efdfb7", "garden-note"),'Записка · осмотреть');
+      decoratePaper(box(0.4, 0.018, 0.25, 2, 0.77, 0.4, "#efdfb7", "garden-note"),()=>tr('Записка · осмотреть'));
       prop('garden-fence',()=>box(3, 0.6, 0.2, -2, 0.3, -3, "#6e8272"));
     } else if (kind === 'station') {
       prop('station-platform',()=>box(70, 0.2, 35, 0, -0.1, 0, "#687575"));
@@ -108,7 +115,7 @@ function Exterior({
       for (const x of [-2, 2]) box(0.12, 2.8, 0.12, x, 1.4, 1.4, "#829a91");
       });
       prop('station-luggage',()=>box(0.65, 0.8, 0.4, 1.4, 0.4, 1.2, "#aaa39a"));
-      decoratePaper(box(0.4, 0.018, 0.26, 1.4, 0.83, 1.2, "#e6d6b5", "ticket"),'Билет · предъявить');
+      decoratePaper(box(0.4, 0.018, 0.26, 1.4, 0.83, 1.2, "#e6d6b5", "ticket"),()=>tr('Билет · предъявить'));
     }
     const chars = [];
     objects
@@ -173,6 +180,8 @@ function Exterior({
     const viewport=createRendererViewport(renderer,camera,element);
     const gizmo=createSceneGizmo(scene,camera,renderer.domElement,controls,()=>live.current,()=>picks);
     const physics=createScenePhysics(scene,()=>live.current,()=>picks);if(physicsApi)physicsApi.current=physics;
+    const gameVisuals=createGameVisuals(scene);
+    const gameControls=createGameControls(camera,renderer.domElement,()=>live.current);
     const cameraRig=createCameraRig(scene,camera,controls,renderer.domElement,()=>live.current);if(cameraApi)cameraApi.current=cameraRig;
     let down;
     const destinationMarker=new THREE.Mesh(new THREE.SphereGeometry(.09,16,12),new THREE.MeshBasicMaterial({color:0xffca68,depthTest:false}));destinationMarker.renderOrder=1000;destinationMarker.visible=false;scene.add(destinationMarker);
@@ -195,10 +204,9 @@ function Exterior({
         return;
       }
       const cameraHit=cameraRig.pick(ray);if(cameraHit){live.current.onCameraSelect?.(cameraHit);return;}
-      let hit = ray.intersectObjects(
-        picks.filter((m) => m.visible),
-        true,
-      ).find(h=>{let o=h.object;while(o){if(!o.visible)return false;o=o.parent;}return true;})?.object;
+      let hit = gameSceneHit(ray.intersectObjects(picks.filter(m=>m.visible),true),live.current.state,live.current.mode)?.object;
+      let hitId=hit;while(hitId&&!hitId.userData.id&&hitId.parent)hitId=hitId.parent;
+      if(gameControls.click(ray,hitId?.userData.id))return;
       if (hit) {
         while (!hit.userData.id && hit.parent) hit = hit.parent;
         if (live.current.mode === "game")
@@ -214,6 +222,7 @@ function Exterior({
       const destination=live.current.actionPosition;destinationMarker.visible=Array.isArray(destination)&&destination.length===3&&live.current.mode==='scene';if(destinationMarker.visible)destinationMarker.position.set(...destination);
       const { state, mode, showGrid,objects } = live.current;
       const now=performance.now(),dt=Math.min(.05,(now-previous)/1000);previous=now;const animTime=updateAtmosphere(state,dt);
+      gameControls.tick(dt);gameVisuals.update(live.current.state.game);
       grid.visible = showGrid && mode === "scene";
       const anchors = {
         камин: [-2, 0, 0.3],
@@ -227,12 +236,12 @@ function Exterior({
           disposeCharacterVisual(mesh);disposeMeshVisual(mesh);mesh.visible = false;
           return;
         }
-        mesh.visible = o.active && state.visible?.[o.id] !== false;
-        if(mesh.userData.marker)mesh.userData.marker.visible=state.interactionTarget===o.id||state.highlights?.[o.id];
+        mesh.visible = o.active && state.visible?.[o.id] !== false && !(state.game?.active&&state.game.preset==='fps'&&state.playerControl?.characterId===o.id);
+        if(mesh.userData.marker)mesh.userData.marker.visible=(state.interactionTarget===o.id||state.interactionTargets?.includes(o.id))||state.highlights?.[o.id];
         gizmo.apply(mesh,o,resolvedPosition(o,state,kind));
         updateLightObject(mesh,o,live.current.mode==='scene');
         updateMeshVisual(mesh,o);if(o.type!=='Персонаж'&&o.type!=='Источник света'&&!mesh.userData.placeholder)applyMaterialAssignments(mesh,o);
-        updateObjectHighlight(mesh,state.interactionTarget===o.id||!!state.highlights?.[o.id],animTime);
+        updateObjectHighlight(mesh,(state.interactionTarget===o.id||state.interactionTargets?.includes(o.id))||!!state.highlights?.[o.id],animTime);
         updateCharacterVisual(mesh,{...o,walkAnimation:state.motions?.[o.id]?.animationId||o.walkAnimation},dt,state.poses?.[o.id],!!state.motions?.[o.id]&&!state.motions[o.id].stopped&&!state.motions[o.id].paused&&state.motions[o.id].progress<1,state.paused,mode==='scene'&&live.current.editing);
 
       });
@@ -250,6 +259,7 @@ function Exterior({
       if(cameraApi?.current===cameraRig)cameraApi.current=null;
       if(physicsApi?.current===physics)physicsApi.current=null;
       physics.dispose();
+      gameVisuals.dispose();gameControls.dispose();
       cameraRig.dispose();
       gizmo.dispose();
       controls.dispose();
@@ -269,12 +279,13 @@ function Exterior({
       ref={host}
       className="scene-canvas"
       aria-label={
-        (kind === "garden" ? "3D сад" : kind === "empty" ? "3D пустая локация" : "3D станция") + '. ЛКМ — выбор; Alt + ЛКМ — вращение; средняя кнопка — панорама; ПКМ + WASD/QE — полёт; колесо — приближение; F — фокус.'
+        (kind === "garden" ? tr("3D сад") : kind === "empty" ? tr("3D пустая локация") : tr("3D станция")) + tr(". ЛКМ — выбор; Alt + ЛКМ — вращение; средняя кнопка — панорама; ПКМ + WASD/QE — полёт; колесо — приближение; F — фокус.")
       }
     />
   );
 }
 export default function LocationScene(props) {
+ useLocale();
   return (props.kind || props.state.location) === "living" ? (
     <Scene {...props} onLetter={() => props.onInteract?.("letter")} />
   ) : (

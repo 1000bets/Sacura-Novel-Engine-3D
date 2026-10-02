@@ -1,9 +1,11 @@
+import {t as tr, useLocale, optionLabel} from './i18n.jsx';
 import React,{useEffect,useId,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {Icon} from './StudioParts.jsx';
 
 // A themed popup for the scene switcher, independent of the OS select palette.
 export default function EditorSelect({value,options,onChange,label}){
+ useLocale();
  const trigger=useRef(),popup=useRef(),id=useId(),[open,setOpen]=useState(false),[active,setActive]=useState(0),[rect,setRect]=useState(null);
  const selected=Math.max(0,options.findIndex(o=>o[0]===value));
  const close=()=>{setOpen(false);trigger.current?.focus();};
@@ -26,7 +28,7 @@ export default function EditorSelect({value,options,onChange,label}){
   if(e.key==='Home')setActive(0);if(e.key==='End')setActive(options.length-1);
   if(open&&['Enter',' '].includes(e.key))choose(active);
  };
- return <><button ref={trigger} className="scene-selector" role="combobox" aria-label={label} aria-expanded={open} aria-controls={open?id:undefined} aria-activedescendant={open?id+'-'+active:undefined} aria-haspopup="listbox" onKeyDown={keyDown} onClick={()=>{setActive(selected);setOpen(v=>!v);}}><span>{options[selected]?.[1]||'Выберите сабсцену'}</span><Icon name="ChevronDown" size={14}/></button>
-  {open&&rect&&createPortal(<div id={id} role="listbox" aria-label={label} ref={popup} className="editor-select-popup" style={rect}>{options.map(([optionValue,text],i)=><button key={optionValue} id={id+'-'+i} role="option" aria-selected={i===active} tabIndex={-1} className={value===optionValue?'chosen':''} onMouseEnter={()=>setActive(i)} onPointerDown={e=>e.preventDefault()} onClick={()=>choose(i)}><span>{text}</span>{value===optionValue&&<Icon name="Check" size={14}/>}</button>)}</div>,document.body)}
+ return <><button ref={trigger} className="scene-selector" role="combobox" aria-label={tr(label)} aria-expanded={open} aria-controls={open?id:undefined} aria-activedescendant={open?id+'-'+active:undefined} aria-haspopup="listbox" onKeyDown={keyDown} onClick={()=>{setActive(selected);setOpen(v=>!v);}}><span>{optionLabel(options[selected]?.[1])||tr("Выберите сабсцену")}</span><Icon name="ChevronDown" size={14}/></button>
+  {open&&rect&&createPortal(<div id={id} role="listbox" aria-label={tr(label)} ref={popup} className="editor-select-popup" style={rect}>{options.map(([optionValue,text],i)=><button key={optionValue} id={id+'-'+i} role="option" aria-selected={i===active} tabIndex={-1} className={value===optionValue?'chosen':''} onMouseEnter={()=>setActive(i)} onPointerDown={e=>e.preventDefault()} onClick={()=>choose(i)}><span>{optionLabel(text)}</span>{value===optionValue&&<Icon name="Check" size={14}/>}</button>)}</div>,document.body)}
  </>;
 }

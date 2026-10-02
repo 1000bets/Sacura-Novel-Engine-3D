@@ -84,6 +84,8 @@ export function createScenePhysics(scene,getLive,getMeshes){
  };
  return {
   sceneId:()=>getLive().sceneId,
+  colliders:()=>entries().map(e=>({id:e.object.id,box:{min:e.box.min.toArray(),max:e.box.max.toArray()}})),
+  raycast(origin,direction,range,exclude=[]){const ray=new THREE.Raycaster(new THREE.Vector3(...origin),new THREE.Vector3(...direction).normalize(),0,range),meshes=getMeshes().filter(m=>!exclude.includes(m.userData.id)&&m.visible);for(const hit of ray.intersectObjects(meshes,true)){if(!hit.object.isMesh)continue;let visible=true,id;for(let n=hit.object;n;n=n.parent){if(n.visible===false||n.userData.marker===hit.object)visible=false;if(n.userData.id)id=n.userData.id;}if(visible&&id&&!exclude.includes(id))return {id,distance:hit.distance,point:hit.point.toArray()};}return null;},
   planMotion(object,from,to){const nav=navMeshSettings(getLive().cameraScene),{boxes,padding}=obstacles(object);if(object.type==='Персонаж'&&nav.enabled)return findFlatPath(from,to,nav,boxes,padding);if(segmentBlocked(from,to,boxes))throw new Error('Движение перекрыто коллизией. Включите nav mesh для обхода или отключите коллизию.');return [from,to];},
   validateStep(object,from,to){if(segmentBlocked(from,to,obstacles(object).boxes))throw new Error('Движение остановлено: на пути появилась коллизия.');},
   update(){const live=getLive(),nav=navMeshSettings(live.cameraScene),next=JSON.stringify([nav.center,nav.size]);

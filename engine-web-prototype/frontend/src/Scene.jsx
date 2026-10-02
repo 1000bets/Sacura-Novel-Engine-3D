@@ -1,3 +1,6 @@
+import {t as tr, useLocale} from './i18n.jsx';
+import {createGameVisuals} from './GameVisuals.js';
+import {createGameControls,gameSceneHit} from './GameControls.js';
 import {createScenePhysics} from './scenePhysics.js';
 import {createMeshObject,updateMeshVisual,disposeMeshVisual,applyMaterialAssignments,disposeMaterialAssignments} from './meshVisual.js';
 import {createRendererViewport} from './rendererViewport.js';
@@ -19,22 +22,26 @@ export default function Scene({
   selected, selectedIds,
   onSelect, onContext, onPickPosition, actionPosition,
   onLetter,
-  onInteract,
+  onInteract, onPlayerStep, onPlayerClick, onPlayerInteract, inputSettings, onInputAction, onInputDevices,
   mode = "scene",
   showGrid = true, sceneId="living", editTool, editSpace, snap, onTransform, onTransforms, focusRequest, editing=true, cameraScene, selectedCameraId, cameraPreviewId, cameraPilotId, onCameraChange, onCameraSelect, cameraApi, physicsApi, showCameras=true,
 }) {
+ const language=useLocale();
+ const webglFailed=useRef(false);
+ useEffect(()=>{if(webglFailed.current&&host.current)host.current.textContent=tr('3D-превью недоступно в этом браузере. Сценарий и редакторы продолжают работать.');},[language]);
   const host = useRef(),
     api = useRef();
   const callbacks = useRef();
-  callbacks.current = { onSelect, onContext, onPickPosition, actionPosition, onLetter, onInteract, mode, state,objects,selected,selectedIds,sceneId,kind:"living",editTool,editSpace,snap,onTransform,onTransforms,focusRequest,editing,cameraScene,selectedCameraId,cameraPreviewId,cameraPilotId,onCameraChange,onCameraSelect,showCameras };
+  callbacks.current = { onSelect, onContext, onPickPosition, actionPosition, onLetter, onInteract, onPlayerStep, onPlayerClick, onPlayerInteract, inputSettings, onInputAction, onInputDevices, mode, state,objects,selected,selectedIds,sceneId,kind:"living",editTool,editSpace,snap,onTransform,onTransforms,focusRequest,editing,cameraScene,selectedCameraId,cameraPreviewId,cameraPilotId,onCameraChange,onCameraSelect,showCameras };
   useEffect(() => {
     const element = host.current;
     let renderer;
     try {
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     } catch {
+      webglFailed.current=true;
       element.textContent =
-        "3D-превью недоступно в этом браузере. Сценарий и редакторы продолжают работать.";
+        tr('3D-превью недоступно в этом браузере. Сценарий и редакторы продолжают работать.');
       return;
     }
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -134,7 +141,7 @@ export default function Scene({
     const letter = box(0.47, 0.012, 0.3, -0.35, 0.782, 1.55, 0xf4e4bd);
     letter.rotation.y = 0.18;
     letter.userData.id = "letter";
-    decoratePaper(letter,'Письмо · осмотреть');
+    decoratePaper(letter,()=>tr('Письмо · осмотреть'));
     pickables.push(letter);
     const door = box(1, 2.5, 0.08, 3.55, 1.13, -3.08, 0x718c87);
     door.geometry.translate(.5,0,0);door.position.x=3.05;
@@ -188,6 +195,8 @@ export default function Scene({
     const viewport=createRendererViewport(renderer,camera,element);
     const gizmo=createSceneGizmo(scene,camera,renderer.domElement,controls,()=>callbacks.current,()=>pickables);
     const physics=createScenePhysics(scene,()=>callbacks.current,()=>pickables);if(physicsApi)physicsApi.current=physics;
+    const gameVisuals=createGameVisuals(scene);
+    const gameControls=createGameControls(camera,renderer.domElement,()=>callbacks.current);
     const cameraRig=createCameraRig(scene,camera,controls,renderer.domElement,()=>callbacks.current);if(cameraApi)cameraApi.current=cameraRig;
     const destinationMarker=new THREE.Mesh(new THREE.SphereGeometry(.09,16,12),new THREE.MeshBasicMaterial({color:0xffca68,depthTest:false}));destinationMarker.renderOrder=1000;destinationMarker.visible=false;scene.add(destinationMarker);
     const ray = new THREE.Raycaster(),
@@ -212,10 +221,9 @@ export default function Scene({
         return;
       }
       const cameraHit=cameraRig.pick(ray);if(cameraHit){callbacks.current.onCameraSelect?.(cameraHit);return;}
-      const h = ray.intersectObjects(
-        pickables.filter((m) => m.visible),
-        true,
-      ).find(h=>{let o=h.object;while(o){if(!o.visible)return false;o=o.parent;}return true;});
+      const h = gameSceneHit(ray.intersectObjects(pickables.filter(m=>m.visible),true),callbacks.current.state,callbacks.current.mode);
+      let hitId=h?.object;while(hitId&&!hitId.userData.id&&hitId.parent)hitId=hitId.parent;
+      if(gameControls.click(ray,hitId?.userData.id))return;
       if (h) {
         let o = h.object;
         while (!o.userData.id && o.parent) o = o.parent;
@@ -254,21 +262,22 @@ export default function Scene({
       const now=performance.now(),dt=Math.min(.05,(now-previous)/1000);previous=now;
 
       const live = callbacks.current.state;
+      gameControls.tick(dt);gameVisuals.update(callbacks.current.state.game);
       animTime=updateAtmosphere(live,dt);
-      pickables.forEach(mesh=>{const o=callbacks.current.objects.find(o=>o.id===mesh.userData.id);if(!o){disposeCharacterVisual(mesh);disposeMeshVisual(mesh);mesh.visible=false;return;}mesh.visible=o.active&&live.visible?.[o.id]!==false;
+      pickables.forEach(mesh=>{const o=callbacks.current.objects.find(o=>o.id===mesh.userData.id);if(!o){disposeCharacterVisual(mesh);disposeMeshVisual(mesh);mesh.visible=false;return;}mesh.visible=o.active&&live.visible?.[o.id]!==false&&!(live.game?.active&&live.game.preset==='fps'&&live.playerControl?.characterId===o.id);
         gizmo.apply(mesh,o,resolvedPosition(o,live,'living'));
         updateLightObject(mesh,o,callbacks.current.mode==='scene');
         updateMeshVisual(mesh,o);if(o.type!=='Персонаж'&&o.type!=='Источник света'&&!mesh.userData.placeholder)applyMaterialAssignments(mesh,o);
         if((o.builtin||o.id)==='door'&&callbacks.current.mode==='game'){mesh.userData.openAngle=THREE.MathUtils.damp(mesh.userData.openAngle||0,live.doors?.[o.id]==='Открыть'?-1.25:0,3,live.paused||live.pausedDoors?.[o.id]?0:dt);mesh.rotation.y+=mesh.userData.openAngle;}
-        if(mesh.userData.marker)mesh.userData.marker.visible=live.interactionTarget===o.id||live.highlights?.[o.id];
-        updateObjectHighlight(mesh,!!live.highlights?.[o.id],animTime);
+        if(mesh.userData.marker)mesh.userData.marker.visible=(live.interactionTarget===o.id||live.interactionTargets?.includes(o.id))||live.highlights?.[o.id];
+        updateObjectHighlight(mesh,!!live.highlights?.[o.id]||live.interactionTargets?.includes(o.id),animTime);
         updateCharacterVisual(mesh,{...o,walkAnimation:live.motions?.[o.id]?.animationId||o.walkAnimation},dt,live.poses?.[o.id],!!live.motions?.[o.id]&&!live.motions[o.id].stopped&&!live.motions[o.id].paused&&live.motions[o.id].progress<1,live.paused,callbacks.current.mode==='scene'&&callbacks.current.editing);
       });
       physics.update();
       gizmo.update();
       cameraRig.update(dt,gizmo.dragging);
       controls.tick(dt);
-      letter.userData.marker.visible=live.interactionTarget==='letter'||live.highlights?.letter;
+      letter.userData.marker.visible=live.interactionTarget==='letter'||live.interactionTargets?.includes('letter')||live.highlights?.letter;
       ring.scale.setScalar(live.interactionTarget?1+Math.sin(animTime*3)*.06:1);
       lamp.intensity=live.lighting==='Выключить'?0:live.lighting==='Холодный свет'?12:35;
       lamp.color.set(live.lighting==='Холодный свет'?'#98beff':'#ffa553');
@@ -282,6 +291,7 @@ export default function Scene({
       if(cameraApi?.current===cameraRig)cameraApi.current=null;
       if(physicsApi?.current===physics)physicsApi.current=null;
       physics.dispose();
+      gameVisuals.dispose();gameControls.dispose();
       cameraRig.dispose();
       gizmo.dispose();
       controls.dispose();
@@ -386,7 +396,7 @@ export default function Scene({
     <div
       className="scene-canvas"
       ref={host}
-      aria-label="3D-сцена. ЛКМ — выбор; Alt + ЛКМ — вращение; средняя кнопка — панорама; ПКМ + WASD/QE — полёт; колесо — приближение; F — фокус."
+      aria-label={tr("3D-сцена. ЛКМ — выбор; Alt + ЛКМ — вращение; средняя кнопка — панорама; ПКМ + WASD/QE — полёт; колесо — приближение; F — фокус.")}
     />
   );
 }

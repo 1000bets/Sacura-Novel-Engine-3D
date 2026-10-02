@@ -1,23 +1,29 @@
 import {ANSWER_VARIABLE,typedValue} from './choiceModel.js';
-export const VARIABLE_TYPES=[['boolean','Boolean · Да / нет'],['integer','Integer · Целое число'],['number','Float · Число'],['string','String · Текст']];
-export const variableType=(p,id)=>p.variableTypes?.[id]||(id===ANSWER_VARIABLE?'string':(Object.hasOwn(p.variables||{},id)?typeof p.variables[id]:undefined));
+export const VARIABLE_TYPES=[['boolean','Boolean · Да / нет'],['integer','Integer · Целое число'],['number','Float · Число'],['string','String · Текст'],['array','Array · Массив'],['struct','Struct · Структура']];
+export const variableType=(p,id)=>p.variableTypes?.[id]||(id===ANSWER_VARIABLE?'string':(Object.hasOwn(p.variables||{},id)?(Array.isArray(p.variables[id])?'array':typeof p.variables[id]==='object'?'struct':typeof p.variables[id]):undefined));
 export const runtimeVariableType=(p,id)=>variableType(p,id)==='integer'?'number':variableType(p,id);
 export const variableValue=(p,id,value)=>variableType(p,id)==='integer'?Math.trunc(typedValue(value,'number')):typedValue(value,runtimeVariableType(p,id));
 export function variableReferences(p,id){
- const refs=[];
+ const refs=[];if(p.gameplay?.enabled&&['hp','maxHp','ammo','reserve','kills','inventory'].includes(id))refs.push('gameplay');
+ for(const w of p.widgets||[])if(w.elements.some(e=>e.binding?.source==='variable'&&e.binding.path.split('.')[0]===id||e.showIf?.source==='variable'&&e.showIf.path.split('.')[0]===id||e.maxVariable===id))refs.push(w.id);
+ const find=(v)=>v&&typeof v==='object'&&Object.entries(v).some(([k,x])=>k==='path'&&typeof x==='string'&&(x==='global.'+id||x.startsWith('global.'+id+'.'))||find(x));for(const f of p.functions||[])if(find(f))refs.push(f.id);
  for(const b of (p.chapters||[]).flatMap(c=>c.beats||[])){
   if(b.variable===id||b.resultVariable===id||(b.test?.rules||[]).some(r=>r.variable===id)||(b.choices||[]).some(c=>c.condition===id||c.availability?.rules?.some(r=>r.variable===id))||(b.bindings||[]).some(bind=>bind.condition===id||Object.values(bind.actionOverrides||{}).some(a=>a.target===id)))refs.push(b.id);
  }
  for(const event of p.events||[])if(event.groups?.some(g=>g.actions.some(a=>a.type==='variable'&&a.target===id)))refs.push(event.id);
+ for(const action of p.input?.actions||[])if(['variable','variableX','variableY'].some(field=>action[field]===id))refs.push(action.id);
  return [...new Set(refs)];
 }
 export function editVariable(p,id,patch){
  const name=(patch.name??id).trim();
  if(!name||name===ANSWER_VARIABLE&&id!==ANSWER_VARIABLE)return 'Введите имя переменной.';
+ if(name!==id&&p.gameplay?.enabled&&['hp','maxHp','ammo','reserve','kills','inventory'].includes(id))return 'Игровая переменная используется контроллером. Отключите игровые механики перед переименованием.';
  if(name!==id&&Object.hasOwn(p.variables,name))return 'Переменная с таким именем уже существует.';
  if(patch.remove){if(variableReferences(p,id).length)return 'Переменная используется в графе. Сначала удалите её ноды и действия.';delete p.variables[id];if(p.variableTypes)delete p.variableTypes[id];return null;}
  if(id===ANSWER_VARIABLE){if(name!==id)return 'Системную переменную нельзя переименовать.';p.variableTypes??={};if(patch.type)p.variableTypes[id]=patch.type;for(const b of p.chapters.flatMap(c=>c.beats))if(b.variable===id)b.valueType=runtimeVariableType(p,id);return null;}
  if(name!==id){
+  for(const w of p.widgets||[])for(const e of w.elements){for(const binding of [e.binding,e.showIf])if(binding?.source==='variable'&&(binding.path===id||binding.path.startsWith(id+'.')))binding.path=name+binding.path.slice(id.length);if(e.maxVariable===id)e.maxVariable=name;}
+  const renamePaths=v=>{if(!v||typeof v!=='object')return;for(const [key,x]of Object.entries(v)){if(key==='path'&&typeof x==='string'&&(x==='global.'+id||x.startsWith('global.'+id+'.')))v[key]='global.'+name+x.slice(('global.'+id).length);else renamePaths(x);}};for(const f of p.functions||[])renamePaths(f);
   if(Object.hasOwn(p.variables,id)){p.variables[name]=p.variables[id];delete p.variables[id];}
   if(p.variableTypes&&Object.hasOwn(p.variableTypes,id)){p.variableTypes[name]=p.variableTypes[id];delete p.variableTypes[id];}
   for(const b of (p.chapters||[]).flatMap(c=>c.beats||[])){
@@ -27,8 +33,9 @@ export function editVariable(p,id,patch){
    for(const bind of b.bindings||[]){if(bind.condition===id)bind.condition=name;for(const a of Object.values(bind.actionOverrides||{}))if(a.target===id)a.target=name;}
   }
   for(const e of p.events||[])for(const g of e.groups||[])for(const a of g.actions||[])if(a.type==='variable'&&a.target===id)a.target=name;
+  for(const action of p.input?.actions||[])for(const field of ['variable','variableX','variableY'])if(action[field]===id)action[field]=name;
  }
- p.variableTypes??={};if(patch.type)p.variableTypes[name]=patch.type;
+ p.variableTypes??={};if(patch.type){p.variableTypes[name]=patch.type;if(patch.type==='array'&&!Array.isArray(p.variables[name]))p.variables[name]=[];if(patch.type==='struct'&&(!p.variables[name]||typeof p.variables[name]!=='object'||Array.isArray(p.variables[name])))p.variables[name]={};}
  p.variables[name]=variableValue(p,name,'value'in patch?patch.value:p.variables[name]);
  for(const b of (p.chapters||[]).flatMap(c=>c.beats||[]))if(b.variable===name)b.valueType=runtimeVariableType(p,name);
  return null;
