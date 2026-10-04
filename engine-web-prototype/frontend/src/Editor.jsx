@@ -317,13 +317,13 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     }),
     [selectedBeat, setSelectedBeat] = useState(initialBeat),
     [selection, setSelection] = useState({ kind: "beat", id: initialBeat }),
-    [dock, setDock] = useState("story"),
+    [dock, setDock] = useState(seed.current.project.gameplay?.enabled ? "gameplay" : "story"),
     [phase, setPhase] = useState("ALL"),
     [eventContext, setEventContext] = useState(null),
     [mode, setMode] = useState("scene"),
     [showDialogue, setShowDialogue] = useState(true),
     [showGrid, setShowGrid] = useState(true),
-    [maximized, setMaximized] = useState(null),
+    [maximized, setMaximized] = useState(seed.current.project.gameplay?.enabled ? "graph" : null),
     [preview, setPreview] = useState(null),
     [follow, setFollow] = useState(true),
     [query, setQuery] = useState(""),
@@ -708,6 +708,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     soundDesk.unlock().catch(()=>{});
     setFollow(true);
     setMode("game");
+    setMaximized(project.gameplay?.enabled ? "scene" : null);setFloatingDock(false);
     setShowDialogue(true);
     rt.start(project, startId);
   };
@@ -2194,6 +2195,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             {tr(m)}
           </button>
         ))}
+        <Button icon="Gamepad2" onClick={()=>{setDock('gameplay');setDetailEditor(false);setFloatingDock(false);setMaximized('graph');setCompactPanel('workspace');setMenu(null);}}>{tr('Игровые механики')}</Button>
         <div className="flex-space" />
         <span className="project-title" title={project.title}>
           <Icon name="FolderOpen" size={14} />
@@ -2608,7 +2610,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 onGraph={id=>{setEventContext({eventId:id});setSelection({kind:'event',id});setDock('event');}}
                 onPreview={draft=>{setCameraPreviewId(null);setCameraPilotId(null);const test=structuredClone(project);const i=test.events.findIndex(e=>e.id===draft.id);if(i<0)test.events.push(draft);else test.events[i]=draft;soundDesk.unlock();rt.stop();setMode('game');setMaximized(null);setFollow(false);rt.previewEvent(test,draft.id,beat.id);}}
                 onPlace={(draft,hook)=>{mutate(p=>addToBatch(p,beat.id,hook,null,draft.id));setPhase(hook);setDock('story');setMaximized(null);setNotice(tr("Добавлено: {0} · {1}", [draft.name, PHASES.find(x=>x.id===hook).label]));}}/>
-              {dock==='create'?null:dock==='gameplay'?<GameplayWorkspace project={project} onChange={mutate} sceneId={displayScene.id} running={running} onStop={()=>rt.stop()} onWidgets={()=>{setWidgetRequest({id:project.gameplay.hudWidgetId||project.ui.hud});setDock('widgets');}} onInput={()=>setDock('input')}/>:dock==='input'?<InputWorkspace project={project} onChange={mutate} beat={playBeat} preview={preview} devices={inputDevices} running={running} onStop={()=>rt.stop()}/>:detailEditor && event ? (
+              {dock==='create'?null:dock==='gameplay'?<GameplayWorkspace project={project} onChange={mutate} sceneId={displayScene.id} running={running} onStop={()=>rt.stop()} onWidgets={()=>{setWidgetRequest({id:project.gameplay.hudWidgetId||project.ui.hud});setDock('widgets');}} onInput={()=>setDock('input')} onEvent={id=>openAuthoring('event',id?{id}:{})} onStory={()=>{setDock('story');setDetailEditor(false);}}/>:dock==='input'?<InputWorkspace project={project} onChange={mutate} beat={playBeat} preview={preview} devices={inputDevices} running={running} onStop={()=>rt.stop()}/>:detailEditor && event ? (
                 <EventEditor
                   project={project}
                   event={event}

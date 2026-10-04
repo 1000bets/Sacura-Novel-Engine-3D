@@ -3270,3 +3270,9 @@ select option,select optgroup { background:var(--graphite-700); color:var(--ivor
 .camera-component-list>button.active { border-color: var(--accent); background: var(--line); }
 
 .tree-object-group{margin:4px 0;border-left:1px solid var(--divider);padding-left:6px}.tree-object-group .tree-folder{flex:1;text-align:left;display:flex;align-items:center;gap:6px}.file-inspector-preview{max-width:100%;max-height:240px;object-fit:contain}
+
+/* Keep the editor's grid within the browser while allowing its toolbar to scroll. */
+.editor-app { grid-template-columns:minmax(0,1fr); }
+.editor-menubar { min-width:0; overflow-x:auto; scrollbar-width:thin; }
+@media(max-width:1400px){.editor-menubar>.project-title{display:none}}
+@media(max-width:700px){.editor-app{min-width:0}.editor-menubar{flex-shrink:0}}

@@ -3,7 +3,7 @@ import {defaultInputSettings} from './inputModel.js';
 export const GAME_PRESETS={quest:'Квест',gallery:'Тир',fps:'От первого лица',thirdPerson:'От третьего лица'};
 export const GAME_COMMANDS={goTo:'Перейти к ноде истории',damage:'Нанести урон',heal:'Лечить',shoot:'Выстрелить',reload:'Перезарядить',jump:'Прыгнуть',impulse:'Толкнуть объект',addItem:'Добавить предмет',removeItem:'Убрать предмет',equip:'Экипировать',useItem:'Использовать предмет',combine:'Соединить предметы',startTimer:'Запустить таймер',stopTimer:'Остановить таймер',callFunction:'Вызвать функцию',save:'Сохранить прохождение',load:'Загрузить прохождение'};
 export const GAME_TRIGGERS={start:'Начало игры',hit:'Попадание',death:'Смерть',victory:'Все противники побеждены',pickup:'Получен предмет',enter:'Вход в область',exit:'Выход из области',collision:'Столкновение',timer:'Таймер',tick:'Периодически'};
-export function defaultGameplay(){return {version:1,enabled:false,preset:'quest',playerId:'',controller:{mode:'point-click',speed:3.5,jumpSpeed:5,gravity:16,eyeHeight:1.5,sensitivity:.003,distance:3,fov:70},actors:{},weapons:[],items:[],recipes:[],rules:[],inventory:{slots:12,starting:[],equipment:{}},hudWidgetId:null};}
+export function defaultGameplay(){return {version:1,enabled:false,preset:'quest',playerId:'',controller:{mode:'point-click',speed:3.5,jumpSpeed:5,gravity:16,eyeHeight:1.25,sensitivity:.003,distance:3,fov:70},actors:{},weapons:[],items:[],recipes:[],rules:[],inventory:{slots:12,starting:[],equipment:{}},hudWidgetId:null};}
 export function ensureGameplay(p){p.gameplay??=defaultGameplay();p.functions??=[];return p;}
 export function newWeapon(){return {id:uid('weapon'),name:'Пистолет',mode:'hitscan',damage:25,range:40,magazine:6,reserve:30,cooldown:.3,reloadTime:1,projectileSpeed:20,recoil:.025};}
 export function newItem(){return {id:uid('item'),name:'Новый предмет',stackLimit:10,slot:'',weaponId:'',heal:0,consumable:false,useEventId:'',worldObjectId:''};}
@@ -11,7 +11,7 @@ export function newRule(){return {id:uid('rule'),name:'Новое правило
 export function applyGamePreset(p,preset,playerId){
  ensureGameplay(p);const g=p.gameplay;g.enabled=true;g.preset=preset;g.playerId=playerId;
  g.controller={...defaultGameplay().controller,mode:preset==='quest'?'point-click':preset==='gallery'?'none':'wasd'};
- if(playerId)g.actors[playerId]??={team:'player',maxHP:100};
+ if(playerId)g.actors[playerId]={...g.actors[playerId],team:'player',maxHP:g.actors[playerId]?.maxHP||100,ai:null};
  if(preset!=='quest'&&!g.weapons.length)g.weapons.push(newWeapon());
  p.variables??={};p.variableTypes??={};for(const [id,value,type]of [['hp',100,'number'],['maxHp',100,'number'],['ammo',6,'number'],['reserve',30,'number'],['kills',0,'integer'],['inventory',[],'array']]){if(!Object.hasOwn(p.variables,id))p.variables[id]=value;p.variableTypes[id]??=type;}
  p.input??=defaultInputSettings();
