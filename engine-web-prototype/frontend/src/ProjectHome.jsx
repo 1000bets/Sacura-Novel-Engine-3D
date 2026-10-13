@@ -3,7 +3,8 @@ import {projectFromTemplate} from './projectLifecycle.js';
 import LanguagePicker from './LanguagePicker.jsx';
 import {t as tr, useLocale, localeTag, message} from './i18n.jsx';
 import React,{useEffect,useRef,useState} from 'react';
-import {Flower2,Plus,BookOpen,FolderOpen,ArrowRight,LogOut,Upload} from 'lucide-react';
+import {Flower2,Plus,BookOpen,FolderOpen,ArrowRight,LogOut,Upload,UserPlus} from 'lucide-react';
+import InviteDialog from './InviteDialog.jsx';
 import Editor from './Editor.jsx';
 import ThemePicker from './ThemePicker.jsx';
 import {accountStorage} from './accountStorage.js';
@@ -15,6 +16,7 @@ import './projectHome.css';
 export default function ProjectHome({user=null,onLogout}) {
  useLocale();
  const [active,setActive]=useState(null),[projects,setProjects]=useState([]),[otherProjects,setOtherProjects]=useState([]),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[creating,setCreating]=useState(false),[name,setName]=useState(()=>tr('Новый проект'));
+ const [inviting,setInviting]=useState(false);
  const operation=useRef(false),fileInput=useRef(null),newButton=useRef(null);
  async function refresh(){
   setLoading(true);setError('');
@@ -46,7 +48,7 @@ export default function ProjectHome({user=null,onLogout}) {
  function cancelCreate(){setCreating(false);newButton.current?.focus();}
  if(active)return <Editor key={active.id} initialProject={active} user={user} onLogout={onLogout} onHome={home}/>;
  return <main className="project-home">
-  <header className="project-home-header"><div className="project-home-brand"><Flower2 aria-hidden="true" size={28}/><span>Sacura <small>Novel Studio</small></span></div><div className="project-home-account"><LanguagePicker/><ThemePicker/>{user&&<><span>{user.login}</span><button disabled={busy} onClick={()=>run(()=>onLogout())}><LogOut aria-hidden="true" size={16}/>{tr("Выйти")}</button></>}</div></header>
+  <header className="project-home-header"><div className="project-home-brand"><Flower2 aria-hidden="true" size={28}/><span>Sacura <small>Novel Studio</small></span></div><div className="project-home-account"><LanguagePicker/><ThemePicker/>{user&&<><span>{user.login}</span>{serverStorageEnabled&&<button disabled={busy} onClick={()=>setInviting(true)}><UserPlus aria-hidden="true" size={16}/>{tr("Пригласить пользователя")}</button>}<button disabled={busy} onClick={()=>run(()=>onLogout())}><LogOut aria-hidden="true" size={16}/>{tr("Выйти")}</button></>}</div></header>
   <div className="project-home-content">
    <p className="project-home-eyebrow">{tr("ВАША СЛЕДУЮЩАЯ ИСТОРИЯ")}</p><h1>{tr("С чего начнём?")}</h1><p className="project-home-intro">{tr("Создайте новеллу, квест или FPS в браузере — или продолжите свой проект.")}</p>
    <section className="project-home-actions" aria-label={tr("Начать работу")}>
@@ -65,5 +67,6 @@ export default function ProjectHome({user=null,onLogout}) {
     {loading?<p role="status">{tr("Загрузка проектов…")}</p>:otherProjects.length?<div className="project-home-list">{otherProjects.map(project=><button key={project.ownerId+':'+project.id} disabled={busy} onClick={()=>run(async()=>open(await openServerProject(project.id,project.ownerId)))}><FolderOpen aria-hidden="true" size={20}/><span><strong>{project.title}</strong><small>{tr("Автор: ")}{project.ownerLogin}</small><small>{tr("Сохранён ")}{new Date(project.updatedAt).toLocaleString(localeTag())}</small></span><span className="project-home-open">{tr("Открыть ")}<ArrowRight aria-hidden="true" size={16}/></span></button>)}</div>:<p className="project-home-empty">{tr("У других пользователей пока нет сохранённых проектов.")}</p>}
    </section>}
   </div>
+  {inviting&&<InviteDialog onClose={()=>setInviting(false)}/>}
  </main>;
 }

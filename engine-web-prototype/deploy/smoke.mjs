@@ -16,8 +16,20 @@ if(process.env.SACURA_SMOKE_STATE){
   console.log('Persistence passed: session, SQLite project and S3 mesh survive container restart.');process.exit(0);
  }
 }
-const registration=await fetch(base+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({login:'smoke-'+randomUUID(),password:randomUUID()})});
+const ownerLogin=process.env.SACURA_SMOKE_LOGIN||process.env.APP_USER,ownerPassword=process.env.SACURA_SMOKE_PASSWORD||process.env.APP_PASSWORD;
+assert.ok(ownerLogin&&ownerPassword,'Set SACURA_SMOKE_LOGIN/PASSWORD to an existing account on this isolated deployment.');
+const ownerResponse=await fetch(base+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({login:ownerLogin,password:ownerPassword})});
+assert.equal(ownerResponse.status,200);
+const ownerCookie=ownerResponse.headers.get('set-cookie').split(';')[0];
+assert.equal((await fetch(base+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({login:'blocked',password:'blocked'})})).status,403);
+const invited=await fetch(base+'/api/invites',{method:'POST',headers:{Cookie:ownerCookie}});
+assert.equal(invited.status,201);
+const invite=new URL((await invited.json()).url).searchParams.get('invite');
+const validation=await fetch(base+'/api/invites/validate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({invite})});
+assert.equal(validation.status,200);
+const registration=await fetch(base+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({login:'smoke-'+randomUUID(),password:randomUUID(),invite})});
 assert.equal(registration.status,201);
+assert.equal((await fetch(base+'/api/invites/validate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({invite})})).status,403);
 const cookie=registration.headers.get('set-cookie').split(';')[0];
 const request=(path,options={})=>fetch(base+path,{...options,headers:{Cookie:cookie,...options.headers}});
 assert.equal((await fetch(base+'/api/projects')).status,401);

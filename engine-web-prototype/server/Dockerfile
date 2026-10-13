@@ -3,6 +3,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev && mkdir /data && chown node:node /data
 COPY --chown=node:node *.js ./
+COPY --chown=node:node migrations ./migrations
 USER node
 ENV NODE_ENV=production DB_PATH=/data/projects.sqlite PORT=3000
 EXPOSE 3000
