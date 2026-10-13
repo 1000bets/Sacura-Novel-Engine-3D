@@ -1,0 +1,3 @@
+
+# Deployment scripts must run in Bash on Linux, including from git archive.
+*.sh text eol=lf
