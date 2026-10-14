@@ -4,7 +4,7 @@ import {createGameControls,gameSceneHit} from './GameControls.js';
 import {createScenePhysics} from './scenePhysics.js';
 import {createMeshObject,updateMeshVisual,disposeMeshVisual,applyMaterialAssignments,disposeMaterialAssignments} from './meshVisual.js';
 import {createRendererViewport} from './rendererViewport.js';
-import {updateObjectHighlight} from './sceneEffects.js';
+import {updateObjectHighlight,updateDoorEffect} from './sceneEffects.js';
 import React, { useEffect, useRef } from "react";
 import * as THREE from "three";
 import {updateCharacterVisual,disposeCharacterVisual} from "./characterVisual.js";
@@ -264,11 +264,11 @@ export default function Scene({
       const live = callbacks.current.state;
       gameControls.tick(dt);gameVisuals.update(callbacks.current.state.game);
       animTime=updateAtmosphere(live,dt);
-      pickables.forEach(mesh=>{const o=callbacks.current.objects.find(o=>o.id===mesh.userData.id);if(!o){disposeCharacterVisual(mesh);disposeMeshVisual(mesh);mesh.visible=false;return;}mesh.visible=o.active&&live.visible?.[o.id]!==false&&!(live.game?.active&&live.game.preset==='fps'&&live.playerControl?.characterId===o.id);
+      pickables.forEach(mesh=>{const o=callbacks.current.objects.find(o=>o.id===mesh.userData.id);if(!o){disposeCharacterVisual(mesh);disposeMeshVisual(mesh);mesh.visible=false;return;}mesh.visible=o.active&&live.visible?.[o.id]!==false&&!(live.game?.active&&live.game.camera?.mode==='firstPerson'&&live.game.camera.targetId===o.id);
         gizmo.apply(mesh,o,resolvedPosition(o,live,'living'));
         updateLightObject(mesh,o,callbacks.current.mode==='scene');
         updateMeshVisual(mesh,o);if(o.type!=='Персонаж'&&o.type!=='Источник света'&&!mesh.userData.placeholder)applyMaterialAssignments(mesh,o);
-        if((o.builtin||o.id)==='door'&&callbacks.current.mode==='game'){mesh.userData.openAngle=THREE.MathUtils.damp(mesh.userData.openAngle||0,live.doors?.[o.id]==='Открыть'?-1.25:0,3,live.paused||live.pausedDoors?.[o.id]?0:dt);mesh.rotation.y+=mesh.userData.openAngle;}
+        updateDoorEffect(mesh,live,o.id,dt,callbacks.current.mode==='game');
         if(mesh.userData.marker)mesh.userData.marker.visible=(live.interactionTarget===o.id||live.interactionTargets?.includes(o.id))||live.highlights?.[o.id];
         updateObjectHighlight(mesh,!!live.highlights?.[o.id]||live.interactionTargets?.includes(o.id),animTime);
         updateCharacterVisual(mesh,{...o,walkAnimation:live.motions?.[o.id]?.animationId||o.walkAnimation},dt,live.poses?.[o.id],!!live.motions?.[o.id]&&!live.motions[o.id].stopped&&!live.motions[o.id].paused&&live.motions[o.id].progress<1,live.paused,callbacks.current.mode==='scene'&&callbacks.current.editing);

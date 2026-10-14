@@ -105,3 +105,13 @@ export function atmosphere(scene,{kind,renderer,sun,hemi}){
   return elapsed;
  };
 }
+
+// The door action uses the same native object ID in every scene and renderer.
+// Called after the authored transform is applied, so rotation never accumulates.
+export function updateDoorEffect(mesh,world,id,dt,playing=true) {
+  const target=playing&&world.doors?.[id]==='Открыть'?-1.25:0;
+  const seconds=world.paused||world.pausedDoors?.[id]?0:Math.max(0,Math.min(.1,dt||0));
+  const current=mesh.userData.openAngle||0;
+  mesh.userData.openAngle=playing?current+(target-current)*(1-Math.exp(-3*seconds)):0;
+  mesh.rotation.y+=mesh.userData.openAngle;
+}

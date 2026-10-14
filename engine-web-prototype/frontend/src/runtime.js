@@ -1,4 +1,6 @@
+import {normalizeRule,ruleMatches} from './ruleModel.js';
 import {GameSession} from './GameSession.js';
+import {ownerExists} from './ruleModel.js';
 import {gameSave,restoreGameSave} from './gameSave.js';
 import {inputContextsFor} from './inputModel.js';
 import {audioActionOptions} from './audioTransitions.js';
@@ -57,6 +59,11 @@ export class PreviewRuntime {
     });
   }
   async delay(ms, token, runId) {
+    if(runId&&this.snapshot.instances[runId]?.operationContext?.timeSource==='game'){
+      const deadline=(this.game?.state.clock||0)+ms/1000;
+      while((this.game?.state.clock||0)<deadline||this.snapshot.paused||this.snapshot.instances[runId]?.status==='paused'){this.assert(token,runId);await new Promise(r=>setTimeout(r,5));}
+      this.assert(token,runId);return;
+    }
     let remaining = ms;
     while (
       remaining > 0 ||
@@ -76,6 +83,9 @@ export class PreviewRuntime {
   assert(token, runId) {
     if (token !== this.generation || !this.running)
       throw new Error("CANCELLED");
+    const context=this.snapshot.instances[runId]?.operationContext;
+    if(context?.capabilityOwner&&(!(context.capabilityOwners||[context.capabilityOwner]).every(owner=>ownerExists(this.project,owner,owner.kind==='project'?undefined:context.capabilitySceneId))||context.capabilitySceneId&&context.capabilitySceneId!==this.snapshot.world.location)){this.controlInstance(runId,'stop');throw Error('INSTANCE_STOPPED');}
+    if(runId&&this.snapshot.instances[runId]?.operationContext)this.game?.assertReaction(this.snapshot.instances[runId].operationContext);
     if (runId && this.snapshot.instances[runId]?.status === "stopped")
       throw new Error("INSTANCE_STOPPED");
   }
@@ -117,6 +127,7 @@ export class PreviewRuntime {
     this.audio.unlock?.().catch(()=>{});
     this.stop();
     this.project = structuredClone(project);
+    delete this.project.gameplayMigration;
     this.audio.setAssets?.(projectAudioAssets(project));
     this.setSidechain(project.audioSettings?.sidechain);
     this.running = true;
@@ -136,26 +147,35 @@ export class PreviewRuntime {
       activity: [],audition:false,
       world: { positions: {}, poses: {}, visible: {} },
     };
-    this.game=project.gameplay?.enabled?new GameSession(this):null;
+    this.game=new GameSession(this);delete this.project.gameplayMigration;
     try {
       this.game?.initialize();
-      await this.enter(beatId, token);
+      if(this.project.gameplay.storyPolicy?.mode==='none')await this.enterScene(this.project.subscenes[0].id,token);else await this.enter(beatId, token);
     } catch (e) {
       this.handle(e);
     }
   }
+  // Design preview reads real native initializers. No story entry, signals or
+  // author callbacks are executed, and the isolated session is disposed.
+  initialPreviewContext(project){
+    this.stop();this.project=structuredClone(project);delete this.project.gameplayMigration;
+    this.running=true;this.generation++;this.snapshot={...this.snapshot,audition:true,variables:structuredClone(project.variables),world:{positions:{},poses:{},visible:{}},instances:{},states:{},effects:{}};
+    try{this.game=new GameSession(this);this.game.initialize();this.applyScene(this.project.subscenes[0]);this.game.sync();return structuredClone({variables:this.snapshot.variables,game:this.snapshot.world.game});}
+    finally{this.stop();}
+  }
   async previewEvent(project,eventId,beatId){
     this.audio.unlock?.().catch(()=>{});
     if(!this.running||!this.snapshot.audition||this.snapshot.world.location!==sceneFor(project,beatId).id){
-      this.stop();this.running=true;this.project=structuredClone(project);const scene=sceneFor(project,beatId);
+      this.stop();this.running=true;this.project=structuredClone(project);delete this.project.gameplayMigration;const scene=sceneFor(project,beatId);
       this.snapshot={...this.snapshot,beatId,phase:'EVENT_PREVIEW',audition:true,paused:false,ready:false,textVisible:false,error:null,activity:[],variables:{...project.variables},choiceResults:{},world:{location:scene.id,weather:scene.weather,time:scene.time,camera:'Общий план',cameraId:null,positions:{},poses:{},visible:{},motions:{},stagingPoints:sceneStagingPoints(scene,project.objects)}};
       for(const type of ['weather','time'])this.snapshot.effects[type]={key:type,type,name:scene[type],status:'held',owner:'SubScene',origin:scene.name};
     }else {this.project.events=structuredClone(project.events);}
     this.audio.setAssets?.(projectAudioAssets(project));
     this.setSidechain(project.audioSettings?.sidechain);
+    if(!this.game||this.game.host!==this||this.game.config!==this.project.gameplay){this.game=new GameSession(this);delete this.project.gameplayMigration;this.game.initialize();}
     this.snapshot.auditionName=this.project.events.find(e=>e.id===eventId)?.name;this.snapshot.error=null;this.emit();
     const token=this.generation,b={id:'audition-'+eventId,eventId,hook:'ON_START',join:'FLOW_END',overrides:{},actionOverrides:{}};
-    const candidate=structuredClone(this.project),beat=allBeats(candidate).find(x=>x.id===beatId);beat.bindings=[b];beat.batches={ON_START:[{id:'audition',mode:'SEQUENTIAL',bindingIds:[b.id]}]};
+    const candidate=structuredClone(this.project),beat=allBeats(candidate).find(x=>x.id===beatId);if(beat)beat.bindings=[b];if(beat)beat.batches={ON_START:[{id:'audition',mode:'SEQUENTIAL',bindingIds:[b.id]}]};
     try{const issue=validateStudio(candidate).find(i=>i.level==='error'&&(i.beatId===beatId||i.eventId===eventId));if(issue)throw new Error(issue.title);
       const claims=bindingActions(candidate,b).filter(a=>TYPES[a.type]?.domain).map(a=>a.target+'/'+TYPES[a.type].domain);
       const conflict=Object.values(this.snapshot.instances).find(i=>['running','paused'].includes(i.status)&&this.project.events.find(e=>e.id===i.eventId)?.groups.some(g=>g.actions.some(a=>claims.includes(a.target+'/'+TYPES[a.type]?.domain))));
@@ -163,8 +183,10 @@ export class PreviewRuntime {
       await this.binding(b,token);}catch(e){this.handle(e);}
   }
   stop() {
+    this.game?.dispose();
     this.resetInputValues();
     this.generation++;
+    this.eventFlows=new Map();
     this.running = false;
     this.audio.stopAll();
     this.playerDestination=null;
@@ -185,6 +207,7 @@ export class PreviewRuntime {
   }
   handle(e) {
     if (["CANCELLED", "INSTANCE_STOPPED"].includes(e.message)) return;
+    this.game?.dispose();
     this.generation++;
     this.audio.stopAll();
     for (const id of Object.keys(this.snapshot.states))
@@ -197,16 +220,9 @@ export class PreviewRuntime {
     this.snapshot.ready = false;
     this.emit();
   }
-  async enter(id, token, automaticDepth=0) {
-    if(automaticDepth>100)throw new Error("Проверки образовали бесконечный цикл. Подключите выход к реплике или концовке.");
-    this.assert(token);
-    for(const instance of Object.values(this.snapshot.instances||{}))if(instance.bindingId?.startsWith('input:')&&instance.beatId!==id&&['running','paused'].includes(instance.status)){instance.status='stopped';this.closeEventAudio(instance);instance.audioKeys.forEach(key=>{if(this.ownsAudio(key,instance.id))this.audio.stop(key);});}
-    const b = allBeats(this.project).find((b) => b.id === id);
-    if (!b) throw new Error("Реплика назначения удалена");
-    const scene = sceneFor(this.project, id),
-      old = this.snapshot.world.location;
-    const dialogueIndex=scene.id===old?(this.snapshot.world.dialogue?.index??-1)+1:0;
-    if (scene.id !== old) {
+  applyScene(scene){
+    if (scene.id !== this.snapshot.world.location) {
+      this.game?.ruleRuntime.sceneChanged(scene.id);
       for (const i of Object.values(this.snapshot.instances || {}))
         if (i.owner === "SubScene" && i.sceneId !== scene.id) {
           i.audioKeys.forEach((k) => {if(this.ownsAudio(k,i.id))this.audio.stop(k);});
@@ -243,10 +259,23 @@ export class PreviewRuntime {
           status: "held",
           owner: "SubScene",
           origin: scene.name,
-          beatId: id,
+          beatId: null,
           type: key,
         };
     }
+    this.snapshot.world.stagingPoints=sceneStagingPoints(scene,this.project.objects);this.playerDestination=null;this.game?.cleanupOwners();
+  }
+  async enterScene(sceneId,token=this.generation){this.assert(token);const errors=validateStudio(this.project).filter(i=>i.id?.startsWith('capability-')&&i.level==='error');if(errors.length)throw Error(errors.map(i=>i.detail||i.title).join(' · '));const scene=this.project.subscenes.find(s=>s.id===sceneId);if(!scene)throw Error('Сцена удалена.');this.applyScene(scene);this.snapshot.beatId=null;this.snapshot.phase='PLAYING';this.snapshot.ready=true;this.snapshot.textVisible=false;this.snapshot.interacted=[];this.game.enter();this.emit();}
+  async enter(id, token, automaticDepth=0) {
+    if(automaticDepth>100)throw new Error("Проверки образовали бесконечный цикл. Подключите выход к реплике или концовке.");
+    this.assert(token);
+    for(const instance of Object.values(this.snapshot.instances||{}))if(instance.bindingId?.startsWith('input:')&&!instance.operationContext?.reactionId&&instance.beatId!==id&&['running','paused'].includes(instance.status)){instance.status='stopped';this.closeEventAudio(instance);instance.audioKeys.forEach(key=>{if(this.ownsAudio(key,instance.id))this.audio.stop(key);});}
+    const b = allBeats(this.project).find((b) => b.id === id);
+    if (!b) throw new Error("Реплика назначения удалена");
+    const scene = sceneFor(this.project, id),
+      old = this.snapshot.world.location;
+    const dialogueIndex=scene.id===old?(this.snapshot.world.dialogue?.index??-1)+1:0;
+    this.applyScene(scene);
     this.snapshot.world.stagingPoints=sceneStagingPoints(scene,this.project.objects);
     this.playerDestination=null;
     this.snapshot.world.playerControl=null;
@@ -263,7 +292,7 @@ export class PreviewRuntime {
     this.snapshot.phase = "BEFORE";
     this.emit();
     const errors = validateStudio(this.project).filter(
-      (i) => (i.beatId === id || (!i.beatId && ['input-','game-','function-','widget-'].some(prefix=>i.id?.startsWith(prefix)))) && i.level === "error",
+      (i) => (i.beatId === id || (!i.beatId && ['input-','game-','function-','widget-','capability-'].some(prefix=>i.id?.startsWith(prefix)))) && i.level === "error",
     );
     if (errors.length) throw new Error(`Реплика «${id}»: `+errors.map((i) => i.title).join(" · "));
     await this.phase(b, "BEFORE", token);
@@ -297,7 +326,7 @@ export class PreviewRuntime {
     this.snapshot.gateElapsed = 0;
     const controls=playerControls(b);
     if(b.kind==='gate'&&controls.characterId&&controls.mode!=='none')this.snapshot.world.playerControl=controls;
-    if(this.game){this.game.state.active=b.kind==='gameplay';if(b.kind==='gameplay')this.game.enter();}
+    if(this.game){this.game.state.active=b.kind==='gameplay'||(this.game.config.storyPolicy?.mechanics||this.game.config.activation)==='continuous'&&(b.kind!=='end'||this.game.config.storyPolicy?.ending==='continue');if(this.game.state.active)this.game.enter();}
     if(b.kind==='choice')this.snapshot.inputChoiceId=b.choices.find(c=>conditionPass(c,this.snapshot.variables,this.project,this.snapshot.choiceResults))?.id||null;
     this.emit();
     if (b.kind === "gate") {
@@ -336,6 +365,7 @@ export class PreviewRuntime {
             ...definition,
             originScene: this.snapshot.world.location,
             originBeat: this.snapshot.beatId,
+            operationContext: binding.operationContext||{},
             originShotKey: token+':'+this.snapshot.history.length,
           }
         : null;
@@ -362,6 +392,7 @@ export class PreviewRuntime {
       owner: event.owner,
       status: "running",
       audioKeys: [],
+      operationContext:event.operationContext,
     };
     this.snapshot.states[binding.id] = "running";
     this.emit();
@@ -384,6 +415,7 @@ export class PreviewRuntime {
         this.snapshot.states[binding.id];
       this.emit();
     })().catch((e) => {
+      if(token!==this.generation)throw Error('CANCELLED');
       if (e.message === "INSTANCE_STOPPED") {
         this.snapshot.states[binding.id] = "stopped";
         for (const a of bindingActions(this.project, binding))
@@ -394,8 +426,10 @@ export class PreviewRuntime {
       }
       throw e;
     });
+    this.eventFlows??=new Map();this.eventFlows.set(event.runId,work);
+    work.then(()=>this.eventFlows.delete(event.runId),()=>this.eventFlows.delete(event.runId));
     if (["NONE", "STARTED"].includes(binding.join)) {
-      work.catch((e) => this.handle(e));
+      work.catch((e) => {if(token===this.generation)this.handle(e);});
       return;
     }
     await work;
@@ -410,14 +444,14 @@ export class PreviewRuntime {
   }
   async action(a, event, binding, token) {
     this.assert(token, event.runId);
-    await this.delay(1, token, event.runId);
+    await this.delay(event.operationContext?.timeSource==='game'?0:1, token, event.runId);
     if (
       event.owner === "SubScene" &&
       event.originScene !== this.snapshot.world.location
     )
       throw new Error("CANCELLED");
     this.snapshot.states[a.id] = "running";
-    const activity={id:event.runId+':'+a.id,runId:event.runId,actionId:a.id,type:a.type,target:a.target,value:a.value,name:event.name,status:'running',progress:0};
+    const activity={id:event.runId+':'+a.id,runId:event.runId,actionId:a.id,type:a.type,command:a.command,operationVersion:a.operationVersion,target:a.target,value:a.value,name:event.name,status:'running',progress:0};
     this.snapshot.activity=[...(this.snapshot.activity||[]).slice(-11),activity];
     this.emit();
     const world = this.snapshot.world;
@@ -555,7 +589,7 @@ export class PreviewRuntime {
             ...audioActionOptions(a),
           });
           if(this.audio.get(key))this.audio.get(key).runId=event.runId;
-          if(a.endMode==='event'){await this.audio.get(key)?.started;done.catch(e=>this.handle(e));}else await done;
+          if(a.endMode==='event'){await this.audio.get(key)?.started;done.catch(e=>{if(token===this.generation)this.handle(e);});}else await done;
           this.assert(token, event.runId);
           if (this.audio.get(key)?.error)
             throw new Error(this.audio.get(key).error);
@@ -584,8 +618,8 @@ export class PreviewRuntime {
         break;
       }
       case 'gameplay':
-        if(!this.game)throw new Error('Включите игровые механики проекта.');
-        await this.game.command(a.command,{...a.value,...(a.target!=='world'?{target:a.target}:{})});break;
+        if(!this.game)throw new Error('Запустите проект для выполнения механики.');
+        await this.game.command(a.command,a.command?.includes('.')?a.value:{...a.value,...(a.target!=='world'?{target:a.target}:{})},{scope:event.operationContext.scope|| (event.owner==='GameSession'?{kind:'project',id:this.project.id}:{kind:'scene',id:event.originScene}),...event.operationContext,nativeRunId:event.runId,kind:'event',version:a.operationVersion??1});break;
       case "visibility":
         world.visible = { ...world.visible, [a.target]: a.value !== "Скрыть" };
         break;
@@ -612,9 +646,17 @@ export class PreviewRuntime {
     activity.status=this.snapshot.states[a.id];activity.progress=1;
     this.emit();
   }
-  saveGame(){const storage=this.storage||globalThis.localStorage;if(!storage)throw new Error('Хранилище сохранений недоступно.');storage.setItem('sacura-save:'+this.project.id,JSON.stringify(gameSave(this)));this.snapshot.hint='Прохождение сохранено';this.emit();}
-  async loadGame(){const storage=this.storage||globalThis.localStorage,raw=storage?.getItem('sacura-save:'+this.project.id);if(!raw)throw new Error('Сохранение ещё не создано.');await restoreGameSave(this,JSON.parse(raw));this.snapshot.hint='Прохождение загружено';this.emit();}
-  async uiAction(action,element={}){try{if(action==='event'&&element.eventId)await this.binding({id:'input:widget:'+element.id,eventId:element.eventId,join:'FLOW_END',overrides:{},actionOverrides:{}},this.generation);else if(action==='save')this.saveGame();else if(action==='load')await this.loadGame();else if(action==='gameplay'&&this.game)await this.game.command(element.command,element.value||{});await this.game?.flushTransition();this.emit();}catch(e){this.snapshot.hint=e.message;this.emit();}}
+  async waitReactionWork(reactionId){const ids=Object.values(this.snapshot.instances).filter(i=>i.operationContext?.reactionId===reactionId).map(i=>i.id);await Promise.all(ids.map(id=>this.eventFlows?.get(id)).filter(Boolean));}
+  saveGame(){const saved=gameSave(this),storage=this.storage||globalThis.localStorage;if(!storage)throw new Error('Хранилище сохранений недоступно.');storage.setItem('sacura-save:'+this.project.id,JSON.stringify(saved));this.snapshot.hint='Прохождение сохранено';this.emit();}
+  async loadGame(project=this.project){if(!project)throw Error('Выберите проект для загрузки сохранения.');const storage=this.storage||globalThis.localStorage,raw=storage?.getItem('sacura-save:'+project.id);if(!raw)throw new Error('Сохранение ещё не создано.');await restoreGameSave(this,JSON.parse(raw),project);this.emit();}
+  async uiAction(action,element={},sourceProject){const token=this.generation;const widget=this.project?.widgets?.find(w=>w.elements?.some(e=>e.id===element.id)),context={kind:'widget',version:element.operationVersion??1,...(widget?{source:{type:'widget',id:widget.id,elementId:element.id}}:{})};try{
+    if(action==='event'&&element.eventId)await this.binding({id:'input:widget:'+element.id,eventId:element.eventId,join:'FLOW_END',overrides:{},actionOverrides:{},operationContext:context},token);
+    else if(action==='advance')await this.advance();else if(action==='resume'&&this.snapshot.paused)this.togglePause();else if(action==='save')this.saveGame();else if(action==='load')await this.loadGame(sourceProject);else if(action==='gameplay'&&this.game)await this.game.command(element.command,element.value||{},context);
+    if(token!==this.generation||!this.running)return;
+    if(element.id)await this.game?.trigger('button',{elementId:element.id,action},undefined,context);
+    if(token!==this.generation||!this.running)return;await this.game?.flushTransition();this.emit();
+   }catch(e){if(token===this.generation&&!['CANCELLED','INSTANCE_STOPPED'].includes(e.message)){this.snapshot.hint=e.message;this.emit();}}}
+
   writeInputValue(action,value){
     this.snapshot.inputValues??={};const changed=JSON.stringify(this.snapshot.inputValues[action.id])!==JSON.stringify(value);this.snapshot.inputValues[action.id]=value;
     const outputs=action.valueType==='axis2d'?[[action.variableX,value?.[0]||0],[action.variableY,value?.[1]||0]]:[[action.variable,action.valueType==='boolean'?Boolean(value):value||0]];
@@ -626,6 +668,7 @@ export class PreviewRuntime {
     this.snapshot.inputValues={};
   }
   async inputAction({actionId,phase,value,payload,device}){
+    const inputGeneration=this.generation;
     if(!this.running||this.snapshot.audition)return;
     const action=this.project.input?.actions.find(a=>a.id===actionId);if(!action)return;
     if(['completed','canceled'].includes(phase)){this.writeInputValue(action,action.valueType==='axis2d'?[0,0]:0);this.snapshot.lastInput={actionId,name:action.name,phase,value,device};this.emit();return;}
@@ -636,12 +679,15 @@ export class PreviewRuntime {
     this.snapshot.lastInput={actionId,name:action.name,phase,value,device};
     if(changed||phase==='started')this.emit();
     if(phase!=='triggered')return;
+    if(action.trigger!=='continuous')this.game?.post('input',{actionId,phase,value:value??0,...(device?{device}:{})},undefined,{source:{type:'inputAction',id:actionId}});
+    if(!this.running)return;
+    if(action.behavior==='operation'){if(this.snapshot.paused||!this.snapshot.ready)return;try{const m=this.project.gameplay.mechanics.find(m=>m.id===action.mechanicId);if(action.mechanicId&&!m)return;await this.game.execute(action.operation,{kind:'event',scope:m?.scope||action.scope||{kind:'project',id:this.project.id},mechanicInstanceId:m?.definitionId?m.id:undefined,source:{type:'inputAction',id:action.id},args:{value:value??0,payload:payload||{},device:device||'axis'}});if(inputGeneration!==this.generation)return;await this.game.flushTransition();this.emit();}catch(e){if(inputGeneration===this.generation)this.game.error(e);}return;}
     if(action.behavior==='pause'){this.togglePause();return;}
     if(this.snapshot.paused||!this.snapshot.ready)return;
-    if(this.game&&['shoot','reload','jump','look','saveGame','loadGame'].includes(action.behavior)){try{if(action.behavior==='look')this.game.look(payload?.delta||value,device);else await this.game.command(({shoot:'shoot',saveGame:'save',loadGame:'load'})[action.behavior]||action.behavior,payload||{});await this.game.flushTransition();this.emit();}catch(e){this.game.error(e);}return;}
+    if(this.game&&['shoot','reload','jump','look','saveGame','loadGame'].includes(action.behavior)){try{if(action.behavior==='look')this.game.look(payload?.delta||value,device);else await this.game.command(({shoot:'shoot',saveGame:'save',loadGame:'load'})[action.behavior]||action.behavior,payload||{});if(inputGeneration!==this.generation)return;await this.game.flushTransition();this.emit();}catch(e){this.game.error(e);}return;}
     if(action.behavior==='move')return; // The scene adapter converts 2D input to camera-relative movement.
     if(action.behavior==='interact'){if(this.snapshot.world.playerControl)this.playerInteract();else await this.advance(null,interactionTargets(beat).find(id=>!this.snapshot.interacted?.includes(id)));return;}
-    if(action.behavior==='point'){if(this.snapshot.world.playerControl)this.playerClick(payload?.point,payload?.id);else await this.advance(null,payload?.id);return;}
+    if(action.behavior==='point'){if(this.game?.state.active&&payload?.id&&(this.game.config.items.some(i=>i.worldObjectId===payload.id)||this.hasInteraction(payload.id))){this.playerClick(payload.point,payload.id);return;}if(this.snapshot.world.playerControl)this.playerClick(payload?.point,payload?.id);else await this.advance(null,payload?.id);return;}
     if(action.behavior==='advance'){
       const choices=beat?.choices?.filter(c=>conditionPass(c,this.snapshot.variables,this.project,this.snapshot.choiceResults));
       await this.advance(beat?.kind==='choice'?(this.snapshot.inputChoiceId||choices?.[0]?.id):undefined);return;
@@ -664,7 +710,11 @@ export class PreviewRuntime {
     if(!object||object.active===false||!isObjectInScene(object,scene)||this.snapshot.world.visible?.[object.id]===false)return null;
     return {control,scene,object,world:this.snapshot.world,beat:allBeats(this.project).find(b=>b.id===this.snapshot.beatId)};
   }
+  hasInteraction(id){return !!this.game&&this.game.rules.some(r=>ruleMatches(this.project,normalizeRule(this.project,r),{type:'interact',payload:{objectId:id},context:{target:{type:'object',id},sceneId:this.game.scene.id}}));}
   playerClick(point,id){
+    if(!this.running||this.snapshot.paused||this.game&&!this.game.controlAllowed)return;
+    if(this.game?.state.active&&id){const pickup=this.game.interact(id),hasRule=this.hasInteraction(id);if(hasRule)this.game.post('interact',{objectId:id});if(pickup||hasRule)return;}
+    if(this.game?.state.active&&this.game.controlledId&&point&&['point-click','both'].includes(this.game.config.controller.mode)){this.game.setDestination(point);return;}
     if(this.snapshot.phase==='PLAYING'&&this.game){if(id&&this.game.interact(id))return;if(point&&['point-click','both'].includes(this.game.config.controller.mode))this.game.setDestination(point);return;}
     const context=this.playerContext();if(!context)return;
     const {control,world,scene,object,beat}=context;
@@ -685,7 +735,7 @@ export class PreviewRuntime {
     }catch(e){this.snapshot.hint=e.message;this.emit();}
   }
   playerInteract(){
-    if(this.snapshot.phase==='PLAYING'&&this.game){const p=this.game.position(this.game.config.playerId),nearest=this.game.config.items.map(i=>i.worldObjectId).filter(id=>this.game.position(id)&&this.game.world.visible[id]!==false).sort((a,b)=>Math.hypot(...this.game.position(a).map((v,i)=>v-p[i]))-Math.hypot(...this.game.position(b).map((v,i)=>v-p[i])));if(nearest[0])this.game.interact(nearest[0]);return;}
+    if(this.snapshot.phase==='PLAYING'&&this.game){const p=this.game.position(this.game.controlledId);if(!p)return;const nearest=this.game.config.items.map(i=>i.worldObjectId).filter(id=>this.game.position(id)&&this.game.world.visible[id]!==false).sort((a,b)=>Math.hypot(...this.game.position(a).map((v,i)=>v-p[i]))-Math.hypot(...this.game.position(b).map((v,i)=>v-p[i])));if(nearest[0])this.game.interact(nearest[0]);return;}
     const c=this.playerContext();if(!c)return;const from=resolvedPosition(c.object,c.world,c.scene.kind);
     const nearest=interactionTargets(c.beat).filter(id=>!this.snapshot.interacted.includes(id)).map(id=>this.project.objects.find(o=>o.id===id)).filter(o=>o&&o.active!==false&&c.world.visible?.[o.id]!==false).map(o=>({o,p:resolvedPosition(o,c.world,c.scene.kind)})).sort((a,b)=>Math.hypot(a.p[0]-from[0],a.p[2]-from[2])-Math.hypot(b.p[0]-from[0],b.p[2]-from[2]));
     if(nearest[0]){
@@ -694,7 +744,7 @@ export class PreviewRuntime {
     }
   }
   playerStep(direction,dt){
-    if(this.game&&this.snapshot.phase==='PLAYING'){this.game.step(direction,dt);return;}
+    if(this.game?.state){if(this.game.state.active&&(this.snapshot.phase==='PLAYING'||(this.game.config.storyPolicy?.mechanics||this.game.config.activation)==='continuous'&&this.game.controlledId&&this.game.config.controller.mode!=='none')){this.game.step(direction,dt);return;}this.game.tick(dt);}
     const c=this.playerContext();if(!c)return;const {object,world,scene,control}=c,from=resolvedPosition(object,world,scene.kind),manual=direction.some(v=>Math.abs(v)>.001);
     if(manual)this.playerDestination=null;
     const route=this.playerDestination;let to=from;
@@ -798,6 +848,7 @@ export class PreviewRuntime {
         .filter((t) => ['playing','loading'].includes(t.status));
       this.pausedAudio.forEach((t) => this.audio.pause(t.key));
     } else this.pausedAudio?.forEach((t) => {if(this.audio.get(t.key)===t&&t.status==='paused')this.audio.resume(t.key);});
+    if(!this.snapshot.paused)this.game?.ruleRuntime.resume();
     this.emit();
   }
   controlInstance(id, command) {

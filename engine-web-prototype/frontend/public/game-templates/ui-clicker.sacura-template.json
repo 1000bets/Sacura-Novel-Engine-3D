@@ -1,0 +1,2071 @@
+{
+  "format": "sacura-authoring-package",
+  "formatVersion": 2,
+  "metadata": {
+    "id": "sacura.template.ui-clicker",
+    "version": "1.0.0",
+    "name": "Монеты",
+    "description": "Редактируемый пример на общих возможностях Sacura.",
+    "author": "Sacura contributors",
+    "license": "MIT",
+    "sources": []
+  },
+  "compatibility": {
+    "projectSchemaVersion": 2,
+    "requiredCapabilities": [
+      {
+        "id": "capability.sacura.resource",
+        "version": 1
+      },
+      {
+        "id": "action.variable",
+        "version": 1
+      },
+      {
+        "id": "action.move",
+        "version": 1
+      },
+      {
+        "id": "action.pose",
+        "version": 1
+      },
+      {
+        "id": "action.camera",
+        "version": 1
+      },
+      {
+        "id": "action.time",
+        "version": 1
+      },
+      {
+        "id": "action.lighting",
+        "version": 1
+      },
+      {
+        "id": "action.visibility",
+        "version": 1
+      },
+      {
+        "id": "operation.sacura.resource.add",
+        "version": 1
+      },
+      {
+        "id": "function.graph",
+        "version": 1
+      },
+      {
+        "id": "mechanic.rules",
+        "version": 1
+      },
+      {
+        "id": "operation.sacura.signal.emit",
+        "version": 1
+      },
+      {
+        "id": "operation.sacura.variable.set",
+        "version": 1
+      }
+    ],
+    "requiredEngineModules": []
+  },
+  "roots": {
+    "kind": "template",
+    "entries": [
+      "/content/gameplay"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  "inputs": [],
+  "content": {
+    "gameplay": {
+      "version": 2,
+      "capabilitySchemaVersion": 1,
+      "resources": [
+        {
+          "id": "coins",
+          "name": "Монеты",
+          "owner": {
+            "kind": "project",
+            "id": null
+          },
+          "type": "integer",
+          "initial": 0
+        }
+      ],
+      "inventories": [],
+      "movements": [],
+      "stateBindings": [
+        {
+          "id": "sample-binding-coins",
+          "variable": {
+            "kind": "reference",
+            "type": "variable",
+            "mode": "direct",
+            "id": "sample-variable-coins"
+          },
+          "source": "capability",
+          "capability": "sacura.resource",
+          "owner": {
+            "kind": "reference",
+            "type": "project",
+            "mode": "direct",
+            "id": "package-project"
+          },
+          "field": "value",
+          "valueType": "integer",
+          "recordId": "coins"
+        }
+      ],
+      "mechanicSchemaVersion": 1,
+      "mechanicDefinitions": [
+        {
+          "id": "sample.mechanic.reward",
+          "version": 1,
+          "scopes": [
+            "project",
+            "scene",
+            "object"
+          ],
+          "when": "sample.signal.reward",
+          "stateSchema": {
+            "type": "object",
+            "properties": {}
+          },
+          "initialState": {},
+          "requirements": [],
+          "name": "Награда за действие",
+          "description": "Один сигнал увеличивает выбранный счётчик. Подходит для отношения, очков, монет.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "owner": {
+                "type": "union",
+                "label": "Владелец счётчика",
+                "variants": [
+                  {
+                    "type": "reference",
+                    "referenceType": "project",
+                    "label": "Проект"
+                  },
+                  {
+                    "type": "reference",
+                    "referenceType": "scene",
+                    "label": "Сцена"
+                  },
+                  {
+                    "type": "reference",
+                    "referenceType": "object",
+                    "label": "Объект"
+                  }
+                ]
+              },
+              "counter": {
+                "type": "reference",
+                "referenceType": "resource",
+                "label": "Счётчик"
+              },
+              "amount": {
+                "type": "integer",
+                "label": "Награда",
+                "default": 1
+              }
+            }
+          },
+          "exposed": [
+            "owner",
+            "counter",
+            "amount"
+          ],
+          "logic": {
+            "functionId": "sample-reward-function"
+          },
+          "rules": [
+            {
+              "id": "reward",
+              "name": "Новая реакция",
+              "version": 1,
+              "enabled": true,
+              "signal": {
+                "type": "sample.signal.reward"
+              },
+              "filter": {},
+              "condition": null,
+              "actions": [
+                {
+                  "kind": "function",
+                  "functionId": "sample-reward-function",
+                  "args": {
+                    "owner": {
+                      "op": "get",
+                      "path": "args.owner"
+                    },
+                    "counter": {
+                      "op": "get",
+                      "path": "args.counter"
+                    },
+                    "amount": {
+                      "op": "get",
+                      "path": "args.amount"
+                    }
+                  }
+                }
+              ],
+              "otherwise": [],
+              "once": false,
+              "cooldown": 0,
+              "reentry": "queue",
+              "maxConcurrent": 1,
+              "maxQueued": 16
+            }
+          ]
+        }
+      ],
+      "signals": [
+        {
+          "id": "sample.signal.reward",
+          "version": 1,
+          "name": "Получена награда",
+          "payloadSchema": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string",
+                "optional": true
+              }
+            }
+          }
+        }
+      ],
+      "variableBindings": [
+        {
+          "id": "sample-variable-coins",
+          "key": "coins"
+        },
+        {
+          "id": "sample-variable-rate",
+          "key": "rate"
+        }
+      ],
+      "enabled": true,
+      "activation": "continuous",
+      "camera": {
+        "mode": "authored",
+        "targetId": "",
+        "pointerLock": false,
+        "crosshair": false
+      },
+      "mechanics": [
+        {
+          "id": "sample-resource-coins",
+          "type": "resource",
+          "recordId": "coins",
+          "scope": {
+            "kind": "project",
+            "id": null
+          }
+        },
+        {
+          "id": "sample-reward-coins",
+          "type": "definition",
+          "definitionId": "sample.mechanic.reward",
+          "definitionVersion": 1,
+          "scope": {
+            "kind": "project",
+            "id": null
+          },
+          "values": {
+            "amount": 1,
+            "owner": {
+              "kind": "reference",
+              "type": "project",
+              "mode": "direct",
+              "id": "package-project"
+            },
+            "counter": {
+              "kind": "reference",
+              "type": "resource",
+              "mode": "direct",
+              "id": "coins"
+            }
+          }
+        },
+        {
+          "id": "sample-rule-click-reward",
+          "type": "rule",
+          "name": "Кнопка → награда",
+          "scope": {
+            "kind": "project",
+            "id": null
+          },
+          "ruleId": "click-reward"
+        },
+        {
+          "id": "sample-rule-upgrade-rate",
+          "type": "rule",
+          "name": "Улучшение → быстрее получать монеты",
+          "scope": {
+            "kind": "project",
+            "id": null
+          },
+          "ruleId": "upgrade-rate"
+        },
+        {
+          "id": "sample-rule-automatic-coins",
+          "type": "rule",
+          "name": "Каждую секунду → монеты с выбранной скоростью",
+          "scope": {
+            "kind": "project",
+            "id": null
+          },
+          "ruleId": "automatic-coins"
+        }
+      ],
+      "playerId": "",
+      "controller": {
+        "ownerId": "",
+        "mode": "none",
+        "speed": 3.5,
+        "jumpSpeed": 5,
+        "gravity": 16,
+        "eyeHeight": 1.25,
+        "sensitivity": 0.003,
+        "distance": 3,
+        "fov": 70
+      },
+      "actors": {},
+      "weapons": [],
+      "items": [],
+      "recipes": [],
+      "rules": [
+        {
+          "id": "click-reward",
+          "name": "Кнопка → награда",
+          "version": 1,
+          "enabled": true,
+          "signal": {
+            "type": "button"
+          },
+          "scope": {
+            "kind": "project",
+            "id": null
+          },
+          "filter": {
+            "source": {
+              "kind": "reference",
+              "type": "widget",
+              "mode": "direct",
+              "id": "clicker-controls",
+              "elementId": "coin-button"
+            }
+          },
+          "condition": null,
+          "actions": [
+            {
+              "kind": "operation",
+              "call": {
+                "id": "sacura.signal.emit",
+                "version": 1,
+                "parameters": {
+                  "signal": {
+                    "kind": "reference",
+                    "type": "signal",
+                    "mode": "direct",
+                    "id": "sample.signal.reward"
+                  },
+                  "payload": {
+                    "reason": "Нажата кнопка"
+                  }
+                }
+              }
+            }
+          ],
+          "otherwise": [],
+          "once": false,
+          "cooldown": 0,
+          "reentry": "queue",
+          "maxConcurrent": 1,
+          "maxQueued": 16
+        },
+        {
+          "id": "upgrade-rate",
+          "name": "Улучшение → быстрее получать монеты",
+          "version": 1,
+          "enabled": true,
+          "signal": {
+            "type": "button"
+          },
+          "scope": {
+            "kind": "project",
+            "id": null
+          },
+          "filter": {
+            "source": {
+              "kind": "reference",
+              "type": "widget",
+              "mode": "direct",
+              "id": "clicker-controls",
+              "elementId": "upgrade-button"
+            }
+          },
+          "condition": null,
+          "actions": [
+            {
+              "kind": "operation",
+              "call": {
+                "id": "sacura.variable.set",
+                "version": 1,
+                "parameters": {
+                  "variable": {
+                    "kind": "reference",
+                    "type": "variable",
+                    "mode": "direct",
+                    "id": "sample-variable-rate"
+                  },
+                  "value": {
+                    "op": "add",
+                    "a": {
+                      "op": "get",
+                      "path": "global.rate"
+                    },
+                    "b": 1
+                  }
+                }
+              }
+            }
+          ],
+          "otherwise": [],
+          "once": false,
+          "cooldown": 0,
+          "reentry": "queue",
+          "maxConcurrent": 1,
+          "maxQueued": 16
+        },
+        {
+          "id": "automatic-coins",
+          "name": "Каждую секунду → монеты с выбранной скоростью",
+          "version": 1,
+          "enabled": true,
+          "signal": {
+            "type": "tick"
+          },
+          "scope": {
+            "kind": "project",
+            "id": null
+          },
+          "filter": {},
+          "condition": null,
+          "actions": [
+            {
+              "kind": "operation",
+              "call": {
+                "id": "sacura.resource.add",
+                "version": 1,
+                "parameters": {
+                  "owner": {
+                    "kind": "reference",
+                    "type": "project",
+                    "mode": "direct",
+                    "id": "package-project"
+                  },
+                  "resource": {
+                    "kind": "reference",
+                    "type": "resource",
+                    "mode": "direct",
+                    "id": "coins"
+                  },
+                  "amount": {
+                    "op": "get",
+                    "path": "global.rate"
+                  }
+                }
+              }
+            }
+          ],
+          "otherwise": [],
+          "once": false,
+          "cooldown": 0,
+          "reentry": "queue",
+          "maxConcurrent": 1,
+          "maxQueued": 16,
+          "seconds": 1,
+          "repeat": true
+        }
+      ],
+      "inventory": {
+        "slots": 12,
+        "starting": [],
+        "equipment": {},
+        "owner": {
+          "kind": "project",
+          "id": null
+        },
+        "enabled": false
+      },
+      "hudWidgetId": "clicker-controls",
+      "cameraSettings": {
+        "eyeHeight": 1.25,
+        "sensitivity": 0.003,
+        "distance": 3,
+        "fov": 70
+      },
+      "storyPolicy": {
+        "mode": "none",
+        "mechanics": "continuous",
+        "dialogueControl": "allow",
+        "ending": "continue"
+      }
+    },
+    "version": 2,
+    "visualExamplesVersion": 1,
+    "sceneEditingVersion": 2,
+    "standardEventsVersion": 1,
+    "events": [
+      {
+        "id": "event-b5b9e36a-09b4-4544-8370-91b7ba235afb",
+        "name": "Подойти с анимацией",
+        "description": "",
+        "retention": "AUTO_CLOSE_ON_FLOW_END",
+        "owner": "SubScene",
+        "groups": [
+          {
+            "id": "group-272610ff-7f22-4175-afea-213f520f8f52",
+            "name": "Подойти",
+            "actions": [
+              {
+                "id": "action-59ef1305-69e2-4977-9eed-cdf2b9dc6827",
+                "type": "move",
+                "target": "",
+                "value": [
+                  0,
+                  0,
+                  0
+                ],
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "footstepAssetId": "",
+                "footstepVolume": 1,
+                "duration": 2,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние",
+                "animationId": "ходит"
+              }
+            ]
+          }
+        ],
+        "standardPreset": true
+      },
+      {
+        "id": "event-7bcbebdf-db98-4002-9ad3-8ccce69acdb1",
+        "name": "Подойти и сесть",
+        "description": "",
+        "retention": "AUTO_CLOSE_ON_FLOW_END",
+        "owner": "SubScene",
+        "groups": [
+          {
+            "id": "group-c1e0ee47-9625-4fd3-b3ce-f2db8d2be682",
+            "name": "Подойти к месту",
+            "actions": [
+              {
+                "id": "action-8d250d16-9870-4c22-b413-e35ae41254d7",
+                "type": "move",
+                "target": "",
+                "value": [
+                  0,
+                  0,
+                  0
+                ],
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "footstepAssetId": "",
+                "footstepVolume": 1,
+                "duration": 2,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние",
+                "animationId": "ходит"
+              }
+            ]
+          },
+          {
+            "id": "group-fecb0f7d-d5e8-491c-8291-4e1b534fdaa5",
+            "name": "Сесть",
+            "actions": [
+              {
+                "id": "action-261fd1ee-3817-458e-80ce-cc5e380faddf",
+                "type": "pose",
+                "target": "",
+                "value": "сидит",
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "duration": 2,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние"
+              }
+            ]
+          }
+        ],
+        "standardPreset": true
+      },
+      {
+        "id": "event-61613968-c9b4-4cb0-b8b7-2c7483e44337",
+        "name": "Приветствие крупным планом",
+        "description": "",
+        "retention": "AUTO_CLOSE_ON_FLOW_END",
+        "owner": "SubScene",
+        "groups": [
+          {
+            "id": "group-e14c7f10-797c-4949-9fe2-f21a6a879ac4",
+            "name": "Приветствие",
+            "actions": [
+              {
+                "id": "action-c6bef859-4d5b-4425-bff6-c040ee5da582",
+                "type": "pose",
+                "target": "",
+                "value": "машет",
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "duration": 2,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние"
+              },
+              {
+                "id": "action-3cb2e77d-068b-4784-b399-119bcb8e33af",
+                "type": "camera",
+                "target": "camera",
+                "value": "Крупный план",
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "REPLACE_CURRENT",
+                "duration": 2,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние"
+              }
+            ]
+          }
+        ],
+        "standardPreset": true
+      },
+      {
+        "id": "event-2ca8b687-4671-444b-9b17-d3d0946dbb02",
+        "name": "Наступает вечер",
+        "description": "",
+        "retention": "AUTO_CLOSE_ON_FLOW_END",
+        "owner": "SubScene",
+        "groups": [
+          {
+            "id": "group-6d2019be-8f9f-40cc-8a26-1b8e664b7909",
+            "name": "Окружение",
+            "actions": [
+              {
+                "id": "action-6f0f8781-7219-4f4d-9e71-ab0d39027384",
+                "type": "time",
+                "target": "world",
+                "value": "Закат",
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "duration": 2,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние"
+              },
+              {
+                "id": "action-e02724d6-e386-4c0e-9d81-34602428845d",
+                "type": "lighting",
+                "target": "world",
+                "value": "Тёплый свет",
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "duration": 2,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние"
+              }
+            ]
+          }
+        ],
+        "standardPreset": true
+      },
+      {
+        "id": "event-62f16f7b-b5d3-4e1d-83cd-d219049a106d",
+        "name": "Появиться в кадре",
+        "description": "",
+        "retention": "AUTO_CLOSE_ON_FLOW_END",
+        "owner": "SubScene",
+        "groups": [
+          {
+            "id": "group-7c1ffec3-9937-4161-b49f-47e158526bb3",
+            "name": "Появление",
+            "actions": [
+              {
+                "id": "action-704cd0cf-7708-48f1-8bad-7140bff15229",
+                "type": "visibility",
+                "target": "",
+                "value": "Показать",
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "duration": 2,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние"
+              },
+              {
+                "id": "action-4c766377-90e1-463b-b023-498e5ce78d58",
+                "type": "pose",
+                "target": "",
+                "value": "стоит",
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "duration": 2,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние"
+              }
+            ]
+          }
+        ],
+        "standardPreset": true
+      }
+    ],
+    "functions": [
+      {
+        "id": "sample-reward-function",
+        "name": "Начислить награду",
+        "parameters": [
+          {
+            "name": "owner",
+            "label": "Владелец счётчика",
+            "schema": {
+              "type": "union",
+              "label": "Владелец счётчика",
+              "variants": [
+                {
+                  "type": "reference",
+                  "referenceType": "project",
+                  "label": "Проект"
+                },
+                {
+                  "type": "reference",
+                  "referenceType": "scene",
+                  "label": "Сцена"
+                },
+                {
+                  "type": "reference",
+                  "referenceType": "object",
+                  "label": "Объект"
+                }
+              ]
+            }
+          },
+          {
+            "name": "counter",
+            "label": "Счётчик",
+            "schema": {
+              "type": "reference",
+              "referenceType": "resource",
+              "label": "Счётчик"
+            }
+          },
+          {
+            "name": "amount",
+            "label": "Награда",
+            "schema": {
+              "type": "integer",
+              "label": "Награда",
+              "default": 1
+            }
+          }
+        ],
+        "locals": {},
+        "resultSchema": {
+          "type": "void"
+        },
+        "entry": "reward-operation",
+        "nodes": [
+          {
+            "id": "reward-operation",
+            "kind": "command",
+            "name": "Изменить выбранный счётчик",
+            "position": {
+              "x": 120,
+              "y": 100
+            },
+            "comment": "Общая операция для отношения, очков и монет.",
+            "command": {
+              "command": "sacura.resource.add",
+              "operationVersion": 1,
+              "value": {
+                "owner": {
+                  "op": "get",
+                  "path": "args.owner"
+                },
+                "resource": {
+                  "op": "get",
+                  "path": "args.counter"
+                },
+                "amount": {
+                  "op": "get",
+                  "path": "args.amount"
+                }
+              }
+            },
+            "next": null
+          }
+        ]
+      }
+    ],
+    "actionTemplates": [],
+    "groupTemplates": [],
+    "widgets": [
+      {
+        "id": "widget-default-dialogue",
+        "name": "Диалог",
+        "kind": "dialogue",
+        "referenceSize": [
+          1280,
+          720
+        ],
+        "elements": [
+          {
+            "id": "widget-default-dialogue-panel",
+            "name": "Диалоговое окно",
+            "type": "panel",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                0.5,
+                1
+              ],
+              "x": 0,
+              "y": -34,
+              "width": -100,
+              "height": 205
+            },
+            "style": {
+              "background": "#211c29",
+              "color": "#fff4f8",
+              "opacity": 0.96,
+              "borderRadius": 16,
+              "borderWidth": 1,
+              "borderColor": "#ad849d",
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-dialogue-speaker",
+            "name": "Имя персонажа",
+            "type": "text",
+            "parentId": "widget-default-dialogue-panel",
+            "role": "speaker",
+            "text": "Новый текст",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 28,
+              "y": 18,
+              "width": -56,
+              "height": 32
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#e2b8d1",
+              "fontSize": 23,
+              "fontWeight": 600,
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-dialogue-text",
+            "name": "Текст реплики",
+            "type": "text",
+            "parentId": "widget-default-dialogue-panel",
+            "role": "dialogueText",
+            "text": "Новый текст",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 28,
+              "y": 60,
+              "width": -88,
+              "height": -105
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-dialogue-status",
+            "name": "Подсказка",
+            "type": "text",
+            "parentId": "widget-default-dialogue-panel",
+            "role": "status",
+            "text": "Новый текст",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                0,
+                1
+              ],
+              "x": 28,
+              "y": -16,
+              "width": -90,
+              "height": 25
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#d1bfd0",
+              "fontSize": 15,
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-dialogue-next",
+            "name": "Продолжить",
+            "type": "button",
+            "parentId": "widget-default-dialogue-panel",
+            "role": "none",
+            "text": "›",
+            "action": "advance",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                1,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                1,
+                1
+              ],
+              "x": -20,
+              "y": -14,
+              "width": 44,
+              "height": 44
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 28,
+              "borderRadius": 10,
+              "textAlign": "center",
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-dialogue-choices",
+            "name": "Ответы игрока",
+            "type": "choices",
+            "parentId": null,
+            "role": "choices",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                1
+              ],
+              "anchorMax": [
+                0.5,
+                1
+              ],
+              "pivot": [
+                0.5,
+                1
+              ],
+              "x": 0,
+              "y": -255,
+              "width": 620,
+              "height": 190
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 22,
+              "borderRadius": 10,
+              "padding": 4,
+              "gap": 8
+            }
+          }
+        ],
+        "css": ""
+      },
+      {
+        "id": "widget-default-mainMenu",
+        "name": "Главное меню",
+        "kind": "mainMenu",
+        "referenceSize": [
+          1280,
+          720
+        ],
+        "elements": [
+          {
+            "id": "widget-default-mainMenu-panel",
+            "name": "Панель меню",
+            "type": "panel",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0.5
+              ],
+              "anchorMax": [
+                0.5,
+                0.5
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 0,
+              "width": 510,
+              "height": 440
+            },
+            "style": {
+              "background": "#211c29",
+              "color": "#fff4f8",
+              "opacity": 0.98,
+              "borderRadius": 20,
+              "borderWidth": 1,
+              "borderColor": "#ad849d",
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-mainMenu-title",
+            "name": "Заголовок",
+            "type": "text",
+            "parentId": "widget-default-mainMenu-panel",
+            "role": "title",
+            "text": "Пауза",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 30,
+              "y": 35,
+              "width": -60,
+              "height": 90
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 36,
+              "fontWeight": 600,
+              "textAlign": "center",
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-mainMenu-start",
+            "name": "Начать игру",
+            "type": "button",
+            "parentId": "widget-default-mainMenu-panel",
+            "role": "none",
+            "text": "Начать игру",
+            "action": "start",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0
+              ],
+              "anchorMax": [
+                0.5,
+                0
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 160,
+              "width": 380,
+              "height": 60
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "textAlign": "center",
+              "borderRadius": 10,
+              "padding": 8
+            }
+          },
+          {
+            "id": "widget-default-mainMenu-restart",
+            "name": "Начать заново",
+            "type": "button",
+            "parentId": "widget-default-mainMenu-panel",
+            "role": "none",
+            "text": "Начать заново",
+            "action": "restart",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0
+              ],
+              "anchorMax": [
+                0.5,
+                0
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 240,
+              "width": 380,
+              "height": 60
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "textAlign": "center",
+              "borderRadius": 10,
+              "padding": 8
+            }
+          }
+        ],
+        "css": ""
+      },
+      {
+        "id": "widget-default-pauseMenu",
+        "name": "Меню паузы",
+        "kind": "pauseMenu",
+        "referenceSize": [
+          1280,
+          720
+        ],
+        "elements": [
+          {
+            "id": "widget-default-pauseMenu-panel",
+            "name": "Панель меню",
+            "type": "panel",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0.5
+              ],
+              "anchorMax": [
+                0.5,
+                0.5
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 0,
+              "width": 510,
+              "height": 440
+            },
+            "style": {
+              "background": "#211c29",
+              "color": "#fff4f8",
+              "opacity": 0.98,
+              "borderRadius": 20,
+              "borderWidth": 1,
+              "borderColor": "#ad849d",
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-pauseMenu-title",
+            "name": "Заголовок",
+            "type": "text",
+            "parentId": "widget-default-pauseMenu-panel",
+            "role": "none",
+            "text": "Пауза",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 30,
+              "y": 35,
+              "width": -60,
+              "height": 90
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 36,
+              "fontWeight": 600,
+              "textAlign": "center",
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-pauseMenu-resume",
+            "name": "Продолжить",
+            "type": "button",
+            "parentId": "widget-default-pauseMenu-panel",
+            "role": "none",
+            "text": "Продолжить",
+            "action": "resume",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0
+              ],
+              "anchorMax": [
+                0.5,
+                0
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 160,
+              "width": 380,
+              "height": 60
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "textAlign": "center",
+              "borderRadius": 10,
+              "padding": 8
+            }
+          },
+          {
+            "id": "widget-default-pauseMenu-restart",
+            "name": "Начать заново",
+            "type": "button",
+            "parentId": "widget-default-pauseMenu-panel",
+            "role": "none",
+            "text": "Начать заново",
+            "action": "restart",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0
+              ],
+              "anchorMax": [
+                0.5,
+                0
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 240,
+              "width": 380,
+              "height": 60
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "textAlign": "center",
+              "borderRadius": 10,
+              "padding": 8
+            }
+          },
+          {
+            "id": "widget-default-pauseMenu-mainMenu",
+            "name": "Главное меню",
+            "type": "button",
+            "parentId": "widget-default-pauseMenu-panel",
+            "role": "none",
+            "text": "Главное меню",
+            "action": "mainMenu",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0
+              ],
+              "anchorMax": [
+                0.5,
+                0
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 320,
+              "width": 380,
+              "height": 60
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "textAlign": "center",
+              "borderRadius": 10,
+              "padding": 8
+            }
+          }
+        ],
+        "css": ""
+      },
+      {
+        "id": "clicker-controls",
+        "name": "Монеты и улучшение",
+        "kind": "hud",
+        "referenceSize": [
+          1280,
+          720
+        ],
+        "elements": [
+          {
+            "id": "coin-text",
+            "name": "Монеты",
+            "type": "text",
+            "parentId": null,
+            "role": "none",
+            "text": "Новый текст",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0.5
+              ],
+              "anchorMax": [
+                0.5,
+                0.5
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": -160,
+              "width": 380,
+              "height": 65
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "fontFamily": "system-ui",
+              "fontWeight": 400,
+              "borderColor": "#ad849d",
+              "borderWidth": 0,
+              "borderRadius": 12,
+              "padding": 12,
+              "opacity": 1,
+              "textAlign": "left",
+              "gap": 8
+            },
+            "binding": {
+              "source": "capability",
+              "capability": "sacura.resource",
+              "owner": {
+                "kind": "reference",
+                "type": "project",
+                "mode": "direct",
+                "id": "package-project"
+              },
+              "recordId": "coins",
+              "field": "value",
+              "valueType": "integer",
+              "format": "Монеты: {value}"
+            }
+          },
+          {
+            "id": "rate-text",
+            "name": "Скорость получения",
+            "type": "text",
+            "parentId": null,
+            "role": "none",
+            "text": "Новый текст",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0.5
+              ],
+              "anchorMax": [
+                0.5,
+                0.5
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": -90,
+              "width": 380,
+              "height": 65
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "fontFamily": "system-ui",
+              "fontWeight": 400,
+              "borderColor": "#ad849d",
+              "borderWidth": 0,
+              "borderRadius": 12,
+              "padding": 12,
+              "opacity": 1,
+              "textAlign": "left",
+              "gap": 8
+            },
+            "binding": {
+              "source": "variable",
+              "path": "rate",
+              "format": "Монет за тик: {value}"
+            }
+          },
+          {
+            "id": "coin-button",
+            "name": "Получить монету",
+            "type": "button",
+            "parentId": null,
+            "role": "none",
+            "text": "Получить монету",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0.5
+              ],
+              "anchorMax": [
+                0.5,
+                0.5
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 0,
+              "width": 380,
+              "height": 65
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "fontFamily": "system-ui",
+              "fontWeight": 400,
+              "borderColor": "#ad849d",
+              "borderWidth": 0,
+              "borderRadius": 12,
+              "padding": 12,
+              "opacity": 1,
+              "textAlign": "left",
+              "gap": 8
+            }
+          },
+          {
+            "id": "upgrade-button",
+            "name": "Улучшить скорость",
+            "type": "button",
+            "parentId": null,
+            "role": "none",
+            "text": "Улучшить скорость (+1)",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0.5
+              ],
+              "anchorMax": [
+                0.5,
+                0.5
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 85,
+              "width": 380,
+              "height": 65
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "fontFamily": "system-ui",
+              "fontWeight": 400,
+              "borderColor": "#ad849d",
+              "borderWidth": 0,
+              "borderRadius": 12,
+              "padding": 12,
+              "opacity": 1,
+              "textAlign": "left",
+              "gap": 8
+            }
+          }
+        ],
+        "css": ""
+      }
+    ],
+    "audioAssets": [],
+    "variables": {
+      "coins": 0,
+      "rate": 1
+    },
+    "variableTypes": {
+      "coins": "integer",
+      "rate": "integer"
+    },
+    "objects": [],
+    "subscenes": [
+      {
+        "id": "sample-scene",
+        "name": "Новая сцена",
+        "location": "Пустая сцена",
+        "kind": "empty",
+        "entry": null,
+        "weather": "Ясно",
+        "time": "День",
+        "color": "#bd94a9",
+        "stagingPoints": [],
+        "cameras": [
+          {
+            "id": "sample-camera-0",
+            "name": "Основная камера",
+            "position": [
+              -2.8,
+              1.65,
+              2.8
+            ],
+            "target": [
+              0.3,
+              1.02,
+              -1.3
+            ],
+            "mode": "fixed",
+            "fov": 58,
+            "distance": 3,
+            "height": 1.65,
+            "yaw": 0,
+            "targetHeight": 1.08,
+            "smoothing": 0.2
+          }
+        ],
+        "defaultCameraId": "sample-camera-0"
+      }
+    ],
+    "chapters": [],
+    "input": {
+      "version": 1,
+      "touchMode": "auto",
+      "actions": [
+        {
+          "id": "move",
+          "name": "Двигаться",
+          "valueType": "axis2d",
+          "behavior": "move",
+          "trigger": "continuous",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "interact",
+          "name": "Осмотреть",
+          "valueType": "boolean",
+          "behavior": "interact",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "point",
+          "name": "Идти по указателю",
+          "valueType": "boolean",
+          "behavior": "point",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "advance",
+          "name": "Дальше",
+          "valueType": "boolean",
+          "behavior": "advance",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "pause",
+          "name": "Пауза",
+          "valueType": "boolean",
+          "behavior": "pause",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "choiceNext",
+          "name": "Следующий ответ",
+          "valueType": "boolean",
+          "behavior": "choiceNext",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "choicePrevious",
+          "name": "Предыдущий ответ",
+          "valueType": "boolean",
+          "behavior": "choicePrevious",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        }
+      ],
+      "contexts": [
+        {
+          "id": "system",
+          "name": "Система",
+          "priority": 100,
+          "bindings": [
+            {
+              "actionId": "pause",
+              "device": "keyboard",
+              "control": "Escape",
+              "scale": 1,
+              "id": "system-0"
+            },
+            {
+              "actionId": "pause",
+              "device": "gamepad-button",
+              "control": "9",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "system-1"
+            },
+            {
+              "actionId": "pause",
+              "device": "touch",
+              "control": "pause",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "system-2"
+            }
+          ]
+        },
+        {
+          "id": "dialogue",
+          "name": "Диалог",
+          "priority": 10,
+          "bindings": [
+            {
+              "actionId": "advance",
+              "device": "keyboard",
+              "control": "Enter",
+              "scale": 1,
+              "id": "dialogue-0"
+            },
+            {
+              "actionId": "advance",
+              "device": "keyboard",
+              "control": "Space",
+              "scale": 1,
+              "id": "dialogue-1"
+            },
+            {
+              "actionId": "advance",
+              "device": "gamepad-button",
+              "control": "0",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "dialogue-2"
+            },
+            {
+              "actionId": "advance",
+              "device": "touch",
+              "control": "advance",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "dialogue-3"
+            },
+            {
+              "actionId": "choiceNext",
+              "device": "keyboard",
+              "control": "ArrowDown",
+              "scale": 1,
+              "id": "dialogue-4"
+            },
+            {
+              "actionId": "choicePrevious",
+              "device": "keyboard",
+              "control": "ArrowUp",
+              "scale": 1,
+              "id": "dialogue-5"
+            },
+            {
+              "actionId": "choiceNext",
+              "device": "gamepad-button",
+              "control": "13",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "dialogue-6"
+            },
+            {
+              "actionId": "choicePrevious",
+              "device": "gamepad-button",
+              "control": "12",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "dialogue-7"
+            }
+          ]
+        },
+        {
+          "id": "gameplay",
+          "name": "Ходьба и взаимодействие",
+          "priority": 20,
+          "bindings": [
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "KeyW",
+              "scale": [
+                0,
+                1
+              ],
+              "id": "gameplay-0"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "ArrowUp",
+              "scale": [
+                0,
+                1
+              ],
+              "id": "gameplay-1"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "KeyS",
+              "scale": [
+                0,
+                -1
+              ],
+              "id": "gameplay-2"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "ArrowDown",
+              "scale": [
+                0,
+                -1
+              ],
+              "id": "gameplay-3"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "KeyA",
+              "scale": [
+                -1,
+                0
+              ],
+              "id": "gameplay-4"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "ArrowLeft",
+              "scale": [
+                -1,
+                0
+              ],
+              "id": "gameplay-5"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "KeyD",
+              "scale": [
+                1,
+                0
+              ],
+              "id": "gameplay-6"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "ArrowRight",
+              "scale": [
+                1,
+                0
+              ],
+              "id": "gameplay-7"
+            },
+            {
+              "actionId": "interact",
+              "device": "keyboard",
+              "control": "KeyE",
+              "scale": 1,
+              "id": "gameplay-8"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-axis",
+              "control": "0",
+              "scale": [
+                1,
+                0
+              ],
+              "deadZone": 0.18,
+              "id": "gameplay-9"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-axis",
+              "control": "1",
+              "scale": [
+                0,
+                -1
+              ],
+              "deadZone": 0.18,
+              "id": "gameplay-10"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-button",
+              "control": "12",
+              "scale": [
+                0,
+                1
+              ],
+              "deadZone": 0,
+              "id": "gameplay-11"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-button",
+              "control": "13",
+              "scale": [
+                0,
+                -1
+              ],
+              "deadZone": 0,
+              "id": "gameplay-12"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-button",
+              "control": "14",
+              "scale": [
+                -1,
+                0
+              ],
+              "deadZone": 0,
+              "id": "gameplay-13"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-button",
+              "control": "15",
+              "scale": [
+                1,
+                0
+              ],
+              "deadZone": 0,
+              "id": "gameplay-14"
+            },
+            {
+              "actionId": "interact",
+              "device": "gamepad-button",
+              "control": "0",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "gameplay-15"
+            },
+            {
+              "actionId": "point",
+              "device": "pointer",
+              "control": "primary",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "gameplay-16"
+            },
+            {
+              "actionId": "move",
+              "device": "touch",
+              "control": "move",
+              "scale": [
+                1,
+                1
+              ],
+              "deadZone": 0,
+              "id": "gameplay-17"
+            },
+            {
+              "actionId": "interact",
+              "device": "touch",
+              "control": "interact",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "gameplay-18"
+            }
+          ]
+        }
+      ]
+    },
+    "ui": {
+      "dialogue": "widget-default-dialogue",
+      "mainMenu": "widget-default-mainMenu",
+      "pauseMenu": "widget-default-pauseMenu",
+      "hud": "clicker-controls"
+    },
+    "audioSettings": {
+      "sidechain": {
+        "reductionDb": 4,
+        "attack": 0.6,
+        "release": 0.9
+      }
+    }
+  },
+  "references": [],
+  "assets": []
+}

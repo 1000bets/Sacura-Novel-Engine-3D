@@ -1,0 +1,372 @@
+{
+  "format": "sacura-authoring-package",
+  "formatVersion": 2,
+  "metadata": {
+    "id": "sacura.recipe.reward",
+    "version": "1.0.0",
+    "name": "Награда за действие",
+    "description": "Сигнал → счётчик для разных жанров.",
+    "author": "Sacura contributors",
+    "license": "MIT",
+    "sources": []
+  },
+  "compatibility": {
+    "projectSchemaVersion": 2,
+    "requiredCapabilities": [
+      {
+        "id": "operation.sacura.resource.add",
+        "version": 1
+      },
+      {
+        "id": "function.graph",
+        "version": 1
+      }
+    ],
+    "requiredEngineModules": []
+  },
+  "roots": {
+    "kind": "mechanic",
+    "entries": [
+      "/content/gameplay/mechanics/0"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "union",
+          "label": "Владелец счётчика",
+          "variants": [
+            {
+              "type": "reference",
+              "referenceType": "project",
+              "label": "Проект"
+            },
+            {
+              "type": "reference",
+              "referenceType": "scene",
+              "label": "Сцена"
+            },
+            {
+              "type": "reference",
+              "referenceType": "object",
+              "label": "Объект"
+            }
+          ]
+        },
+        "counter": {
+          "type": "reference",
+          "referenceType": "resource",
+          "label": "Счётчик"
+        },
+        "amount": {
+          "type": "integer",
+          "label": "Награда",
+          "default": 1
+        }
+      }
+    }
+  },
+  "inputs": [
+    {
+      "id": "input-0bbb5acd-64a0-4bd7-bf22-4b402f2e7036",
+      "name": "Новая сцена",
+      "description": "Выберите в своём проекте.",
+      "type": "scene",
+      "required": true
+    }
+  ],
+  "content": {
+    "gameplay": {
+      "version": 2,
+      "capabilitySchemaVersion": 1,
+      "resources": [
+        {
+          "id": "relationship",
+          "name": "Отношение",
+          "owner": {
+            "kind": "project",
+            "id": null
+          },
+          "type": "integer",
+          "initial": 0
+        }
+      ],
+      "inventories": [],
+      "movements": [],
+      "stateBindings": [],
+      "mechanicSchemaVersion": 1,
+      "mechanicDefinitions": [
+        {
+          "id": "sample.mechanic.reward",
+          "version": 1,
+          "scopes": [
+            "project",
+            "scene",
+            "object"
+          ],
+          "when": "sample.signal.reward",
+          "stateSchema": {
+            "type": "object",
+            "properties": {}
+          },
+          "initialState": {},
+          "requirements": [],
+          "name": "Награда за действие",
+          "description": "Один сигнал увеличивает выбранный счётчик. Подходит для отношения, очков, монет.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "owner": {
+                "type": "union",
+                "label": "Владелец счётчика",
+                "variants": [
+                  {
+                    "type": "reference",
+                    "referenceType": "project",
+                    "label": "Проект"
+                  },
+                  {
+                    "type": "reference",
+                    "referenceType": "scene",
+                    "label": "Сцена"
+                  },
+                  {
+                    "type": "reference",
+                    "referenceType": "object",
+                    "label": "Объект"
+                  }
+                ]
+              },
+              "counter": {
+                "type": "reference",
+                "referenceType": "resource",
+                "label": "Счётчик"
+              },
+              "amount": {
+                "type": "integer",
+                "label": "Награда",
+                "default": 1
+              }
+            }
+          },
+          "exposed": [
+            "owner",
+            "counter",
+            "amount"
+          ],
+          "logic": {
+            "functionId": "sample-reward-function"
+          },
+          "rules": [
+            {
+              "id": "reward",
+              "name": "Новая реакция",
+              "version": 1,
+              "enabled": true,
+              "signal": {
+                "type": "sample.signal.reward"
+              },
+              "filter": {},
+              "condition": null,
+              "actions": [
+                {
+                  "kind": "function",
+                  "functionId": "sample-reward-function",
+                  "args": {
+                    "owner": {
+                      "op": "get",
+                      "path": "args.owner"
+                    },
+                    "counter": {
+                      "op": "get",
+                      "path": "args.counter"
+                    },
+                    "amount": {
+                      "op": "get",
+                      "path": "args.amount"
+                    }
+                  }
+                }
+              ],
+              "otherwise": [],
+              "once": false,
+              "cooldown": 0,
+              "reentry": "queue",
+              "maxConcurrent": 1,
+              "maxQueued": 16
+            }
+          ]
+        }
+      ],
+      "signals": [
+        {
+          "id": "sample.signal.reward",
+          "version": 1,
+          "name": "Получена награда",
+          "payloadSchema": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string",
+                "optional": true
+              }
+            }
+          }
+        }
+      ],
+      "variableBindings": [],
+      "enabled": true,
+      "activation": "continuous",
+      "camera": {
+        "mode": "authored",
+        "targetId": "",
+        "pointerLock": false,
+        "crosshair": false
+      },
+      "mechanics": [
+        {
+          "id": "sample-reward-relationship",
+          "type": "definition",
+          "definitionId": "sample.mechanic.reward",
+          "definitionVersion": 1,
+          "scope": {
+            "kind": "scene",
+            "id": null
+          },
+          "values": {
+            "amount": 1,
+            "owner": {
+              "kind": "reference",
+              "type": "project",
+              "mode": "direct",
+              "id": "package-project"
+            },
+            "counter": {
+              "kind": "reference",
+              "type": "resource",
+              "mode": "direct",
+              "id": "relationship"
+            }
+          }
+        }
+      ],
+      "playerId": "",
+      "controller": {
+        "ownerId": "",
+        "mode": "none",
+        "speed": 3.5,
+        "jumpSpeed": 5,
+        "gravity": 16,
+        "eyeHeight": 1.25,
+        "sensitivity": 0.003,
+        "distance": 3,
+        "fov": 70
+      },
+      "actors": {},
+      "weapons": [],
+      "items": [],
+      "recipes": [],
+      "rules": [],
+      "inventory": {
+        "slots": 12,
+        "starting": [],
+        "equipment": {}
+      },
+      "hudWidgetId": null
+    },
+    "functions": [
+      {
+        "id": "sample-reward-function",
+        "name": "Начислить награду",
+        "parameters": [
+          {
+            "name": "owner",
+            "label": "Владелец счётчика",
+            "schema": {
+              "type": "union",
+              "label": "Владелец счётчика",
+              "variants": [
+                {
+                  "type": "reference",
+                  "referenceType": "project",
+                  "label": "Проект"
+                },
+                {
+                  "type": "reference",
+                  "referenceType": "scene",
+                  "label": "Сцена"
+                },
+                {
+                  "type": "reference",
+                  "referenceType": "object",
+                  "label": "Объект"
+                }
+              ]
+            }
+          },
+          {
+            "name": "counter",
+            "label": "Счётчик",
+            "schema": {
+              "type": "reference",
+              "referenceType": "resource",
+              "label": "Счётчик"
+            }
+          },
+          {
+            "name": "amount",
+            "label": "Награда",
+            "schema": {
+              "type": "integer",
+              "label": "Награда",
+              "default": 1
+            }
+          }
+        ],
+        "locals": {},
+        "resultSchema": {
+          "type": "void"
+        },
+        "entry": "reward-operation",
+        "nodes": [
+          {
+            "id": "reward-operation",
+            "kind": "command",
+            "name": "Изменить выбранный счётчик",
+            "position": {
+              "x": 120,
+              "y": 100
+            },
+            "comment": "Общая операция для отношения, очков и монет.",
+            "command": {
+              "command": "sacura.resource.add",
+              "operationVersion": 1,
+              "value": {
+                "owner": {
+                  "op": "get",
+                  "path": "args.owner"
+                },
+                "resource": {
+                  "op": "get",
+                  "path": "args.counter"
+                },
+                "amount": {
+                  "op": "get",
+                  "path": "args.amount"
+                }
+              }
+            },
+            "next": null
+          }
+        ]
+      }
+    ]
+  },
+  "references": [
+    {
+      "at": "/content/gameplay/mechanics/0/scope/id",
+      "inputId": "input-0bbb5acd-64a0-4bd7-bf22-4b402f2e7036"
+    }
+  ],
+  "assets": []
+}

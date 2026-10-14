@@ -60,7 +60,7 @@ export default function ActionFields({
   if(type==='move'&&!activeScene&&!pointOptions.some(([id])=>id===a.value)){
     pointOptions.unshift([Array.isArray(a.value)?a.value.join(', '):a.value,Array.isArray(a.value)?`Координаты: ${a.value.join(', ')}`:`Сохранённая точка: ${a.value||'выберите точку'}`]);
   }
-  if(type==='gameplay')return <div className="typed-action-fields"><GameplayCommandFields project={project} command={a.command} value={a.value} onChange={onChange}/></div>;
+  if(type==='gameplay')return <div className="typed-action-fields"><GameplayCommandFields project={project} command={a.command} value={a.value} operationVersion={a.operationVersion} onChange={onChange}/></div>;
   return (
     <div className={"typed-action-fields " + (compact ? "compact" : "")}>
       {["move", "pose", "visibility", "highlight", "door"].includes(type) &&

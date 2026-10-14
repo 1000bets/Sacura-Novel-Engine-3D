@@ -9,3 +9,57 @@
 
 .gameplay-guide{max-width:980px;margin:auto;padding:20px;line-height:1.6}.gameplay-guide h2{margin:0 0 8px;font-size:21px}.gameplay-guide p{color:var(--muted,#c4b4c7);margin:8px 0 14px}.gameplay-guide-steps{list-style:none;counter-reset:fps-step;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.gameplay-guide-steps>li{counter-increment:fps-step;border:1px solid var(--border,#ffffff24);border-radius:10px;padding:18px;min-width:0}.gameplay-guide h3{font-size:16px;margin:0;display:flex;align-items:center;gap:10px}.gameplay-guide h3:before{content:counter(fps-step);display:grid;place-items:center;background:#aa7fa726;border-radius:50%;width:28px;height:28px;flex:none;color:var(--text)}.gameplay-guide small{display:block;margin-bottom:12px;color:var(--muted,#c4b4c7);overflow-wrap:anywhere}.gameplay-guide-links,.gameplay-guide-assets{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.gameplay-guide button{min-height:36px;white-space:normal;text-align:left}.gameplay-guide-assets button{font-size:12px}.gameplay-guide button:focus-visible,.gameplay-workspace summary:focus-visible{outline:2px solid var(--accent,#d99bc8);outline-offset:3px}@media(max-width:750px){.gameplay-guide{padding:12px}.gameplay-guide-steps{grid-template-columns:1fr}}
 .gameplay-workspace{min-width:0}.gameplay-workspace nav{flex-wrap:wrap}
+
+.mechanics-layout{display:grid;grid-template-columns:minmax(230px,320px) minmax(260px,1fr);gap:20px;padding:20px;max-width:1100px;margin:auto}.mechanics-catalog,.mechanics-inspector,.package-exchange{min-width:0}.mechanics-layout p,.package-exchange p{color:var(--muted);line-height:1.5;overflow-wrap:anywhere}.mechanics-list{display:grid;gap:8px}.mechanics-list button,.mechanics-layout button,.package-exchange button{background:var(--panel);color:var(--text);border:1px solid var(--border);padding:10px;border-radius:6px;cursor:pointer;min-height:38px}.mechanics-list button[aria-pressed=true]{border-color:var(--accent);background:var(--panel-raised,var(--panel))}.mechanics-layout button:focus-visible,.package-exchange button:focus-visible,.mechanics-layout summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}.mechanics-layout details{margin-top:16px;padding:12px;border:1px solid var(--border);border-radius:8px}.mechanics-layout summary{cursor:pointer;font-weight:600}.mechanics-layout details>button{margin:6px 6px 0 0}.package-exchange{margin:20px;padding:20px;border:1px solid var(--accent);border-radius:8px}.package-exchange>header{display:flex;align-items:center;justify-content:space-between;gap:12px}.package-exchange fieldset{border:0;padding:0}.mechanics-layout button:disabled,.package-exchange button:disabled{opacity:.5;cursor:default}@media(max-width:750px){.mechanics-layout{grid-template-columns:1fr;padding:12px}.package-exchange{margin:12px;padding:12px}}
+
+/* Universal mechanics editor: theme tokens and independently scrolling panes. */
+.mechanics-workbench{height:100%;display:flex;flex-direction:column;min-height:0;container-type:inline-size;color:var(--text)}
+.mechanics-workbench>header{flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.mechanics-workbench .mechanics-tools{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.mechanics-workbench .mechanics-content{border:0;margin:0;padding:0;min-height:0;min-width:0;flex:1}
+.mechanics-workbench .mechanics-layout{height:100%;box-sizing:border-box;display:grid;grid-template-columns:minmax(175px,220px) minmax(0,1fr);gap:0;padding:0;margin:0;max-width:none;overflow:hidden}
+.mechanics-workbench .mechanics-catalog{padding:12px;border-right:1px solid var(--border);overflow:auto}
+.mechanics-workbench .mechanics-inspector{padding:12px 18px;overflow:auto;min-width:0}
+.mechanics-workbench h2{font-size:17px;margin:0 0 8px;overflow-wrap:anywhere}
+.mechanics-workbench h3{font-size:13px;margin:12px 0 8px}
+.mechanics-workbench p{font-size:12px;margin:8px 0;color:var(--muted)}
+.mechanics-workbench .mechanics-owner{margin-bottom:12px}
+.mechanics-workbench .game-field{min-width:0;display:flex;flex-direction:column;gap:5px;margin:0 0 10px;font-size:12px}
+.mechanics-workbench input,.mechanics-workbench select,.mechanics-workbench textarea{box-sizing:border-box;max-width:100%;min-width:0;background:var(--input,var(--panel));color:var(--text);border:1px solid var(--border);border-radius:5px;padding:7px;font:inherit}
+.mechanics-workbench select,.mechanics-workbench input{width:100%;min-height:32px}
+.mechanics-workbench input[type=checkbox]{width:auto;min-height:0}
+.mechanics-workbench textarea{width:100%;min-height:64px;resize:vertical}
+.mechanics-workbench .game-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));gap:8px}
+.mechanics-workbench .game-card,.mechanics-workbench .mechanics-action{border:0;border-top:1px solid var(--border);border-radius:0;padding:12px 0;margin:8px 0;min-width:0}
+.mechanics-workbench .mechanics-list{gap:2px;margin-bottom:12px}
+.mechanics-workbench button{white-space:normal;overflow-wrap:anywhere;background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:7px 10px;min-height:32px;font:inherit;cursor:pointer}
+.mechanics-workbench button:disabled{opacity:.45;cursor:default}
+.mechanics-workbench .mechanics-list button{border:0;border-radius:4px;display:flex;flex-direction:column;gap:4px;text-align:left;padding:8px}
+.mechanics-workbench .mechanics-list button[aria-pressed=true],.mechanics-workbench button[aria-pressed=true]{background:var(--panel-raised,var(--panel));box-shadow:inset 3px 0 var(--accent)}
+.mechanics-workbench small{display:block;font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.mechanics-workbench details{border:0;border-top:1px solid var(--border);border-radius:0;margin:12px 0;padding:10px 0}
+.mechanics-workbench summary{cursor:pointer;font-size:12px;font-weight:500;margin-bottom:6px}
+.mechanics-workbench .mechanics-rule>section{padding:8px 0;border-bottom:1px solid var(--border)}
+.mechanics-workbench .mechanics-rule-summary{padding:8px 0;border-top:1px solid var(--border)}
+.mechanics-workbench .mechanics-library{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));gap:4px;list-style:none;padding:0;margin:12px 0}
+.mechanics-workbench .mechanics-library button{width:100%;border:0;text-align:left;display:grid;gap:5px}
+.mechanics-workbench .package-exchange{padding:0;margin:0;border:0}
+.mechanics-workbench .package-exchange>header{flex-wrap:wrap;font-size:13px}
+.mechanics-workbench :is(button,input,select,textarea,summary):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mechanics-workbench [tabindex="-1"]:focus{outline:0}
+.mechanics-workbench .function-workspace{height:560px;min-width:0;max-width:100%}
+@container(max-width:520px){.mechanics-workbench .mechanics-layout{grid-template-columns:155px minmax(0,1fr)}.mechanics-workbench .mechanics-inspector{padding:10px}.mechanics-workbench .mechanics-catalog{padding:8px}}
+@container(max-width:360px){.mechanics-workbench .mechanics-layout{display:flex;flex-direction:column;overflow:auto}.mechanics-workbench .mechanics-catalog{border-right:0;border-bottom:1px solid var(--border);overflow:visible}.mechanics-workbench .mechanics-inspector{overflow:visible}.mechanics-workbench .mechanics-list{max-height:160px;overflow:auto}}
+.mechanics-workbench .mechanics-inspector>p,.mechanics-workbench .mechanics-inspector>.mechanics-rule{max-width:820px}
+.mechanics-workbench .mechanics-action-settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr));gap:8px}
+.mechanics-workbench .mechanics-action-settings>.game-field:first-child{grid-column:1/-1}
+.mechanics-workbench .mechanics-rule .game-grid{margin:0}
+.mechanics-workbench .mechanics-rule details{margin:4px 0;padding:4px 0}
+.mechanics-workbench .mechanics-rule .game-field{margin-bottom:4px}
+.mechanics-workbench .mechanics-action{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:8px 0}
+.mechanics-workbench .mechanics-action>strong,.mechanics-workbench .mechanics-action-settings{grid-column:1/-1}
+.mechanics-workbench .mechanics-action>button{justify-self:start}
+.mechanics-diagnostics pre {white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%;}
+.mechanics-workbench > .mechanics-diagnostics {max-height:45%;overflow:auto;flex-shrink:0;padding:8px 12px;}
+.standalone-bar {max-width:calc(100% - 16px);flex-wrap:wrap;justify-content:flex-end;}
+.standalone-bar [role="status"] {flex-basis:100%;max-width:38rem;text-align:right;overflow-wrap:anywhere;}

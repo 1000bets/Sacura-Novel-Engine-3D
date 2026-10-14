@@ -1,8 +1,10 @@
+import {activityValue} from './runtimePresentation.js';
 import InputWorkspace,{InputContextSettings} from './InputWorkspace.jsx';
 import TouchInput from './TouchInput.jsx';
 import GameplayWorkspace from './GameplayWorkspace.jsx';
 import GameHUD from './GameHUD.jsx';
 import {exportPlayableGame} from './gameExport.js';
+import {instantiateAuthoringTemplate} from './authoringTemplates.js';
 import {builtinTemplates,loadBuiltinTemplate} from './builtinTemplates.js';
 import {inputContextsFor,inputHelp} from './inputModel.js';
 import LanguagePicker from './LanguagePicker.jsx';
@@ -238,7 +240,7 @@ function GameDialogue({
   const status=beat.kind==='gate'?(message(preview?.hint)||(beat.controls?.mode&&beat.controls.mode!=='none'?inputHelp(project.input,inputContextsFor(project,beat),['move','interact','point']):`${tr('Нажмите на объект')} «${objectLabel||beat.signal}»`)):
     !running?tr('Предпросмотр выбранной реплики'):!preview.ready?tr('Выполняются действия'):beat.kind==='choice'?tr('Выберите ответ'):tr('Нажмите, чтобы продолжить');
   return <WidgetRenderer widget={dialogueWidget} context={{project,variables,game:preview?.world.game,speaker:beat.speaker,text:beat.text,status,title:project.title,choices:beat.kind==='choice'?beat.choices:[],selectedChoiceId:preview?.inputChoiceId,ready,canAdvance}}
-    onAction={(action,element)=>{if(action==='advance'&&canAdvance)running?onAdvance():onStart();else if(action!=='advance')onUiAction?.(action,element);}}
+    onAction={(action,element)=>{if(action==='advance'&&canAdvance)running?onUiAction?.(action,element):onStart();else if(action!=='advance')onUiAction?.(action,element);}}
     onChoice={id=>running&&onAdvance(id)} choiceEnabled={choice=>conditionPass(choice,variables,project,preview?.choiceResults)}/>;
 }
 
@@ -302,7 +304,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     }
   }
   seed.current.project.id ||= uid('project');
-  const initialBeat=seed.current.project.subscenes[0].entry||allBeats(seed.current.project)[0].id;
+  const initialBeat=seed.current.project.subscenes[0].entry||allBeats(seed.current.project)[0]?.id||null;
   const [project, setProject] = useState(seed.current.project),
     [saveError, setSaveError] = useState(seed.current.error),
     [layout, setLayout] = useState(() => {
@@ -317,13 +319,13 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     }),
     [selectedBeat, setSelectedBeat] = useState(initialBeat),
     [selection, setSelection] = useState({ kind: "beat", id: initialBeat }),
-    [dock, setDock] = useState(seed.current.project.gameplay?.enabled ? "gameplay" : "story"),
+    [dock, setDock] = useState(seed.current.project.gameplay?.enabled && (seed.current.project.gameplay.activation==="gameplay-node"||seed.current.project.gameplay.storyPolicy?.mode==='none') ? "gameplay" : "story"),
     [phase, setPhase] = useState("ALL"),
     [eventContext, setEventContext] = useState(null),
     [mode, setMode] = useState("scene"),
     [showDialogue, setShowDialogue] = useState(true),
     [showGrid, setShowGrid] = useState(true),
-    [maximized, setMaximized] = useState(seed.current.project.gameplay?.enabled ? "graph" : null),
+    [maximized, setMaximized] = useState(seed.current.project.gameplay?.enabled && (seed.current.project.gameplay.activation==="gameplay-node"||seed.current.project.gameplay.storyPolicy?.mode==='none') ? "graph" : null),
     [preview, setPreview] = useState(null),
     [follow, setFollow] = useState(true),
     [query, setQuery] = useState(""),
@@ -347,6 +349,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     [inspectorPinned, setInspectorPinned] = useState(false),
     [detailEditor, setDetailEditor] = useState(false),
     [history, setHistory] = useState([]),
+    [future,setFuture]=useState([]),
+    [gameplayRequest,setGameplayRequest]=useState(null),
     [authorRequest,setAuthorRequest]=useState(null),
     [widgetRequest,setWidgetRequest]=useState(null),
     [gameMenu,setGameMenu]=useState(null),
@@ -376,11 +380,11 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   rt.physicsApi=physicsApi;
   previewRef.current = preview;
   const nodes = useMemo(() => allBeats(project), [project]),
-    beat = nodes.find((b) => b.id === selectedBeat) || nodes[0],
+    beat = nodes.find((b) => b.id === selectedBeat) || nodes[0]||{id:null,kind:'gameplay',text:'',speaker:'',choices:[],bindings:[],batches:{}},
     scene = sceneFor(project, beat.id),
     chapter = project.chapters.find((c) =>
       c.beats.some((b) => b.id === beat.id),
-    ),
+    )||{id:null,name:"",beats:[]},
     running = rt.running && preview?.phase !== "EDIT";
   const hierarchyVisible=maximized==='hierarchy'||(!['scene','graph','inspector'].includes(maximized)&&!layout.hiddenHierarchy&&(window.innerWidth>1000||compactPanel==='hierarchy'));
   const inspectorVisible=maximized==='inspector'||(!['scene','graph','hierarchy'].includes(maximized)&&!layout.hiddenInspector&&(window.innerWidth>1000||compactPanel==='inspector'));
@@ -388,7 +392,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     playBeat = running
       ? allBeats(playProject).find((b) => b.id === preview.beatId) || beat
       : beat,
-    playScene = sceneFor(playProject, playBeat.id),
+    playScene = playProject.subscenes.find(s=>s.id===preview?.world.location)||sceneFor(playProject, playBeat.id),
     displayScene = running ? playScene : scene;
   useEffect(()=>setCompactPanel('workspace'),[dock,displayScene.id]);
   useEffect(()=>{
@@ -505,6 +509,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         allBeats(next).forEach(normalizeBatches);
         if (JSON.stringify(next) === JSON.stringify(p)) return p;
         setHistory((h) => [...h.slice(-19), p]);
+        setFuture([]);
         return next;
       }),
     [],
@@ -703,7 +708,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   const start = (fromSelection=false,entryId=null) => {
     setGameMenu(null);setPreviewWidgetId(null);
     const startId=entryId||playbackStartId(project,beat.id,fromSelection);
-    if(!startId){setNotice('Укажите начальную реплику во вкладке «Сабсцены».');return;}
+    if(!startId&&project.gameplay.storyPolicy?.mode!=='none'){setNotice('Укажите начальную реплику во вкладке «Сабсцены».');return;}
     setCameraPreviewId(null);setCameraPilotId(null);
     soundDesk.unlock().catch(()=>{});
     setFollow(true);
@@ -714,10 +719,11 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   };
   rt.storage=accountStorage;
   const widgetAction=async(action,element)=>{
-    if(action==='load'&&!running){setMode('game');setGameMenu(null);await rt.start(project,project.subscenes[0].entry);await rt.uiAction(action,element);return;}
-    if(['event','gameplay','save','load'].includes(action)&&running){rt.storage=accountStorage;rt.uiAction(action,element);}
+    if(action==='load'&&!running){rt.storage=accountStorage;await rt.uiAction(action,element,project);if(rt.running){setMode('game');setGameMenu(null);}else setNotice(rt.snapshot.hint);return;}
+    if(action==='save'&&!running){await rt.uiAction(action,element,project);setNotice(rt.snapshot.hint);return;}
+    if(['none','event','gameplay','save','load','advance','resume'].includes(action)&&running){rt.storage=accountStorage;await rt.uiAction(action,element);}
     if(action==='start'||action==='restart')start(false,project.subscenes[0]?.entry);
-    if(action==='resume'&&preview?.paused){setPreviewWidgetId(null);rt.togglePause();}
+    if(action==='resume')setPreviewWidgetId(null);
     if(action==='mainMenu'){rt.stop();setMode('game');setGameMenu('mainMenu');setPreviewWidgetId(null);}
   };
   const audition=(eventId)=>{setCameraPreviewId(null);setCameraPilotId(null);soundDesk.unlock().catch(()=>{});setMode('game');setFollow(false);rt.previewEvent(project,eventId,beat.id);};
@@ -770,7 +776,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     next.id ||= uid('project');
     const entry=next.subscenes[0].entry||allBeats(next)[0].id;
     backupProject(accountStorage,project);
-    rt.stop();setHistory([]);setEventContext(null);setAuthorRequest(null);setSubsceneRequest(null);setSubsceneDraft(null);
+    rt.stop();setHistory([]);setFuture([]);setEventContext(null);setAuthorRequest(null);setSubsceneRequest(null);setSubsceneDraft(null);
     setCameraPilotId(null);setCameraPreviewId(null);setPicker(null);setDetailEditor(false);setDock('story');setMaximized(null);setMode('scene');
     setQuery('');setFocusRequest(0);setMenu(null);setPreview(null);setFollow(true);
     setLayout(l=>({...l,positions:{},treeOpen:{}}));
@@ -801,8 +807,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   };
   const submitProjectDialog = ({name,templateId}) => runFileOperation(async()=>{
     if(projectDialog==='new'){
-      const template=projectTemplates.find(t=>t.id===templateId);if(template?.builtin)template.project=(await loadBuiltinTemplate(template.id)).project;
-      const next=template?projectFromTemplate(template,name):createEmptyProject(name);
+      const template=projectTemplates.find(t=>t.id===templateId);const next=template?await instantiateAuthoringTemplate(template.builtin?await loadBuiltinTemplate(template.id):template,name):createEmptyProject(name);
       replaceProject(next);setNotice(template?tr("Создан проект из шаблона «{0}».", [template.name]):'Создан пустой проект.');
     } else if(projectDialog==='template'){
       storeTemplate(accountStorage,createProjectTemplate(project,name));
@@ -812,7 +817,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       if(serverStorageEnabled){const saved=await saveServerProject(next);replaceProject(saved);setProjectDialog(null);setNotice('Копия проекта сохранена на сервере.');return;}
       const result=await writeProjectFile(await portableProject(next),{chooseFile:window.showSaveFilePicker?.bind(window),download:downloadFile,filename:projectFilename(next.title)});
       backupProject(accountStorage,project);projectFile.current=result.handle;seed.current.error=null;
-      setProject(next);setHistory([]);
+      setProject(next);setHistory([]);setFuture([]);
       setNotice(result.downloaded?tr("Копия проекта передана в загрузки: {0}", [result.filename]):tr("Копия проекта сохранена: {0}", [result.filename]));
     }
     setProjectDialog(null);
@@ -825,7 +830,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     if(!window.showOpenFilePicker){fileInput.current.click();return;}
     return runFileOperation(async()=>{
       const [handle]=await window.showOpenFilePicker({multiple:false,types:PROJECT_FILE_TYPES});
-      const {project:next,template}=parseProjectFile(await (await handle.getFile()).text());
+      const {project:next,template}=await parseProjectFile(await (await handle.getFile()).text());
       replaceProject(next,template?null:handle);setNotice(template?'Создан проект из файла шаблона.':'Проект загружен.');
     });
   };
@@ -834,7 +839,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     const file=e.target.files[0];e.target.value='';
     await runFileOperation(async()=>{
       validateImportSize(file);
-      const {project:next,template}=parseProjectFile(await file.text());
+      const {project:next,template}=await parseProjectFile(await file.text());
       replaceProject(next);setNotice(template?'Создан проект из файла шаблона.':'Проект загружен.');
     });
   };
@@ -845,8 +850,14 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   const undo = () => {
     if (!history.length) return;
     rt.stop();setCameraPilotId(null);setCameraPreviewId(null);
+    setFuture(f=>[...f.slice(-19),project]);
     setProject(history.at(-1));
     setHistory((h) => h.slice(0, -1));
+  };
+  const redo=()=>{
+    if(!future.length)return;
+    rt.stop();setCameraPilotId(null);setCameraPreviewId(null);
+    setHistory(h=>[...h.slice(-19),project]);setProject(future.at(-1));setFuture(f=>f.slice(0,-1));
   };
   const addBeat = (kind,placement) => {
     if(rt.running)return;
@@ -886,7 +897,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         b.next = null;
         b.ending = "Новая концовка";
       }
-      insertStoryNode(p,chapter.id,beat.id,b);
+      let owner=p.chapters.find(c=>c.id===chapter.id);if(!owner){owner={id:uid('chapter'),name:'Первый эпизод',subsceneId:scene.id,beats:[]};p.chapters.push(owner);p.subscenes.find(s=>s.id===scene.id).entry=b.id;}insertStoryNode(p,owner.id,beat.id,b);
       if(placement?.pin){const pin=placement.pin;
         const connection=pin.handleType==='source'?{source:pin.nodeId,sourceHandle:pin.handleId,target:id,targetHandle:placement.wireType==='flow'?'in':kind==='branch'?'condition':['set-variable','convert'].includes(kind)?'value':'a'}:{source:id,sourceHandle:placement.wireType==='flow'?'next':'value',target:pin.nodeId,targetHandle:pin.handleId};
         const error=applyConnections(p,[connection]);if(error)setNotice(error);
@@ -1082,7 +1093,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       );
     }
     allBeats(next).forEach(normalizeBatches);
-    setHistory((h) => [...h, project]);
+    setHistory((h) => [...h, project]);setFuture([]);
     setProject(next);
   };
   const resize = (key, delta) =>
@@ -1156,17 +1167,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         e.preventDefault();
         if(!projectDialog)e.shiftKey?openProjectDialog('saveAs'):saveProject();
       }
-      if (
-        (e.ctrlKey || e.metaKey) &&
-        e.key.toLowerCase() === "z" &&
-        !["INPUT", "TEXTAREA"].includes(e.target.tagName)
-      ) {
-        e.preventDefault();
-        if (history.length) {
-          rt.stop();setCameraPilotId(null);setCameraPreviewId(null);
-          setProject(history.at(-1));
-          setHistory((h) => h.slice(0, -1));
-        }
+      if ((e.ctrlKey||e.metaKey)&&['z','y'].includes(e.key.toLowerCase())&&!e.defaultPrevented&&!['INPUT','TEXTAREA'].includes(e.target.tagName)&&!e.target.isContentEditable) {
+        e.preventDefault();if(e.key.toLowerCase()==='y'||e.shiftKey)redo();else undo();
       }
     };
     const nativeClipboard=e=>{
@@ -1177,7 +1179,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     };
     window.addEventListener("keydown", listener);window.addEventListener('copy',nativeClipboard);window.addEventListener('paste',nativeClipboard);
     return () => {window.removeEventListener("keydown", listener);window.removeEventListener('copy',nativeClipboard);window.removeEventListener('paste',nativeClipboard);};
-  }, [history,project,projectDialog,mode,running,selection,picker,detailEditor,cameraPilotId,menu,displayScene,contextMenu,dock,floatingDock]);
+  }, [history,future,project,projectDialog,mode,running,selection,picker,detailEditor,cameraPilotId,menu,displayScene,contextMenu,dock,floatingDock]);
 
   const updateVariable = (id,patch) => {
     if(rt.running)return 'Остановите игру, чтобы редактировать переменные.';
@@ -1352,6 +1354,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               title={tr("Объект активен")}
             />
           </div>
+          <Button disabled={running} icon="Plus" onClick={()=>{setGameplayRequest({objectId:o.id,nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');}}>{tr("Добавить механику")}</Button>
           <Field label={tr("Группа в иерархии")}><Select disabled={running} value={project.objectGroups?.find(g=>g.sceneId===scene.id&&g.objectIds.includes(o.id))?.id||''} options={[["","Объекты сцены · корень"],...(project.objectGroups||[]).filter(g=>g.sceneId===scene.id).map(g=>[g.id,literalLabel(g.name)])]} onChange={groupId=>mutate(p=>groupId?addObjectsToGroup(p,groupId,[o.id]):removeObjectsFromGroups(p,scene.id,[o.id]))}/></Field>
           {o.type==='Персонаж'&&<Fold title={tr("Виджет диалога")} icon="PanelsTopLeft"><WidgetAssignment project={project} character={o} onCustomize={()=>customizeWidget({characterId:o.id})} onChange={dialogueWidgetId=>patch({dialogueWidgetId})} onEdit={openWidgets} disabled={running}/></Fold>}
           {o.type==='Персонаж'&&<Button icon="Users" onClick={()=>{setDock('characters');setCompactPanel('workspace');}}>{tr("Модель и анимации персонажа")}</Button>}
@@ -2447,10 +2450,10 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 }
                 show={mode==="game"&&showDialogue&&!preview?.audition&&!gameMenu&&!preview?.paused}
               />
-              {running&&preview?.phase==='PLAYING'&&<GameHUD project={playProject} preview={preview} onAction={widgetAction} text={playBeat.text}/>}
+              {running&&(preview?.phase==='PLAYING'||playProject.gameplay?.hudWidgetId&&preview?.world.game?.active)&&<GameHUD project={playProject} preview={preview} onAction={widgetAction} text={preview.phase==='PLAYING'&&preview.beatId?playBeat.text:''}/>}
               {mode==='game'&&(gameMenu==='mainMenu'||(running&&preview?.paused&&!preview?.audition))&&<WidgetMenu label={gameMenu==='mainMenu'?tr('Главное меню'):tr('Пауза')} widget={project.widgets.find(w=>w.id===previewWidgetId&&w.kind===(gameMenu==='mainMenu'?'mainMenu':'pauseMenu'))||resolveWidget(project,gameMenu==='mainMenu'?'mainMenu':'pauseMenu')}
                   context={{project:playProject,variables,game:preview?.world.game,title:project.title,paused:!!preview?.paused}} onAction={widgetAction}/>}
-              {running && !preview.textVisible && !preview.audition && (
+              {running && !preview.textVisible && !preview.audition && (!preview.ready||preview.error) && (
                 <div className="scene-preparing">
                   <Icon name="LoaderCircle" size={15} />
                   {message(preview.error) || tr("Подготовка сцены перед репликой")}
@@ -2458,7 +2461,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               )}
               {running&&!preview.world.playerControl&&<div className="scene-activity" aria-live="polite">
                 {preview.audition&&<header><Icon name="Clapperboard" size={13}/><strong>{tr("Проба · ")}{preview.auditionName}</strong><button title={tr("Закончить пробу")} onClick={()=>rt.stop()}><Icon name="X" size={13}/></button></header>}
-                {(preview.activity||[]).slice(-4).map(a=><div className={'activity-item '+a.status} key={a.id}><Icon name={a.status==='running'?'LoaderCircle':'Check'} size={12}/><span>{tr(TYPES[a.type]?.label)} <b>{project.objects.find(o=>o.id===a.target)?.name||''} {String(a.value).slice(0,42)}</b></span>{a.status==='running'&&<progress max="1" value={a.progress||0}/>}</div>)}
+                {(preview.activity||[]).slice(-4).map(a=><div className={'activity-item '+a.status} key={a.id}><Icon name={a.status==='running'?'LoaderCircle':'Check'} size={12}/><span>{tr(TYPES[a.type]?.label)} <b>{project.objects.find(o=>o.id===a.target)?.name||''} {activityValue(project,a).slice(0,64)}</b></span>{a.status==='running'&&<progress max="1" value={a.progress||0}/>}</div>)}
                 {preview.error&&<span className="error-box">{message(preview.error)}</span>}
               </div>}
               {running && <div className="viewport-caption">
@@ -2468,7 +2471,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   : tr("Перспектива · вращение мышью")}
                 <span />
                 {running
-                  ? `${playBeat.id} / ${preview.phase}`
+                  ? `${preview.beatId||playScene.name} / ${preview.phase}`
                   : tr("3D · примитивы")}
               </div>}
             </div>
@@ -2610,7 +2613,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 onGraph={id=>{setEventContext({eventId:id});setSelection({kind:'event',id});setDock('event');}}
                 onPreview={draft=>{setCameraPreviewId(null);setCameraPilotId(null);const test=structuredClone(project);const i=test.events.findIndex(e=>e.id===draft.id);if(i<0)test.events.push(draft);else test.events[i]=draft;soundDesk.unlock();rt.stop();setMode('game');setMaximized(null);setFollow(false);rt.previewEvent(test,draft.id,beat.id);}}
                 onPlace={(draft,hook)=>{mutate(p=>addToBatch(p,beat.id,hook,null,draft.id));setPhase(hook);setDock('story');setMaximized(null);setNotice(tr("Добавлено: {0} · {1}", [draft.name, PHASES.find(x=>x.id===hook).label]));}}/>
-              {dock==='create'?null:dock==='gameplay'?<GameplayWorkspace project={project} onChange={mutate} sceneId={displayScene.id} running={running} onStop={()=>rt.stop()} onWidgets={()=>{setWidgetRequest({id:project.gameplay.hudWidgetId||project.ui.hud});setDock('widgets');}} onInput={()=>setDock('input')} onEvent={id=>openAuthoring('event',id?{id}:{})} onStory={()=>{setDock('story');setDetailEditor(false);}}/>:dock==='input'?<InputWorkspace project={project} onChange={mutate} beat={playBeat} preview={preview} devices={inputDevices} running={running} onStop={()=>rt.stop()}/>:detailEditor && event ? (
+              {dock==='create'?null:dock==='gameplay'?<GameplayWorkspace preview={preview} onObject={id=>{setSelection({kind:"object",id});openObjectTransform();}} addRequest={gameplayRequest} onUndo={undo} onRedo={redo} canUndo={!!history.length} canRedo={!!future.length} onPlay={()=>start()} selectedObjectId={selection.kind==="object"?selection.id:null} project={project} onChange={mutate} onImport={plan=>changeAssetLibrary(p=>Object.assign(p,plan.apply(p)))} sceneId={displayScene.id} running={running} onStop={()=>rt.stop()} onWidgets={()=>{setWidgetRequest({id:project.gameplay.hudWidgetId||project.ui.hud});setDock('widgets');}} onInput={()=>setDock('input')} onEvent={id=>openAuthoring('event',id?{id}:{})} onStory={()=>{setDock('story');setDetailEditor(false);}}/>:dock==='input'?<InputWorkspace project={project} onChange={mutate} beat={playBeat} preview={preview} devices={inputDevices} running={running} onStop={()=>rt.stop()}/>:detailEditor && event ? (
                 <EventEditor
                   project={project}
                   event={event}
@@ -2761,7 +2764,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           {tr("Диагностика · ")}{issues.length}
         </button>
         <span className="status-divider" />
-        <span data-help-title={tr("Хранение проекта")} data-help={serverStorageEnabled?tr("Автосохранение записывает проект в серверную БД, модели — в S3. Ctrl+S сохраняет сразу. Серверные проекты доступны через меню «Файл». Для переносимой копии используйте экспорт JSON."):tr("Автосохранение хранит последний проект в браузере. Ctrl+S сохраняет файл JSON.")}>{saveError || notice || (serverStorageEnabled?tr("Сохранено на сервере · Ctrl+S"):tr("Автосохранение в браузере · файл: Ctrl+S"))}</span>
+        <span role="status" data-help-title={tr("Хранение проекта")} data-help={serverStorageEnabled?tr("Автосохранение записывает проект в серверную БД, модели — в S3. Ctrl+S сохраняет сразу. Серверные проекты доступны через меню «Файл». Для переносимой копии используйте экспорт JSON."):tr("Автосохранение хранит последний проект в браузере. Ctrl+S сохраняет файл JSON.")}>{saveError || notice || (running&&preview?.hint) || (serverStorageEnabled?tr("Сохранено на сервере · Ctrl+S"):tr("Автосохранение в браузере · файл: Ctrl+S"))}</span>
         <div className="flex-space" />
         <span>
           {tr("Выделено:")}{" "}
@@ -2807,7 +2810,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             >
               <Icon name="Undo2" />
               {tr("Отменить ")}<kbd>Ctrl Z</kbd>
-            </button></>
+            </button><button disabled={!future.length} onClick={()=>{redo();setMenu(null);}}><Icon name="Redo2"/>{tr("Повторить ")}<kbd>Ctrl Shift Z</kbd></button></>
           ) : menu === "Создать" ? (
             <>
               <button onClick={()=>openSubscenes('create')}><Icon name="PanelsTopLeft"/>{tr("Сабсцена")}</button>

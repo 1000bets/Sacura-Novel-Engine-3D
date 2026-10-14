@@ -1,0 +1,49 @@
+import React,{useId,useSyncExternalStore} from 'react';
+import {reference,referenceRecords,dependentSchema,validateValue,schemaDefaults} from './valueSchemas.js';
+import {operationDefinitions,operationDefinition,operationRevision,subscribeOperations,validateOperationCall} from './operationRegistry.js';
+import {validateExpression} from './expressionValidation.js';
+import {t} from './i18n.js';
+import {referenceLabel} from './referencePresentation.js';
+export function useOperationLibrary(){useSyncExternalStore(subscribeOperations,operationRevision,operationRevision);return operationDefinitions();}
+export function initialSchemaValue(schema,project){
+ const value=schemaDefaults(schema);if(value!==undefined)return value;
+ if(schema.type==='reference')return reference(schema.referenceType,referenceRecords(project,schema.referenceType)[0]?.id||'');
+ if(schema.type==='union')return initialSchemaValue(schema.variants[0],project);
+ return ({number:0,integer:0,boolean:false,string:'',vector:Array(schema.size||3).fill(0),collection:[],object:{}})[schema.type];
+}
+export function SchemaValue({schema,value,onChange,project,parameters={},label=schema.label||'Значение',expressionOptions=[],path='',issues=[],scope}){
+ const id=useId(),context={project,scope,parameters,allowDeferred:true,allowExpressions:true,validateExpression},resolved=(()=>{try{return dependentSchema(schema,context);}catch{return null;}})(),s=resolved||schema,errors=[...new Map([...validateValue(schema,value,context,path),...issues].map(e=>[e.path+'|'+e.message,e])).values()],invalid=errors.length>0;
+ const props={id, 'aria-invalid':invalid||undefined,'aria-describedby':invalid?id+'-error':undefined};
+ const input=el=><label className="game-field"><span>{t(label)}</span>{el}</label>;
+ const expression=value?.op;
+ const choices=expressionOptions.filter(([, ,type])=>!type||type.type===s.type||s.type==='number'&&type.type==='integer'||s.type==='reference'&&type.type==='reference'&&type.referenceType===s.referenceType).map(([path,label])=>[path,label]);
+ let field;
+ if(expression){field=input(<select {...props} value={value.op==='get'?value.path:'__complex'} onChange={e=>onChange(e.target.value?{op:'get',path:e.target.value}:initialSchemaValue(s,project))}><option value="">{t('Задать значение')}</option>{value.op!=='get'&&<option value="__complex">{t('Сложное выражение сохранено')}</option>}{choices.map(([key,name])=><option key={key} value={key}>{name}</option>)}</select>);}
+ else if(s.type==='reference'){
+  const records=referenceRecords(project,s.referenceType).filter(x=>!['resource','weapon'].includes(s.referenceType)||!parameters.owner?.id||!x.owner||x.owner.id===parameters.owner.id);
+  const options=records.map(x=>[JSON.stringify(reference(s.referenceType,x.id)),referenceLabel(project,s.referenceType,x)]);
+  if(s.referenceType==='object')options.unshift(...[['self','Этот объект'],['source','Источник'],['target','Цель'],['initiator','Инициатор']].filter(([role])=>role!=='self'||!scope||scope.kind==='object').map(([role,name])=>[JSON.stringify({kind:'reference',type:'object',mode:'context',role}),t(name)]));
+  const selected=value?JSON.stringify(value):'';if(value&&!options.some(([key])=>key===selected))options.unshift([selected,t('Недоступная или внешняя связь')]);
+  field=input(<select {...props} value={selected} onChange={e=>onChange(e.target.value?JSON.parse(e.target.value):s.optional?undefined:reference(s.referenceType,''))}><option value="">{t(s.optional?'Автоматически / не задано':'Выберите…')}</option>{options.map(([key,name])=><option key={key} value={key}>{name}</option>)}</select>);
+ }else if(s.type==='object')field=<fieldset className="game-card"><legend>{t(label)}</legend><SchemaFields project={project} scope={scope} schema={s} value={value||{}} onChange={onChange} expressionOptions={expressionOptions}/></fieldset>;
+ else if(s.type==='collection'){
+  const tags=[...new Set(project.objects.flatMap(o=>o.tags||[]))],selector=s.items.type==='reference'&&s.items.referenceType==='object';
+  field=<fieldset className="game-card"><legend>{t(label)}</legend>{selector&&<label className="game-field"><span>{t('Группа по тегу')}</span><select {...props} value={value?.mode==='tag'?value.tag:''} onChange={e=>onChange(e.target.value?{kind:'reference',type:'object',mode:'tag',tag:e.target.value}:[])}><option value="">{t('Отдельные объекты')}</option>{tags.map(tag=><option key={tag}>{tag}</option>)}</select></label>}{Array.isArray(value)&&value.map((item,index)=><div key={index}><SchemaValue project={project} scope={scope} schema={s.items} value={item} label={label+' · '+(index+1)} parameters={parameters} expressionOptions={expressionOptions} onChange={next=>onChange(value.map((x,i)=>i===index?next:x))}/><button type="button" onClick={()=>onChange(value.filter((_,i)=>i!==index))}>{t('Убрать')}</button></div>)}{value?.mode!=='tag'&&<button type="button" onClick={()=>onChange([...(value||[]),initialSchemaValue(s.items,project)])}>{t('Добавить значение')}</button>}</fieldset>;
+ }else if(s.type==='vector')field=<fieldset className="game-card"><legend>{t(label)}</legend>{Array.from({length:s.size||3},(_,i)=><label key={i}>{['X','Y','Z','W'][i]}<input {...props} id={id+'-'+i} aria-label={label+' '+['X','Y','Z','W'][i]} type="number" step="any" value={value?.[i]??0} onChange={e=>{const v=[...(value||Array(s.size||3).fill(0))];v[i]=Number(e.target.value);onChange(v);}}/></label>)}</fieldset>;
+ else if(s.type==='union'){
+  const type=typeof value,selected=s.variants.findIndex(x=>x.type===type||x.type==='integer'&&type==='number'||x.type==='reference'&&x.referenceType===value?.type);
+  field=<div><label className="game-field"><span>{t(label+' · тип')}</span><select value={Math.max(0,selected)} onChange={e=>onChange(initialSchemaValue(s.variants[Number(e.target.value)],project))}>{s.variants.map((v,i)=><option key={i} value={i}>{t(v.label||({number:'Число',integer:'Целое число',boolean:'Да / нет',string:'Текст'})[v.type]||v.type)}</option>)}</select></label><SchemaValue project={project} scope={scope} schema={s.variants[Math.max(0,selected)]} value={value} parameters={parameters} label={label} expressionOptions={expressionOptions} onChange={onChange}/></div>;
+ }else if(s.type==='boolean')field=input(<select {...props} value={String(value??false)} onChange={e=>onChange(e.target.value==='true')}><option value="true">{t('Да')}</option><option value="false">{t('Нет')}</option></select>);
+ else if(s.enum)field=input(<select {...props} value={value??s.default??''} onChange={e=>onChange(s.type==='number'||s.type==='integer'?Number(e.target.value):e.target.value)}>{s.enum.map(x=><option key={x} value={x}>{t(s.options?.[x]||String(x))}</option>)}</select>);
+ else if(['number','integer'].includes(s.type))field=input(<input {...props} type="number" min={s.min} max={s.max} step={s.type==='integer'?1:'any'} value={value??''} onChange={e=>onChange(e.target.value===''?undefined:Number(e.target.value))}/>);
+ else if(s.type==='string')field=input(<input {...props} value={value??''} onChange={e=>onChange(e.target.value)}/>);
+ else field=<p>{t('Сначала выберите связь для значения.')}</p>;
+ return <div>{field}{!expression&&choices.length>0&&s.type!=='object'&&<details><summary>{t('Значение из переменной или параметра')}</summary><label className="game-field"><span>{t(label+' · источник')}</span><select value="" onChange={e=>{if(e.target.value)onChange({op:'get',path:e.target.value});}}><option value="">{t('Выберите…')}</option>{choices.map(([key,name])=><option key={key} value={key}>{name}</option>)}</select></label></details>}{invalid&&<small id={id+'-error'} role="alert">{errors.map(e=>t(e.message)).join(' ')}</small>}</div>;
+}
+export default function SchemaFields({project,schema,value={},onChange,expressionOptions=[],issues=[],scope}){
+ const values={...schemaDefaults(schema),...value};return Object.entries(schema.properties).map(([key,s])=><SchemaValue key={key} project={project} scope={scope} schema={s} value={values[key]} label={s.label||key} parameters={values} path={key} issues={issues.filter(e=>e.path===key||e.path?.startsWith(key+'.'))} expressionOptions={expressionOptions} onChange={next=>{const out={...values};if(next===undefined)delete out[key];else out[key]=next;onChange(out);}}/>);
+}
+export function OperationFields({project,call,onChange,kind='rule',resultType,pureOnly=false,expressionOptions=[],scope}){
+ const library=useOperationLibrary().filter(d=>d.contexts.includes(kind)&&(!resultType||d.result.type===resultType)&&(!pureOnly||d.pure)),d=operationDefinition(call?.id,call?.version),byId=[...new Map(library.map(d=>[d.id,d])).values()];
+ return <><label className="game-field"><span>{t('Операция')}</span><select value={call?.id||''} onChange={e=>{const next=byId.find(x=>x.id===e.target.value);onChange(next?{id:next.id,version:next.version,parameters:schemaDefaults(next.parameters)}:null);}}><option value="">{t('Без операции')}</option>{call&&!d&&<option value={call.id}>{call.id+' · '+t('Недоступна')}</option>}{byId.map(d=><option key={d.id} value={d.id}>{t(d.editor.label)}</option>)}</select></label>{library.filter(d=>d.id===call?.id).length>1&&<label className="game-field"><span>{t('Версия операции')}</span><select value={call.version} onChange={e=>onChange({...call,version:Number(e.target.value)})}>{library.filter(d=>d.id===call.id).map(d=><option key={d.version} value={d.version}>{d.version}</option>)}</select></label>}{call&&!d&&<p role="alert">Операция или версия недоступна. Параметры сохранены.</p>}{d&&<SchemaFields project={project} scope={scope} schema={d.parameters} value={call.parameters} issues={validateOperationCall(call,{project,kind,allowDeferred:true,allowExpressions:true})} expressionOptions={expressionOptions} onChange={parameters=>onChange({...call,parameters})}/>}</>;
+}

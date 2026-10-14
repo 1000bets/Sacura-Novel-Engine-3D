@@ -2652,5 +2652,20 @@
   "Вы уже вошли в аккаунт.": "You are already signed in.",
   "Слишком много попыток. Повторите позже.": "Too many attempts. Try again later.",
   "Выделите и скопируйте ссылку вручную: буфер обмена недоступен.": "Select and copy the link manually: the clipboard is unavailable.",
-  "Не удалось скопировать ссылку. Выделите и скопируйте её вручную.": "Could not copy the link. Select and copy it manually."
+  "Не удалось скопировать ссылку. Выделите и скопируйте её вручную.": "Could not copy the link. Select and copy it manually.",
+  "Выбирайте тип параметра: значение, объект, предмет или готовое определение. Локальные переменные нужны только для расчётов функции.": "Choose a parameter type: a value, object, item or existing definition. Local variables are only used for function calculations.",
+  "Сложное выражение сохранено": "Complex expression preserved",
+  "Недоступная или внешняя связь": "Unavailable or external binding",
+  "Группа по тегу": "Objects with tag",
+  "Отдельные объекты": "Individual objects",
+  "Убрать": "Убрать",
+  "Добавить значение": "Add value",
+  "Сначала выберите связь для значения.": "Select a binding first.",
+  "Значение из переменной или параметра": "Value from variable or parameter",
+  "Без операции": "No operation",
+  "Недоступна": "Unavailable",
+  "Версия операции": "Operation version",
+  "Добавить механику": "Add mechanic",
+  "Недоступная связь · выберите замену": "Unavailable reference · choose a replacement",
+  "Выбранная связь удалена или недоступна. Выберите замену.": "The selected reference was deleted or is unavailable. Choose a replacement."
 }

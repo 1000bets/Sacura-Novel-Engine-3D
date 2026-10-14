@@ -1,3 +1,4 @@
+import {validateCapabilityBinding} from './capabilityBindings.js';
 // Shared authoring/runtime RectTransform model. Coordinates use the widget's reference resolution.
 export const WIDGET_KINDS={dialogue:'Диалог',mainMenu:'Главное меню',pauseMenu:'Меню паузы',hud:'Игровой HUD'};
 export const ELEMENT_TYPES={progress:'Шкала',inventory:'Инвентарь',panel:'Панель',text:'Текст',button:'Кнопка',image:'Изображение',choices:'Ответы игрока'};
@@ -122,7 +123,7 @@ export function validateWidgets(project){
    if(!e||typeof e!=='object'){bad('Некорректный элемент.');continue;}
    if(typeof e.id!=='string'||!e.id)bad('Отсутствует ID элемента.');
    if(elementIds.has(e.id))bad('Повторяющийся ID элемента.');elementIds.add(e.id);
-   if(e.binding&&(!['variable','game'].includes(e.binding.source)||typeof e.binding.path!=='string'))bad('Повреждена привязка значения.');if(e.action==='event'&&e.eventId&&!project.events?.some(x=>x.id===e.eventId))bad('Событие кнопки удалено.');
+   for(const b of [e.binding,e.maxBinding,e.showIf].filter(Boolean)){if(b.source==='capability'){for(const error of validateCapabilityBinding(project,b))bad(error.message);}else if(!['variable','game'].includes(b.source)||typeof b.path!=='string')bad('Повреждена привязка значения.');}if(e.type==='progress'&&[e.binding,e.maxBinding].some(b=>b?.source==='capability'&&!['number','integer'].includes(b.valueType)))bad('Для шкалы выберите числовое значение.');if(e.type==='inventory'&&e.binding?.source==='capability'&&e.binding.valueType!=='collection')bad('Для инвентаря выберите коллекцию предметов.');if(e.action==='event'&&e.eventId&&!project.events?.some(x=>x.id===e.eventId))bad('Событие кнопки удалено.');
    if(!ELEMENT_TYPES[e.type])bad('Неизвестный тип элемента.');
    const l=e.layout;
    if(!l||['anchorMin','anchorMax','pivot'].some(k=>!Array.isArray(l[k])||l[k].length!==2||l[k].some(v=>!Number.isFinite(v)||v<0||v>1))||['x','y','width','height'].some(k=>!Number.isFinite(l[k]))||l.anchorMin.some((v,i)=>v>l.anchorMax[i]))bad('Некорректные анкеры или размер элемента «'+e.name+'».');

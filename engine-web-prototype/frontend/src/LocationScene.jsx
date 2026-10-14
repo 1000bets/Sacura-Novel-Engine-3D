@@ -4,7 +4,7 @@ import {createGameControls,gameSceneHit} from './GameControls.js';
 import {createScenePhysics} from './scenePhysics.js';
 import {createMeshObject,updateMeshVisual,disposeMeshVisual,applyMaterialAssignments,disposeMaterialAssignments} from './meshVisual.js';
 import {createRendererViewport} from './rendererViewport.js';
-import {updateObjectHighlight} from './sceneEffects.js';
+import {updateObjectHighlight,updateDoorEffect} from './sceneEffects.js';
 import React, { useEffect, useRef } from "react";
 import * as THREE from "three";
 import {updateCharacterVisual,disposeCharacterVisual} from "./characterVisual.js";
@@ -236,11 +236,12 @@ function Exterior({
           disposeCharacterVisual(mesh);disposeMeshVisual(mesh);mesh.visible = false;
           return;
         }
-        mesh.visible = o.active && state.visible?.[o.id] !== false && !(state.game?.active&&state.game.preset==='fps'&&state.playerControl?.characterId===o.id);
+        mesh.visible = o.active && state.visible?.[o.id] !== false && !(state.game?.active&&state.game.camera?.mode==='firstPerson'&&state.game.camera.targetId===o.id);
         if(mesh.userData.marker)mesh.userData.marker.visible=(state.interactionTarget===o.id||state.interactionTargets?.includes(o.id))||state.highlights?.[o.id];
         gizmo.apply(mesh,o,resolvedPosition(o,state,kind));
         updateLightObject(mesh,o,live.current.mode==='scene');
         updateMeshVisual(mesh,o);if(o.type!=='Персонаж'&&o.type!=='Источник света'&&!mesh.userData.placeholder)applyMaterialAssignments(mesh,o);
+        updateDoorEffect(mesh,state,o.id,dt,live.current.mode==='game');
         updateObjectHighlight(mesh,(state.interactionTarget===o.id||state.interactionTargets?.includes(o.id))||!!state.highlights?.[o.id],animTime);
         updateCharacterVisual(mesh,{...o,walkAnimation:state.motions?.[o.id]?.animationId||o.walkAnimation},dt,state.poses?.[o.id],!!state.motions?.[o.id]&&!state.motions[o.id].stopped&&!state.motions[o.id].paused&&state.motions[o.id].progress<1,state.paused,mode==='scene'&&live.current.editing);
 
