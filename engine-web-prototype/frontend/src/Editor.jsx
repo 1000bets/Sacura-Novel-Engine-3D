@@ -83,6 +83,7 @@ import {
 import LocationScene from "./LocationScene.jsx";
 import EditorGraph from "./EditorGraph.jsx";
 import EditorContextMenu from "./EditorContextMenu.jsx";
+import SceneObjectMenu from './SceneObjectMenu.jsx';
 import ActionFields from "./ActionFields.jsx";
 import EventInspector from "./EventInspector.jsx";
 import {exportLocation,importLocation} from "./locationFiles.js";
@@ -362,8 +363,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     [snap,setSnap]=useState(false),
     [focusRequest,setFocusRequest]=useState(0),
     [cameraPilotId,setCameraPilotId]=useState(null),
-    [cameraPreviewId,setCameraPreviewId]=useState(null),
-    [showCameras,setShowCameras]=useState(true);
+    [cameraPreviewId,setCameraPreviewId]=useState(null);
   const currentProject=useRef(project);currentProject.current=project;
   const root = useRef(),
     fileInput = useRef(),
@@ -961,7 +961,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     const c=newCamera(view,followTarget?'Слежение · '+followTarget.name:'Камера '+((scene.cameras?.length||0)+1));
     if(followTarget)Object.assign(c,{mode:'follow',followTargetId:followTarget.id,distance:3,height:1.7,yaw:-15,targetHeight:1.08});
     mutate(p=>{const sc=p.subscenes.find(s=>s.id===scene.id);sc.cameras||=[];sc.cameras.push(c);if(followTarget||!sc.defaultCameraId)sc.defaultCameraId=c.id;});
-    selectCamera(c.id);setShowCameras(true);setNotice(followTarget?'Следящая камера назначена основной.':'Камера создана из текущего вида.');
+    selectCamera(c.id);setNotice(followTarget?'Следящая камера назначена основной.':'Камера создана из текущего вида.');
     if(followTarget){setMode('game');setCameraPreviewId(c.id);}else{setCameraPilotId(null);setMode('scene');}
   };
   const followCharacter=()=>{const target=objects.find(o=>o.id===selection.id&&o.type==='Персонаж')||objects.find(o=>o.type==='Персонаж'&&o.active);if(target)createCamera(target);};
@@ -1012,10 +1012,15 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     if(rt.running)return;const id=uid('point'),selectedObject=objects.find(o=>o.id===selection.id),position=contextMenu?.worldPosition||(selectedObject?objectTransform(selectedObject,scene.id,scene.kind).position:[0,0,0]);
     mutate(p=>{const target=p.subscenes.find(s=>s.id===scene.id);target.stagingPoints||=[];target.stagingPoints.push({id,label:'Новая точка постановки',position:[position[0],0,position[2]]});});
     setSelection({kind:'point',id});editScene();setPicker(null);setContextMenu(null);openObjectTransform();
-    setLayout(l=>({...l,treeOpen:{...l.treeOpen,[scene.id+':points']:true}}));
   };
   const addSoundEvent=()=>{if(rt.running)return;const e=newEvent('sound','world','Звук','Новое звуковое событие');mutate(p=>p.events.push(e));setPicker(null);setContextMenu(null);editSample(e.id);setNotice('Выберите аудиофайл в инспекторе; затем добавьте событие к реплике.');};
-  const addEmptyGroup=()=>{if(rt.running)return;const next=structuredClone(project),group=createObjectGroup(next,scene.id,[],'Новая группа',{allowEmpty:true});mutate(p=>Object.assign(p,next));setSelection({kind:'group',id:group.id});setLayout(l=>({...l,treeOpen:{...l.treeOpen,[scene.id+':objects']:true,[scene.id+':'+group.id]:true}}));openObjectTransform();};
+  const openObjectPicker=(event,groupId)=>{
+    if(rt.running)return;
+    const clicked=event.currentTarget,anchor=clicked.closest('.editor-menu')?root.current.querySelector('.editor-menubar>button.active'):clicked;
+    setPicker(current=>current?.kind==='object'&&current.anchor===anchor?null:{kind:'object',groupId,anchor});
+    setMenu(null);setContextMenu(null);
+  };
+  const addEmptyGroup=()=>{if(rt.running)return;const next=structuredClone(project),group=createObjectGroup(next,scene.id,[],'Новая группа',{allowEmpty:true});mutate(p=>Object.assign(p,next));setSelection({kind:'group',id:group.id});setLayout(l=>({...l,treeOpen:{...l.treeOpen,[scene.id+':'+group.id]:true}}));openObjectTransform();};
   const addObject = (type,primitive="box") => {
     if(rt.running)return;
     editScene();
@@ -1038,6 +1043,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     });
     setContextMenu(null);
     setSelection({ kind: "object", id });
+    if(groupId)setLayout(l=>({...l,treeOpen:{...l.treeOpen,[scene.id+':'+groupId]:true}}));
     setFocusRequest({nonce:uid('focus')});
     setPicker(null);
     if(type==='Персонаж'){setDock('characters');setCompactPanel('workspace');}
@@ -1210,7 +1216,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     }
     if(selection.kind==='group'){
       const group=project.objectGroups?.find(g=>g.id===selection.id);
-      if(group)return <><Field label={tr("Название группы")}><input disabled={running} value={group.name} onChange={e=>{const name=e.target.value;mutate(p=>p.objectGroups.find(g=>g.id===group.id).name=name);}}/></Field><Button icon="Plus" disabled={running} onClick={()=>setPicker({kind:'object',groupId:group.id})}>{tr("Создать объект в группе")}</Button><p>{tr("Перетащите сюда объекты из иерархии.")}</p></>;
+      if(group)return <><Field label={tr("Название группы")}><input disabled={running} value={group.name} onChange={e=>{const name=e.target.value;mutate(p=>p.objectGroups.find(g=>g.id===group.id).name=name);}}/></Field><Button icon="Plus" disabled={running} aria-haspopup="menu" onClick={event=>openObjectPicker(event,group.id)}>{tr("Создать объект в группе")}</Button><p>{tr("Перетащите сюда объекты из иерархии.")}</p></>;
     }
     if(selection.kind==='file'){
       const file=collectAssetFiles(project,projectAudioAssets(project)).find(f=>f.id===selection.id);
@@ -2065,8 +2071,11 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       {label:'Сгруппировать выделение',icon:'FolderPlus',group:'Выделение',disabled:objectSelectionIds.length<2,action:createSelectionGroup},
       {label:'Дублировать выделение',icon:'Copy',group:'Выделение',disabled:!objectSelectionIds.length,action:duplicateObjects},
       {label:'Удалить выделение',icon:'Trash2',group:'Выделение',shortcut:'Del',disabled:!objectSelectionIds.length,action:deleteObjects},
+      {label:'Оси трансформации',icon:'Axis3d',group:'Выделение',disabled:!objectSelectionIds.length,children:[
+        {label:'Мировые оси',icon:editSpace==='world'?'Check':'Globe',action:()=>setEditSpace('world')},
+        {label:'Оси объекта',icon:editSpace==='local'?'Check':'Box',action:()=>setEditSpace('local')},
+      ]},
       {label:showGrid?'Скрыть сетку':'Показать сетку',icon:'Grid2X2',group:'Вид',action:()=>setShowGrid(v=>!v)},
-      {label:showCameras?'Скрыть камеры':'Показать камеры',icon:'Video',group:'Вид',action:()=>setShowCameras(v=>!v)},
     ];
     if(contextMenu?.kind==='event')return binding?[
       {label:'Редактировать исходный шаблон',icon:'Layers',group:'Состав нод задаётся в шаблоне',action:()=>setEventContext({eventId:event.id})}
@@ -2270,33 +2279,29 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           <div className="panel-tabs">
             <button className="active">{tr("Иерархия")}</button>
             <div className="flex-space" />
-            <Button
-              icon="Plus"
-              title={tr("Создать объект")}
-              onClick={() => setPicker({ kind: "object" })}
-            />
             <Button icon={maximized==='hierarchy'?'Minimize2':'Maximize2'} title={maximized==='hierarchy'?tr("Восстановить иерархию"):tr("Развернуть иерархию")} onClick={()=>setMaximized(v=>v==='hierarchy'?null:'hierarchy')}/>
             <Button icon="PanelLeftClose" title={tr("Свернуть иерархию")} onClick={()=>{setMaximized(null);setLayout(l=>({...l,hiddenHierarchy:true}));setCompactPanel('workspace');}}/>
           </div>
-          <div className="panel-search">
-            <Icon name="Search" size={13} />
-            <input
-              aria-label={tr("Поиск объектов")}
-              placeholder={tr("Найти объект…")}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
+          <div className="hierarchy-toolbar">
+            <Button className="hierarchy-add" icon="Plus" title={tr("Добавить объект")} aria-haspopup="menu" aria-expanded={picker?.kind==='object'&&picker.anchor===root.current?.querySelector('.hierarchy-add')} disabled={running} onClick={openObjectPicker}/>
+            <div className="panel-search">
+              <Icon name="Search" size={13} />
+              <input
+                aria-label={tr("Поиск объектов")}
+                placeholder={tr("Найти объект…")}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
           </div>
           <div className="hierarchy-tree">
-              <HierarchyTree onAddObject={groupId=>setPicker({kind:'object',groupId})} onAddPoint={addStagingPoint} onAddSound={addSoundEvent} onCreateEmptyGroup={addEmptyGroup} onRootDrop={ids=>{if(!rt.running)mutate(p=>removeObjectsFromGroups(p,displayScene.id,ids));}} groups={sceneObjectGroups(project,displayScene.id,objects)} disabled={running} onCreateGroup={createSelectionGroup} onSelectGroup={group=>{if(rt.running)return;setMode('scene');setSelection(group.objectIds.length?{kind:'object',id:group.objectIds[0],ids:group.objectIds,groupId:group.id}:{kind:'group',id:group.id});openObjectTransform();}} onGroupDrop={(groupId,ids)=>{if(!rt.running)mutate(p=>addObjectsToGroup(p,groupId,ids));}} scene={displayScene} objects={objects} points={sceneStagingPoints(displayScene,objects)} query={query} selected={selection.id} selectedIds={objectSelectionIds}
+              <HierarchyTree onAddObject={(groupId,event)=>openObjectPicker(event,groupId)} onRootDrop={ids=>{if(!rt.running)mutate(p=>removeObjectsFromGroups(p,displayScene.id,ids));}} groups={sceneObjectGroups(project,displayScene.id,objects)} disabled={running} onSelectGroup={group=>{if(rt.running)return;setMode('scene');setSelection(group.objectIds.length?{kind:'object',id:group.objectIds[0],ids:group.objectIds,groupId:group.id}:{kind:'group',id:group.id});openObjectTransform();}} onGroupDrop={(groupId,ids)=>{if(!rt.running)mutate(p=>addObjectsToGroup(p,groupId,ids));}} scene={displayScene} objects={objects} points={sceneStagingPoints(displayScene,objects)} query={query} selected={selection.id} selectedIds={objectSelectionIds}
                 expanded={layout.treeOpen||{}} onExpanded={treeOpen=>setLayout(l=>({...l,treeOpen}))}
                 onSelectObject={(id,options)=>{if(!running){setMode('scene');setCameraPilotId(null);setCameraPreviewId(null);}selectObject(id,options);}}
                 onFrameObject={id=>{editScene();setSelection({kind:'object',id});setFocusRequest({nonce:uid('focus')});}}
                 onVisibility={id=>mutate(p=>{const o=p.objects.find(o=>o.id===id);o.active=o.active===false;})}
                 onPoint={point=>{editScene();setSelection({kind:'point',id:point.id});openObjectTransform();setFocusRequest({nonce:uid('focus'),position:point.position,objectId:point.objectId});}}
-                onSelectCamera={selectCamera} onCameras={openCameras} showCameras={showCameras} onShowCameras={()=>setShowCameras(v=>!v)}
-                showDialogue={showDialogue} onShowDialogue={()=>setShowDialogue(v=>!v)} onStory={()=>{setDock('story');setDetailEditor(false);setMaximized(null);}}
-                onAudio={()=>{setDock('active');setDetailEditor(false);setMaximized(null);}}/>
+                onSelectCamera={selectCamera}/>
 
           </div>
           <div className="hierarchy-footer">
@@ -2375,14 +2380,9 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             </div>
             <div className="viewport-commandbar" aria-label={tr("Инструменты сцены")}>
               {mode==='scene'&&!cameraPilotId&&<div className="scene-edit-bar">
-                <button className="scene-edit-add" onClick={()=>setPicker({kind:'object'})}><Icon name="Plus" size={14}/>{tr("Добавить объект / примитив")}</button>
                 {[['select','MousePointer2','Выбор','Q'],['translate','Move','Сдвиг','W'],['rotate','Rotate3D','Поворот','E'],['scale','Scaling','Масштаб','R']].map(([tool,icon,label,key])=><button key={tool} disabled={running||(selection.kind==='camera'&&(tool==='scale'||(tool==='rotate'&&displayScene.cameras?.find(c=>c.id===selection.id)?.mode==='follow')))} title={tr(label)+' · '+key} aria-pressed={editTool===tool} className={'transform-tool '+(editTool===tool?'active':'')} onClick={()=>setEditTool(tool)}><Icon name={icon} size={14}/><span className="tool-label">{tr(label)} · {key}</span></button>)}
-                <Button icon="Settings2" disabled={selection.kind!=='object'} title={tr("Позиция, вращение и масштаб выбранного объекта")} onClick={openObjectTransform}>{tr("Положение, поворот, масштаб")}</Button>
                 <button title={tr("Привязка: 0,25 м / 15° / 0,1×")} aria-pressed={snap} className={snap?'active':''} onClick={()=>setSnap(v=>!v)}><Icon name="Magnet" size={14}/></button>
-                <select aria-label={tr("Оси трансформации")} value={editSpace} onChange={e=>setEditSpace(e.target.value)}><option value="world">{tr("Мир")}</option><option value="local">{tr("Объект")}</option></select>
-                <Button icon="Video" title={tr("Показать камеры в 3D")} aria-pressed={showCameras} className={showCameras?"active":""} onClick={()=>setShowCameras(v=>!v)}/>
                 <Button icon="Grid3X3" title={tr("Сетка сцены")} aria-pressed={showGrid} className={showGrid?"active":""} onClick={()=>setShowGrid(v=>!v)}/>
-                <Button icon="Focus" title={tr("Приблизить выбранный объект · F")} disabled={selection.kind!=='object'} onClick={()=>setFocusRequest({nonce:uid('focus')})}/>
               </div>}
               {cameraPilotId&&mode==='scene'&&<div className="camera-pilot-bar"><Icon name="Video"/><span>{tr("Настройка: ")}{displayScene.cameras?.find(c=>c.id===cameraPilotId)?.name}<small>{tr("Обзор мышью · правая кнопка — сдвиг · колесо — приближение")}</small></span><Button icon="Check" onClick={()=>captureCamera(cameraPilotId)}>{tr("Сохранить ракурс")}</Button><Button icon="X" title={tr("Вернуться без сохранения")} onClick={()=>setCameraPilotId(null)}/></div>}
               {(mode==='game'||(cameraPreviewId&&!cameraPilotId))&&<div className="camera-view-badge"><Icon name={resolveCamera(displayScene,world,objects,cameraPreviewId).mode==='follow'?'UserRoundCheck':'Video'} size={14}/><span className="camera-view-name">{resolveCamera(displayScene,world,objects,cameraPreviewId).name}</span>{cameraPreviewId&&<button onClick={()=>setCameraPreviewId(null)}>{mode==='game'?tr("По сценарию"):tr("Вернуться к сцене")} <Icon name="X" size={12}/></button>}</div>}
@@ -2408,7 +2408,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               <LocationScene
                 sceneId={displayScene.id}
                 editTool={editTool} editSpace={editSpace} snap={snap} focusRequest={cameraPilotId?0:focusRequest} editing={!running&&!cameraPilotId&&!positionPick} onTransform={transformObject} onTransforms={transformObjects}
-                cameraScene={displayScene} selectedCameraId={selection.kind==='camera'?selection.id:null} cameraPreviewId={cameraPreviewId} cameraPilotId={cameraPilotId} onCameraChange={changeCamera} onCameraSelect={selectCamera} cameraApi={cameraApi} physicsApi={physicsApi} showCameras={showCameras}
+                cameraScene={displayScene} selectedCameraId={selection.kind==='camera'?selection.id:null} cameraPreviewId={cameraPreviewId} cameraPilotId={cameraPilotId} onCameraChange={changeCamera} onCameraSelect={selectCamera} cameraApi={cameraApi} physicsApi={physicsApi}
                 kind={displayScene.kind}
                 objects={objects}
                 state={world}
@@ -2833,10 +2833,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 <Icon name="Layers" />
                 {tr("Событие")}</button>
               <button
-                onClick={() => {
-                  setMenu(null);
-                  setPicker({ kind: "object" });
-                }}
+                onClick={openObjectPicker}
               >
                 <Icon name="Box" />
                 {tr("Объект")}</button>
@@ -2868,7 +2865,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         </div>
       )}
       {contextMenu&&<EditorContextMenu x={contextMenu.x} y={contextMenu.y} title={contextMenu.kind==='scene'?tr("Сцена"):tr("Добавить ноду")} items={contextItems()} onClose={closeContextMenu}/>}
-      {picker && (
+      {picker?.kind==='object'&&<SceneObjectMenu anchor={picker.anchor} onClose={()=>setPicker(null)} onGroup={addEmptyGroup} onCamera={()=>createCamera()} onPoint={addStagingPoint} onSound={addSoundEvent} onObject={addObject}/>}
+      {picker && picker.kind!=='object' && (
         <div
           className="create-overlay"
           onPointerDown={(e) => {
@@ -2883,11 +2881,9 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   ? tr("Добавить ноду")
                   : picker.kind === "event"
                     ? tr("Добавить событие")
-                    : picker.kind === "object"
-                      ? tr("Добавить объект")
-                      : picker.kind === "object-action"
-                        ? tr("Действие с объектом")
-                        : tr("Добавить действие")}
+                    : picker.kind === "object-action"
+                      ? tr("Действие с объектом")
+                      : tr("Добавить действие")}
               </strong>
               <Button
                 icon="X"
@@ -2950,13 +2946,6 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   ))}
                 </div>
               </>
-            ) : picker.kind === "object" ? (
-              <><p>{tr("Создать в: ")}{project.objectGroups?.find(g=>g.id===(picker?.groupId||selection.groupId||(selection.kind==='group'?selection.id:null)))?.name||tr("Объекты сцены")}</p>
-              <div className="create-options">
-                <button onClick={addStagingPoint}><Icon name="MapPin" size={23}/><span><strong>{tr("Точка постановки")}</strong><small>{tr("Место назначения для движения персонажа")}</small></span></button>
-                <button onClick={addSoundEvent}><Icon name="Volume2" size={23}/><span><strong>{tr("Звуковое событие")}</strong><small>{tr("Аудиофайл, громкость, fade in и fade out")}</small></span></button>
-                {[['Персонаж','box','PersonStanding','Персонаж','Участвует в диалогах и постановке'],['Активный меш','box','MousePointer2','Интерактивный предмет','Клик игрока запускает продолжение'],['Меш','box','Box','Куб','Декорация · размеры меняются мышью'],['Меш','sphere','Circle','Сфера','Простой объёмный объект'],['Меш','cylinder','Cylinder','Цилиндр','Колонна, ваза или временный объект'],['Источник света','box','Lightbulb','Источник освещения','Точечный свет с настройкой цвета и интенсивности']].map(([type,shape,icon,name,hint])=><button key={name} onClick={()=>addObject(type,shape)}><Icon name={icon} size={23}/><span><strong>{tr(name)}</strong><small>{tr(hint)}</small></span></button>)}
-              </div></>
             ) : picker.kind === "event" ? (
               <>
                 <div className="create-phase">

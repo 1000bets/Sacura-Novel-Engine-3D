@@ -574,6 +574,8 @@
   "Положение, поворот, масштаб": "Position, rotation, scale",
   "Привязка: 0,25 м / 15° / 0,1×": "Snap: 0.25 m / 15° / 0.1×",
   "Оси трансформации": "Transform axes",
+  "Мировые оси": "World axes",
+  "Оси объекта": "Object axes",
   "Мир": "World",
   "Объект": "Object",
   "Показать камеры в 3D": "Show cameras in 3D",

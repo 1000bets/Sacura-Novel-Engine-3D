@@ -25,7 +25,7 @@ const areas=[
 ];
 export function InfoView(){
  const language=useLocale();
- const [info,setInfo]=useState(fallback),[collapsed,setCollapsed]=useState(false);
+ const [info,setInfo]=useState(fallback),[collapsed,setCollapsed]=useState(true);
  useEffect(()=>setInfo(fallback),[language]);
  useEffect(()=>{
   const update=e=>{
