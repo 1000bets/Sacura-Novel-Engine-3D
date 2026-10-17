@@ -200,7 +200,7 @@ bool BuildStaticMeshFromPrimitive(
         }
         if (Index < Tangents.size())
         {
-            Vertex.Tangent = {Tangents[Index][0], Tangents[Index][1], Tangents[Index][2], Tangents[Index][3]};
+            Vertex.Tangent = DirectX::SimpleMath::Vector4(Tangents[Index][0], Tangents[Index][1], Tangents[Index][2], Tangents[Index][3]);
             Vertex.bHasTangent = true;
         }
         if (Index < TexCoords.size())

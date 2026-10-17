@@ -86,9 +86,15 @@ FetchContent_MakeAvailable(SDL3 DiligentCore)
 set(DILIGENT_SOURCE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/DiligentCore")
 include("${CMAKE_CURRENT_SOURCE_DIR}/PatchDiligentOpenGLQuery.cmake")
 unset(DILIGENT_SOURCE_DIRECTORY)
+if(APPLE)
+    include("${CMAKE_CURRENT_SOURCE_DIR}/PatchDiligentMacOS.cmake")
+endif()
 
 # DiligentTools embeds its own ImGui into Diligent-Imgui when target "imgui" is absent.
 # Do not add a top-level target named "imgui" — leave Tools' bundled ImGui alone.
+if(NOT WIN32)
+    include("${CMAKE_CURRENT_SOURCE_DIR}/NormalizeDiligentToolsScripts.cmake")
+endif()
 FetchContent_MakeAvailable(DiligentTools DiligentFX)
 
 if(SAKURA_BUILD_DILIGENT_SAMPLES)
@@ -129,7 +135,11 @@ set(PHYSX_SLN_FREEGLUT_PATH "${SAKURA_PHYSX_EXTERNAL_BIN}" CACHE INTERNAL "PhysX
 if(WIN32)
     set(TARGET_BUILD_PLATFORM "windows" CACHE INTERNAL "" FORCE)
 elseif(APPLE)
-    set(TARGET_BUILD_PLATFORM "mac" CACHE INTERNAL "" FORCE)
+    # Reuse upstream Unix CPU source lists, retaining native Apple/ARM defines.
+    set(SAKURA_PHYSX_SOURCE_DIR "${physx_SOURCE_DIR}")
+    include("${CMAKE_CURRENT_SOURCE_DIR}/PatchPhysXMacOS.cmake")
+    unset(SAKURA_PHYSX_SOURCE_DIR)
+    set(TARGET_BUILD_PLATFORM "linux" CACHE INTERNAL "PhysX Unix source lists" FORCE)
 else()
     set(TARGET_BUILD_PLATFORM "linux" CACHE INTERNAL "" FORCE)
 endif()
@@ -153,6 +163,7 @@ set(SAKURA_PHYSX_TARGETS
     PhysXPvdSDK
     PhysXCharacterKinematic
     PhysXVehicle
+    PhysXVehicle2
 )
 
 foreach(PhysXTarget ${SAKURA_PHYSX_TARGETS})
@@ -209,7 +220,15 @@ if(SAKURA_PYTHON_AVAILABLE)
     FetchContent_MakeAvailable(pybind11)
 endif()
 
+if(NOT WIN32)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/DirectXMath.cmake)
+endif()
+
 include(${CMAKE_CURRENT_SOURCE_DIR}/Qt.cmake)
+
+if(APPLE)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/MoltenVK.cmake)
+endif()
 
 # ---- Aggregate for Engine ----
 add_library(SakuraEngineThirdParty INTERFACE)
@@ -222,6 +241,10 @@ target_link_libraries(SakuraEngineThirdParty INTERFACE
     Sakura::PhysX
     Sakura::AssetThirdParty
 )
+
+if(APPLE)
+    target_link_libraries(SakuraEngineThirdParty INTERFACE SakuraMoltenVKRuntime)
+endif()
 
 if(SAKURA_PYTHON_AVAILABLE)
     add_library(SakuraPythonThirdParty INTERFACE)

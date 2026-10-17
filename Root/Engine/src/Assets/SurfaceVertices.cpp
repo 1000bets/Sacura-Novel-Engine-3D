@@ -114,7 +114,7 @@ void PrepareSurfaceVertices(StaticMeshResource& Mesh)
                 {
                     Sign = -1.f;
                 }
-                Vertex.Tangent = {Tangent.x, Tangent.y, Tangent.z, Sign};
+                Vertex.Tangent = DirectX::SimpleMath::Vector4(Tangent.x, Tangent.y, Tangent.z, Sign);
                 Vertex.bHasTangent = true;
             }
             else

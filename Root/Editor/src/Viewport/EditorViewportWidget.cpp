@@ -1,4 +1,5 @@
 #include "Viewport/EditorViewportWidget.h"
+#include "Viewport/EditorPhysicalKeys.h"
 
 #include "Panels/EditorAssetMime.h"
 #include "Engine.h"
@@ -46,15 +47,15 @@ constexpr float WheelDollyFactor = 0.12f;
 constexpr float MinMoveSpeed = 0.25f;
 constexpr float MaxMoveSpeed = 250.0f;
 
-constexpr quint32 ForwardKeyScanCode = 0x11;
-constexpr quint32 BackwardKeyScanCode = 0x1f;
-constexpr quint32 LeftKeyScanCode = 0x1e;
-constexpr quint32 RightKeyScanCode = 0x20;
-constexpr quint32 DownKeyScanCode = 0x10;
-constexpr quint32 UpKeyScanCode = 0x12;
-constexpr quint32 SpaceKeyScanCode = 0x39;
-constexpr quint32 RotateGizmoKeyScanCode = 0x12;
-constexpr quint32 ScaleGizmoKeyScanCode = 0x13;
+constexpr quint32 ForwardKeyScanCode = EditorPhysicalKeys::Forward;
+constexpr quint32 BackwardKeyScanCode = EditorPhysicalKeys::Backward;
+constexpr quint32 LeftKeyScanCode = EditorPhysicalKeys::Left;
+constexpr quint32 RightKeyScanCode = EditorPhysicalKeys::Right;
+constexpr quint32 DownKeyScanCode = EditorPhysicalKeys::Down;
+constexpr quint32 UpKeyScanCode = EditorPhysicalKeys::Up;
+constexpr quint32 SpaceKeyScanCode = EditorPhysicalKeys::Space;
+constexpr quint32 RotateGizmoKeyScanCode = EditorPhysicalKeys::Up;
+constexpr quint32 ScaleGizmoKeyScanCode = EditorPhysicalKeys::Scale;
 
 float ClampPitch(float PitchDegrees)
 {
@@ -900,7 +901,7 @@ void EditorViewportWidget::HandleCameraKeyPress(QKeyEvent* Event)
         return;
     }
 
-    const quint32 ScanCode = Event->nativeScanCode();
+    const quint32 ScanCode = EditorPhysicalKeys::Read(*Event);
     if (ActiveCameraMode != CameraMode::FlyLook)
     {
         if (ScanCode == ForwardKeyScanCode)
@@ -936,7 +937,7 @@ void EditorViewportWidget::HandleCameraKeyRelease(QKeyEvent* Event)
     {
         return;
     }
-    HeldKeys.remove(Event->nativeScanCode());
+    HeldKeys.remove(EditorPhysicalKeys::Read(*Event));
     if (ActiveCameraMode == CameraMode::FlyLook)
     {
         Event->accept();

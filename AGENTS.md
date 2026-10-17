@@ -305,6 +305,10 @@ Python @register_class / field()
 
 ## Architecture follow-up and rendering roadmap
 
+- macOS Apple Silicon uses `macos-arm64-debug` (Ninja, Xcode, source-built Qt). PhysX remains pinned to 5.6.1: `PatchPhysXMacOS.cmake` adapts the Unix CPU source lists to AppleClang/ARM64 while the compiler selects native `PX_OSX`/`PX_A64`. Do not remove PhysX to enable macOS builds. CUDA remains disabled.
+- macOS Vulkan uses source-built MoltenVK under `Root/Engine/ThirdParty/MoltenVK/_src`, configured by `MoltenVK.cmake`. DirectXMath and its pinned SAL header are fetched under Engine ThirdParty on non-Windows hosts. Qt source patches handle regex-sensitive source paths and newer Apple SDKs; their hash participates in the Qt build identity.
+- The Qt macOS viewport prepares its CAMetalLayer on the Game thread through the private RHI surface helper before publishing the opaque NSView identity. Diligent/Vulkan execution stays on Render Thread. Cocoa physical key positions arrive in Qt's `nativeVirtualKey` field; use `EditorPhysicalKeys` for camera/gizmo controls, preserving layout independence.
+
 - The architecture cleanup preserves PhysX, DiligentFX, ozz, Python and the current backend choices; dependency scope is unchanged.
 - Minimal Forward implementation contracts are documented below; the current source layout and local validation workflow are documented in `README.md`. Do not describe newly written GPU code as runtime-verified until the current sources have been built and exercised.
 - Continue using forward rendering. Deferred and ray tracing require a separate explicit decision.

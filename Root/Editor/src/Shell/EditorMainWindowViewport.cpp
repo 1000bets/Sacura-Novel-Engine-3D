@@ -7,6 +7,7 @@
 #include "Panels/ContentBrowserWidget.h"
 #include "Shell/EditorTheme.h"
 #include "Viewport/EditorViewportWidget.h"
+#include "Viewport/EditorPhysicalKeys.h"
 #include "Engine.h"
 #include "World/Simulation/PlaySession.h"
 #include "World/Scene.h"
@@ -253,20 +254,20 @@ bool EditorMainWindow::HandleGizmoModeHotkey(QEvent* Event)
         return false;
     }
 
-    const quint32 ScanCode = KeyEvent->nativeScanCode();
+    const quint32 ScanCode = EditorPhysicalKeys::Read(*KeyEvent);
     EditorViewportWidget::GizmoOperation Operation = PrimaryViewport->GetGizmoOperation();
     bool bMatched = false;
-    if (ScanCode == 0x11)
+    if (ScanCode == EditorPhysicalKeys::Forward)
     {
         Operation = EditorViewportWidget::GizmoOperation::Translate;
         bMatched = true;
     }
-    else if (ScanCode == 0x12)
+    else if (ScanCode == EditorPhysicalKeys::Up)
     {
         Operation = EditorViewportWidget::GizmoOperation::Rotate;
         bMatched = true;
     }
-    else if (ScanCode == 0x13)
+    else if (ScanCode == EditorPhysicalKeys::Scale)
     {
         Operation = EditorViewportWidget::GizmoOperation::Scale;
         bMatched = true;

@@ -7,6 +7,29 @@
   },
   "configurePresets": [
     {
+      "name": "macos-arm64-debug",
+      "displayName": "macOS Apple Silicon Debug (Editor + CPU PhysX)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_OSX_ARCHITECTURES": "arm64",
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "12.0",
+        "CMAKE_POLICY_VERSION_MINIMUM": "3.5",
+        "CMAKE_POLICY_DEFAULT_CMP0169": "OLD",
+        "SAKURA_BUILD_EDITOR": "ON",
+        "SAKURA_BUILD_QT_FROM_SOURCE": "ON",
+        "SAKURA_QT_BUILD_JOBS": "8",
+        "SAKURA_ENABLE_PYTHON": "ON",
+        "SAKURA_BUILD_DILIGENT_SAMPLES": "OFF"
+      }
+    },
+    {
       "name": "windows-msvc-base",
       "hidden": true,
       "generator": "Visual Studio 17 2022",
@@ -51,6 +74,12 @@
   ],
   "buildPresets": [
     {
+      "name": "macos-arm64-debug",
+      "configurePreset": "macos-arm64-debug",
+      "targets": ["SakuraEditor", "SakuraPlayer"],
+      "jobs": 8
+    },
+    {
       "name": "windows-msvc-debug",
       "configurePreset": "windows-msvc-debug",
       "configuration": "Debug"
@@ -67,6 +96,18 @@
     }
   ],
   "testPresets": [
+    {
+      "name": "macos-arm64-debug",
+      "configurePreset": "macos-arm64-debug",
+      "output": {
+        "outputOnFailure": true
+      },
+      "filter": {
+        "exclude": {
+          "label": "probe"
+        }
+      }
+    },
     {
       "name": "windows-msvc-debug",
       "configurePreset": "windows-msvc-debug",

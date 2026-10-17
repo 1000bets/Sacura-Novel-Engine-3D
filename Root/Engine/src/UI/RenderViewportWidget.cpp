@@ -7,6 +7,10 @@
 #include <QShowEvent>
 #include <QtGlobal>
 
+#ifdef Q_OS_MACOS
+#    include "Rendering/RHI/NativeSurfaceMacOS.h"
+#endif
+
 #ifdef Q_OS_WIN
 #    include <windows.h>
 #endif
@@ -65,6 +69,9 @@ void RenderViewportWidget::RefreshNativeHandle()
     {
         return;
     }
+#ifdef Q_OS_MACOS
+    PrepareMacOSRenderSurface(reinterpret_cast<void*>(Current), devicePixelRatioF());
+#endif
     if (Current == CachedNativeHandle)
     {
         return;
@@ -126,6 +133,7 @@ bool RenderViewportWidget::event(QEvent* Event)
     const bool bResult = QWidget::event(Event);
     if (Event->type() == QEvent::DevicePixelRatioChange)
     {
+        RefreshNativeHandle();
         emit ViewportResized(this);
     }
     return bResult;

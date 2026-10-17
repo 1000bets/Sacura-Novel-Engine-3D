@@ -14,6 +14,11 @@ set(FASTGLTF_COMPILE_AS_CPP20 OFF CACHE BOOL "" FORCE)
 set(FASTGLTF_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
 set(FASTGLTF_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(FASTGLTF_ENABLE_DOCS OFF CACHE BOOL "" FORCE)
+if(APPLE)
+    # Use fastgltf's pinned source dependency rather than an unrelated Homebrew
+    # dylib that may require a newer deployment target than the engine.
+    set(CMAKE_DISABLE_FIND_PACKAGE_simdjson ON)
+endif()
 
 FetchContent_Declare(
     fastgltf

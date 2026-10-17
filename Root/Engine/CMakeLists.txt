@@ -198,9 +198,7 @@ target_include_directories(Engine PUBLIC
 )
 
 if(NOT WIN32)
-    target_include_directories(Engine PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/DirectXMath
-    )
+    target_link_libraries(Engine PUBLIC DirectXMath)
 endif()
 
 target_link_libraries(Engine
@@ -228,36 +226,13 @@ endif()
 # ---------------------------------------------------------------
 function(sakura_stage_engine_runtime TargetName)
     set(SakuraStageRoot "${CMAKE_BINARY_DIR}/Stage")
-    set(SakuraEngineSourceContent "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/Content")
-    set(SakuraEngineSourceShaders "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/shaders")
-    set(SakuraEngineSourceConfig "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/Config")
 
     add_custom_target(${TargetName}RuntimeAssets
-        COMMAND ${CMAKE_COMMAND} -E make_directory
-            "${SakuraStageRoot}/Engine/Content"
-            "${SakuraStageRoot}/Engine/Shaders"
-            "${SakuraStageRoot}/Engine/Config"
-            "$<TARGET_FILE_DIR:${TargetName}>/Engine/Content"
-            "$<TARGET_FILE_DIR:${TargetName}>/Engine/Shaders"
-            "$<TARGET_FILE_DIR:${TargetName}>/Engine/Config"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${SakuraEngineSourceShaders}"
-            "${SakuraStageRoot}/Engine/Shaders"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${SakuraEngineSourceContent}"
-            "${SakuraStageRoot}/Engine/Content"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${SakuraEngineSourceConfig}"
-            "${SakuraStageRoot}/Engine/Config"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${SakuraEngineSourceShaders}"
-            "$<TARGET_FILE_DIR:${TargetName}>/Engine/Shaders"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${SakuraEngineSourceContent}"
-            "$<TARGET_FILE_DIR:${TargetName}>/Engine/Content"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${SakuraEngineSourceConfig}"
-            "$<TARGET_FILE_DIR:${TargetName}>/Engine/Config"
+        COMMAND ${CMAKE_COMMAND}
+            "-DENGINE_SOURCE_ROOT=${CMAKE_CURRENT_FUNCTION_LIST_DIR}"
+            "-DSTAGE_ROOT=${SakuraStageRoot}"
+            "-DTARGET_DIRECTORY=$<TARGET_FILE_DIR:${TargetName}>"
+            -P "${CMAKE_SOURCE_DIR}/Root/cmake/DeployEngineAssets.cmake"
         COMMENT "Deploy engine assets for ${TargetName}"
         VERBATIM
     )
@@ -276,7 +251,13 @@ endfunction()
 if(WIN32)
     target_compile_definitions(Engine PRIVATE PLATFORM_WIN32=1 D3D12_SUPPORTED=1)
 endif()
-target_compile_definitions(Engine PRIVATE ENGINE_DLL=1 VULKAN_SUPPORTED=1 GL_SUPPORTED=1)
+target_compile_definitions(Engine PRIVATE VULKAN_SUPPORTED=1 GL_SUPPORTED=1
+    $<$<CONFIG:Debug>:_DEBUG=1>)
+
+if(APPLE)
+    target_sources(Engine PRIVATE src/Rendering/RHI/NativeSurfaceMacOS.mm)
+    target_link_libraries(Engine PRIVATE "-framework AppKit" "-framework QuartzCore")
+endif()
 
 target_sources(Engine PRIVATE src/Rendering/RHI/MaterialShaderCompiler.cpp)
 target_link_libraries(Engine PRIVATE Diligent-ShaderTools spirv-cross-glsl)

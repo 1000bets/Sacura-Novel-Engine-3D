@@ -32,6 +32,16 @@ build/windows-msvc-debug/Stage/Bin/SakuraEditor.exe --project "M:/path/to/MyGame
 
 Чтобы явно использовать внешний Qt SDK, конфигурируйте отдельный каталог с `-DSAKURA_BUILD_QT_FROM_SOURCE=OFF` и задайте `Qt6_DIR` или `SAKURA_QT_ROOT`. В основном режиме эти пути не выбирают внешний SDK. Для Release используйте пресет `windows-msvc-release`: Qt собирается для него отдельно. На Linux необходимы Ninja и системные зависимости платформы Qt; Linux-путь не проверялся.
 
+На macOS с Apple Silicon используются Xcode, CMake 3.25+, Ninja и Git:
+
+```sh
+cmake --preset macos-arm64-debug
+cmake --build --preset macos-arm64-debug
+build/macos-arm64-debug/Stage/Bin/SakuraEditor --backend Vulkan
+```
+
+PhysX остаётся версии 5.6.1 и собирается для CPU с воспроизводимым macOS-патчем; CUDA не требуется. Vulkan работает через MoltenVK, который CMake также скачивает и собирает из закреплённых исходников. Qt 6.8.3 собирается локально; патчи учитывают пути с `+` и изменения новых Apple SDK. DirectXMath и SAL загружаются автоматически. Первая конфигурация включает сборку этих зависимостей и занимает заметно больше времени, чем последующие запуски. Тесты, если установлен локальный набор, запускаются через `ctest --preset macos-arm64-debug`.
+
 ## Структура
 
 - `Root/Engine` — runtime движка (без пользовательских проектов)

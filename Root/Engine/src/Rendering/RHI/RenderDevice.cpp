@@ -123,6 +123,8 @@ bool RenderDevice::InitializeBackend(GraphicsBackend Backend, const NativeWindow
     NativeWindow Window{};
 #if PLATFORM_WIN32
     Window.hWnd = WindowInfo.WindowHandle;
+#elif PLATFORM_MACOS
+    Window.pNSView = WindowInfo.WindowHandle;
 #endif
 
     IDeviceContext* Contexts[1] = {};
@@ -130,7 +132,7 @@ bool RenderDevice::InitializeBackend(GraphicsBackend Backend, const NativeWindow
 #if D3D12_SUPPORTED
     if (Backend == GraphicsBackend::D3D12)
     {
-#    if ENGINE_DLL
+#    if ENGINE_DLL && PLATFORM_WIN32 && defined(_MSC_VER)
         auto GetFactory = LoadGraphicsEngineD3D12();
         IEngineFactoryD3D12* FactoryD3D12 = GetFactory();
 #    else
@@ -167,7 +169,7 @@ bool RenderDevice::InitializeBackend(GraphicsBackend Backend, const NativeWindow
 #if VULKAN_SUPPORTED
     if (Backend == GraphicsBackend::Vulkan)
     {
-#    if ENGINE_DLL
+#    if ENGINE_DLL && PLATFORM_WIN32 && defined(_MSC_VER)
         auto GetFactory = LoadGraphicsEngineVk();
         IEngineFactoryVk* FactoryVk = GetFactory();
 #    else
@@ -204,7 +206,7 @@ bool RenderDevice::InitializeBackend(GraphicsBackend Backend, const NativeWindow
 #if GL_SUPPORTED
     if (Backend == GraphicsBackend::OpenGL)
     {
-#    if ENGINE_DLL
+#    if ENGINE_DLL && PLATFORM_WIN32 && defined(_MSC_VER)
         auto GetFactory = LoadGraphicsEngineOpenGL();
         IEngineFactoryOpenGL* FactoryGL = GetFactory();
 #    else
@@ -337,6 +339,8 @@ bool RenderDevice::AddSurface(RenderSurfaceId Surface, const NativeWindowInfo& W
     NativeWindow Window{};
 #if PLATFORM_WIN32
     Window.hWnd = WindowInfo.WindowHandle;
+#elif PLATFORM_MACOS
+    Window.pNSView = WindowInfo.WindowHandle;
 #endif
     RefCntAutoPtr<ISwapChain> Created;
 #if D3D12_SUPPORTED

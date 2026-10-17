@@ -57,7 +57,7 @@ static bool LoadMaterialValues(const AssetLoadContext& Context, MaterialResource
         }
         else if (Parameter.first == "Emissive" && Value.Type == MaterialParameterType::Vector3)
         {
-            Resource.Emissive = {Value.Numbers.x, Value.Numbers.y, Value.Numbers.z};
+            Resource.Emissive = DirectX::SimpleMath::Vector3(Value.Numbers.x, Value.Numbers.y, Value.Numbers.z);
         }
         else if (Parameter.first == "BaseColorTexture" && Value.Type == MaterialParameterType::Texture2D)
         {
