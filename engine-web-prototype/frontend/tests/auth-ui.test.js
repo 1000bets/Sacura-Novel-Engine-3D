@@ -87,3 +87,45 @@ test('loading dialog keeps keyboard focus inside while controls are disabled',()
  const dialog=screen.getByRole("dialog");assert.equal(document.activeElement,dialog);
  fireEvent.keyDown(dialog,{key:"Tab"});assert.equal(document.activeElement,dialog);
 });
+
+
+test('home search filters saved project names without changing the list and clear restores them',async()=>{
+ mock();const original=fetch;
+ globalThis.fetch=(path,options)=>path==='/api/projects'?Promise.resolve(response([
+  {id:'forest',title:'Лес на рассвете',updatedAt:'2026-10-17T10:00:00Z'},
+  {id:'station',title:'Станция у моря',updatedAt:'2026-10-16T10:00:00Z'}
+ ])):original(path,options);
+ render(React.createElement(ProjectHome));
+ await screen.findByRole('button',{name:/Лес на рассвете/});
+ const search=screen.getByRole('searchbox',{name:'Найти проект'});
+ fireEvent.change(search,{target:{value:'  ЛЕС  '}});
+ assert.ok(screen.getByRole('button',{name:/Лес на рассвете/}));
+ assert.equal(screen.queryByRole('button',{name:/Станция у моря/}),null);
+ fireEvent.change(search,{target:{value:'не существующий проект'}});
+ assert.ok(screen.getByRole('heading',{name:'Проекты не найдены'}));
+ fireEvent.click(screen.getAllByRole('button',{name:'Очистить поиск'})[0]);
+ assert.equal(search.value,'');assert.ok(screen.getByRole('button',{name:/Станция у моря/}));
+ assert.equal(calls.filter(call=>call.options.method).length,0);
+});
+
+test('home creation dialog focuses name, rejects a blank title and returns focus on Escape',async()=>{
+ mock();render(React.createElement(ProjectHome));
+ const trigger=screen.getByRole('button',{name:'Создать новый проект'});trigger.focus();fireEvent.click(trigger);
+ const input=screen.getByLabelText('Название нового проекта');assert.equal(document.activeElement,input);
+ fireEvent.change(input,{target:{value:'   '}});assert.equal(screen.getByRole('button',{name:'Создать',exact:true}).disabled,true);
+ fireEvent.keyDown(input,{key:'Escape'});await waitFor(()=>assert.equal(screen.queryByRole('dialog'),null));
+ assert.equal(document.activeElement,trigger);
+});
+
+test('failed home project creation keeps the editable name and offers retry or cancel',async()=>{
+ mock();const original=fetch;let submitted;
+ globalThis.fetch=(path,options)=>path.startsWith('/api/projects/')&&options?.method==='PUT'?
+  (submitted=JSON.parse(options.body),Promise.resolve(response({error:'Не удалось сохранить проект.'},500))):original(path,options);
+ render(React.createElement(ProjectHome));fireEvent.click(screen.getByRole('button',{name:'Создать новый проект'}));
+ fireEvent.change(screen.getByLabelText('Название нового проекта'),{target:{value:'Моя новая история'}});
+ fireEvent.click(screen.getByRole('button',{name:'Создать',exact:true}));
+ await screen.findByRole('alert');assert.equal(submitted.project.title,'Моя новая история');
+ assert.equal(screen.getByLabelText('Название нового проекта').value,'Моя новая история');
+ assert.equal(screen.getByRole('button',{name:'Создать',exact:true}).disabled,false);
+ fireEvent.click(screen.getByRole('button',{name:'Отмена'}));assert.equal(screen.queryByRole('dialog'),null);
+});

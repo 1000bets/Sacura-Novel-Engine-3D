@@ -10,3 +10,4 @@ const root=createRoot(document.getElementById('root'));
 root.render(<AuthGate/>);
 
 import "./editorTheme.css";
+import "./editorWindows.css";

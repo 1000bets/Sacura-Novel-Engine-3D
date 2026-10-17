@@ -113,3 +113,13 @@ test('explicit Russian UI translation calls have entries in the English catalog'
   }
  }
 });
+
+
+test('launcher built-in template names, descriptions and walkthroughs have English translations',async()=>{
+ const {builtinTemplates}=await import('../src/builtinTemplates.js');
+ for(const template of builtinTemplates){
+  for(const label of [template.name,template.description,...template.guide||[]]){
+   assert.ok(Object.hasOwn(english,label),label);
+  }
+ }
+});
