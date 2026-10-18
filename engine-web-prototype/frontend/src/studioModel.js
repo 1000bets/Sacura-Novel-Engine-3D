@@ -107,7 +107,6 @@ export function validateStudio(p){
   for(const port of dataTargets(b)){const source=getInput(b,port);if(source&&!allBeats(p).some(n=>n.id===source&&isDataSource(n)))issues.push({id:`logic-source-${b.id}-${port}`,beatId:b.id,level:'error',title:'Источник значения удалён',detail:'Переподключите круглый вход.'});}
   if(b.kind==='set-variable'&&!Object.hasOwn(p.variables||{},b.variable))issues.push({id:`set-variable-${b.id}`,beatId:b.id,level:'error',title:'Переменная не создана',detail:'Введите имя в ноде переменной.'});
   const location=sceneFor(p,b.id);
-  if(b.kind==='gameplay'&&(!p.gameplay?.enabled||!p.objects.some(o=>o.id===p.gameplay.playerId&&o.active!==false&&isObjectInScene(o,location))))issues.push({id:'game-player-'+b.id,beatId:b.id,level:'error',title:'Подготовьте игровую сцену',detail:'Выберите режим и доступного героя во вкладке «Игровые механики».'});
   if(b.kind==='gate'){
     for(const id of interactionTargets(b)){const object=p.objects.find(o=>o.id===id);if(object&&!isObjectInScene(object,location))issues.push({id:`gate-location-${b.id}${interactionTargets(b).length>1?'-'+id:''}`,beatId:b.id,level:'error',title:'Предмет ожидания отсутствует в сабсцене',detail:object.name});}
     const controls=playerControls(b),character=p.objects.find(o=>o.id===controls.characterId);

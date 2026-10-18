@@ -1,0 +1,9 @@
+import {createMechanicsProject} from '../../src/projectLifecycle.js';
+import {addMechanic,bindDoorKey,removeMechanic} from '../../src/mechanicsModel.js';
+import {createFromRule} from '../../src/authoredMechanics.js';
+import {addMechanicInstance} from '../../src/mechanicDescriptions.js';
+import {inputRecords} from '../../src/packageReferences.js';
+export const meta={name:'Дверь с ключом',author:'Автор A',license:'CC0-1.0'};
+export function fixture(title){const p=createMechanicsProject(title);p.subscenes[0].kind='empty';for(const n of ['Дверь','Ключ','Другая дверь','Другой ключ'])p.objects.push({id:title+'-'+p.objects.length,name:n,type:'Активный меш',active:true,subsceneId:p.subscenes[0].id,transforms:{[p.subscenes[0].id]:{position:[0,0,0],rotation:[0,0,0],scale:[1,1,1]}}});return p;}
+export function source(){const p=fixture('A'),native=addMechanic(p,'door',{kind:'object',id:p.objects[0].id});bindDoorKey(p,native,p.objects[1].id);const d=createFromRule(p,p.gameplay.rules.find(r=>r.id===native.ruleId),{name:meta.name,scope:native.scope});removeMechanic(p,native);const t={...d.rules[0],id:'open',from:'closed',to:'open'};d.rules=[];d.machine={version:1,initial:'closed',states:[{id:'closed',name:'Закрыта',comment:'Не менять оформление'},{id:'open',name:'Открыта'}],transitions:[t]};d.stateSchema={type:'object',properties:{uses:{type:'integer',default:0}}};d.initialState={uses:0};const m=addMechanicInstance(p,d.id,{kind:'object',id:p.objects[0].id});const f=p.functions.find(f=>f.id===t.conditionFunctionId);f.nodes[0].position={x:111,y:222};f.nodes[0].comment='Ключ проверяется здесь';p.graphLayout={[f.id]:{zoom:.8,pan:[12,30]}};for(const e of p.events)for(const g of e.groups)for(const a of g.actions)a.duration=0;return {p,d,m};}
+export function bindings(pkg,p){return Object.fromEntries(pkg.inputs.map(i=>[i.id,inputRecords(p,i).find(r=>r.name===i.name)?.id||inputRecords(p,i)[0]?.id]));}

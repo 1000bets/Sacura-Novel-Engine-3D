@@ -1,3 +1,4 @@
+import {createAuth} from '../auth.js';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtempSync,rmSync} from 'node:fs';
@@ -18,7 +19,9 @@ async function fixture(run){
  const server=createApp(storage).listen(0,'127.0.0.1');
  await new Promise(resolve=>server.once('listening',resolve));
  const base=`http://127.0.0.1:${server.address().port}`;
- const registration=await fetch(base+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({login:'owner',password:'1'})});
+ const auth=createAuth(storage.db);await auth.migrateOwner('seed','seed');
+ const seed=await auth.login({login:'seed',password:'seed'});
+ const registration=await fetch(base+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({login:'owner',password:'1',invite:auth.createInvite(seed.id).token})});
  const cookie=registration.headers.get('set-cookie').split(';')[0],user=(await registration.json()).user;
  const request=(path,options={})=>fetch(base+path,{...options,headers:{Cookie:cookie,...options.headers}});
  try{await run({storage,request,base,filename,s3,user,puts:()=>puts});}

@@ -1,15 +1,25 @@
+import SchemaFields,{useOperationLibrary} from './SchemaFields.jsx';
+import {operationDefinition,validateOperationCall} from './operationRegistry.js';
+import {schemaDefaults} from './valueSchemas.js';
 import React from 'react';
-import {t as tr,useLocale} from './i18n.jsx';
+import {t as tr,useLocale,optionLabel} from './i18n.jsx';
+import FunctionArguments from './FunctionArguments.jsx';
 import {GAME_COMMANDS} from './gameplayModel.js';
 export function GameField({label,children}){return <label className="game-field"><span>{tr(label)}</span>{children}</label>;}
-export function GameSelect({label,value='',options,onChange}){return <GameField label={label}><select value={value} onChange={e=>onChange(e.target.value)}>{options.map(([id,name])=><option key={id} value={id}>{tr(name)}</option>)}</select></GameField>;}
-export function GameNumber({label,value=0,min=0,step=.1,onChange}){return <GameField label={label}><input type="number" value={value} min={min} step={step} onChange={e=>{if(e.target.value!=='')onChange(Number(e.target.value));}}/></GameField>;}
+export function GameSelect({label,value='',options,onChange}){
+ const invalid=value!=null&&value!==''&&!options.some(([id])=>String(id)===String(value));
+ return <GameField label={label}><select value={value??''} aria-invalid={invalid||undefined} onChange={e=>onChange(e.target.value)}>{invalid&&<option value={value}>{tr('Недоступная связь · выберите замену')}</option>}{options.map(([id,name])=><option key={id} value={id}>{optionLabel(name)}</option>)}</select>{invalid&&<small role="alert">{tr('Выбранная связь удалена или недоступна. Выберите замену.')}</small>}</GameField>;
+}
+export function GameNumber({label,value=0,min=0,max,step=.1,onChange}){return <GameField label={label}><input type="number" value={value} min={min} max={max} step={step} onChange={e=>{if(e.target.value!=='')onChange(Number(e.target.value));}}/></GameField>;}
 export function GameVector({label,value=[0,0,0],onChange,min}){return <GameField label={label}><div className="game-vector">{value.map((v,i)=><input key={i} aria-label={tr(label)+' '+['X','Y','Z'][i]} type="number" step=".1" min={min} value={v} onChange={e=>{const next=[...value];next[i]=Number(e.target.value);onChange(next);}}/>)}</div></GameField>;}
 export function JsonValue({label,value,onChange}){const [text,setText]=React.useState(()=>JSON.stringify(value,null,2)),[error,setError]=React.useState('');React.useEffect(()=>setText(JSON.stringify(value,null,2)),[JSON.stringify(value)]);return <GameField label={label}><textarea rows={3} spellCheck={false} value={text??''} aria-invalid={!!error} onChange={e=>setText(e.target.value)} onBlur={()=>{try{onChange(JSON.parse(text));setError('');}catch{setError(tr('Проверьте JSON значения.'));}}}/>{error&&<small role="alert">{error}</small>}</GameField>;}
-export default function GameplayCommandFields({project,command='damage',value={},onChange}){
- useLocale();const v=value&&typeof value==='object'?value:{},patch=x=>onChange({command,value:{...v,...x}}),ids=(array)=>[['','Выберите…'],...array.map(x=>[x.id,x.name])];
- return <><GameSelect label="Команда" value={command} options={Object.entries(GAME_COMMANDS)} onChange={command=>onChange({command,value:command==='startTimer'?{seconds:2,timerId:'timer'}:command==='impulse'?{velocity:[0,5,0]}:{}})}/>
- {['damage','heal','impulse'].includes(command)&&<GameSelect label="Объект" value={v.target||''} options={[["","Главный герой"],...project.objects.map(o=>[o.id,o.name])]} onChange={target=>patch({target})}/>}
+export default function GameplayCommandFields({project,command='runEvent',value={},operationVersion=1,kind='event',expressionOptions=[],onChange}){
+ useLocale();const operations=useOperationLibrary().filter(d=>d.contexts.includes(kind)),definition=operationDefinition(command,operationVersion);const v=value&&typeof value==='object'?value:{},patch=x=>onChange({command,value:{...v,...x}}),ids=(array)=>[['','Выберите…'],...array.map(x=>[x.id,x.name])];
+ return <><GameSelect label="Команда" value={command} options={[...Object.entries(GAME_COMMANDS),...new Map(operations.map(d=>[d.id,[d.id,d.editor.label]])).values(),...(command.includes('.')&&!definition?[[command,'Недоступная операция']]:[])]} onChange={command=>{const d=operations.find(d=>d.id===command);onChange(d?{command,operationVersion:d.version,value:schemaDefaults(d.parameters)}:{command,value:command==='startTimer'?{seconds:2,timerId:'timer'}:command==='impulse'?{velocity:[0,5,0]}:{}});}}/>
+ {operations.filter(d=>d.id===command).length>1&&<GameSelect label="Версия операции" value={operationVersion} options={operations.filter(d=>d.id===command).map(d=>[d.version,String(d.version)])} onChange={version=>onChange({command,operationVersion:Number(version),value:v})}/>}
+ {definition&&<SchemaFields project={project} schema={definition.parameters} value={v} issues={validateOperationCall({id:command,version:operationVersion,parameters:v},{project,kind,allowDeferred:true,allowExpressions:true})} expressionOptions={expressionOptions} onChange={value=>onChange({command,operationVersion,value})}/>}
+ {command.includes('.')&&!definition&&<p role="alert">Операция или версия недоступна. Настройки сохранены.</p>}
+ {['damage','heal','impulse'].includes(command)&&<GameSelect label="Объект" value={v.target||''} options={[["","Управляемый объект"],...project.objects.map(o=>[o.id,o.name])]} onChange={target=>patch({target})}/>}
  {['damage','heal'].includes(command)&&<GameNumber label="Количество" value={v.amount??25} onChange={amount=>patch({amount})}/>}
  {['addItem','removeItem','equip','useItem'].includes(command)&&<GameSelect label="Предмет" value={v.itemId} options={ids(project.gameplay?.items||[])} onChange={itemId=>patch({itemId})}/>}
  {['addItem','removeItem'].includes(command)&&<GameNumber label="Количество" min={1} step={1} value={v.count??1} onChange={count=>patch({count})}/>}
@@ -18,6 +28,7 @@ export default function GameplayCommandFields({project,command='damage',value={}
  {command==='impulse'&&<GameVector label="Импульс" value={v.velocity||[0,5,0]} onChange={velocity=>patch({velocity})}/>}
  {['startTimer','stopTimer'].includes(command)&&<GameField label="Имя таймера"><input value={v.timerId||'timer'} onChange={e=>patch({timerId:e.target.value})}/></GameField>}
  {command==='startTimer'&&<><GameNumber label="Секунды" value={v.seconds??2} onChange={seconds=>patch({seconds})}/><GameSelect label="Объект правила" value={v.objectId} options={[["","Без объекта"],...project.objects.map(o=>[o.id,o.name])]} onChange={objectId=>patch({objectId})}/><label><input type="checkbox" checked={!!v.repeat} onChange={e=>patch({repeat:e.target.checked})}/> {tr('Повторять')}</label></>}
- {command==='callFunction'&&<><GameSelect label="Функция Blueprint" value={v.functionId} options={ids(project.functions||[])} onChange={functionId=>patch({functionId})}/><JsonValue label="Параметры функции" value={v.args||{}} onChange={args=>patch({args})}/></>}
+ {command==='runEvent'&&<GameSelect label="Событие" value={v.eventId} options={ids(project.events)} onChange={eventId=>patch({eventId})}/>}
+ {command==='callFunction'&&<><GameSelect label="Функция Blueprint" value={v.functionId} options={ids(project.functions||[])} onChange={functionId=>patch({functionId})}/><FunctionArguments project={project} functionId={v.functionId} value={v.args||{}} onChange={args=>patch({args})}/></>}
  </>;
 }

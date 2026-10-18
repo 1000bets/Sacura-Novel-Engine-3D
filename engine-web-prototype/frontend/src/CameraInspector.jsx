@@ -13,14 +13,13 @@ export default function CameraInspector({camera:c,scene,objects,state,onChange,o
  const characters=objects.filter(o=>o.type==='Персонаж'&&o.active!==false),pose=cameraPose(c,state,objects,scene.kind);
  const patch=value=>onChange(c.id,value);
  const hints={fov:'Меньше угол — крупнее герой; больше — больше окружения в кадре.',smoothing:'0 — мгновенное изменение. Чем больше значение, тем плавнее движение.',distance:'Расстояние от персонажа до камеры.',height:'Высота камеры над уровнем персонажа.',yaw:'Поворот камеры вокруг персонажа.',targetHeight:'Высота точки взгляда: например, лицо героя.'};
- const range=(key,label,min,max,step,unit)=><label className="camera-range" data-help-title={tr(label)} data-help={tr(hints[key])}><span>{tr(label)}<b>{Number(c[key]).toFixed(step<1?1:0)}{tr(unit)}</b></span><input aria-label={tr(label)} type="range" min={min} max={max} step={step} value={c[key]} onChange={e=>patch({[key]:Number(e.target.value)})}/><small>{tr(hints[key])}</small></label>;
+ const range=(key,label,min,max,step,unit)=><label className="camera-range" title={tr(hints[key])} data-help-title={tr(label)} data-help={tr(hints[key])}><span>{tr(label)}<b>{Number(c[key]).toFixed(step<1?1:0)}{tr(unit)}</b></span><input aria-label={tr(label)} type="range" min={min} max={max} step={step} value={c[key]} onChange={e=>patch({[key]:Number(e.target.value)})}/></label>;
  return <div className="camera-inspector">
-  <div className="inspector-identity"><Icon name="Video" size={25}/><div><strong>{c.name}</strong><small>{scene.location}</small></div></div>
   {running&&<p className="camera-step-note">{tr("Остановите предпросмотр, чтобы изменить камеру. ")}<Button icon="Square" onClick={onEdit}>{tr("Остановить")}</Button></p>}
   <Section title={tr("Камера")}>
    <fieldset disabled={running}>
     <Field label={tr("Название")}><input aria-label={tr("Название камеры")} value={c.name} onChange={e=>patch({name:e.target.value})}/></Field>
-    <Button icon={c.id===scene.defaultCameraId?'Star':'StarOff'} disabled={c.id===scene.defaultCameraId} onClick={()=>onDefault(c.id)}>{c.id===scene.defaultCameraId?tr("Основная камера"):tr("Сделать основной")}</Button>
+    {c.id===scene.defaultCameraId?<span className="camera-default"><Icon name="Star" size={14}/>{tr("Основная камера")}</span>:<Button icon="StarOff" onClick={()=>onDefault(c.id)}>{tr("Сделать основной")}</Button>}
     <Field label={tr("Режим")}><Select value={c.mode} options={[["fixed","Стоит на месте"],...(characters.length||c.mode==='follow'?[["follow","Следует за персонажем"]]:[])]} onChange={mode=>patch(mode==='fixed'?{mode,position:pose.position,target:pose.target}:{mode,followTargetId:c.followTargetId||characters[0]?.id})}/></Field>
     {c.mode==='follow'&&<><Field label={tr("Персонаж")}><Select value={c.followTargetId||''} options={[["","Выберите персонажа"],...(!characters.some(o=>o.id===c.followTargetId)&&c.followTargetId?[[c.followTargetId,'Персонаж недоступен']]:[]),...characters.map(o=>[o.id,literalLabel(o.name)])]} onChange={followTargetId=>patch({followTargetId})}/></Field>{pose.targetMissing&&<p className="camera-error">{tr("Персонаж скрыт или отсутствует в этой сабсцене. Используется сохранённый неподвижный кадр.")}</p>}</>}
    </fieldset>
@@ -37,7 +36,7 @@ export default function CameraInspector({camera:c,scene,objects,state,onChange,o
   </Section>
   <Section title={tr("Настроить кадр в сцене")}>
    <div className="camera-shot-actions"><Button icon="Eye" onClick={()=>onView(c.id)}>{tr("Посмотреть кадр")}</Button><Button icon="Move" disabled={running} className={piloting===c.id?'active':''} onClick={()=>onPilot(c.id)}>{piloting===c.id?tr("Настройка в сцене…"):tr("Настроить в сцене")}</Button><Button icon="ScanLine" disabled={running} onClick={()=>onCapture(c.id)}>{piloting===c.id?tr("Сохранить ракурс"):tr("Взять текущий вид сцены")}</Button></div>
-   <p className="camera-step-note">{piloting===c.id?tr("Подберите кадр мышью в сцене, затем нажмите «Сохранить ракурс». Крестик над сценой отменяет настройку."):tr("«Настроить в сцене» открывает управление мышью. «Взять текущий вид» сохраняет ракурс из окна сцены.")}</p>
+   {piloting===c.id&&<p className="camera-step-note">{tr("Подберите кадр мышью в сцене, затем нажмите «Сохранить ракурс». Крестик над сценой отменяет настройку.")}</p>}
   </Section>
   <Button icon="Trash2" disabled={running} onClick={()=>onDelete(c.id)}>{tr("Удалить камеру")}</Button>
  </div>;

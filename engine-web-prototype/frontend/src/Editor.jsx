@@ -1,8 +1,10 @@
+import {activityValue} from './runtimePresentation.js';
 import InputWorkspace,{InputContextSettings} from './InputWorkspace.jsx';
 import TouchInput from './TouchInput.jsx';
 import GameplayWorkspace from './GameplayWorkspace.jsx';
 import GameHUD from './GameHUD.jsx';
 import {exportPlayableGame} from './gameExport.js';
+import {instantiateAuthoringTemplate} from './authoringTemplates.js';
 import {builtinTemplates,loadBuiltinTemplate} from './builtinTemplates.js';
 import {inputContextsFor,inputHelp} from './inputModel.js';
 import LanguagePicker from './LanguagePicker.jsx';
@@ -81,6 +83,7 @@ import {
 import LocationScene from "./LocationScene.jsx";
 import EditorGraph from "./EditorGraph.jsx";
 import EditorContextMenu from "./EditorContextMenu.jsx";
+import SceneObjectMenu from './SceneObjectMenu.jsx';
 import ActionFields from "./ActionFields.jsx";
 import EventInspector from "./EventInspector.jsx";
 import {exportLocation,importLocation} from "./locationFiles.js";
@@ -103,6 +106,9 @@ import {objectTransform,setObjectTransform,isObjectInScene,sceneStagingPoints} f
 import HierarchyTree from './HierarchyTree.jsx';
 import EditorSelect from './EditorSelect.jsx';
 import StoryFlow from './StoryFlow.jsx';
+import EditorWorkspace, {EditorWindowsMenu, EditorDockTabs} from './EditorWorkspace.jsx';
+import {EditorDockProvider, EditorDockStrip, EditorDockBody, DockDropTarget} from './EditorDocking.jsx';
+import {defaultWindows, restoreWindows, openWindow, closeWindow, dockTabs, windowArea, activeDockWindow, selectDockBase} from './editorWindows.js';
 
 const PROJECT_KEY = "sacura-studio-v2",
   LAYOUT_KEY = "sacura-workspace-v3";
@@ -238,56 +244,8 @@ function GameDialogue({
   const status=beat.kind==='gate'?(message(preview?.hint)||(beat.controls?.mode&&beat.controls.mode!=='none'?inputHelp(project.input,inputContextsFor(project,beat),['move','interact','point']):`${tr('Нажмите на объект')} «${objectLabel||beat.signal}»`)):
     !running?tr('Предпросмотр выбранной реплики'):!preview.ready?tr('Выполняются действия'):beat.kind==='choice'?tr('Выберите ответ'):tr('Нажмите, чтобы продолжить');
   return <WidgetRenderer widget={dialogueWidget} context={{project,variables,game:preview?.world.game,speaker:beat.speaker,text:beat.text,status,title:project.title,choices:beat.kind==='choice'?beat.choices:[],selectedChoiceId:preview?.inputChoiceId,ready,canAdvance}}
-    onAction={(action,element)=>{if(action==='advance'&&canAdvance)running?onAdvance():onStart();else if(action!=='advance')onUiAction?.(action,element);}}
+    onAction={(action,element)=>{if(action==='advance'&&canAdvance)running?onUiAction?.(action,element):onStart();else if(action!=='advance')onUiAction?.(action,element);}}
     onChoice={id=>running&&onAdvance(id)} choiceEnabled={choice=>conditionPass(choice,variables,project,preview?.choiceResults)}/>;
-}
-
-// Keep everyday workspaces visible; secondary tools remain one click away.
-const dockTools = [
-  ["story", "Поток истории"], ["subscenes", "Сабсцены"], ["characters", "Персонажи"],
-  ["widgets", "Виджеты UI"], ["gameplay", "Игровые механики"], ["cameras", "Камеры"], ["input", "Ввод"], ["files", "Проводник"], ["active", "Звук и окружение"], ["event", "Событие"],
-  ["create", "Создание"], ["assets", "Проект"], ["sound", "Звук"],
-  ["samples", "Эффекты"], ["issues", "Проблемы"],
-];
-function DockTools({ dock, event, issueCount, onSelect }) {
- useLocale();
-  const [open, setOpen] = useState(false);
-  const [opensUp, setOpensUp] = useState(false);
-  const popup = useRef(null), trigger = useRef(null);
-  const secondary = dockTools.slice(6);
-  const current = secondary.find(([id]) => id === dock);
-  useEffect(() => {
-    if (!open) return;
-    const outside = e => { if (!popup.current?.contains(e.target)) setOpen(false); };
-    const escape = e => {
-      if (e.key === "Escape" && !e.defaultPrevented) { e.stopPropagation(); setOpen(false); trigger.current?.focus(); }
-    };
-    document.addEventListener("pointerdown", outside);
-    document.addEventListener("keydown", escape, true);
-    return () => {
-      document.removeEventListener("pointerdown", outside);
-      document.removeEventListener("keydown", escape, true);
-    };
-  }, [open]);
-  return <>
-    {dockTools.slice(0, 6).map(([id, label]) => <button key={id}
-      aria-pressed={dock === id} className={dock === id ? "active" : ""}
-      onClick={() => onSelect(id)}>{tr(label)}</button>)}
-    <div className={"dock-more" + (opensUp ? " opens-up" : "")} ref={popup} onBlur={e => {
-      if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false);
-    }}>
-      <button ref={trigger} className={current ? "active" : ""}
-        aria-expanded={open} aria-controls={open ? "dock-more-tools" : undefined}
-        onClick={e => {setOpensUp(window.innerHeight - e.currentTarget.getBoundingClientRect().bottom < 270); setOpen(v => !v);}}>{tr("Ещё")}<Icon name="ChevronDown" size={12}/></button>
-      {open && <div className="dock-more-popup" id="dock-more-tools" aria-label={tr("Другие инструменты")}>
-        {secondary.map(([id, label]) => <button key={id} disabled={id === "event" && !event}
-          aria-pressed={dock === id} onClick={() => {onSelect(id); setOpen(false); trigger.current?.focus();}}>
-          <span>{tr(label)}</span>{id === "issues" && issueCount > 0 && <span className="tool-issue-count">{issueCount}</span>}
-          {dock === id && <Icon name="Check" size={13}/>}
-        </button>)}
-      </div>}
-    </div>
-  </>;
 }
 
 export default function Editor({initialProject=null,user=null,onLogout,onHome}) {
@@ -302,33 +260,30 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     }
   }
   seed.current.project.id ||= uid('project');
-  const initialBeat=seed.current.project.subscenes[0].entry||allBeats(seed.current.project)[0].id;
+  const defaultWindowId=seed.current.project.gameplay?.enabled && (seed.current.project.gameplay.activation==="gameplay-node"||seed.current.project.gameplay.storyPolicy?.mode==='none') ? 'gameplay' : 'story';
+  const initialBeat=seed.current.project.subscenes[0].entry||allBeats(seed.current.project)[0]?.id||null;
   const [project, setProject] = useState(seed.current.project),
     [saveError, setSaveError] = useState(seed.current.error),
     [layout, setLayout] = useState(() => {
       try {
-        return {
-          ...initialLayout,
-          ...JSON.parse(accountStorage.getItem(LAYOUT_KEY) || "{}"),
-        };
+        const saved=JSON.parse(accountStorage.getItem(LAYOUT_KEY) || "{}");
+        return {...initialLayout, ...saved, windows:restoreWindows(saved.windows,defaultWindowId,{width:window.innerWidth,height:window.innerHeight})};
       } catch {
-        return initialLayout;
+        return {...initialLayout,windows:defaultWindows(defaultWindowId)};
       }
     }),
     [selectedBeat, setSelectedBeat] = useState(initialBeat),
     [selection, setSelection] = useState({ kind: "beat", id: initialBeat }),
-    [dock, setDock] = useState("story"),
     [phase, setPhase] = useState("ALL"),
     [eventContext, setEventContext] = useState(null),
     [mode, setMode] = useState("scene"),
     [showDialogue, setShowDialogue] = useState(true),
     [showGrid, setShowGrid] = useState(true),
-    [maximized, setMaximized] = useState(null),
+    [maximized, setMaximized] = useState(dockTabs(layout.windows).length && defaultWindowId === "gameplay" ? "graph" : null),
     [preview, setPreview] = useState(null),
     [follow, setFollow] = useState(true),
     [query, setQuery] = useState(""),
     [historyQuery, setHistoryQuery] = useState(""),
-    [floatingDock, setFloatingDock] = useState(false),
     [historyOpen, setHistoryOpen] = useState(false),
     [compactPanel,setCompactPanel]=useState('workspace'),
     [picker, setPicker] = useState(null),
@@ -347,6 +302,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     [inspectorPinned, setInspectorPinned] = useState(false),
     [detailEditor, setDetailEditor] = useState(false),
     [history, setHistory] = useState([]),
+    [future,setFuture]=useState([]),
+    [gameplayRequest,setGameplayRequest]=useState(null),
     [authorRequest,setAuthorRequest]=useState(null),
     [widgetRequest,setWidgetRequest]=useState(null),
     [gameMenu,setGameMenu]=useState(null),
@@ -359,28 +316,66 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     [focusRequest,setFocusRequest]=useState(0),
     [cameraPilotId,setCameraPilotId]=useState(null),
     [cameraPreviewId,setCameraPreviewId]=useState(null),
-    [showCameras,setShowCameras]=useState(true);
+    [viewportWidth,setViewportWidth]=useState(window.innerWidth);
+  const windows=layout.windows, dock=windows.focused, workspaceTabCount=dockTabs(windows).length;
+  const windowPreferences=useRef(windows);windowPreferences.current=windows;
+  const sceneTool=activeDockWindow(windows,'scene'), hierarchyTool=activeDockWindow(windows,'hierarchy'), inspectorTool=activeDockWindow(windows,'inspector');
+  const sideWorkspace=windows.position!=='bottom'&&viewportWidth>1000;
+  useEffect(()=>{if(!workspaceTabCount)setMaximized(current=>current==='graph'?null:current);},[workspaceTabCount]);
+  useEffect(()=>{
+    const resize=()=>setViewportWidth(window.innerWidth);
+    window.addEventListener('resize',resize);
+    return()=>window.removeEventListener('resize',resize);
+  },[]);
+  const changeWindows=useCallback(value=>setLayout(current=>{
+    const next=typeof value==='function'?value(current.windows):value;
+    return next===current.windows?current:{...current,windows:next};
+  }),[]);
+  const revealDockArea=useCallback(area=>{
+    setMaximized(null);
+    if(area==='hierarchy')setLayout(current=>({...current,hiddenHierarchy:false}));
+    if(area==='inspector')setLayout(current=>({...current,hiddenInspector:false}));
+    setCompactPanel(['hierarchy','inspector'].includes(area)?area:'workspace');
+  },[]);
+  const setDock=useCallback(id=>{
+    changeWindows(current=>openWindow(current,id));
+    revealDockArea(windowArea(windowPreferences.current,id));
+  },[changeWindows,revealDockArea]);
+  const showBaseDock=area=>changeWindows(current=>selectDockBase(current,area));
+  const maximizeWindow=id=>setMaximized(({workspace:'graph',scene:'scene',hierarchy:'hierarchy',inspector:'inspector'})[windowArea(windowPreferences.current,id)]);
+  const selectWorkspace=id=>{
+    setDock(id);setDetailEditor(false);setMaximized(null);
+    if(id==='characters'){if(runtime.current?.running)runtime.current.stop();setMode('scene');}
+  };
+  const closeWorkspace=id=>{
+    changeWindows(current=>closeWindow(current,id));
+    if(workspaceTabCount===1&&dockTabs(windows)[0]===id)setMaximized(null);
+  };
   const currentProject=useRef(project);currentProject.current=project;
   const root = useRef(),
     fileInput = useRef(),
     projectFile = useRef(null),
     fileOperation = useRef(false),
     graphApi = useRef(),
+    graphApis = useRef({}),
+    focusedWindow = useRef(dock),
     cameraApi = useRef(),
     physicsApi = useRef(),
     previewRef = useRef(),
     runtime = useRef();
   if (!runtime.current)
     runtime.current = new PreviewRuntime(soundDesk, setPreview);
+  focusedWindow.current=dock;
+  graphApi.current=graphApis.current[dock]||null;
   const rt = runtime.current;
   rt.physicsApi=physicsApi;
   previewRef.current = preview;
   const nodes = useMemo(() => allBeats(project), [project]),
-    beat = nodes.find((b) => b.id === selectedBeat) || nodes[0],
+    beat = nodes.find((b) => b.id === selectedBeat) || nodes[0]||{id:null,kind:'gameplay',text:'',speaker:'',choices:[],bindings:[],batches:{}},
     scene = sceneFor(project, beat.id),
     chapter = project.chapters.find((c) =>
       c.beats.some((b) => b.id === beat.id),
-    ),
+    )||{id:null,name:"",beats:[]},
     running = rt.running && preview?.phase !== "EDIT";
   const hierarchyVisible=maximized==='hierarchy'||(!['scene','graph','inspector'].includes(maximized)&&!layout.hiddenHierarchy&&(window.innerWidth>1000||compactPanel==='hierarchy'));
   const inspectorVisible=maximized==='inspector'||(!['scene','graph','hierarchy'].includes(maximized)&&!layout.hiddenInspector&&(window.innerWidth>1000||compactPanel==='inspector'));
@@ -388,9 +383,12 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     playBeat = running
       ? allBeats(playProject).find((b) => b.id === preview.beatId) || beat
       : beat,
-    playScene = sceneFor(playProject, playBeat.id),
+    playScene = playProject.subscenes.find(s=>s.id===preview?.world.location)||sceneFor(playProject, playBeat.id),
     displayScene = running ? playScene : scene;
-  useEffect(()=>setCompactPanel('workspace'),[dock,displayScene.id]);
+  useEffect(()=>{
+    const area=windowArea(windowPreferences.current,dock);
+    setCompactPanel(['hierarchy','inspector'].includes(area)?area:'workspace');
+  },[dock,displayScene.id]);
   useEffect(()=>{
     if(rt.invalidateStoryPreview(project))setNotice('Маршрут истории изменён. Предпросмотр остановлен — нажмите «Запуск» или «С реплики», чтобы проверить новые связи.');
   },[project,rt]);
@@ -479,6 +477,16 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     },1200);
     return()=>{active=false;clearTimeout(timer);};
   },[project]);
+  useEffect(()=>{
+    if(!menu)return;
+    const trigger=root.current?.querySelector('.editor-menubar>button.active');
+    const outside=e=>{if(!e.target.closest('.editor-menu,.editor-menubar>button'))setMenu(null);};
+    document.addEventListener('pointerdown',outside);
+    return()=>{
+      document.removeEventListener('pointerdown',outside);
+      if(document.activeElement===document.body||document.activeElement?.closest('.editor-menu'))trigger?.focus();
+    };
+  },[menu]);
   useEffect(() => {
     accountStorage.setItem(LAYOUT_KEY, JSON.stringify(layout));
   }, [layout]);
@@ -505,6 +513,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         allBeats(next).forEach(normalizeBatches);
         if (JSON.stringify(next) === JSON.stringify(p)) return p;
         setHistory((h) => [...h.slice(-19), p]);
+        setFuture([]);
         return next;
       }),
     [],
@@ -539,8 +548,9 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       setLayout((l) => ({ ...l, positions: { ...l.positions, [key]: value } })),
     [],
   );
-  const onGraphReady = useCallback((api) => {
-    graphApi.current = api;
+  const onGraphReady = useCallback((id,api) => {
+    graphApis.current[id]=api;
+    if(focusedWindow.current===id)graphApi.current=api;
   }, []);
   const openStaging = useCallback((id, ph = "ALL") => {
     setSelectedBeat(id);
@@ -698,25 +708,27 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     mutate(p=>{const character=createCharacter(p,sceneFor(p,beat.id).id,name);allBeats(p).find(b=>b.id===beat.id).speaker=character.name;});
     setCharacterDraft(null);setNotice(tr("Персонаж «{0}» создан и выбран для реплики.", [name]));
   };
-  const openWidgets=id=>{setWidgetRequest({id,token:uid("widget-request")});setDock("widgets");setDetailEditor(false);setFloatingDock(true);setMaximized(null);setCompactPanel("workspace");};
+  const openWidgets=id=>{setWidgetRequest({id,token:uid("widget-request")});setDock("widgets");setDetailEditor(false);setMaximized(null);setCompactPanel("workspace");};
   const customizeWidget=owner=>{const id=uid('widget');mutate(p=>createDialogueVariant(p,owner,id));openWidgets(id);};
   const start = (fromSelection=false,entryId=null) => {
     setGameMenu(null);setPreviewWidgetId(null);
     const startId=entryId||playbackStartId(project,beat.id,fromSelection);
-    if(!startId){setNotice('Укажите начальную реплику во вкладке «Сабсцены».');return;}
+    if(!startId&&project.gameplay.storyPolicy?.mode!=='none'){setNotice('Укажите начальную реплику во вкладке «Сабсцены».');return;}
     setCameraPreviewId(null);setCameraPilotId(null);
     soundDesk.unlock().catch(()=>{});
     setFollow(true);
-    setMode("game");
+    showBaseDock('scene');setMode("game");
+    setMaximized(project.gameplay?.enabled ? "scene" : null);
     setShowDialogue(true);
     rt.start(project, startId);
   };
   rt.storage=accountStorage;
   const widgetAction=async(action,element)=>{
-    if(action==='load'&&!running){setMode('game');setGameMenu(null);await rt.start(project,project.subscenes[0].entry);await rt.uiAction(action,element);return;}
-    if(['event','gameplay','save','load'].includes(action)&&running){rt.storage=accountStorage;rt.uiAction(action,element);}
+    if(action==='load'&&!running){rt.storage=accountStorage;await rt.uiAction(action,element,project);if(rt.running){setMode('game');setGameMenu(null);}else setNotice(rt.snapshot.hint);return;}
+    if(action==='save'&&!running){await rt.uiAction(action,element,project);setNotice(rt.snapshot.hint);return;}
+    if(['none','event','gameplay','save','load','advance','resume'].includes(action)&&running){rt.storage=accountStorage;await rt.uiAction(action,element);}
     if(action==='start'||action==='restart')start(false,project.subscenes[0]?.entry);
-    if(action==='resume'&&preview?.paused){setPreviewWidgetId(null);rt.togglePause();}
+    if(action==='resume')setPreviewWidgetId(null);
     if(action==='mainMenu'){rt.stop();setMode('game');setGameMenu('mainMenu');setPreviewWidgetId(null);}
   };
   const audition=(eventId)=>{setCameraPreviewId(null);setCameraPilotId(null);soundDesk.unlock().catch(()=>{});setMode('game');setFollow(false);rt.previewEvent(project,eventId,beat.id);};
@@ -769,7 +781,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     next.id ||= uid('project');
     const entry=next.subscenes[0].entry||allBeats(next)[0].id;
     backupProject(accountStorage,project);
-    rt.stop();setHistory([]);setEventContext(null);setAuthorRequest(null);setSubsceneRequest(null);setSubsceneDraft(null);
+    rt.stop();setHistory([]);setFuture([]);setEventContext(null);setAuthorRequest(null);setSubsceneRequest(null);setSubsceneDraft(null);
     setCameraPilotId(null);setCameraPreviewId(null);setPicker(null);setDetailEditor(false);setDock('story');setMaximized(null);setMode('scene');
     setQuery('');setFocusRequest(0);setMenu(null);setPreview(null);setFollow(true);
     setLayout(l=>({...l,positions:{},treeOpen:{}}));
@@ -800,8 +812,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   };
   const submitProjectDialog = ({name,templateId}) => runFileOperation(async()=>{
     if(projectDialog==='new'){
-      const template=projectTemplates.find(t=>t.id===templateId);if(template?.builtin)template.project=(await loadBuiltinTemplate(template.id)).project;
-      const next=template?projectFromTemplate(template,name):createEmptyProject(name);
+      const template=projectTemplates.find(t=>t.id===templateId);const next=template?await instantiateAuthoringTemplate(template.builtin?await loadBuiltinTemplate(template.id):template,name):createEmptyProject(name);
       replaceProject(next);setNotice(template?tr("Создан проект из шаблона «{0}».", [template.name]):'Создан пустой проект.');
     } else if(projectDialog==='template'){
       storeTemplate(accountStorage,createProjectTemplate(project,name));
@@ -811,7 +822,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       if(serverStorageEnabled){const saved=await saveServerProject(next);replaceProject(saved);setProjectDialog(null);setNotice('Копия проекта сохранена на сервере.');return;}
       const result=await writeProjectFile(await portableProject(next),{chooseFile:window.showSaveFilePicker?.bind(window),download:downloadFile,filename:projectFilename(next.title)});
       backupProject(accountStorage,project);projectFile.current=result.handle;seed.current.error=null;
-      setProject(next);setHistory([]);
+      setProject(next);setHistory([]);setFuture([]);
       setNotice(result.downloaded?tr("Копия проекта передана в загрузки: {0}", [result.filename]):tr("Копия проекта сохранена: {0}", [result.filename]));
     }
     setProjectDialog(null);
@@ -824,7 +835,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     if(!window.showOpenFilePicker){fileInput.current.click();return;}
     return runFileOperation(async()=>{
       const [handle]=await window.showOpenFilePicker({multiple:false,types:PROJECT_FILE_TYPES});
-      const {project:next,template}=parseProjectFile(await (await handle.getFile()).text());
+      const {project:next,template}=await parseProjectFile(await (await handle.getFile()).text());
       replaceProject(next,template?null:handle);setNotice(template?'Создан проект из файла шаблона.':'Проект загружен.');
     });
   };
@@ -833,7 +844,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     const file=e.target.files[0];e.target.value='';
     await runFileOperation(async()=>{
       validateImportSize(file);
-      const {project:next,template}=parseProjectFile(await file.text());
+      const {project:next,template}=await parseProjectFile(await file.text());
       replaceProject(next);setNotice(template?'Создан проект из файла шаблона.':'Проект загружен.');
     });
   };
@@ -844,8 +855,14 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   const undo = () => {
     if (!history.length) return;
     rt.stop();setCameraPilotId(null);setCameraPreviewId(null);
+    setFuture(f=>[...f.slice(-19),project]);
     setProject(history.at(-1));
     setHistory((h) => h.slice(0, -1));
+  };
+  const redo=()=>{
+    if(!future.length)return;
+    rt.stop();setCameraPilotId(null);setCameraPreviewId(null);
+    setHistory(h=>[...h.slice(-19),project]);setProject(future.at(-1));setFuture(f=>f.slice(0,-1));
   };
   const addBeat = (kind,placement) => {
     if(rt.running)return;
@@ -885,7 +902,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         b.next = null;
         b.ending = "Новая концовка";
       }
-      insertStoryNode(p,chapter.id,beat.id,b);
+      let owner=p.chapters.find(c=>c.id===chapter.id);if(!owner){owner={id:uid('chapter'),name:'Первый эпизод',subsceneId:scene.id,beats:[]};p.chapters.push(owner);p.subscenes.find(s=>s.id===scene.id).entry=b.id;}insertStoryNode(p,owner.id,beat.id,b);
       if(placement?.pin){const pin=placement.pin;
         const connection=pin.handleType==='source'?{source:pin.nodeId,sourceHandle:pin.handleId,target:id,targetHandle:placement.wireType==='flow'?'in':kind==='branch'?'condition':['set-variable','convert'].includes(kind)?'value':'a'}:{source:id,sourceHandle:placement.wireType==='flow'?'next':'value',target:pin.nodeId,targetHandle:pin.handleId};
         const error=applyConnections(p,[connection]);if(error)setNotice(error);
@@ -911,9 +928,9 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     setDock("story");
     setNotice("Событие добавлено в постановку реплики.");
   };
-  const openAuthoring=(kind='event',options={})=>{setAuthorRequest({kind,...options,token:uid('request')});setDock('create');setMaximized('graph');setDetailEditor(false);setEventContext(null);setPicker(null);setMenu(null);};
+  const openAuthoring=(kind='event',options={})=>{setAuthorRequest({kind,...options,token:uid('request')});setDock('create');maximizeWindow('create');setDetailEditor(false);setEventContext(null);setPicker(null);setMenu(null);};
   const createEvent = () => openAuthoring('event');
-  const editScene=()=>{setGameMenu(null);setPreviewWidgetId(null);if(rt.running){if(rt.snapshot.beatId)setSelectedBeat(rt.snapshot.beatId);rt.stop();}setCameraPilotId(null);setCameraPreviewId(null);setMode('scene');setMaximized(null);setCompactPanel('workspace');};
+  const editScene=()=>{showBaseDock('scene');setGameMenu(null);setPreviewWidgetId(null);if(rt.running){if(rt.snapshot.beatId)setSelectedBeat(rt.snapshot.beatId);rt.stop();}setCameraPilotId(null);setCameraPreviewId(null);setMode('scene');setMaximized(null);setCompactPanel('workspace');};
   const openSubscenes=(mode='edit',id=displayScene.id)=>{
     if(rt.running)rt.stop();const target=project.subscenes.find(s=>s.id===id);
     if(target&&mode!=='create'){setSelectedBeat(target.entry);setSelection({kind:'scene',id});}
@@ -949,12 +966,12 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     const c=newCamera(view,followTarget?'Слежение · '+followTarget.name:'Камера '+((scene.cameras?.length||0)+1));
     if(followTarget)Object.assign(c,{mode:'follow',followTargetId:followTarget.id,distance:3,height:1.7,yaw:-15,targetHeight:1.08});
     mutate(p=>{const sc=p.subscenes.find(s=>s.id===scene.id);sc.cameras||=[];sc.cameras.push(c);if(followTarget||!sc.defaultCameraId)sc.defaultCameraId=c.id;});
-    selectCamera(c.id);setShowCameras(true);setNotice(followTarget?'Следящая камера назначена основной.':'Камера создана из текущего вида.');
+    selectCamera(c.id);setNotice(followTarget?'Следящая камера назначена основной.':'Камера создана из текущего вида.');
     if(followTarget){setMode('game');setCameraPreviewId(c.id);}else{setCameraPilotId(null);setMode('scene');}
   };
   const followCharacter=()=>{const target=objects.find(o=>o.id===selection.id&&o.type==='Персонаж')||objects.find(o=>o.type==='Персонаж'&&o.active);if(target)createCamera(target);};
   const captureCamera=id=>{const c=scene.cameras?.find(c=>c.id===id),view=cameraApi.current?.capture();if(c&&view){changeCamera(id,cameraFromView(c,view,world,objects,scene.kind));setCameraPilotId(null);setNotice('Ракурс сохранён.');}};
-  const pilotCamera=id=>{setFloatingDock(false);editScene();setCameraPilotId(id);setCameraPreviewId(null);selectCamera(id,{preview:false});};
+  const pilotCamera=id=>{editScene();setCameraPilotId(id);setCameraPreviewId(null);selectCamera(id,{preview:false});};
   const viewCamera=id=>{setCameraPilotId(null);setCameraPreviewId(id);setMode('game');};
   const deleteCamera=id=>{if(rt.running)return;mutate(p=>{const sc=p.subscenes.find(s=>s.id===scene.id);sc.cameras=sc.cameras.filter(c=>c.id!==id);if(sc.defaultCameraId===id)sc.defaultCameraId=sc.cameras[0]?.id||null;});if(cameraPilotId===id)setCameraPilotId(null);if(cameraPreviewId===id)setCameraPreviewId(null);setSelection({kind:'scene',id:scene.id});setNotice('Камера удалена. Ctrl+Z — отменить.');};
   useEffect(()=>{setCameraPilotId(null);setCameraPreviewId(null);setFocusRequest(0);},[displayScene.id]);
@@ -1000,10 +1017,15 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     if(rt.running)return;const id=uid('point'),selectedObject=objects.find(o=>o.id===selection.id),position=contextMenu?.worldPosition||(selectedObject?objectTransform(selectedObject,scene.id,scene.kind).position:[0,0,0]);
     mutate(p=>{const target=p.subscenes.find(s=>s.id===scene.id);target.stagingPoints||=[];target.stagingPoints.push({id,label:'Новая точка постановки',position:[position[0],0,position[2]]});});
     setSelection({kind:'point',id});editScene();setPicker(null);setContextMenu(null);openObjectTransform();
-    setLayout(l=>({...l,treeOpen:{...l.treeOpen,[scene.id+':points']:true}}));
   };
   const addSoundEvent=()=>{if(rt.running)return;const e=newEvent('sound','world','Звук','Новое звуковое событие');mutate(p=>p.events.push(e));setPicker(null);setContextMenu(null);editSample(e.id);setNotice('Выберите аудиофайл в инспекторе; затем добавьте событие к реплике.');};
-  const addEmptyGroup=()=>{if(rt.running)return;const next=structuredClone(project),group=createObjectGroup(next,scene.id,[],'Новая группа',{allowEmpty:true});mutate(p=>Object.assign(p,next));setSelection({kind:'group',id:group.id});setLayout(l=>({...l,treeOpen:{...l.treeOpen,[scene.id+':objects']:true,[scene.id+':'+group.id]:true}}));openObjectTransform();};
+  const openObjectPicker=(event,groupId)=>{
+    if(rt.running)return;
+    const clicked=event.currentTarget,anchor=clicked.closest('.editor-menu')?root.current.querySelector('.editor-menubar>button.active'):clicked;
+    setPicker(current=>current?.kind==='object'&&current.anchor===anchor?null:{kind:'object',groupId,anchor});
+    setMenu(null);setContextMenu(null);
+  };
+  const addEmptyGroup=()=>{if(rt.running)return;const next=structuredClone(project),group=createObjectGroup(next,scene.id,[],'Новая группа',{allowEmpty:true});mutate(p=>Object.assign(p,next));setSelection({kind:'group',id:group.id});setLayout(l=>({...l,treeOpen:{...l.treeOpen,[scene.id+':'+group.id]:true}}));openObjectTransform();};
   const addObject = (type,primitive="box") => {
     if(rt.running)return;
     editScene();
@@ -1026,6 +1048,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     });
     setContextMenu(null);
     setSelection({ kind: "object", id });
+    if(groupId)setLayout(l=>({...l,treeOpen:{...l.treeOpen,[scene.id+':'+groupId]:true}}));
     setFocusRequest({nonce:uid('focus')});
     setPicker(null);
     if(type==='Персонаж'){setDock('characters');setCompactPanel('workspace');}
@@ -1081,7 +1104,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       );
     }
     allBeats(next).forEach(normalizeBatches);
-    setHistory((h) => [...h, project]);
+    setHistory((h) => [...h, project]);setFuture([]);
     setProject(next);
   };
   const resize = (key, delta) =>
@@ -1100,7 +1123,6 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       ),
     }));
   const resetLayout = () => {
-    setFloatingDock(false);
     setHistoryOpen(false);
     setLayout((l) => ({
       ...l,
@@ -1108,6 +1130,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       right: 280,
       height: defaultSceneHeight(),
       hiddenHierarchy:false,hiddenInspector:false,
+      windows:defaultWindows(defaultWindowId),
     }));
     setMaximized(null);
     setMenu(null);
@@ -1144,7 +1167,6 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       }
       if (e.key === "Escape" && !e.defaultPrevented) {
         if(contextMenu){e.preventDefault();setContextMenu(null);return;}
-        if(dock==='widgets'&&floatingDock){e.preventDefault();setFloatingDock(false);return;}
         setCompactPanel('workspace');
         setPicker(null);
         setMenu(null);
@@ -1155,17 +1177,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         e.preventDefault();
         if(!projectDialog)e.shiftKey?openProjectDialog('saveAs'):saveProject();
       }
-      if (
-        (e.ctrlKey || e.metaKey) &&
-        e.key.toLowerCase() === "z" &&
-        !["INPUT", "TEXTAREA"].includes(e.target.tagName)
-      ) {
-        e.preventDefault();
-        if (history.length) {
-          rt.stop();setCameraPilotId(null);setCameraPreviewId(null);
-          setProject(history.at(-1));
-          setHistory((h) => h.slice(0, -1));
-        }
+      if ((e.ctrlKey||e.metaKey)&&['z','y'].includes(e.key.toLowerCase())&&!e.defaultPrevented&&!['INPUT','TEXTAREA'].includes(e.target.tagName)&&!e.target.isContentEditable) {
+        e.preventDefault();if(e.key.toLowerCase()==='y'||e.shiftKey)redo();else undo();
       }
     };
     const nativeClipboard=e=>{
@@ -1176,7 +1189,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     };
     window.addEventListener("keydown", listener);window.addEventListener('copy',nativeClipboard);window.addEventListener('paste',nativeClipboard);
     return () => {window.removeEventListener("keydown", listener);window.removeEventListener('copy',nativeClipboard);window.removeEventListener('paste',nativeClipboard);};
-  }, [history,project,projectDialog,mode,running,selection,picker,detailEditor,cameraPilotId,menu,displayScene,contextMenu,dock,floatingDock]);
+  }, [history,future,project,projectDialog,mode,running,selection,picker,detailEditor,cameraPilotId,menu,displayScene,contextMenu,dock]);
 
   const updateVariable = (id,patch) => {
     if(rt.running)return 'Остановите игру, чтобы редактировать переменные.';
@@ -1207,7 +1220,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     }
     if(selection.kind==='group'){
       const group=project.objectGroups?.find(g=>g.id===selection.id);
-      if(group)return <><Field label={tr("Название группы")}><input disabled={running} value={group.name} onChange={e=>{const name=e.target.value;mutate(p=>p.objectGroups.find(g=>g.id===group.id).name=name);}}/></Field><Button icon="Plus" disabled={running} onClick={()=>setPicker({kind:'object',groupId:group.id})}>{tr("Создать объект в группе")}</Button><p>{tr("Перетащите сюда объекты из иерархии.")}</p></>;
+      if(group)return <><Field label={tr("Название группы")}><input disabled={running} value={group.name} onChange={e=>{const name=e.target.value;mutate(p=>p.objectGroups.find(g=>g.id===group.id).name=name);}}/></Field><Button icon="Plus" disabled={running} aria-haspopup="menu" onClick={event=>openObjectPicker(event,group.id)}>{tr("Создать объект в группе")}</Button><p>{tr("Перетащите сюда объекты из иерархии.")}</p></>;
     }
     if(selection.kind==='file'){
       const file=collectAssetFiles(project,projectAudioAssets(project)).find(f=>f.id===selection.id);
@@ -1351,6 +1364,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               title={tr("Объект активен")}
             />
           </div>
+          <Button disabled={running} icon="Plus" onClick={()=>{setGameplayRequest({objectId:o.id,nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');}}>{tr("Добавить механику")}</Button>
           <Field label={tr("Группа в иерархии")}><Select disabled={running} value={project.objectGroups?.find(g=>g.sceneId===scene.id&&g.objectIds.includes(o.id))?.id||''} options={[["","Объекты сцены · корень"],...(project.objectGroups||[]).filter(g=>g.sceneId===scene.id).map(g=>[g.id,literalLabel(g.name)])]} onChange={groupId=>mutate(p=>groupId?addObjectsToGroup(p,groupId,[o.id]):removeObjectsFromGroups(p,scene.id,[o.id]))}/></Field>
           {o.type==='Персонаж'&&<Fold title={tr("Виджет диалога")} icon="PanelsTopLeft"><WidgetAssignment project={project} character={o} onCustomize={()=>customizeWidget({characterId:o.id})} onChange={dialogueWidgetId=>patch({dialogueWidgetId})} onEdit={openWidgets} disabled={running}/></Fold>}
           {o.type==='Персонаж'&&<Button icon="Users" onClick={()=>{setDock('characters');setCompactPanel('workspace');}}>{tr("Модель и анимации персонажа")}</Button>}
@@ -1641,7 +1655,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             icon="Maximize2"
             onClick={() => {
               setDetailEditor(true);
-              setFloatingDock(true);
+
               setMaximized(null);
             }}
           >
@@ -1775,7 +1789,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     return (
       <div className="project-browser">
         <div className="asset-folders">
-            <button onClick={()=>{setDock('create');setMaximized('graph');}}><Icon name="MousePointer2" size={15}/>{tr("Действия и группы")}</button>
+            <button onClick={()=>{setDock('create');maximizeWindow('create');}}><Icon name="MousePointer2" size={15}/>{tr("Действия и группы")}</button>
           {[
             ["scenes", "PanelsTopLeft", "Сабсцены"],
             ["events", "Layers", "События"],
@@ -2061,8 +2075,11 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       {label:'Сгруппировать выделение',icon:'FolderPlus',group:'Выделение',disabled:objectSelectionIds.length<2,action:createSelectionGroup},
       {label:'Дублировать выделение',icon:'Copy',group:'Выделение',disabled:!objectSelectionIds.length,action:duplicateObjects},
       {label:'Удалить выделение',icon:'Trash2',group:'Выделение',shortcut:'Del',disabled:!objectSelectionIds.length,action:deleteObjects},
+      {label:'Оси трансформации',icon:'Axis3d',group:'Выделение',disabled:!objectSelectionIds.length,children:[
+        {label:'Мировые оси',icon:editSpace==='world'?'Check':'Globe',action:()=>setEditSpace('world')},
+        {label:'Оси объекта',icon:editSpace==='local'?'Check':'Box',action:()=>setEditSpace('local')},
+      ]},
       {label:showGrid?'Скрыть сетку':'Показать сетку',icon:'Grid2X2',group:'Вид',action:()=>setShowGrid(v=>!v)},
-      {label:showCameras?'Скрыть камеры':'Показать камеры',icon:'Video',group:'Вид',action:()=>setShowCameras(v=>!v)},
     ];
     if(contextMenu?.kind==='event')return binding?[
       {label:'Редактировать исходный шаблон',icon:'Layers',group:'Состав нод задаётся в шаблоне',action:()=>setEventContext({eventId:event.id})}
@@ -2093,7 +2110,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   onEdit={(data) => {
                     setSelection({ kind: "action", id: data.action.id });
                     setDetailEditor(true);
-                    setMaximized("graph");
+                    maximizeWindow(dock||'story');
                   }}
                   onPhase={openStaging}
                   onPatchAction={patchAction}
@@ -2102,7 +2119,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   preview={preview}
                   positions={layout.positions}
                   onPositions={setPositions}
-                  onReady={graphMode === dock ? onGraphReady : undefined}
+                  onReady={api=>onGraphReady(graphMode,api)}
                   onClipboard={graphClipboard}
                   onContext={point=>{if(!rt.running)setContextMenu({...point,kind:graphMode});}}
 
@@ -2163,377 +2180,17 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                     ))}
                 </details>
               ))}</div>);
-  return (
-    <div
-      className="editor-app"
-      ref={root}
-      style={{
-        "--left": layout.left + "px",
-        "--right": layout.right + "px",
-        "--scene-height": layout.height + "px",
-      }}
-    >
-      <header className="editor-menubar">
-        <div className="editor-brand">
-          <Icon name="Flower2" size={23} />
-          <strong>
-            Sacura<span>Novel Studio</span>
-          </strong>
-        </div>
-        {["Файл", "Правка", "Создать", "Окна"].map((m) => (
-          <button
-            className={menu === m ? "active" : ""}
-            key={m}
-            aria-expanded={menu === m}
-            onClick={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              setMenuAnchor({left: Math.max(8, Math.min(rect.left, window.innerWidth - 250)), top: rect.bottom + 4});
-              setMenu(menu === m ? null : m);
-            }}
-          >
-            {tr(m)}
-          </button>
-        ))}
-        <div className="flex-space" />
-        <span className="project-title" title={project.title}>
-          <Icon name="FolderOpen" size={14} />
-          {project.title}
-        </span>
-        <div className="main-play-controls">
-          <Button
-            className={running ? "playing" : ""}
-            icon={running ? "Square" : "Play"}
-            title={
-              running
-                ? tr("Остановить предпросмотр")
-                : tr("Запустить с начала текущей сабсцены")
-            }
-            onClick={() => (running ? rt.stop() : start())}
-          >{running ? tr("Стоп") : tr("Запуск")}</Button>
-          <Button icon="Play" title={tr("Проверить историю с выделенной реплики")} disabled={running} onClick={()=>start(true)}>{tr("С реплики")}</Button>
-          <Button
-            icon="Pause"
-            title={tr("Пауза / продолжить")}
-            className={preview?.paused ? "active" : ""}
-            disabled={!running || preview.phase === "FINISHED"}
-            onClick={() => rt.togglePause()}
-          />
-          <Button
-            icon="StepForward"
-            title={tr("Следующая реплика")}
-            disabled={
-              !running ||
-              !preview.ready ||
-              preview.paused ||
-              ["choice", "gate"].includes(playBeat.kind)
-            }
-            onClick={() => rt.advance()}
-          />
-        </div>
-        <div className="toolbar-layout">
-          <span className="play-label" hidden={!running}>
-            {running
-              ? preview.paused
-                ? tr("На паузе")
-                : tr("Предпросмотр")
-              : tr("Редактирование")}
-          </span>
-          <Select
-            aria-label={tr("Раскладка редактора")}
-            value={maximized || "balanced"}
-            onChange={(v) => setMaximized(v === "balanced" ? null : v)}
-            options={[
-              ["balanced", "Сцена и редактор"],
-              ["graph", "Рабочая область"],
-              ["scene", "Только сцена"],
-              ["hierarchy", "Только иерархия"],
-              ["inspector", "Только инспектор"],
-            ]}
-          />
-        </div>
-        {onHome&&<Button icon="FolderOpen" disabled={projectFileBusy} onClick={()=>runFileOperation(async()=>{rt.stop();await onHome(project);})}>{tr("Главное меню")}</Button>}
-        {user&&<button onClick={()=>onLogout(project)} title={tr("Выйти из аккаунта {0}", [user.login])}>{user.login} {tr("· Выйти")}</button>}
-        <LanguagePicker onOpen={() => setMenu(null)} />
-        <ThemePicker onOpen={() => setMenu(null)} />
-      </header>
-      <div className={'editor-workspace compact-'+compactPanel+(layout.hiddenHierarchy?' hierarchy-hidden':'')+(layout.hiddenInspector?' inspector-hidden':'')+(['scene','graph'].includes(maximized)?' focus-center':maximized==='hierarchy'?' focus-hierarchy':maximized==='inspector'?' focus-inspector':'')}>
-        <nav className="compact-panel-tabs" aria-label={tr("Панели редактора")}>
-          {[['hierarchy','ListTree','Объекты сцены'],['workspace','PanelsTopLeft','Рабочая область'],['inspector','Settings2','Свойства']].map(([id,icon,label])=><button key={id} aria-pressed={compactPanel===id} onClick={()=>{if(['hierarchy','inspector'].includes(maximized))setMaximized(null);setCompactPanel(id);}}><Icon name={icon} size={13}/>{tr(label)}</button>)}
-        </nav>
-        <aside className="hierarchy-panel">
-          <button className="panel-restore" aria-label={tr("Показать иерархию")} title={tr("Показать иерархию")} onClick={()=>setLayout(l=>({...l,hiddenHierarchy:false}))}><Icon name="PanelLeftOpen" size={18}/><span>{tr("Иерархия")}</span></button>
-          <div className="panel-tabs">
-            <button className="active">{tr("Иерархия")}</button>
-            <div className="flex-space" />
-            <Button
-              icon="Plus"
-              title={tr("Создать объект")}
-              onClick={() => setPicker({ kind: "object" })}
-            />
-            <Button icon={maximized==='hierarchy'?'Minimize2':'Maximize2'} title={maximized==='hierarchy'?tr("Восстановить иерархию"):tr("Развернуть иерархию")} onClick={()=>setMaximized(v=>v==='hierarchy'?null:'hierarchy')}/>
-            <Button icon="PanelLeftClose" title={tr("Свернуть иерархию")} onClick={()=>{setMaximized(null);setLayout(l=>({...l,hiddenHierarchy:true}));setCompactPanel('workspace');}}/>
-          </div>
-          <div className="panel-search">
-            <Icon name="Search" size={13} />
-            <input
-              aria-label={tr("Поиск объектов")}
-              placeholder={tr("Найти объект…")}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </div>
-          <div className="hierarchy-tree">
-              <HierarchyTree onAddObject={groupId=>setPicker({kind:'object',groupId})} onAddPoint={addStagingPoint} onAddSound={addSoundEvent} onCreateEmptyGroup={addEmptyGroup} onRootDrop={ids=>{if(!rt.running)mutate(p=>removeObjectsFromGroups(p,displayScene.id,ids));}} groups={sceneObjectGroups(project,displayScene.id,objects)} disabled={running} onCreateGroup={createSelectionGroup} onSelectGroup={group=>{if(rt.running)return;setMode('scene');setSelection(group.objectIds.length?{kind:'object',id:group.objectIds[0],ids:group.objectIds,groupId:group.id}:{kind:'group',id:group.id});openObjectTransform();}} onGroupDrop={(groupId,ids)=>{if(!rt.running)mutate(p=>addObjectsToGroup(p,groupId,ids));}} scene={displayScene} objects={objects} points={sceneStagingPoints(displayScene,objects)} query={query} selected={selection.id} selectedIds={objectSelectionIds}
-                expanded={layout.treeOpen||{}} onExpanded={treeOpen=>setLayout(l=>({...l,treeOpen}))}
-                onSelectObject={(id,options)=>{if(!running){setMode('scene');setCameraPilotId(null);setCameraPreviewId(null);}selectObject(id,options);}}
-                onFrameObject={id=>{editScene();setSelection({kind:'object',id});setFocusRequest({nonce:uid('focus')});}}
-                onVisibility={id=>mutate(p=>{const o=p.objects.find(o=>o.id===id);o.active=o.active===false;})}
-                onPoint={point=>{editScene();setSelection({kind:'point',id:point.id});openObjectTransform();setFocusRequest({nonce:uid('focus'),position:point.position,objectId:point.objectId});}}
-                onSelectCamera={selectCamera} onCameras={openCameras} showCameras={showCameras} onShowCameras={()=>setShowCameras(v=>!v)}
-                showDialogue={showDialogue} onShowDialogue={()=>setShowDialogue(v=>!v)} onStory={()=>{setDock('story');setDetailEditor(false);setMaximized(null);}}
-                onAudio={()=>{setDock('active');setDetailEditor(false);setMaximized(null);}}/>
-
-          </div>
-          <div className="hierarchy-footer">
-            <Icon name="Layers" size={13} />
-            {objects.length} {tr("объектов")}<span />
-            {nodes.length} {tr("блоков")}</div>
-          <InfoView />
-        </aside>
-        <ResizeBar
-          axis="x"
-          label={tr("Ширина иерархии")}
-          onMove={(d) => resize("left", d)}
-          onReset={() => setLayout((l) => ({ ...l, left: 210 }))}
-        />
-        <section
-          className={
-            "editor-center " +
-            (maximized === "graph"
-              ? "graph-max"
-              : maximized === "scene"
-                ? "scene-max"
-                : "")
-          }
-        >
-          <section className="viewport-panel">
-            <div className="panel-tabs viewport-tabs">
-              <button
-                aria-label={tr("Редактор локации")}
-                aria-pressed={mode === "scene"}
-                className={mode === "scene" ? "active" : ""}
-                onClick={editScene}
-              >
-                <Icon name="Box" size={14} />
-                {tr("Локация")}</button>
-              <button
-                aria-pressed={mode === "game"}
-                className={mode === "game" ? "active" : ""}
-                onClick={() => setMode("game")}
-              >
-                <Icon name="Gamepad2" size={15} />
-                {tr("Игра")}</button>
-              <div className="toolbar-project">
-          <span className="toolbar-context-label">{tr("Сабсцена")}</span>
-          <EditorSelect
-            label={tr("Текущая сабсцена")}
-            value={displayScene.id}
-            onChange={(id) =>
-              openSubscenes('edit',id)
-            }
-            options={project.subscenes.map((s) => [s.id,literalLabel(s.name)])}
-          />
-        </div>
-              <div className="flex-space" />
-              <Button icon="PanelsTopLeft" title={tr("Редактор интерфейса игры")} onClick={()=>openWidgets(resolveWidget(project,'dialogue',beat).id)}/>
-              {mode==='game'&&<Button icon="Menu" title={tr("Главное меню игры")} onClick={()=>{rt.stop();setGameMenu('mainMenu');setPreviewWidgetId(null);}}>{tr("Меню")}</Button>}
-              <button
-                title={tr("Диалог в игровом кадре")}
-                hidden={mode !== "game"}
-                aria-pressed={showDialogue}
-                className={showDialogue ? "toggled" : ""}
-                onClick={() => setShowDialogue((v) => !v)}
-              >
-                <Icon name="PanelBottom" size={14} />
-              </button>
-              <button
-                title={maximized==='scene'?tr("Восстановить сцену"):tr("Развернуть сцену")}
-                onClick={() =>
-                  setMaximized(maximized === "scene" ? null : "scene")
-                }
-              >
-                <Icon
-                  name={maximized === "scene" ? "Minimize2" : "Maximize2"}
-                  size={14}
-                />
-              </button>
-            </div>
-            <div className="viewport-commandbar" aria-label={tr("Инструменты сцены")}>
-              {mode==='scene'&&!cameraPilotId&&<div className="scene-edit-bar">
-                <button className="scene-edit-add" onClick={()=>setPicker({kind:'object'})}><Icon name="Plus" size={14}/>{tr("Добавить объект / примитив")}</button>
-                {[['select','MousePointer2','Выбор','Q'],['translate','Move','Сдвиг','W'],['rotate','Rotate3D','Поворот','E'],['scale','Scaling','Масштаб','R']].map(([tool,icon,label,key])=><button key={tool} disabled={running||(selection.kind==='camera'&&(tool==='scale'||(tool==='rotate'&&displayScene.cameras?.find(c=>c.id===selection.id)?.mode==='follow')))} title={tr(label)+' · '+key} aria-pressed={editTool===tool} className={'transform-tool '+(editTool===tool?'active':'')} onClick={()=>setEditTool(tool)}><Icon name={icon} size={14}/><span className="tool-label">{tr(label)} · {key}</span></button>)}
-                <Button icon="Settings2" disabled={selection.kind!=='object'} title={tr("Позиция, вращение и масштаб выбранного объекта")} onClick={openObjectTransform}>{tr("Положение, поворот, масштаб")}</Button>
-                <button title={tr("Привязка: 0,25 м / 15° / 0,1×")} aria-pressed={snap} className={snap?'active':''} onClick={()=>setSnap(v=>!v)}><Icon name="Magnet" size={14}/></button>
-                <select aria-label={tr("Оси трансформации")} value={editSpace} onChange={e=>setEditSpace(e.target.value)}><option value="world">{tr("Мир")}</option><option value="local">{tr("Объект")}</option></select>
-                <Button icon="Video" title={tr("Показать камеры в 3D")} aria-pressed={showCameras} className={showCameras?"active":""} onClick={()=>setShowCameras(v=>!v)}/>
-                <Button icon="Grid3X3" title={tr("Сетка сцены")} aria-pressed={showGrid} className={showGrid?"active":""} onClick={()=>setShowGrid(v=>!v)}/>
-                <Button icon="Focus" title={tr("Приблизить выбранный объект · F")} disabled={selection.kind!=='object'} onClick={()=>setFocusRequest({nonce:uid('focus')})}/>
-              </div>}
-              {cameraPilotId&&mode==='scene'&&<div className="camera-pilot-bar"><Icon name="Video"/><span>{tr("Настройка: ")}{displayScene.cameras?.find(c=>c.id===cameraPilotId)?.name}<small>{tr("Обзор мышью · правая кнопка — сдвиг · колесо — приближение")}</small></span><Button icon="Check" onClick={()=>captureCamera(cameraPilotId)}>{tr("Сохранить ракурс")}</Button><Button icon="X" title={tr("Вернуться без сохранения")} onClick={()=>setCameraPilotId(null)}/></div>}
-              {(mode==='game'||(cameraPreviewId&&!cameraPilotId))&&<div className="camera-view-badge"><Icon name={resolveCamera(displayScene,world,objects,cameraPreviewId).mode==='follow'?'UserRoundCheck':'Video'} size={14}/><span className="camera-view-name">{resolveCamera(displayScene,world,objects,cameraPreviewId).name}</span>{cameraPreviewId&&<button onClick={()=>setCameraPreviewId(null)}>{mode==='game'?tr("По сценарию"):tr("Вернуться к сцене")} <Icon name="X" size={12}/></button>}</div>}
-              <details className="viewport-help"><summary title={tr("Управление сценой")} aria-label={tr("Управление сценой")}><Icon name="CircleHelp" size={15}/></summary><div>{mode==='game'?<>{tr("Кадр показан из активной камеры.")}<br/>{tr("Выберите камеру в иерархии, чтобы посмотреть её ракурс.")}<br/>{tr("«По сценарию» возвращает камеру, выбранную историей.")}<br/>{inputHelp(playProject.input,inputContextsFor(playProject,playBeat),['move','interact','point','advance','pause'])}<br/>{tr("Для настройки ракурса вернитесь в «Локацию».")}</>:<>{tr("W — перемещение · E — вращение")}<br/>{tr("R — масштаб · Q — выбор")}<br/>{tr("Работают и в русской раскладке")}<br/>{tr("Shift + щелчок — мультивыбор")}<br/>{tr("Alt + ЛКМ — орбита · СКМ — панорама")}<br/>{tr("ПКМ + WASD / QE — полёт")}<br/>{tr("F — выделение в кадр")}<br/>{tr("Delete — удалить выделенные объекты")}<br/>{tr("Ctrl+Z — вернуть удалённые объекты")}</>}</div></details>
-            </div>
-            <div
-              className="scene-viewport"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if(e.currentTarget.dataset.navigating==='true')return;
-                if(mode==='scene'&&!running&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!e.shiftKey&&!['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)&&!e.target.isContentEditable&&e.code==='KeyF'){e.preventDefault();setFocusRequest({nonce:uid('focus')});}
-                if (
-                  mode === "game" &&
-                  !running && !e.defaultPrevented &&
-                  [" ", "Enter"].includes(e.key) &&
-                  e.target === e.currentTarget
-                ) {
-                  e.preventDefault();
-                  start();
-                }
-              }}
-            >
-              <LocationScene
-                sceneId={displayScene.id}
-                editTool={editTool} editSpace={editSpace} snap={snap} focusRequest={cameraPilotId?0:focusRequest} editing={!running&&!cameraPilotId&&!positionPick} onTransform={transformObject} onTransforms={transformObjects}
-                cameraScene={displayScene} selectedCameraId={selection.kind==='camera'?selection.id:null} cameraPreviewId={cameraPreviewId} cameraPilotId={cameraPilotId} onCameraChange={changeCamera} onCameraSelect={selectCamera} cameraApi={cameraApi} physicsApi={physicsApi} showCameras={showCameras}
-                kind={displayScene.kind}
-                objects={objects}
-                state={world}
-                selected={selection.kind === "object" ? selection.id : null}
-                selectedIds={objectSelectionIds}
-                mode={mode}
-                showGrid={showGrid}
-                actionPosition={(()=>{if(selection.kind==='point')return sceneStagingPoints(displayScene,objects).find(p=>p.id===selection.id)?.position;const a=inspectedAction||(binding?bindingActions(project,binding):event?.groups.flatMap(g=>g.actions))?.find(a=>a.type==='move');return a?.type==='move'&&Array.isArray(a.value)?a.value:null;})()}
-                onPickPosition={positionPick?value=>{
-                  const request=positionPick;
-                  mutate(p=>{if(request.context.bindingId){const b=allBeats(p).find(b=>b.id===request.context.beatId)?.bindings.find(b=>b.id===request.context.bindingId);if(b){b.actionOverrides||={};b.actionOverrides[request.id]={...b.actionOverrides[request.id],value};}}
-                    else {const a=p.events.find(e=>e.id===request.context.eventId)?.groups.flatMap(g=>g.actions).find(a=>a.id===request.id);if(a)a.value=value;}});
-                  setPositionPick(null);setNotice(tr("Координаты выбраны: {0}", [value.join(', ')]));
-                }:undefined}
-                onSelect={selectObject}
-                onContext={point=>{if(!rt.running)setContextMenu({...point,kind:'scene'});}}
-                inputSettings={playProject.input}
-                onInputAction={event=>rt.inputAction(event)}
-                onInputDevices={setInputDevices}
-                onPlayerStep={(direction,dt)=>rt.playerStep(direction,dt)}
-                onPlayerClick={(point,id)=>rt.playerClick(point,id)}
-                onPlayerInteract={()=>rt.playerInteract()}
-                onInteract={interact}
-              />
-              {mode==='game'&&<TouchInput settings={playProject.input} contexts={world.inputContexts||[]} active={world.inputActive} playerMode={world.playerControl?.mode} paused={world.paused||!world.inputReady}/>}
-              {positionPick&&<div className="viewport-caption"><strong>{tr("Выберите точку на сцене")}</strong><Button icon="X" onClick={()=>setPositionPick(null)}>{tr("Отмена")}</Button></div>}
-              <GameDialogue project={running?rt.project:project}
-                beat={playBeat}
-                onUiAction={widgetAction}
-                widgetOverride={!running?project.widgets.find(w=>w.id===previewWidgetId&&w.kind==='dialogue'):null}
-                preview={preview}
-                running={running}
-                variables={variables}
-                onAdvance={(c) => rt.advance(c)}
-                onStart={start}
-                objectLabel={
-                  playProject.objects.find((o) => o.id === playBeat.signal)
-                    ?.name
-                }
-                show={mode==="game"&&showDialogue&&!preview?.audition&&!gameMenu&&!preview?.paused}
-              />
-              {running&&preview?.phase==='PLAYING'&&<GameHUD project={playProject} preview={preview} onAction={widgetAction} text={playBeat.text}/>}
-              {mode==='game'&&(gameMenu==='mainMenu'||(running&&preview?.paused&&!preview?.audition))&&<WidgetMenu label={gameMenu==='mainMenu'?tr('Главное меню'):tr('Пауза')} widget={project.widgets.find(w=>w.id===previewWidgetId&&w.kind===(gameMenu==='mainMenu'?'mainMenu':'pauseMenu'))||resolveWidget(project,gameMenu==='mainMenu'?'mainMenu':'pauseMenu')}
-                  context={{project:playProject,variables,game:preview?.world.game,title:project.title,paused:!!preview?.paused}} onAction={widgetAction}/>}
-              {running && !preview.textVisible && !preview.audition && (
-                <div className="scene-preparing">
-                  <Icon name="LoaderCircle" size={15} />
-                  {message(preview.error) || tr("Подготовка сцены перед репликой")}
-                </div>
-              )}
-              {running&&!preview.world.playerControl&&<div className="scene-activity" aria-live="polite">
-                {preview.audition&&<header><Icon name="Clapperboard" size={13}/><strong>{tr("Проба · ")}{preview.auditionName}</strong><button title={tr("Закончить пробу")} onClick={()=>rt.stop()}><Icon name="X" size={13}/></button></header>}
-                {(preview.activity||[]).slice(-4).map(a=><div className={'activity-item '+a.status} key={a.id}><Icon name={a.status==='running'?'LoaderCircle':'Check'} size={12}/><span>{tr(TYPES[a.type]?.label)} <b>{project.objects.find(o=>o.id===a.target)?.name||''} {String(a.value).slice(0,42)}</b></span>{a.status==='running'&&<progress max="1" value={a.progress||0}/>}</div>)}
-                {preview.error&&<span className="error-box">{message(preview.error)}</span>}
-              </div>}
-              {running && <div className="viewport-caption">
-                <Icon name="Video" size={12} />
-                {mode === "game"
-                  ? tr("Главная камера")
-                  : tr("Перспектива · вращение мышью")}
-                <span />
-                {running
-                  ? `${playBeat.id} / ${preview.phase}`
-                  : tr("3D · примитивы")}
-              </div>}
-            </div>
-            {(running || [...soundDesk.tracks.values()].some(t=>["playing","error"].includes(t.status))) && <div className="live-strip">
-              <output className="audio-output" title={tr("Измеренный уровень на аудиовыходе")} aria-label={tr("Уровень звукового выхода")}><Icon name="Volume2" size={13}/><meter min="0" max="1" value={[...soundDesk.tracks.values()].some(t=>t.status==='playing')?(soundDesk.output?.level()||0):0}/><span>{soundDesk.output?.context?.state==='running'?tr("Аудио включено"):tr("Аудио · нажмите Play")}</span></output>
-              <button onClick={() => setDock("active")}>
-                <Icon name="Activity" size={13} />
-                {running
-                  ? Object.values(preview.effects).filter(
-                      (e) => e.status !== "stopped",
-                    ).length
-                  : "2"}{" "}
-                {tr("активных состояния")}</button>
-              <span className="live-separator" />
-              <span>
-                <Icon name="Music2" size={13} />
-                {soundDesk.get("background")?.status === "playing"
-                  ? tr("Главная тема · ") +
-                    clockLabel(soundDesk.get("background").audio.currentTime)
-                  : tr("Музыка не играет")}
-              </span>
-              <div className="flex-space" />
-              {soundDesk.ducks.size > 0 && (
-                <span className="duck-label">{tr("Голос → музыка −")}{normalizeSidechain(project.audioSettings?.sidechain).reductionDb} dB</span>
-              )}
-              {[...soundDesk.tracks.values()].some(t=>t.status==='error')&&<button className="audio-error" onClick={()=>setDock('sound')}>{tr("Ошибка аудио · открыть")}</button>}
-              <button onClick={() => setDock("active")}>
-                {tr("Управление ")}<Icon name="ChevronRight" size={12} />
-              </button>
-            </div>}
-          </section>
-          <ResizeBar
-            axis="y"
-            label={tr("Размер сцены и графа")}
-            onMove={(d) => resize("height", d)}
-            onReset={() =>
-              setLayout((l) => ({ ...l, height: defaultSceneHeight() }))
-            }
-          />
-          <FloatingWindow active={floatingDock} title={tr("Рабочая область")} onClose={()=>setFloatingDock(false)}><section className="graph-dock">
-            <div className="panel-tabs dock-tabs">
-              <DockTools dock={["story","timeline","staging"].includes(dock)?"story":dock} event={event} issueCount={issues.length} onSelect={id => {
-                setDock(id);
-                if (id === "create") setMaximized("graph");
-                else setMaximized(null);
-                if(id==='characters'){if(rt.running)rt.stop();setMode('scene');setCompactPanel('workspace');}
-                setDetailEditor(false);
-              }} />
-              <div className="flex-space" />
-              <Button
-                icon={maximized === "graph" ? "Minimize2" : "Maximize2"}
-                title={maximized==='graph'?tr("Восстановить рабочую область"):tr("Развернуть рабочую область")}
-                onClick={() =>
-                  setMaximized(maximized === "graph" ? null : "graph")
-                }
-              />
-            </div>
+  const renderWorkspace=(dock,visible)=><>
             {["story", "timeline", "staging", "event"].includes(dock) && !detailEditor && (
               <div className="graph-toolbar">
-                {dock==='event'?<><Button icon="ArrowLeft" title={tr("Вернуться в поток истории")} onClick={()=>setDock('story')}/><span className="graph-breadcrumb">{event?.name}</span></>:<><Icon name="Route" size={15}/><span className="flow-toolbar-context">{project.subscenes.length} {tr("сабсцены · ")}{nodes.length} {tr("реплик · единый поток")}</span><Button icon="Focus" onClick={()=>graphApi.current?.focus(beat.id)}>{tr("К реплике")}</Button><Button icon="Scan" onClick={()=>graphApi.current?.fit()}>{tr("Вся история")}</Button></>}
+                {dock==='event'?<><Button icon="ArrowLeft" title={tr("Вернуться в поток истории")} onClick={()=>setDock('story')}/><span className="graph-breadcrumb">{event?.name}</span></>:<><Icon name="Route" size={15}/><span className="flow-toolbar-context">{project.subscenes.length} {tr("сабсцены · ")}{nodes.length} {tr("реплик · единый поток")}</span><Button icon="Focus" onClick={()=>graphApis.current[dock]?.focus(beat.id)}>{tr("К реплике")}</Button><Button icon="Scan" onClick={()=>graphApis.current[dock]?.fit()}>{tr("Вся история")}</Button></>}
                 <div className="flex-space" />
                 <details className="viewport-help graph-help"><summary title={tr("Навигация по графу")} aria-label={tr("Навигация по графу")}><Icon name="CircleHelp" size={15}/></summary><div>{tr("ПКМ — панорама")}<br/>{tr("Колесо — масштаб")}<br/>{tr("Пин → пин — соединить")}<br/>{tr("Alt + щелчок по пину — разорвать связи")}<br/>{tr("Ctrl + перетаскивание пина — перенести связи")}<br/>{tr("Выбрать провод + Delete — разорвать")}<br/>{tr("ЛКМ — выбор и перемещение узла")}<br/>{tr("Двойной щелчок — открыть узел")}</div></details>
                 {dock !== "event" && beat.kind === "choice" && (
                   <Button
                     icon="GitFork"
                     onClick={() => {
-                      graphApi.current?.focus(beat.id);
+                      graphApis.current[dock]?.focus(beat.id);
                     }}
                   >
                     {tr("Обзор развилки")}</Button>
@@ -2544,7 +2201,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                     className={follow ? "active" : ""}
                     onClick={() => {
                       setFollow(!follow);
-                      if (!follow) graphApi.current?.focus(preview.beatId);
+                      if (!follow) graphApis.current[dock]?.focus(preview.beatId);
                     }}
                   >
                     <Icon name="LocateFixed" size={13} />
@@ -2553,7 +2210,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 <Button
                   icon="AlignHorizontalDistributeCenter"
                   title={tr("Расположить узлы автоматически")}
-                  onClick={() => graphApi.current?.arrange()}
+                  onClick={() => graphApis.current[dock]?.arrange()}
                 />
                 <Button
                   className="rose-button"
@@ -2604,11 +2261,11 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 } catch {}
               }}
             >
-              <AuthoringWorkspace hidden={dock!=='create'} project={project} request={authorRequest} mutate={mutate} beat={beat} onNotice={setNotice}
+              {dock==='create'&&<AuthoringWorkspace hidden={!visible} project={project} request={authorRequest} mutate={mutate} beat={beat} onNotice={setNotice}
                 onGraph={id=>{setEventContext({eventId:id});setSelection({kind:'event',id});setDock('event');}}
                 onPreview={draft=>{setCameraPreviewId(null);setCameraPilotId(null);const test=structuredClone(project);const i=test.events.findIndex(e=>e.id===draft.id);if(i<0)test.events.push(draft);else test.events[i]=draft;soundDesk.unlock();rt.stop();setMode('game');setMaximized(null);setFollow(false);rt.previewEvent(test,draft.id,beat.id);}}
-                onPlace={(draft,hook)=>{mutate(p=>addToBatch(p,beat.id,hook,null,draft.id));setPhase(hook);setDock('story');setMaximized(null);setNotice(tr("Добавлено: {0} · {1}", [draft.name, PHASES.find(x=>x.id===hook).label]));}}/>
-              {dock==='create'?null:dock==='gameplay'?<GameplayWorkspace project={project} onChange={mutate} sceneId={displayScene.id} running={running} onStop={()=>rt.stop()} onWidgets={()=>{setWidgetRequest({id:project.gameplay.hudWidgetId||project.ui.hud});setDock('widgets');}} onInput={()=>setDock('input')}/>:dock==='input'?<InputWorkspace project={project} onChange={mutate} beat={playBeat} preview={preview} devices={inputDevices} running={running} onStop={()=>rt.stop()}/>:detailEditor && event ? (
+                onPlace={(draft,hook)=>{mutate(p=>addToBatch(p,beat.id,hook,null,draft.id));setPhase(hook);setDock('story');setMaximized(null);setNotice(tr("Добавлено: {0} · {1}", [draft.name, PHASES.find(x=>x.id===hook).label]));}}/>}
+              {dock==='create'?null:dock==='gameplay'?<GameplayWorkspace preview={preview} onObject={id=>{setSelection({kind:"object",id});openObjectTransform();}} addRequest={gameplayRequest} onUndo={undo} onRedo={redo} canUndo={!!history.length} canRedo={!!future.length} onPlay={()=>start()} selectedObjectId={selection.kind==="object"?selection.id:null} project={project} onChange={mutate} onImport={plan=>changeAssetLibrary(p=>Object.assign(p,plan.apply(p)))} sceneId={displayScene.id} running={running} onStop={()=>rt.stop()} onWidgets={()=>{setWidgetRequest({id:project.gameplay.hudWidgetId||project.ui.hud});setDock('widgets');}} onInput={()=>setDock('input')} onEvent={id=>openAuthoring('event',id?{id}:{})} onStory={()=>{setDock('story');setDetailEditor(false);}}/>:dock==='input'?<InputWorkspace project={project} onChange={mutate} beat={playBeat} preview={preview} devices={inputDevices} running={running} onStop={()=>rt.stop()}/>:dock==='event' && detailEditor && event ? (
                 <EventEditor
                   project={project}
                   event={event}
@@ -2626,7 +2283,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   onScene={id=>openSubscenes('edit',id)}
                   onContext={point=>{if(!rt.running)setContextMenu({...point,kind:point.kind||'story'});}}
                   onAdd={(id,hook)=>{setSelectedBeat(id);setSelection({kind:'beat',id});setPicker({kind:'event',phase:hook});}}
-                  positions={layout.positions['flow:all']||{}} onPositions={positions=>setPositions('flow:all',positions)} onReady={onGraphReady}/>
+                  positions={layout.positions['flow:all']||{}} onPositions={positions=>setPositions('flow:all',positions)} onReady={api=>onGraphReady(dock,api)}/>
               ) : dock === 'event' ? renderGraph('event') : dock === 'cameras' ? <CameraWorkspace scene={displayScene} objects={objects} selected={selection.kind==='camera'?selection.id:null} onSelect={selectCamera} onCreate={()=>createCamera()} onFollow={followCharacter} running={running} onEdit={editScene}/> : dock === 'subscenes' ? <SubsceneWorkspace project={project} scene={displayScene} beat={nodes.find(b=>b.id===subsceneDraft?.fromBeatId)||beat} request={subsceneRequest} draft={subsceneDraft} onDraftChange={setSubsceneDraft} running={running}
                 onSaveLocation={async()=>{try{const data=await portableProject(exportLocation(project,displayScene.id));const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download='location.sacura-location.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setNotice('Локация сохранена в файл.');}catch(e){setNotice(e.message);}}}
                 onLoadLocation={async file=>{try{if(rt.running)return;validateImportSize(file);const raw=await file.text(),next=structuredClone(project),created=importLocation(next,raw);mutate(p=>Object.assign(p,next));setSelectedBeat(created.entry);setSelection({kind:'scene',id:created.id});setMode('scene');setMaximized(null);setNotice(tr("Локация загружена: {0}", [created.name]));}catch(e){setNotice(tr("Локация не загружена: {0}", [e.message]));}}}
@@ -2637,7 +2294,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 onDisconnect={(from,choice,to)=>{editSubscene(p=>{const b=allBeats(p).find(b=>b.id===from),edge=choice?b?.choices.find(c=>c.id===choice):b;if(edge?.next===to)edge.next=null;});setNotice('Переход убран. Ctrl+Z — вернуть.');}}
                 onOpenBeat={openSubsceneBeat} onScene={editScene} onPrimitive={shape=>addObject("Меш",shape)} onCameras={openCameras} onCreateRequest={()=>openSubscenes('create')}
                 onCancel={()=>setSubsceneRequest({mode:'edit',token:uid('request')})}/> : dock === 'samples' ? <EventPlayground project={project} preview={preview} scene={displayScene} onPreview={audition} onEdit={editSample} onAdd={id=>{mutate(p=>addToBatch(p,beat.id,'ON_START',null,id));setNotice(tr("Событие добавлено: во время реплики {0}", [beat.id]));}}/> : dock === "widgets" ? <WidgetWorkspace project={project} onChange={mutate} request={widgetRequest} beat={beat} running={running} onStop={()=>{rt.stop();setGameMenu(null);}}
-                onPreview={widget=>{setMode('game');setFloatingDock(false);setPreviewWidgetId(widget.id);if(widget.kind==='mainMenu'){setGameMenu('mainMenu');}else if(widget.kind==='pauseMenu'){start();setPreviewWidgetId(widget.id);rt.togglePause();}else{setGameMenu(null);setShowDialogue(true);}}}/>: dock === "characters" ? <CharacterWorkspace project={project} scene={displayScene} selected={selection.kind==="object"?selection.id:null} running={running} onStop={()=>rt.stop()}
+                onPreview={widget=>{setMode('game');setPreviewWidgetId(widget.id);if(widget.kind==='mainMenu'){setGameMenu('mainMenu');}else if(widget.kind==='pauseMenu'){start();setPreviewWidgetId(widget.id);rt.togglePause();}else{setGameMenu(null);setShowDialogue(true);}}}/>: dock === "characters" ? <CharacterWorkspace project={project} scene={displayScene} selected={selection.kind==="object"?selection.id:null} running={running} onStop={()=>rt.stop()}
                 onSelect={id=>{setSelection({kind:"object",id});setCompactPanel("workspace");}}
                 onCreate={name=>{const next=structuredClone(project),character=createCharacter(next,scene.id,name);mutate(p=>Object.assign(p,next));setSelection({kind:"object",id:character.id});setMode("scene");setCompactPanel("workspace");}}
                 onCustomizeWidget={id=>customizeWidget({characterId:id})} onEditWidget={openWidgets} onPatch={patchCharacter} onPresence={(id,sceneId,present)=>editSubscene(p=>setCharacterInScene(p,id,sceneId,present))}
@@ -2697,7 +2354,327 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 </div>
               )}
             </div>
-          </section></FloatingWindow>
+  </>;
+  return (
+    <EditorDockProvider windows={windows} onChange={changeWindows} onSelect={selectWorkspace} onClose={closeWorkspace} onPlace={revealDockArea}>
+    <div
+      className="editor-app"
+      ref={root}
+      style={{
+        "--left": layout.left + "px",
+        "--right": layout.right + "px",
+        "--scene-height": layout.height + "px",
+        "--workspace-width": windows.width + "px",
+      }}
+    >
+      <header className="editor-menubar">
+        <div className="editor-brand">
+          <Icon name="Flower2" size={23} />
+          <strong>
+            Sacura<span>Novel Studio</span>
+          </strong>
+        </div>
+        {["Файл", "Правка", "Создать", "Окна"].map((m) => (
+          <button
+            className={menu === m ? "active" : ""}
+            key={m}
+            aria-expanded={menu === m}
+            aria-haspopup="menu"
+            data-windows-menu={m==='Окна'?true:undefined}
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setMenuAnchor({left: Math.max(8, Math.min(rect.left, window.innerWidth - (m==='Окна'?348:250))), top: rect.bottom + 4});
+              setMenu(menu === m ? null : m);
+            }}
+          >
+            {tr(m)}
+          </button>
+        ))}
+        <div className="flex-space" />
+        <span className="project-title" title={project.title}>
+          <Icon name="FolderOpen" size={14} />
+          {project.title}
+        </span>
+        <div className="main-play-controls">
+          <Button
+            className={running ? "playing" : ""}
+            icon={running ? "Square" : "Play"}
+            title={
+              running
+                ? tr("Остановить предпросмотр")
+                : tr("Запустить с начала текущей сабсцены")
+            }
+            onClick={() => (running ? rt.stop() : start())}
+          >{running ? tr("Стоп") : tr("Запуск")}</Button>
+          <Button icon="Play" title={tr("Проверить историю с выделенной реплики")} disabled={running} onClick={()=>start(true)}>{tr("С реплики")}</Button>
+          <Button
+            icon="Pause"
+            title={tr("Пауза / продолжить")}
+            className={preview?.paused ? "active" : ""}
+            disabled={!running || preview.phase === "FINISHED"}
+            onClick={() => rt.togglePause()}
+          />
+          <Button
+            icon="StepForward"
+            title={tr("Следующая реплика")}
+            disabled={
+              !running ||
+              !preview.ready ||
+              preview.paused ||
+              ["choice", "gate"].includes(playBeat.kind)
+            }
+            onClick={() => rt.advance()}
+          />
+        </div>
+        {running&&<div className="toolbar-layout">
+          <span className="play-label">{preview.paused ? tr("На паузе") : tr("Предпросмотр")}</span>
+        </div>}
+        {onHome&&<Button icon="FolderOpen" disabled={projectFileBusy} onClick={()=>runFileOperation(async()=>{rt.stop();await onHome(project);})}>{tr("Главное меню")}</Button>}
+        {user&&<button onClick={()=>onLogout(project)} title={tr("Выйти из аккаунта {0}", [user.login])}>{user.login} {tr("· Выйти")}</button>}
+        <LanguagePicker onOpen={() => setMenu(null)} />
+        <ThemePicker onOpen={() => setMenu(null)} />
+      </header>
+      <div className={'editor-workspace compact-'+compactPanel+(layout.hiddenHierarchy?' hierarchy-hidden':'')+(layout.hiddenInspector?' inspector-hidden':'')+(['scene','graph'].includes(maximized)?' focus-center':maximized==='hierarchy'?' focus-hierarchy':maximized==='inspector'?' focus-inspector':'')}>
+        <nav className="compact-panel-tabs" aria-label={tr("Панели редактора")}>
+          {[['hierarchy','ListTree','Объекты сцены'],['workspace','PanelsTopLeft','Рабочая область'],['inspector','Settings2','Свойства']].map(([id,icon,label])=><button key={id} aria-pressed={compactPanel===id} onClick={()=>{if(['hierarchy','inspector'].includes(maximized))setMaximized(null);setCompactPanel(id);}}><Icon name={icon} size={13}/>{tr(label)}</button>)}
+        </nav>
+        <aside data-dock-root="hierarchy" className={"hierarchy-panel dockable-region"+(hierarchyTool?" has-docked-tool":"")}>
+          <button className="panel-restore" aria-label={tr("Показать иерархию")} title={tr("Показать иерархию")} onClick={()=>setLayout(l=>({...l,hiddenHierarchy:false}))}><Icon name="PanelLeftOpen" size={18}/><span>{tr("Иерархия")}</span></button>
+          <EditorDockStrip area="hierarchy" className="panel-tabs">
+            <button data-dock-base="hierarchy" className={!hierarchyTool?"active":""} onClick={()=>showBaseDock('hierarchy')}>{tr("Иерархия")}</button>
+            <EditorDockTabs area="hierarchy"/>
+            <div className="flex-space" />
+            <Button icon={maximized==='hierarchy'?'Minimize2':'Maximize2'} title={maximized==='hierarchy'?tr("Восстановить иерархию"):tr("Развернуть иерархию")} onClick={()=>setMaximized(v=>v==='hierarchy'?null:'hierarchy')}/>
+            <Button icon="PanelLeftClose" title={tr("Свернуть иерархию")} onClick={()=>{setMaximized(null);setLayout(l=>({...l,hiddenHierarchy:true}));setCompactPanel('workspace');}}/>
+          </EditorDockStrip>
+          <EditorDockBody area="hierarchy"/>
+          <DockDropTarget area="hierarchy"/>
+          <div className="hierarchy-toolbar">
+            <Button className="hierarchy-add" icon="Plus" title={tr("Добавить объект")} aria-haspopup="menu" aria-expanded={picker?.kind==='object'&&picker.anchor===root.current?.querySelector('.hierarchy-add')} disabled={running} onClick={openObjectPicker}/>
+            <div className="panel-search">
+              <Icon name="Search" size={13} />
+              <input
+                aria-label={tr("Поиск объектов")}
+                placeholder={tr("Найти объект…")}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="hierarchy-tree">
+              <HierarchyTree onAddObject={(groupId,event)=>openObjectPicker(event,groupId)} onRootDrop={ids=>{if(!rt.running)mutate(p=>removeObjectsFromGroups(p,displayScene.id,ids));}} groups={sceneObjectGroups(project,displayScene.id,objects)} disabled={running} onSelectGroup={group=>{if(rt.running)return;setMode('scene');setSelection(group.objectIds.length?{kind:'object',id:group.objectIds[0],ids:group.objectIds,groupId:group.id}:{kind:'group',id:group.id});openObjectTransform();}} onGroupDrop={(groupId,ids)=>{if(!rt.running)mutate(p=>addObjectsToGroup(p,groupId,ids));}} scene={displayScene} objects={objects} points={sceneStagingPoints(displayScene,objects)} query={query} selected={selection.id} selectedIds={objectSelectionIds}
+                expanded={layout.treeOpen||{}} onExpanded={treeOpen=>setLayout(l=>({...l,treeOpen}))}
+                onSelectObject={(id,options)=>{if(!running){setMode('scene');setCameraPilotId(null);setCameraPreviewId(null);}selectObject(id,options);}}
+                onFrameObject={id=>{editScene();setSelection({kind:'object',id});setFocusRequest({nonce:uid('focus')});}}
+                onVisibility={id=>mutate(p=>{const o=p.objects.find(o=>o.id===id);o.active=o.active===false;})}
+                onPoint={point=>{editScene();setSelection({kind:'point',id:point.id});openObjectTransform();setFocusRequest({nonce:uid('focus'),position:point.position,objectId:point.objectId});}}
+                onSelectCamera={selectCamera}/>
+
+          </div>
+          <div className="hierarchy-footer">
+            <Icon name="Layers" size={13} />
+            {objects.length} {tr("объектов")}<span />
+            {nodes.length} {tr("блоков")}</div>
+          <InfoView />
+        </aside>
+        <ResizeBar
+          axis="x"
+          label={tr("Ширина иерархии")}
+          onMove={(d) => resize("left", d)}
+          onReset={() => setLayout((l) => ({ ...l, left: 210 }))}
+        />
+        <section
+          className={
+            "editor-center dock-"+windows.position+(!workspaceTabCount?" no-docked-windows":"")+" " +
+            (maximized === "graph"
+              ? "graph-max"
+              : maximized === "scene"
+                ? "scene-max"
+                : "")
+          }
+        >
+          <section data-dock-root="scene" className={"viewport-panel dockable-region"+(sceneTool?" has-docked-tool":"")}>
+            <EditorDockStrip area="scene" className="panel-tabs viewport-tabs">
+              <button
+                data-dock-base="scene"
+                aria-label={tr("Редактор локации")}
+                aria-pressed={!sceneTool && mode === "scene"}
+                className={!sceneTool && mode === "scene" ? "active" : ""}
+                onClick={editScene}
+              >
+                <Icon name="Box" size={14} />
+                {tr("Локация")}</button>
+              <button
+                aria-pressed={!sceneTool && mode === "game"}
+                className={!sceneTool && mode === "game" ? "active" : ""}
+                onClick={() => {showBaseDock('scene');setMode("game");}}
+              >
+                <Icon name="Gamepad2" size={15} />
+                {tr("Игра")}</button>
+              <EditorDockTabs area="scene"/>
+              <div className="flex-space" />
+              <Button icon="PanelsTopLeft" title={tr("Редактор интерфейса игры")} onClick={()=>openWidgets(resolveWidget(project,'dialogue',beat).id)}/>
+              {mode==='game'&&<Button icon="Menu" title={tr("Главное меню игры")} onClick={()=>{rt.stop();setGameMenu('mainMenu');setPreviewWidgetId(null);}}>{tr("Меню")}</Button>}
+              <button
+                title={tr("Диалог в игровом кадре")}
+                hidden={mode !== "game"}
+                aria-pressed={showDialogue}
+                className={showDialogue ? "toggled" : ""}
+                onClick={() => setShowDialogue((v) => !v)}
+              >
+                <Icon name="PanelBottom" size={14} />
+              </button>
+              <button
+                title={maximized==='scene'?tr("Восстановить сцену"):tr("Развернуть сцену")}
+                onClick={() =>
+                  setMaximized(maximized === "scene" ? null : "scene")
+                }
+              >
+                <Icon
+                  name={maximized === "scene" ? "Minimize2" : "Maximize2"}
+                  size={14}
+                />
+              </button>
+            </EditorDockStrip>
+            <EditorDockBody area="scene"/>
+            <DockDropTarget area="scene"/>
+            <div className="viewport-commandbar" aria-label={tr("Инструменты сцены")}>
+              {mode==='scene'&&!cameraPilotId&&<div className="scene-edit-bar">
+                {[['select','MousePointer2','Выбор','Q'],['translate','Move','Сдвиг','W'],['rotate','Rotate3D','Поворот','E'],['scale','Scaling','Масштаб','R']].map(([tool,icon,label,key])=><button key={tool} disabled={running||(selection.kind==='camera'&&(tool==='scale'||(tool==='rotate'&&displayScene.cameras?.find(c=>c.id===selection.id)?.mode==='follow')))} title={tr(label)+' · '+key} aria-pressed={editTool===tool} className={'transform-tool '+(editTool===tool?'active':'')} onClick={()=>setEditTool(tool)}><Icon name={icon} size={14}/><span className="tool-label">{tr(label)} · {key}</span></button>)}
+                <button title={tr("Привязка: 0,25 м / 15° / 0,1×")} aria-pressed={snap} className={snap?'active':''} onClick={()=>setSnap(v=>!v)}><Icon name="Magnet" size={14}/></button>
+                <Button icon="Grid3X3" title={tr("Сетка сцены")} aria-pressed={showGrid} className={showGrid?"active":""} onClick={()=>setShowGrid(v=>!v)}/>
+              </div>}
+              {cameraPilotId&&mode==='scene'&&<div className="camera-pilot-bar"><Icon name="Video"/><span>{tr("Настройка: ")}{displayScene.cameras?.find(c=>c.id===cameraPilotId)?.name}<small>{tr("Обзор мышью · правая кнопка — сдвиг · колесо — приближение")}</small></span><Button icon="Check" onClick={()=>captureCamera(cameraPilotId)}>{tr("Сохранить ракурс")}</Button><Button icon="X" title={tr("Вернуться без сохранения")} onClick={()=>setCameraPilotId(null)}/></div>}
+              {(mode==='game'||(cameraPreviewId&&!cameraPilotId))&&<div className="camera-view-badge"><Icon name={resolveCamera(displayScene,world,objects,cameraPreviewId).mode==='follow'?'UserRoundCheck':'Video'} size={14}/><span className="camera-view-name">{resolveCamera(displayScene,world,objects,cameraPreviewId).name}</span>{cameraPreviewId&&<button onClick={()=>setCameraPreviewId(null)}>{mode==='game'?tr("По сценарию"):tr("Вернуться к сцене")} <Icon name="X" size={12}/></button>}</div>}
+              <details className="viewport-help"><summary title={tr("Управление сценой")} aria-label={tr("Управление сценой")}><Icon name="CircleHelp" size={15}/></summary><div>{mode==='game'?<>{tr("Кадр показан из активной камеры.")}<br/>{tr("Выберите камеру в иерархии, чтобы посмотреть её ракурс.")}<br/>{tr("«По сценарию» возвращает камеру, выбранную историей.")}<br/>{inputHelp(playProject.input,inputContextsFor(playProject,playBeat),['move','interact','point','advance','pause'])}<br/>{tr("Для настройки ракурса вернитесь в «Локацию».")}</>:<>{tr("W — перемещение · E — вращение")}<br/>{tr("R — масштаб · Q — выбор")}<br/>{tr("Работают и в русской раскладке")}<br/>{tr("Shift + щелчок — мультивыбор")}<br/>{tr("Alt + ЛКМ — орбита · СКМ — панорама")}<br/>{tr("ПКМ + WASD / QE — полёт")}<br/>{tr("F — выделение в кадр")}<br/>{tr("Delete — удалить выделенные объекты")}<br/>{tr("Ctrl+Z — вернуть удалённые объекты")}</>}</div></details>
+            </div>
+            <div
+              className="scene-viewport"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if(e.currentTarget.dataset.navigating==='true')return;
+                if(mode==='scene'&&!running&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!e.shiftKey&&!['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)&&!e.target.isContentEditable&&e.code==='KeyF'){e.preventDefault();setFocusRequest({nonce:uid('focus')});}
+                if (
+                  mode === "game" &&
+                  !running && !e.defaultPrevented &&
+                  [" ", "Enter"].includes(e.key) &&
+                  e.target === e.currentTarget
+                ) {
+                  e.preventDefault();
+                  start();
+                }
+              }}
+            >
+              <LocationScene
+                sceneId={displayScene.id}
+                editTool={editTool} editSpace={editSpace} snap={snap} focusRequest={cameraPilotId?0:focusRequest} editing={!running&&!cameraPilotId&&!positionPick} onTransform={transformObject} onTransforms={transformObjects}
+                cameraScene={displayScene} selectedCameraId={selection.kind==='camera'?selection.id:null} cameraPreviewId={cameraPreviewId} cameraPilotId={cameraPilotId} onCameraChange={changeCamera} onCameraSelect={selectCamera} cameraApi={cameraApi} physicsApi={physicsApi}
+                kind={displayScene.kind}
+                objects={objects}
+                state={world}
+                selected={selection.kind === "object" ? selection.id : null}
+                selectedIds={objectSelectionIds}
+                mode={mode}
+                showGrid={showGrid}
+                actionPosition={(()=>{if(selection.kind==='point')return sceneStagingPoints(displayScene,objects).find(p=>p.id===selection.id)?.position;const a=inspectedAction||(binding?bindingActions(project,binding):event?.groups.flatMap(g=>g.actions))?.find(a=>a.type==='move');return a?.type==='move'&&Array.isArray(a.value)?a.value:null;})()}
+                onPickPosition={positionPick?value=>{
+                  const request=positionPick;
+                  mutate(p=>{if(request.context.bindingId){const b=allBeats(p).find(b=>b.id===request.context.beatId)?.bindings.find(b=>b.id===request.context.bindingId);if(b){b.actionOverrides||={};b.actionOverrides[request.id]={...b.actionOverrides[request.id],value};}}
+                    else {const a=p.events.find(e=>e.id===request.context.eventId)?.groups.flatMap(g=>g.actions).find(a=>a.id===request.id);if(a)a.value=value;}});
+                  setPositionPick(null);setNotice(tr("Координаты выбраны: {0}", [value.join(', ')]));
+                }:undefined}
+                onSelect={selectObject}
+                onContext={point=>{if(!rt.running)setContextMenu({...point,kind:'scene'});}}
+                inputSettings={playProject.input}
+                onInputAction={event=>rt.inputAction(event)}
+                onInputDevices={setInputDevices}
+                onPlayerStep={(direction,dt)=>rt.playerStep(direction,dt)}
+                onPlayerClick={(point,id)=>rt.playerClick(point,id)}
+                onPlayerInteract={()=>rt.playerInteract()}
+                onInteract={interact}
+              />
+              {mode==='game'&&<TouchInput settings={playProject.input} contexts={world.inputContexts||[]} active={world.inputActive} playerMode={world.playerControl?.mode} paused={world.paused||!world.inputReady}/>}
+              {positionPick&&<div className="viewport-caption"><strong>{tr("Выберите точку на сцене")}</strong><Button icon="X" onClick={()=>setPositionPick(null)}>{tr("Отмена")}</Button></div>}
+              <GameDialogue project={running?rt.project:project}
+                beat={playBeat}
+                onUiAction={widgetAction}
+                widgetOverride={!running?project.widgets.find(w=>w.id===previewWidgetId&&w.kind==='dialogue'):null}
+                preview={preview}
+                running={running}
+                variables={variables}
+                onAdvance={(c) => rt.advance(c)}
+                onStart={start}
+                objectLabel={
+                  playProject.objects.find((o) => o.id === playBeat.signal)
+                    ?.name
+                }
+                show={mode==="game"&&showDialogue&&!preview?.audition&&!gameMenu&&!preview?.paused}
+              />
+              {running&&(preview?.phase==='PLAYING'||playProject.gameplay?.hudWidgetId&&preview?.world.game?.active)&&<GameHUD project={playProject} preview={preview} onAction={widgetAction} text={preview.phase==='PLAYING'&&preview.beatId?playBeat.text:''}/>}
+              {mode==='game'&&(gameMenu==='mainMenu'||(running&&preview?.paused&&!preview?.audition))&&<WidgetMenu label={gameMenu==='mainMenu'?tr('Главное меню'):tr('Пауза')} widget={project.widgets.find(w=>w.id===previewWidgetId&&w.kind===(gameMenu==='mainMenu'?'mainMenu':'pauseMenu'))||resolveWidget(project,gameMenu==='mainMenu'?'mainMenu':'pauseMenu')}
+                  context={{project:playProject,variables,game:preview?.world.game,title:project.title,paused:!!preview?.paused}} onAction={widgetAction}/>}
+              {running && !preview.textVisible && !preview.audition && (!preview.ready||preview.error) && (
+                <div className="scene-preparing">
+                  <Icon name="LoaderCircle" size={15} />
+                  {message(preview.error) || tr("Подготовка сцены перед репликой")}
+                </div>
+              )}
+              {running&&!preview.world.playerControl&&<div className="scene-activity" aria-live="polite">
+                {preview.audition&&<header><Icon name="Clapperboard" size={13}/><strong>{tr("Проба · ")}{preview.auditionName}</strong><button title={tr("Закончить пробу")} onClick={()=>rt.stop()}><Icon name="X" size={13}/></button></header>}
+                {(preview.activity||[]).slice(-4).map(a=><div className={'activity-item '+a.status} key={a.id}><Icon name={a.status==='running'?'LoaderCircle':'Check'} size={12}/><span>{tr(TYPES[a.type]?.label)} <b>{project.objects.find(o=>o.id===a.target)?.name||''} {activityValue(project,a).slice(0,64)}</b></span>{a.status==='running'&&<progress max="1" value={a.progress||0}/>}</div>)}
+                {preview.error&&<span className="error-box">{message(preview.error)}</span>}
+              </div>}
+              {running && <div className="viewport-caption">
+                <Icon name="Video" size={12} />
+                {mode === "game"
+                  ? tr("Главная камера")
+                  : tr("Перспектива · вращение мышью")}
+                <span />
+                {running
+                  ? `${preview.beatId||playScene.name} / ${preview.phase}`
+                  : tr("3D · примитивы")}
+              </div>}
+            </div>
+            {(running || [...soundDesk.tracks.values()].some(t=>["playing","error"].includes(t.status))) && <div className="live-strip">
+              <output className="audio-output" title={tr("Измеренный уровень на аудиовыходе")} aria-label={tr("Уровень звукового выхода")}><Icon name="Volume2" size={13}/><meter min="0" max="1" value={[...soundDesk.tracks.values()].some(t=>t.status==='playing')?(soundDesk.output?.level()||0):0}/><span>{soundDesk.output?.context?.state==='running'?tr("Аудио включено"):tr("Аудио · нажмите Play")}</span></output>
+              <button onClick={() => setDock("active")}>
+                <Icon name="Activity" size={13} />
+                {running
+                  ? Object.values(preview.effects).filter(
+                      (e) => e.status !== "stopped",
+                    ).length
+                  : "2"}{" "}
+                {tr("активных состояния")}</button>
+              <span className="live-separator" />
+              <span>
+                <Icon name="Music2" size={13} />
+                {soundDesk.get("background")?.status === "playing"
+                  ? tr("Главная тема · ") +
+                    clockLabel(soundDesk.get("background").audio.currentTime)
+                  : tr("Музыка не играет")}
+              </span>
+              <div className="flex-space" />
+              {soundDesk.ducks.size > 0 && (
+                <span className="duck-label">{tr("Голос → музыка −")}{normalizeSidechain(project.audioSettings?.sidechain).reductionDb} dB</span>
+              )}
+              {[...soundDesk.tracks.values()].some(t=>t.status==='error')&&<button className="audio-error" onClick={()=>setDock('sound')}>{tr("Ошибка аудио · открыть")}</button>}
+              <button onClick={() => setDock("active")}>
+                {tr("Управление ")}<Icon name="ChevronRight" size={12} />
+              </button>
+            </div>}
+          </section>
+          <ResizeBar
+            axis={sideWorkspace?'x':'y'}
+            label={tr("Размер сцены и графа")}
+            onMove={d=>{
+              if(!sideWorkspace){resize('height',d);return;}
+              const maxWidth=Math.max(260,Math.min(900,(root.current?.querySelector('.editor-center')?.clientWidth||900)*.55));
+              changeWindows(w=>({...w,width:Math.max(260,Math.min(maxWidth,Math.min(w.width,maxWidth)+(w.position==='left'?d:-d)))}));
+            }}
+            onReset={()=>!sideWorkspace?setLayout(l=>({...l,height:defaultSceneHeight()})):changeWindows(w=>({...w,width:480}))}
+          />
+          <EditorWorkspace windows={windows} onChange={changeWindows} onSelect={selectWorkspace} onClose={closeWorkspace}
+            renderPanel={renderWorkspace} maximized={maximized==='graph'} onMaximize={()=>setMaximized(maximized==='graph'?null:'graph')}/>
         </section>
         <ResizeBar
           axis="x"
@@ -2705,10 +2682,11 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           onMove={(d) => resize("right", -d)}
           onReset={() => setLayout((l) => ({ ...l, right: 280 }))}
         />
-        <aside className="inspector-panel">
+        <aside data-dock-root="inspector" className={"inspector-panel dockable-region"+(inspectorTool?" has-docked-tool":"")}>
           <button className="panel-restore" aria-label={tr("Показать инспектор")} title={tr("Показать инспектор")} onClick={()=>setLayout(l=>({...l,hiddenInspector:false}))}><Icon name="PanelRightOpen" size={18}/><span>{tr("Инспектор")}</span></button>
-          <div className="panel-tabs">
-            <button className="active">{tr("Инспектор")}</button>
+          <EditorDockStrip area="inspector" className="panel-tabs">
+            <button data-dock-base="inspector" className={!inspectorTool?"active":""} onClick={()=>showBaseDock('inspector')}>{tr("Инспектор")}</button>
+            <EditorDockTabs area="inspector"/>
             <button
               onClick={() => openSubscenes()}
             >
@@ -2722,7 +2700,9 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             />
             <Button icon={maximized==='inspector'?'Minimize2':'Maximize2'} title={maximized==='inspector'?tr("Восстановить инспектор"):tr("Развернуть инспектор")} onClick={()=>setMaximized(v=>v==='inspector'?null:'inspector')}/>
             <Button icon="PanelRightClose" title={tr("Свернуть инспектор")} onClick={()=>{setMaximized(null);setLayout(l=>({...l,hiddenInspector:true}));setCompactPanel('workspace');}}/>
-          </div>
+          </EditorDockStrip>
+          <EditorDockBody area="inspector"/>
+          <DockDropTarget area="inspector"/>
           <div className="inspector-scroll">
             {selection.kind === "scene" ? (
               <>
@@ -2759,7 +2739,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           {tr("Диагностика · ")}{issues.length}
         </button>
         <span className="status-divider" />
-        <span data-help-title={tr("Хранение проекта")} data-help={serverStorageEnabled?tr("Автосохранение записывает проект в серверную БД, модели — в S3. Ctrl+S сохраняет сразу. Серверные проекты доступны через меню «Файл». Для переносимой копии используйте экспорт JSON."):tr("Автосохранение хранит последний проект в браузере. Ctrl+S сохраняет файл JSON.")}>{saveError || notice || (serverStorageEnabled?tr("Сохранено на сервере · Ctrl+S"):tr("Автосохранение в браузере · файл: Ctrl+S"))}</span>
+        <span role="status" data-help-title={tr("Хранение проекта")} data-help={serverStorageEnabled?tr("Автосохранение записывает проект в серверную БД, модели — в S3. Ctrl+S сохраняет сразу. Серверные проекты доступны через меню «Файл». Для переносимой копии используйте экспорт JSON."):tr("Автосохранение хранит последний проект в браузере. Ctrl+S сохраняет файл JSON.")}>{saveError || notice || (running&&preview?.hint) || (serverStorageEnabled?tr("Сохранено на сервере · Ctrl+S"):tr("Автосохранение в браузере · файл: Ctrl+S"))}</span>
         <div className="flex-space" />
         <span>
           {tr("Выделено:")}{" "}
@@ -2775,7 +2755,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       {historyOpen && <FloatingWindow active title={tr("История")} onClose={()=>setHistoryOpen(false)}>{renderHistory()}</FloatingWindow>}
       {menu && (
         <div
-          className="editor-menu"
+          className={"editor-menu"+(menu==='Окна'?' windows-menu-container':'')}
           style={menuAnchor}
         >
           {menu === "Файл" ? (
@@ -2805,7 +2785,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             >
               <Icon name="Undo2" />
               {tr("Отменить ")}<kbd>Ctrl Z</kbd>
-            </button></>
+            </button><button disabled={!future.length} onClick={()=>{redo();setMenu(null);}}><Icon name="Redo2"/>{tr("Повторить ")}<kbd>Ctrl Shift Z</kbd></button></>
           ) : menu === "Создать" ? (
             <>
               <button onClick={()=>openSubscenes('create')}><Icon name="PanelsTopLeft"/>{tr("Сабсцена")}</button>
@@ -2828,42 +2808,23 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 <Icon name="Layers" />
                 {tr("Событие")}</button>
               <button
-                onClick={() => {
-                  setMenu(null);
-                  setPicker({ kind: "object" });
-                }}
+                onClick={openObjectPicker}
               >
                 <Icon name="Box" />
                 {tr("Объект")}</button>
             </>
           ) : (
-            <>
-              <button onClick={()=>{setMaximized(null);setLayout(l=>({...l,hiddenHierarchy:hierarchyVisible}));setCompactPanel(hierarchyVisible?'workspace':'hierarchy');setMenu(null);}}><Icon name="PanelLeft"/>{hierarchyVisible?tr("Свернуть"):tr("Показать")} {tr("иерархию")}</button>
-              <button onClick={()=>{setMaximized(null);setLayout(l=>({...l,hiddenInspector:inspectorVisible}));setCompactPanel(inspectorVisible?'workspace':'inspector');setMenu(null);}}><Icon name="PanelRight"/>{inspectorVisible?tr("Свернуть"):tr("Показать")} {tr("инспектор")}</button>
-              <button onClick={()=>{setHistoryOpen(true);setMenu(null);}}><Icon name="BookOpen"/>{tr("История · отдельное окно")}</button>
-              {dockTools.map(([id,label])=><button key={id} disabled={id==='event'&&!event} onClick={()=>{setDock(id);setDetailEditor(false);setMaximized(null);setFloatingDock(true);setMenu(null);}}><Icon name="AppWindow"/>{tr(label)}</button>)}
-              <button
-                onClick={() => {
-                  setMaximized("scene");
-                  setMenu(null);
-                }}
-              >
-                <Icon name="Maximize2" />
-                {tr("Развернуть сцену")}</button>
-              <button
-                onClick={() => {
-                  setMaximized("graph");
-                  setMenu(null);
-                }}
-              >
-                <Icon name="Workflow" />
-                {tr("Развернуть граф")}</button>
-            </>
+            <EditorWindowsMenu windows={windows} onChange={changeWindows} onClose={closeWorkspace} onSelect={(id,dismiss=true)=>{selectWorkspace(id);if(dismiss)setMenu(null);}}
+              eventAvailable={!!event} issueCount={issues.length} hierarchyVisible={hierarchyVisible} inspectorVisible={inspectorVisible} historyOpen={historyOpen}
+              onHierarchy={()=>{setMaximized(null);setLayout(l=>({...l,hiddenHierarchy:hierarchyVisible}));setCompactPanel(hierarchyVisible?'workspace':'hierarchy');}}
+              onInspector={()=>{setMaximized(null);setLayout(l=>({...l,hiddenInspector:inspectorVisible}));setCompactPanel(inspectorVisible?'workspace':'inspector');}}
+              onHistory={()=>setHistoryOpen(v=>!v)} onReset={resetLayout}/>
           )}
         </div>
       )}
       {contextMenu&&<EditorContextMenu x={contextMenu.x} y={contextMenu.y} title={contextMenu.kind==='scene'?tr("Сцена"):tr("Добавить ноду")} items={contextItems()} onClose={closeContextMenu}/>}
-      {picker && (
+      {picker?.kind==='object'&&<SceneObjectMenu anchor={picker.anchor} onClose={()=>setPicker(null)} onGroup={addEmptyGroup} onCamera={()=>createCamera()} onPoint={addStagingPoint} onSound={addSoundEvent} onObject={addObject}/>}
+      {picker && picker.kind!=='object' && (
         <div
           className="create-overlay"
           onPointerDown={(e) => {
@@ -2878,11 +2839,9 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   ? tr("Добавить ноду")
                   : picker.kind === "event"
                     ? tr("Добавить событие")
-                    : picker.kind === "object"
-                      ? tr("Добавить объект")
-                      : picker.kind === "object-action"
-                        ? tr("Действие с объектом")
-                        : tr("Добавить действие")}
+                    : picker.kind === "object-action"
+                      ? tr("Действие с объектом")
+                      : tr("Добавить действие")}
               </strong>
               <Button
                 icon="X"
@@ -2945,13 +2904,6 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   ))}
                 </div>
               </>
-            ) : picker.kind === "object" ? (
-              <><p>{tr("Создать в: ")}{project.objectGroups?.find(g=>g.id===(picker?.groupId||selection.groupId||(selection.kind==='group'?selection.id:null)))?.name||tr("Объекты сцены")}</p>
-              <div className="create-options">
-                <button onClick={addStagingPoint}><Icon name="MapPin" size={23}/><span><strong>{tr("Точка постановки")}</strong><small>{tr("Место назначения для движения персонажа")}</small></span></button>
-                <button onClick={addSoundEvent}><Icon name="Volume2" size={23}/><span><strong>{tr("Звуковое событие")}</strong><small>{tr("Аудиофайл, громкость, fade in и fade out")}</small></span></button>
-                {[['Персонаж','box','PersonStanding','Персонаж','Участвует в диалогах и постановке'],['Активный меш','box','MousePointer2','Интерактивный предмет','Клик игрока запускает продолжение'],['Меш','box','Box','Куб','Декорация · размеры меняются мышью'],['Меш','sphere','Circle','Сфера','Простой объёмный объект'],['Меш','cylinder','Cylinder','Цилиндр','Колонна, ваза или временный объект'],['Источник света','box','Lightbulb','Источник освещения','Точечный свет с настройкой цвета и интенсивности']].map(([type,shape,icon,name,hint])=><button key={name} onClick={()=>addObject(type,shape)}><Icon name={icon} size={23}/><span><strong>{tr(name)}</strong><small>{tr(hint)}</small></span></button>)}
-              </div></>
             ) : picker.kind === "event" ? (
               <>
                 <div className="create-phase">
@@ -3086,5 +3038,6 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         onChange={importProject}
       />
     </div>
+    </EditorDockProvider>
   );
 }

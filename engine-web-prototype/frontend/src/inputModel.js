@@ -1,8 +1,9 @@
 import {t} from './i18n.js';
+import {validateOperationCall} from './operationRegistry.js';
 import {runtimeVariableType} from './variableModel.js';
 export const INPUT_TYPES={boolean:'Кнопка',axis1d:'Ось 1D',axis2d:'Оси 2D'};
 export const INPUT_TRIGGERS={pressed:'Нажатие',released:'Отпускание',hold:'Удержание',continuous:'Пока активно'};
-export const INPUT_BEHAVIORS={shoot:'Стрелять',reload:'Перезарядить',jump:'Прыгнуть',look:'Смотреть',saveGame:'Сохранить прохождение',loadGame:'Загрузить прохождение',event:'Событие движка',move:'Движение персонажа',interact:'Осмотреть предмет',point:'Идти / осмотреть по указателю',advance:'Продолжить диалог',pause:'Пауза / продолжить',choiceNext:'Следующий ответ',choicePrevious:'Предыдущий ответ'};
+export const INPUT_BEHAVIORS={operation:'Общая операция',shoot:'Стрелять',reload:'Перезарядить',jump:'Прыгнуть',look:'Смотреть',saveGame:'Сохранить прохождение',loadGame:'Загрузить прохождение',event:'Событие движка',move:'Движение персонажа',interact:'Осмотреть предмет',point:'Идти / осмотреть по указателю',advance:'Продолжить диалог',pause:'Пауза / продолжить',choiceNext:'Следующий ответ',choicePrevious:'Предыдущий ответ'};
 export const INPUT_DEVICES={keyboard:'Клавиатура',pointer:'Мышь / касание сцены', 'gamepad-axis':'Ось геймпада','gamepad-button':'Кнопка геймпада',touch:'Экранное управление',external:'Другой источник'};
 export function defaultInputSettings(){
  const action=(id,name,valueType,behavior,trigger='pressed')=>({id,name,valueType,behavior,trigger,holdSeconds:.4,consume:true});
@@ -18,7 +19,9 @@ export function defaultInputSettings(){
 }
 export function ensureInputSettings(project){project.input??=defaultInputSettings();return project;}
 export function inputContextsFor(project,beat){
- return [...new Set(['system',...(project.gameplay?.enabled&&beat?.kind==='gameplay'?['gameplay','game-mechanics']:[]),...(beat?.inputContexts??(beat?.kind==='gate'?['gameplay']:['dialogue']))])].filter(id=>project.input?.contexts?.some(c=>c.id===id));
+ const allowControl=beat?.kind!=='dialogue'||project.gameplay?.storyPolicy?.dialogueControl!=='suspend';
+ const mechanics=allowControl&&project.gameplay?.enabled&&(beat?.kind==='gameplay'||(project.gameplay.storyPolicy?.mechanics||project.gameplay.activation)==='continuous'||project.gameplay.storyPolicy?.mode==='none'&&!beat?.id)?(project.gameplay.mechanics||[]).flatMap(m=>m.inputContexts||[]):[];
+ return [...new Set(['system',...mechanics,...(allowControl&&project.gameplay?.enabled&&(beat?.kind==='gameplay'||(project.gameplay.storyPolicy?.mechanics||project.gameplay.activation)==='continuous'||project.gameplay.storyPolicy?.mode==='none'&&!beat?.id)?['gameplay','game-mechanics']:[]),...(beat?.inputContexts??(beat?.kind==='gate'?['gameplay']:(project.gameplay?.storyPolicy?.mode==='none'&&!beat?.id?[]:['dialogue'])))])].filter(id=>project.input?.contexts?.some(c=>c.id===id));
 }
 export function inputHelp(settings,contexts,behaviors){
  if(!settings)return '';
@@ -41,6 +44,7 @@ export function validateInputSettings(project){
  for(const a of s.actions){if(!a||typeof a.id!=='string'||!a.id||ids.has(a.id)){bad('action-id','ID действия должен быть уникальным.');continue;}ids.add(a.id);
   if(!INPUT_TYPES[a.valueType]||!INPUT_TRIGGERS[a.trigger]||!INPUT_BEHAVIORS[a.behavior])bad(a.id,'Неизвестный тип, обработчик или триггер действия.');
   if(typeof a.name!=='string'||!Number.isFinite(a.holdSeconds)||a.holdSeconds<0)bad(a.id+'-hold','Укажите имя и неотрицательное время удержания.');
+  if(a.behavior==='operation'){for(const e of validateOperationCall(a.operation,{project,kind:'event',scope:a.scope,allowDeferred:true,allowExpressions:true}))bad(a.id+'-operation',e.message);if(a.mechanicId&&!project.gameplay?.mechanics.some(m=>m.id===a.mechanicId))bad(a.id+'-mechanic','Владелец действия ввода удалён.');}
   if(a.behavior==='event'&&a.eventId&&!project.events.some(e=>e.id===a.eventId))bad(a.id+'-event','Выберите событие для действия «'+a.name+'».');
   if(a.behavior==='move'&&a.valueType!=='axis2d')bad(a.id+'-type','Движение использует оси 2D.');
   for(const field of a.valueType==='axis2d'?['variableX','variableY']:['variable'])if(a[field]&&runtimeVariableType(project,a[field])!==(a.valueType==='boolean'?'boolean':'number'))bad(a.id+'-'+field,'Переменная значения действия «'+a.name+'» отсутствует или имеет другой тип.');

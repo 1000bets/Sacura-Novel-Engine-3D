@@ -4,12 +4,16 @@ services:
       COOKIE_SECURE: "true"
   web:
     ports: !reset []
+    networks: [default, edge]
   caddy:
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
+    networks:
+      edge:
+        ipv4_address: 172.29.251.2
     image: caddy:2-alpine
     environment:
       DOMAIN: ${DOMAIN:?Set DOMAIN to your domain name}
@@ -27,3 +31,11 @@ services:
 volumes:
   caddy_data:
   caddy_config:
+
+# Only this Caddy address is trusted by Nginx for real client IPs.
+networks:
+  edge:
+    ipam:
+      config:
+        - subnet: 172.29.251.0/24
+          ip_range: 172.29.251.128/25

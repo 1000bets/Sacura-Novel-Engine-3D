@@ -6,7 +6,7 @@ import {readProject} from '../src/projectFiles.js';
 import {validateStudio} from '../src/studioModel.js';
 import {PreviewRuntime} from '../src/runtime.js';
 import {SoundDesk} from '../src/audio.js';
-const template=name=>parseProjectFile(readFileSync(new URL('../public/game-templates/'+name+'.sacura-template.json',import.meta.url),'utf8')).project;
+const template=name=>parseProjectFile(readFileSync(new URL('./fixtures/legacy-'+name+'.sacura-template.json',import.meta.url),'utf8')).project;
 class Audio extends EventTarget {duration=1;currentTime=0;volume=1;play(){return Promise.resolve();}pause(){}}
 const runtime=()=>new PreviewRuntime(new SoundDesk(()=>new Audio()));
 const settle=async(rt)=>{for(let i=0;i<200&&(rt.game.flights.size||!rt.snapshot.ready);i++)await new Promise(r=>setTimeout(r,10));assert.equal(rt.snapshot.error,null);assert.equal(rt.game.flights.size,0);};

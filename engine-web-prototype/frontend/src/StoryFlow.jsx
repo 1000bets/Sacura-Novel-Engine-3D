@@ -22,6 +22,8 @@ import {connectionError,pinConnections,movePinConnections} from './storyConnecti
 const Moment=memo(function Moment({data,selected}){
  useLocale();
  const {beat,scene,phases,ports}=data;
+ const continuation=ports.find(port=>port.id==='next');
+ const footerPorts=ports.filter(port=>port.id!=='next'&&(beat.kind!=='choice'||port.common));
  const updateNodeInternals=useUpdateNodeInternals();
  const eventGesture=useRef(null),suppressEventClick=useRef(false);
  const startEventGesture=(e,bindingId)=>{if(data.running||e.button!==0||e.target.closest('[data-remove-event]'))return;e.stopPropagation();suppressEventClick.current=false;eventGesture.current={bindingId,x:e.clientX,y:e.clientY,moved:false};e.currentTarget.setPointerCapture(e.pointerId);};
@@ -44,8 +46,11 @@ const Moment=memo(function Moment({data,selected}){
  </div>;
  if(isPureNode(beat)||['branch','set-variable'].includes(beat.kind))return <LogicNode data={data} selected={selected}/>;
  return <article className={'story-moment'+(selected?' selected':'')+(data.preview?.phase!=='EDIT'&&data.preview?.beatId===beat.id?' playing':'')}>
-  <Handle type="target" position={Position.Left} id="in" style={{top:40}} title={tr("Вход: соедините с выходом другой реплики. Alt + щелчок — разорвать; Ctrl + перетаскивание — перенести входящие связи.")}/>
   <header className="moment-grab"><Icon name={data.entry?'MapPin':beat.kind==='choice'?'GitFork':beat.kind==='end'?'Flag':'MessageSquare'} size={15}/><span>{scene?.name || tr("Без сабсцены")}</span><small>{tr(({gameplay:'Игровая сцена',choice:'Выбор',end:'Концовка',gate:'Взаимодействие',merge:'Схождение'})[beat.kind]||'Реплика')}</small></header>
+  <div className={'moment-route story-route moment-execution'+(continuation&&!continuation.next?' disconnected':'')}>
+   <Handle type="target" position={Position.Left} id="in" title={tr("Вход: соедините с выходом другой реплики. Alt + щелчок — разорвать; Ctrl + перетаскивание — перенести входящие связи.")}/>
+   {continuation&&<><span className="story-route-label">{tr(continuation.label)}</span><Handle type="source" position={Position.Right} id={continuation.id} title={tr(continuation.label)+tr(" · соединить с входом ноды")}/></>}
+  </div>
   {data.issue&&<div className="moment-issue"><Icon name="TriangleAlert" size={12}/>{tr(data.issue.title)}</div>}
   {data.entry&&<button className="moment-environment nodrag" title={tr("Изменить начальное окружение сабсцены")} onClick={()=>data.onScene(scene.id)}><Icon name="CloudSun" size={13}/>{tr("Начало · ")}{tr(scene.weather)} · {tr(scene.time)}<Icon name="Settings2" size={12}/></button>}
   {events(phases[0])}
@@ -56,7 +61,7 @@ const Moment=memo(function Moment({data,selected}){
   {events(phases[2])}
   {beat.kind==='choice'&&<div className="node-answers nodrag">{beat.choices.map((c,i)=><NodeAnswer key={c.id} choice={c} index={i} beatId={beat.id} data={data} available={data.project.chapters.some(ch=>ch.beats.some(b=>b.id===c.next))} onChange={patch=>data.onChoice(beat.id,c.id,patch)} onRemove={()=>data.onChoice(beat.id,c.id,null)} onDisconnect={()=>data.onConnect({source:beat.id,sourceHandle:'choice:'+c.id,target:null})}/>)}<Button icon="Plus" onClick={()=>data.onChoice(beat.id,null,{label:'Новый ответ'})}>{tr("Добавить ответ")}</Button></div>}
   {beat.kind==='choice'&&choiceResultType(beat)&&<div className={'choice-result-output type-'+choiceResultType(beat)}><span>{tr("Результат выбора · ")}{{string:tr("Текст"),number:tr("Число"),boolean:tr("Да / нет"),any:tr("Разные типы")}[choiceResultType(beat)]}</span><Handle className="data-pin" type="source" position={Position.Right} id="value" title={tr("Результат этого выбора · выход значения")}/></div>}
-  <footer>{ports.filter(port=>beat.kind!=="choice"||port.common).map(port=><div className={'moment-route story-route'+(!port.next?' disconnected':'')} key={port.id}><span className="story-route-label">{port.id.startsWith('choice:')||port.gameRule?port.label:tr(port.label)}</span><Handle type="source" position={Position.Right} id={port.id} isConnectable={!port.gameRule} title={(port.id.startsWith('choice:')||port.gameRule?port.label:tr(port.label))+tr(" · соединить с входом ноды")}/></div>)}{beat.kind==='end'&&<strong><Icon name="Flag" size={13}/>{beat.ending || tr("Конец")}</strong>}</footer>
+  {(footerPorts.length>0||beat.kind==='end')&&<footer>{footerPorts.map(port=><div className={'moment-route story-route'+(!port.next?' disconnected':'')} key={port.id}><span className="story-route-label">{port.id.startsWith('choice:')||port.gameRule?port.label:tr(port.label)}</span><Handle type="source" position={Position.Right} id={port.id} isConnectable={!port.gameRule} title={(port.id.startsWith('choice:')||port.gameRule?port.label:tr(port.label))+tr(" · соединить с входом ноды")}/></div>)}{beat.kind==='end'&&<strong><Icon name="Flag" size={13}/>{beat.ending || tr("Конец")}</strong>}</footer>}
  </article>;
 });
 const Missing=({data})=><article className="story-moment missing"><Handle type="target" position={Position.Left} id="in"/><strong>{tr(data.title)}</strong><p>{tr("Целевая нода удалена")}</p><button className="nodrag" onClick={e=>{e.stopPropagation();data.onRemove();}}><Icon name="Unplug" size={14}/>{tr("Убрать переход")}</button></article>;

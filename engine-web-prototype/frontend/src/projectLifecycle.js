@@ -1,3 +1,4 @@
+import {parseAuthoringProjectFile} from './authoringTemplates.js';
 import {makeAction} from './model.js';
 import {upgradeProject, uid} from './studioModel.js';
 import {readProject} from './projectFiles.js';
@@ -16,7 +17,7 @@ export function projectFilename(name, template=false) {
 }
 export function copyProjectAs(project,name) {
   const copy=structuredClone(project);
-  copy.id=uid('project');copy.title=projectName(name);
+  copy.id=uid('project');const remap=value=>{if(!value||typeof value!=='object')return;if((value.kind==='reference'&&value.type==='project')&&value.id===project.id)value.id=copy.id;for(const v of Object.values(value))if(v&&typeof v==='object')remap(v);};for(const [key,value]of Object.entries(copy))if(key!=='gameplayMigration')remap(value);if(copy.gameplay?.legacyInventoryOwnerId===project.id)copy.gameplay.legacyInventoryOwnerId=copy.id;for(const record of [copy.gameplay?.inventory,...copy.gameplay?.inventories||[],...copy.gameplay?.resources||[]])if(record?.owner?.kind==='project')record.owner.id=copy.id;for(const item of copy.gameplay?.items||[])if(item.inventoryOwner?.kind==='project')item.inventoryOwner.id=copy.id;for(const r of copy.gameplay?.rules||[])if(r.scope?.kind==='project')r.scope.id=copy.id;for(const m of copy.gameplay?.mechanics||[])if(m.scope?.kind==='project')m.scope.id=copy.id;copy.title=projectName(name);
   return copy;
 }
 export function createEmptyProject(name='Новый проект') {
@@ -39,15 +40,16 @@ export function projectFromTemplate(template,name) {
 }
 export function parseProjectFile(text) {
   const raw=typeof text==='string'?JSON.parse(text):text;
+  if(raw?.format==='sacura-authoring-package')return parseAuthoringProjectFile(raw);
   return raw?.format==='sacura-project-template'?{project:projectFromTemplate(raw),template:raw}:{project:readProject(raw),template:null};
 }
 export function readTemplates(storage) {
   const value=JSON.parse(storage.getItem(TEMPLATE_KEY)||'[]');
   if(!Array.isArray(value))throw new Error('Не удалось прочитать библиотеку шаблонов.');
-  return value.filter(t=>t?.format==='sacura-project-template'&&t.version===1&&typeof t.name==='string'&&t.project);
+  return value.filter(t=>t?.format==='sacura-project-template'&&t.version===1&&typeof t.name==='string'&&t.project||t?.format==='sacura-authoring-package'&&t.roots?.kind==='template'&&t.metadata?.name).map(t=>t.format==='sacura-authoring-package'?{id:t.metadata.id,name:t.metadata.name,authoringPackage:t}:t);
 }
 export function storeTemplate(storage,template) {
-  const templates=readTemplates(storage);
+  readTemplates(storage);const templates=JSON.parse(storage.getItem(TEMPLATE_KEY)||'[]');
   storage.setItem(TEMPLATE_KEY,JSON.stringify([...templates,template]));
 }
 export function backupProject(storage,project) {
@@ -107,3 +109,5 @@ export function rememberLocalProject(storage,project) {
   storage.setItem(LOCAL_PROJECTS_KEY,JSON.stringify([{id:project.id,title:project.title,updatedAt:new Date().toISOString(),project},...items]));
   storage.setItem('sacura-studio-v2',JSON.stringify(project));
 }
+
+export function createMechanicsProject(name='Новый проект'){const p=createEmptyProject(name);p.chapters=[];for(const s of p.subscenes)s.entry=null;p.gameplay.enabled=true;p.gameplay.storyPolicy={mode:'none',mechanics:'continuous',dialogueControl:'allow',ending:'continue'};return p;}
