@@ -7,7 +7,7 @@ import React from 'react';
 const dom=new JSDOM('<!doctype html><html><body></body></html>',{url:'http://localhost/'});
 for(const key of ['window','document','navigator','HTMLElement','localStorage'])Object.defineProperty(globalThis,key,{configurable:true,value:dom.window[key]});
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
-const {render,screen,fireEvent,cleanup,waitFor}=await import('@testing-library/react');
+const {render,screen,within,fireEvent,cleanup,waitFor}=await import('@testing-library/react');
 const server=await createServer({root:fileURLToPath(new URL('..',import.meta.url)),server:{middlewareMode:true,watch:null,hmr:false,ws:false}});
 const {default:Workspace}=await server.ssrLoadModule('/src/GameplayWorkspace.jsx');
 const {createEmptyProject}=await server.ssrLoadModule('/src/projectLifecycle.js');
@@ -134,4 +134,39 @@ test('a template button rule names the exact imported widget element and diagnos
 
 test('migration report exposes preserved source and diagnostics in the existing properties',async()=>{
  const {readFile}=await import('node:fs/promises'),{readProject}=await server.ssrLoadModule('/src/projectFiles.js'),{default:Report}=await server.ssrLoadModule('/src/GameplayMigrationReport.jsx');const raw=JSON.parse(await readFile('tests/fixtures/legacy-shooter.sacura-template.json','utf8')).project;raw.gameplay.unknownSetting='keep';const p=readProject(raw);render(React.createElement(Report,{project:p}));fireEvent.click(screen.getByText('Отчёт о преобразовании игровых механик'));assert.match(screen.getByRole('alert').textContent,/unknownSetting/);assert.ok(screen.getByRole('button',{name:'Скачать исходный проект'}));assert.deepEqual(p.gameplayMigration.source,raw);
+});
+
+
+test('library cards add and edit a counter on the chosen scene without requiring genre entities',()=>{
+ let value=createEmptyProject('Без героя');
+ function Harness(){const [p,setP]=React.useState(value);return React.createElement(Workspace,{project:p,sceneId:p.subscenes[0].id,onChange:fn=>setP(p=>{const next=structuredClone(p);fn(next);value=next;return next;})});}
+ render(React.createElement(Harness));
+ const library=screen.getByRole('list',{name:'Библиотека механик'}),counter=within(library).getByRole('button',{name:/^Счётчик/});
+ assert.equal(screen.getByText('Создать свою механику').closest('details').open,false);
+ fireEvent.click(counter);assert.equal(counter.getAttribute('aria-pressed'),'true');
+ assert.match(document.querySelector('.mechanics-add-bar').textContent,new RegExp(value.subscenes[0].name));
+ fireEvent.click(screen.getByRole('button',{name:'Добавить',exact:true}));
+ assert.equal(value.gameplay.mechanics.length,1);assert.deepEqual(value.gameplay.mechanics[0].scope,{kind:'scene',id:value.subscenes[0].id});
+ fireEvent.change(screen.getByRole('textbox',{name:'Название счётчика'}),{target:{value:'Письма'}});
+ fireEvent.change(screen.getByRole('spinbutton',{name:'Начальное значение'}),{target:{value:'7'}});
+ assert.equal(value.gameplay.resources[0].name,'Письма');assert.equal(value.gameplay.resources[0].initial,7);
+ assert.equal(screen.getByText('Дополнительные свойства экземпляра').closest('details').open,false);
+ assert.equal(screen.queryByRole('textbox',{name:/JSON|ID|путь/}),null);
+ assert.deepEqual(value.gameplay.actors,{});assert.equal(value.gameplay.weapons.length,0);
+});
+
+test('card library search and owner changes are non-mutating and recover from no results',()=>{
+ const value=createEmptyProject('Выбор');value.objects.push({id:'door',name:'Входная дверь',active:true});const before=JSON.stringify(value);let changes=0;
+ render(React.createElement(Workspace,{project:value,sceneId:value.subscenes[0].id,onChange:()=>changes++}));
+ const library=()=>screen.getByRole('list',{name:'Библиотека механик'});
+ assert.equal(within(library()).queryByRole('button',{name:/^Дверь/}),null);
+ fireEvent.change(screen.getByRole('combobox',{name:'Добавить к'}),{target:{value:'object:door'}});
+ fireEvent.click(within(library()).getByRole('button',{name:/^Дверь/}));
+ assert.match(document.querySelector('.mechanics-add-bar').textContent,/Входная дверь/);
+ fireEvent.change(screen.getByRole('searchbox',{name:'Поиск механик'}),{target:{value:'нет такой механики'}});
+ assert.ok(screen.getByRole('heading',{name:'Механики не найдены'}));assert.equal(screen.queryByRole('button',{name:'Добавить',exact:true}),null);
+ fireEvent.click(screen.getByRole('button',{name:'Очистить поиск'}));assert.ok(library());
+ fireEvent.click(screen.getByRole('button',{name:'Импортировать',exact:true}));assert.ok(screen.getByRole('heading',{name:'Импортировать',exact:true}));
+ fireEvent.click(screen.getByRole('button',{name:'Добавить механику',exact:true}));assert.ok(library());
+ assert.equal(changes,0);assert.equal(JSON.stringify(value),before);
 });

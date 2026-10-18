@@ -2,13 +2,13 @@ import SchemaFields,{useOperationLibrary} from './SchemaFields.jsx';
 import {operationDefinition,validateOperationCall} from './operationRegistry.js';
 import {schemaDefaults} from './valueSchemas.js';
 import React from 'react';
-import {t as tr,useLocale} from './i18n.jsx';
+import {t as tr,useLocale,optionLabel} from './i18n.jsx';
 import FunctionArguments from './FunctionArguments.jsx';
 import {GAME_COMMANDS} from './gameplayModel.js';
 export function GameField({label,children}){return <label className="game-field"><span>{tr(label)}</span>{children}</label>;}
 export function GameSelect({label,value='',options,onChange}){
  const invalid=value!=null&&value!==''&&!options.some(([id])=>String(id)===String(value));
- return <GameField label={label}><select value={value??''} aria-invalid={invalid||undefined} onChange={e=>onChange(e.target.value)}>{invalid&&<option value={value}>{tr('Недоступная связь · выберите замену')}</option>}{options.map(([id,name])=><option key={id} value={id}>{tr(name)}</option>)}</select>{invalid&&<small role="alert">{tr('Выбранная связь удалена или недоступна. Выберите замену.')}</small>}</GameField>;
+ return <GameField label={label}><select value={value??''} aria-invalid={invalid||undefined} onChange={e=>onChange(e.target.value)}>{invalid&&<option value={value}>{tr('Недоступная связь · выберите замену')}</option>}{options.map(([id,name])=><option key={id} value={id}>{optionLabel(name)}</option>)}</select>{invalid&&<small role="alert">{tr('Выбранная связь удалена или недоступна. Выберите замену.')}</small>}</GameField>;
 }
 export function GameNumber({label,value=0,min=0,max,step=.1,onChange}){return <GameField label={label}><input type="number" value={value} min={min} max={max} step={step} onChange={e=>{if(e.target.value!=='')onChange(Number(e.target.value));}}/></GameField>;}
 export function GameVector({label,value=[0,0,0],onChange,min}){return <GameField label={label}><div className="game-vector">{value.map((v,i)=><input key={i} aria-label={tr(label)+' '+['X','Y','Z'][i]} type="number" step=".1" min={min} value={v} onChange={e=>{const next=[...value];next[i]=Number(e.target.value);onChange(next);}}/>)}</div></GameField>;}
