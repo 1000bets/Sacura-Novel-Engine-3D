@@ -46,6 +46,9 @@ import {applyConnections,connectionError} from './storyConnections.js';
 import {InfoView, FloatingWindow} from './EditorHelp.jsx';
 import './editorHelp.css';
 import './objectInspector.css';
+import './storyInspector.css';
+import Fold from './InspectorSection.jsx';
+import SubsceneInspector from './SubsceneInspector.jsx';
 import ThemePicker from './ThemePicker.jsx';
 import {normalizeSidechain} from './audioSettings.js';
 import React, {
@@ -95,7 +98,7 @@ import EditorGraph from "./EditorGraph.jsx";
 import EditorContextMenu from "./EditorContextMenu.jsx";
 import SceneObjectMenu from './SceneObjectMenu.jsx';
 import ActionFields from "./ActionFields.jsx";
-import EventInspector from "./EventInspector.jsx";
+import EventSelectionInspector from './EventSelectionInspector.jsx';
 import {exportLocation,importLocation} from "./locationFiles.js";
 import FailureLab from "./FailureLab.jsx";
 import SubsceneWorkspace from './SubsceneWorkspace.jsx';
@@ -150,19 +153,6 @@ function loadProject() {
   if (p.version === 1 && !accountStorage.getItem("sacura-ui-project-v1-backup"))
     accountStorage.setItem("sacura-ui-project-v1-backup", raw);
   return readProject(p);
-}
-function Fold({ title, icon, children, open = true, extra }) {
- useLocale();
-  return (
-    <details className="inspector-section" open={open}>
-      <summary>
-        <Icon name="ChevronRight" size={12} />
-        <span>{tr(title)}</span>
-        {extra}
-      </summary>
-      <div className="inspector-fields">{children}</div>
-    </details>
-  );
 }
 function ResizeBar({ axis, onMove, onReset, label }) {
  useLocale();
@@ -383,6 +373,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   const rt = runtime.current;
   rt.physicsApi=physicsApi;
   previewRef.current = preview;
+  const inspectorScroll=useRef(null);
+  useEffect(()=>{if(inspectorScroll.current)inspectorScroll.current.scrollTop=0;},[selection.kind,selection.id,eventContext?.bindingId]);
   const nodes = useMemo(() => allBeats(project), [project]),
     beat = nodes.find((b) => b.id === selectedBeat) || nodes[0]||{id:null,kind:'gameplay',text:'',speaker:'',choices:[],bindings:[],batches:{}},
     scene = sceneFor(project, beat.id),
@@ -716,7 +708,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     setSelectedBeat(result.nextId);setSelection({kind:'beat',id:result.nextId});
     setNotice('Выделенные ноды и их связи удалены. Ctrl + Z — отменить.');
   };
-  const nodeKindField=()=> <Field label={tr("Тип блока")}><Select value={beat.kind} options={STORY_NODE_KINDS} onChange={kind=>mutate(p=>changeStoryNodeKind(allBeats(p).find(b=>b.id===beat.id),kind))}/></Field>;
+  const nodeKindField=()=> <Field label={tr("Тип блока")}><Select disabled={running} value={beat.kind} options={STORY_NODE_KINDS} onChange={kind=>mutate(p=>changeStoryNodeKind(allBeats(p).find(b=>b.id===beat.id),kind))}/></Field>;
   const createSpeaker=()=>{
     const name=characterDraft?.trim();if(!name||running)return;
     mutate(p=>{const character=createCharacter(p,sceneFor(p,beat.id).id,name);allBeats(p).find(b=>b.id===beat.id).speaker=character.name;});
@@ -1359,6 +1351,10 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               v,
             ),
           );
+      const player=project.gameplay?.controller?.ownerId===o.id&&project.gameplay.controller.mode!=='none';
+      const transformInspector=<TransformInspector compact spawn={project.gameplay?.controller?.ownerId===o.id&&project.gameplay.controller.mode!=='none'} object={o} scene={scene} disabled={running} onChange={value=>transformObject(o.id,value)}
+            onReset={()=>mutate(p=>{const x=p.objects.find(x=>x.id===o.id);if(x.transforms)delete x.transforms[scene.id];})}
+            onFocus={()=>{editScene();setFocusRequest({nonce:uid('focus')});}} onDuplicate={()=>duplicateObject(o)} onDelete={()=>deleteObject(o.id)}/>;
       return (
         <div className="object-inspector">
           <div className="inspector-identity">
@@ -1375,7 +1371,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 value={o.name}
                 onChange={(e) => patch({ name: e.target.value })}
               />
-              <small>{tr(o.type)}</small>
+              <small>{tr(project.gameplay?.controller?.ownerId===o.id&&project.gameplay.controller.mode!=='none'?'Игрок':o.type)}</small>
             </div>
             <input
               type="checkbox"
@@ -1386,10 +1382,9 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               title={tr("Объект активен")}
             />
           </div>
+          {player&&transformInspector}
           <ComponentInstancesInspector key={'components:'+o.id} project={project} scope={{kind:'object',id:o.id}} onChange={mutate} preview={preview} running={running} onOpen={(resourceId,mechanicId)=>{setGameplayRequest({resourceId,mechanicId,nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');}} onOpenFunction={(functionId,mechanicId)=>{setGameplayRequest({functionId,mechanicId,nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');}} onCreate={()=>{setGameplayRequest({createComponent:true,scope:{kind:'object',id:o.id},nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');}}/>
-          <TransformInspector compact object={o} scene={scene} disabled={running} onChange={value=>transformObject(o.id,value)}
-            onReset={()=>mutate(p=>{const x=p.objects.find(x=>x.id===o.id);if(x.transforms)delete x.transforms[scene.id];})}
-            onFocus={()=>{editScene();setFocusRequest({nonce:uid('focus')});}} onDuplicate={()=>duplicateObject(o)} onDelete={()=>deleteObject(o.id)}/>
+          {!player&&transformInspector}
           <Fold title={tr("Коллизия")} open={false}><CollisionInspector compact object={o} disabled={running} onChange={collision=>patch({collision})}/></Fold>
           {o.type==='Персонаж'&&<Fold title={tr("Виджет диалога")} icon="PanelsTopLeft" open={false}><WidgetAssignment project={project} character={o} onCustomize={()=>customizeWidget({characterId:o.id})} onChange={dialogueWidgetId=>patch({dialogueWidgetId})} onEdit={openWidgets} disabled={running}/><Button icon="Users" onClick={()=>{setDock('characters');setCompactPanel('workspace');}}>{tr("Модель и анимации персонажа")}</Button></Fold>}
           {o.type!=='Персонаж'&&o.type!=='Источник света'&&<MeshInspector key={o.id} object={o} disabled={running}
@@ -1468,196 +1463,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         selection.kind === "group") &&
       event
     ) {
-      const patchEvent = (v) =>
-        mutate((p) =>
-          Object.assign(
-            p.events.find((e) => e.id === event.id),
-            v,
-          ),
-        );
-      return (
-        <>
-          <div className="inspector-identity">
-            <span className="identity-icon">
-              <Icon
-                name={
-                  inspectedAction ? TYPES[inspectedAction.type].icon : "Layers"
-                }
-                size={25}
-              />
-            </span>
-            <div>
-              <strong>
-                {inspectedAction
-                  ? tr(TYPES[inspectedAction.type].label)
-                  : event.name}
-              </strong>
-              <small>
-                {binding ? tr("Экземпляр · ") + contextBeat.id : tr("Шаблон события")}
-              </small>
-            </div>
-          </div>
-          {binding && (
-            <div className="instance-source">
-              <Icon name="Link2" size={13} />
-              <span>{event.name}</span>
-              <Button
-                title={tr("Открыть исходный шаблон")}
-                icon="ExternalLink"
-                onClick={() => {
-                  setEventContext({ eventId: binding.sourceEventId||event.id });
-                  setSelection({ kind: "event", id: binding.sourceEventId||event.id });
-                }}
-              />
-            </div>
-          )}
-          {inspectedAction ? (
-            <>
-              <Fold title={tr("Параметры действия")} icon="SlidersHorizontal">
-                <Field label={tr("Тип")}>
-                  <Select
-                    value={inspectedAction.type}
-                    options={Object.entries(TYPES).map(([id, t]) => [
-                      id,
-                      t.label,
-                    ])}
-                    onChange={(type) =>
-                      patchAction(inspectedAction.id, {
-                        ...makeAction(type),
-                        id: inspectedAction.id,
-                      })
-                    }
-                  />
-                </Field>
-                <ActionFields onPickPosition={id=>{editScene();setPositionPick({id,context:{...eventContext}});setNotice("Нажмите на место в 3D-сцене. Escape — отмена.");}} sceneId={sceneFor(project,contextBeat.id).id}
-                  action={inspectedAction}
-                  project={project}
-                  onChange={(v) => patchAction(inspectedAction.id, v)}
-                />
-              </Fold>
-              <Fold title={tr("Конфликты и завершение")} icon="Shield">
-                <Field label={tr("Если объект занят")}>
-                  <Select
-                    value={inspectedAction.conflict}
-                    options={[
-                      ["FAIL_NEW", "Показать ошибку"],
-                      ["REPLACE_CURRENT", "Заменить текущее"],
-                      ["QUEUE", "Ожидать · модель поведения"],
-                    ]}
-                    onChange={(conflict) =>
-                      patchAction(inspectedAction.id, { conflict })
-                    }
-                  />
-                </Field>
-                <div className="resource-note">
-                  {project.objects.find((o) => o.id === inspectedAction.target)
-                    ?.name || inspectedAction.target}{" "}
-                  / {tr(TYPES[inspectedAction.type].domain) || tr("Условие")}
-                </div>
-              </Fold>
-            </>
-          ) : (
-            <Fold
-              title={binding ? tr("Параметры размещения") : tr("Свойства события")}
-              icon="Layers"
-            >
-              {binding ? (
-                <>
-                  <Field label={tr("Момент запуска")}>
-                    <Select
-                      value={binding.hook}
-                      options={PHASES.map((p) => [p.id, p.label])}
-                      onChange={(hook) =>
-                        mutate((p) => {
-                          const b = allBeats(p).find(
-                              (b) => b.id === contextBeat.id,
-                            ),
-                            item = b.bindings.find((x) => x.id === binding.id);
-                          item.hook = hook;
-                        })
-                      }
-                    />
-                  </Field>
-                  <Field label={tr("Когда идти дальше")}>
-                    <Select
-                      value={binding.join}
-                      options={Object.entries(JOIN_LABELS)}
-                      onChange={(join) =>
-                        mutate(
-                          (p) =>
-                            (allBeats(p)
-                              .find((b) => b.id === contextBeat.id)
-                              .bindings.find((x) => x.id === binding.id).join =
-                              join),
-                        )
-                      }
-                    />
-                  </Field>
-                  <Button
-                    icon="RotateCcw"
-                    onClick={() =>
-                      mutate((p) => {
-                        const b = allBeats(p)
-                          .find((b) => b.id === contextBeat.id)
-                          .bindings.find((x) => x.id === binding.id);
-                        b.actionOverrides = {};
-                        b.overrides = {};
-                      })
-                    }
-                  >
-                    {tr("Сбросить изменения здесь")}</Button>
-                </>
-              ) : (
-                <>
-                  <Field label={tr("Название")}>
-                    <input
-                      value={event.name}
-                      onChange={(e) => patchEvent({ name: e.target.value })}
-                    />
-                  </Field>
-                  <Field label={tr("После действий")}>
-                    <Select
-                      value={event.retention}
-                      options={[
-                        ["AUTO_CLOSE_ON_FLOW_END", "Завершить событие"],
-                        ["HOLD_UNTIL_STOPPED", "Оставить до остановки"],
-                        ["HOLD_UNTIL_REPLACED", "До замены или выхода"],
-                      ]}
-                      onChange={(retention) =>
-                        patchEvent({
-                          retention,
-                          channel: event.channel || "Effect." + event.id,
-                        })
-                      }
-                    />
-                  </Field>
-                  <Field label={tr("Живёт в пределах")}>
-                    <Select
-                      value={event.owner}
-                      options={[
-                        ["SubScene", "Сабсцены"],
-                        ["Scene", "Всей сцены"],
-                        ["GameSession", "Игровой сессии"],
-                      ]}
-                      onChange={(owner) => patchEvent({ owner })}
-                    />
-                  </Field>
-                  <Button
-                    icon="Plus"
-                    onClick={() => {
-                      addEvent(event.id);
-                      openStaging(beat.id);
-                    }}
-                  >
-                    {tr("Добавить в реплику")}</Button>
-                </>
-              )}
-            </Fold>
-          )}
-          <Fold title={tr("Полное редактирование события")} icon="ListOrdered">
-            <EventInspector event={event} project={project} binding={binding} sceneId={sceneFor(project,contextBeat.id).id}
-              onAction={patchAction} onPickPosition={id=>{editScene();setPositionPick({id,context:{...eventContext}});setNotice('Нажмите на место в 3D-сцене. Escape — отмена.');}}
-              onEdit={fn=>{
+      const editEvent = fn=>{
                 const detach=binding&&(!binding.localEventId||nodes.filter(b=>b.bindings.some(x=>x.eventId===event.id)).length>1||nodes.some(b=>b.bindings.filter(x=>x.eventId===event.id).length>1));
                 const nextId=detach?uid('event'):event.id;
                 mutate(p=>{
@@ -1668,50 +1474,26 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   fn(target);
                 });
                 if(nextId!==event.id)setEventContext(c=>({...c,eventId:nextId}));
-              }}/>
-          </Fold>
-          {binding&&<Button icon="Trash2" onClick={()=>{mutate(p=>{removeEventBinding(p,contextBeat.id,binding.id);});setEventContext(null);setSelection({kind:'beat',id:contextBeat.id});}}>{tr("Удалить событие из реплики")}</Button>}
-          <Button
-            className="inspector-add"
-            icon="Maximize2"
-            onClick={() => {
-              setDetailEditor(true);
-
-              setMaximized(null);
-            }}
-          >
-            {tr("Открыть событие в отдельном окне")}</Button>
-        </>
-      );
+              };
+      return <EventSelectionInspector event={event} action={inspectedAction} binding={binding} project={project} beat={contextBeat} sceneId={sceneFor(project,contextBeat.id).id} running={running}
+        onEdit={editEvent} onAction={patchAction}
+        onSelectAction={id=>setSelection({kind:'action',id})}
+        onBack={()=>setSelection(binding?{kind:'binding',id:binding.id}:{kind:'event',id:event.id})}
+        onBinding={values=>{if(!rt.running)mutate(p=>Object.assign(allBeats(p).find(b=>b.id===contextBeat.id).bindings.find(b=>b.id===binding.id),values));}}
+        onReset={()=>{if(!rt.running)mutate(p=>{const b=allBeats(p).find(b=>b.id===contextBeat.id).bindings.find(b=>b.id===binding.id);b.actionOverrides={};b.overrides={};});}}
+        onOpenSource={()=>{const id=binding.sourceEventId||event.id;setEventContext({eventId:id});setSelection({kind:'event',id});}}
+        onOpenEditor={()=>{setDock('event');setDetailEditor(true);setMaximized(null);}}
+        onAdd={()=>{addEvent(event.id);openStaging(beat.id);}}
+        onRemove={()=>{if(rt.running)return;mutate(p=>removeEventBinding(p,contextBeat.id,binding.id));setEventContext(null);setSelection({kind:'beat',id:contextBeat.id});}}
+        onPickPosition={id=>{editScene();setPositionPick({id,context:{...eventContext}});setNotice('Нажмите на место в 3D-сцене. Escape — отмена.');}}/>;
     }
+
     return (
-      <>
-        <div className="inspector-identity">
-          <span className="identity-icon">
-            <Icon
-              name={
-                beat.kind === "choice"
-                  ? "GitFork"
-                  : beat.kind === "gate"
-                    ? "MousePointer2"
-                    : "MessageSquare"
-              }
-              size={26}
-            />
-          </span>
-          <div>
-            <strong>
-              {beat.kind === "choice"
-                ? tr("Выбор игрока")
-                : beat.kind === "gate"
-                  ? tr("Ожидание игрока")
-                  : beat.kind==='branch'?tr("Проверка") : (beat.text?.trim() ? tr("Реплика · ") + beat.text.trim().split(/\s+/).slice(0,3).join(" ") + (beat.text.trim().split(/\s+/).length>3 ? "…" : "") : tr("Пустая реплика"))}
-            </strong>
-            <small>{chapter.name}</small>
-          </div>
-          <span className="subtle">{beat.bindings.length} {tr("событий")}</span>
-        </div>
-        {beat.kind!=='branch'&&<Fold title={tr("Диалог")} icon="MessageSquare">
+      <div className="story-inspector beat-inspector" key={beat.id}>
+        <div className="story-inspector-heading"><Icon name={beat.kind==='choice'?'GitFork':beat.kind==='gate'?'MousePointer2':'MessageSquare'} size={16}/><strong>{tr('Реплика')}</strong><small title={scene.name}>{scene.name}</small></div>
+        <fieldset className="inspector-primary-fields" disabled={running}>
+          {nodeKindField()}
+        {beat.kind!=='branch'&&<>
           <Field label={tr("Говорит")}>
             <EditorSelect label={tr("Говорит")} value={beat.speaker}
               options={[["Рассказчик","Рассказчик"],...project.objects.filter(o=>o.type==='Персонаж').map(o=>[o.name,literalLabel(o.name)]),['__create_character__','＋ Создать персонажа…']]}
@@ -1729,9 +1511,9 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             rows={4}
             onChange={(e) => patchBeat({ text: e.target.value })}
           />
-          {nodeKindField()}
-        </Fold>
-        }<Fold title={tr("Постановка реплики")} icon="Clapperboard">
+        </>}
+        </fieldset>
+        <Fold title={tr("Постановка реплики")} open={false} extra={beat.bindings.length>0?<span className="inspector-count">{beat.bindings.length}</span>:null}>
           {PHASES.map((p) => (
             <button
               className="phase-inspector-row"
@@ -1756,24 +1538,26 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           <Button icon="Workflow" onClick={() => openStaging(beat.id)}>
             {tr("Показать реплику в потоке")}</Button>
         </Fold>
-        <Fold title={tr("Контексты ввода")} icon="Gamepad2"><InputContextSettings project={project} beat={beat} onChange={patchBeat} disabled={running} onOpen={()=>{setDock('input');setCompactPanel('workspace');}}/></Fold>
+        <Fold title={tr("Контексты ввода")} open={false}><InputContextSettings compact project={project} beat={beat} onChange={patchBeat} disabled={running} onOpen={()=>{setDock('input');setCompactPanel('workspace');}}/></Fold>
         {beat.kind === "choice" ? (
-          <Fold title={tr("Ответы игрока")} icon="GitFork"><p>{tr("Текст ответа, результат и вход доступности редактируются прямо в ноде выбора. Подключите результат сравнения к круглому входу ответа.")}</p><Button icon="Focus" onClick={()=>graphApi.current?.focus(beat.id)}>{tr("К ноде выбора")}</Button></Fold>
+          <Fold title={tr("Ответы игрока")} extra={<span className="inspector-count">{beat.choices?.length||0}</span>}>{(beat.choices||[]).map(c=><button className="inspector-answer" key={c.id} onClick={()=>openStaging(beat.id)}>{c.label}<Icon name="ArrowUpRight" size={13}/></button>)}<Button icon="GitFork" onClick={()=>openStaging(beat.id)}>{tr("Редактировать ответы")}</Button></Fold>
         ) : beat.kind==='branch' ? null : beat.kind === "gate" ? (
           <Fold title={tr("Ждать взаимодействие")} icon="MousePointerClick">
-            <InteractionInspector beat={beat} project={project} scene={scene} onChange={patchBeat}/>
+            <fieldset disabled={running}><InteractionInspector compact beat={beat} project={project} scene={scene} onChange={patchBeat}/>
             <Field label={tr("Подсказка через, сек")}>
               <input
                 type="number"
-                value={beat.timeout || 30}
+                min="0"
+                value={beat.timeout ?? 30}
                 onChange={(e) => patchBeat({ timeout: Number(e.target.value) })}
               />
-            </Field>
+            </Field></fieldset>
           </Fold>
         ) : null}
         {!["choice", "branch", "end"].includes(beat.kind) && (
           <Fold title={tr("Продолжение")} icon="Route">
             <Select
+              aria-label={tr("Продолжение реплики")} disabled={running}
               value={beat.next || ""}
               options={[
                 ["", "Выход не подключён"],
@@ -1784,17 +1568,11 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               ]}
               onChange={(next) => patchBeat({ next: next || null })}
             />
-            <div className="resource-note">
-              {beat.next
-                ? sceneFor(project, beat.next).location === scene.location
-                  ? tr("В этой же локации")
-                  : tr("Переход в другую сабсцену")
-                : tr("Без последовательного продолжения")}
-            </div>
+
           </Fold>
         )}
-        {['dialogue','choice','gate','end'].includes(beat.kind)&&<Fold title={tr("Виджет диалогового окна")} icon="PanelsTopLeft"><WidgetAssignment project={project} beat={beat} onCustomize={()=>customizeWidget({beatId:beat.id})} onChange={widgetId=>patchBeat({widgetId})} onEdit={openWidgets} disabled={running}/></Fold>}
-      </>
+        {['dialogue','choice','gate','end'].includes(beat.kind)&&<Fold title={tr("Виджет диалогового окна")} open={false}><WidgetAssignment project={project} beat={beat} onCustomize={()=>customizeWidget({beatId:beat.id})} onChange={widgetId=>patchBeat({widgetId})} onEdit={openWidgets} disabled={running}/></Fold>}
+      </div>
     );
   };
 
@@ -2485,10 +2263,10 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             </div>
           </div>
           <div className="hierarchy-tree">
-              <HierarchyTree onAddObject={(groupId,event)=>openObjectPicker(event,groupId)} onRootDrop={ids=>{if(!rt.running)mutate(p=>removeObjectsFromGroups(p,displayScene.id,ids));}} groups={sceneObjectGroups(project,displayScene.id,objects)} disabled={running} onSelectGroup={group=>{if(rt.running)return;setMode('scene');setSelection(group.objectIds.length?{kind:'object',id:group.objectIds[0],ids:group.objectIds,groupId:group.id}:{kind:'group',id:group.id});openObjectTransform();}} onGroupDrop={(groupId,ids)=>{if(!rt.running)mutate(p=>addObjectsToGroup(p,groupId,ids));}} scene={displayScene} objects={objects} points={sceneStagingPoints(displayScene,objects)} query={query} selected={selection.id} selectedIds={objectSelectionIds}
+              <HierarchyTree playerId={project.gameplay?.controller?.mode!=='none'?project.gameplay?.controller?.ownerId:undefined} onAddObject={(groupId,event)=>openObjectPicker(event,groupId)} onRootDrop={ids=>{if(!rt.running)mutate(p=>removeObjectsFromGroups(p,displayScene.id,ids));}} groups={sceneObjectGroups(project,displayScene.id,objects)} disabled={running} onSelectGroup={group=>{if(rt.running)return;setMode('scene');setSelection(group.objectIds.length?{kind:'object',id:group.objectIds[0],ids:group.objectIds,groupId:group.id}:{kind:'group',id:group.id});openObjectTransform();}} onGroupDrop={(groupId,ids)=>{if(!rt.running)mutate(p=>addObjectsToGroup(p,groupId,ids));}} scene={displayScene} objects={objects} points={sceneStagingPoints(displayScene,objects)} query={query} selected={selection.id} selectedIds={objectSelectionIds}
                 expanded={layout.treeOpen||{}} onExpanded={treeOpen=>setLayout(l=>({...l,treeOpen}))}
                 onSelectObject={(id,options)=>{if(!running){setMode('scene');setCameraPilotId(null);setCameraPreviewId(null);}selectObject(id,options);}}
-                onFrameObject={id=>{editScene();setSelection({kind:'object',id});setFocusRequest({nonce:uid('focus')});}}
+                onFrameObject={id=>{editScene();showBaseDock('inspector');setLayout(l=>({...l,hiddenInspector:false}));setSelection({kind:'object',id});setFocusRequest({nonce:uid('focus')});}}
                 onVisibility={id=>mutate(p=>{const o=p.objects.find(o=>o.id===id);o.active=o.active===false;})}
                 onPoint={point=>{editScene();setSelection({kind:'point',id:point.id});openObjectTransform();setFocusRequest({nonce:uid('focus'),position:point.position,objectId:point.objectId});}}
                 onSelectCamera={selectCamera}/>
@@ -2711,10 +2489,11 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         <aside data-dock-root="inspector" className={"inspector-panel dockable-region"+(inspectorTool?" has-docked-tool":"")}>
           <button className="panel-restore" aria-label={tr("Показать инспектор")} title={tr("Показать инспектор")} onClick={()=>setLayout(l=>({...l,hiddenInspector:false}))}><Icon name="PanelRightOpen" size={18}/><span>{tr("Инспектор")}</span></button>
           <EditorDockStrip area="inspector" className="panel-tabs">
-            <button data-dock-base="inspector" className={!inspectorTool?"active":""} onClick={()=>showBaseDock('inspector')}>{tr("Инспектор")}</button>
+            <button data-dock-base="inspector" className={!inspectorTool&&selection.kind!=="scene"?"active":""} onClick={()=>{showBaseDock('inspector');if(selection.kind==='scene')setSelection({kind:'beat',id:beat.id});}}>{tr("Инспектор")}</button>
             <EditorDockTabs area="inspector"/>
             <button
-              onClick={() => openSubscenes()}
+              className={!inspectorTool&&selection.kind==='scene'?'active':''}
+              onClick={() => {showBaseDock('inspector');setSelection({kind:'scene',id:scene.id});}}
             >
               {tr("Сабсцена")}</button>
             <div className="flex-space" />
@@ -2729,21 +2508,12 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           </EditorDockStrip>
           <EditorDockBody area="inspector"/>
           <DockDropTarget area="inspector"/>
-          <div className="inspector-scroll">
+          <div className="inspector-scroll" ref={inspectorScroll}>
             {selection.kind === "scene" ? (
-              <>
-                <div className="inspector-identity">
-                  <Icon name="PanelsTopLeft" size={25} />
-                  <strong>{scene.name}</strong>
-                </div>
-                <Fold title={tr("Сабсцена")} icon="MapPin">
-                  <p>{scene.location} · {tr(scene.weather)} · {tr(scene.time)}</p>
-                  {scene.description && <p>{scene.description}</p>}
-                  <Button icon="Settings2" onClick={() => openSubscenes()}>{tr("Открыть редактор сабсцены")}</Button>
-                  <Button icon="Box" onClick={editScene}>{tr("Редактировать 3D-сцену")}</Button>
-                  <Button icon="Workflow" onClick={() => openSubsceneBeat(scene.entry)}>{tr("Открыть сценарий")}</Button>
-                </Fold>
-              </>
+              <SubsceneInspector key={scene.id} project={project} scene={scene} running={running}
+                onPatch={patch=>editSubscene(p=>Object.assign(p.subscenes.find(s=>s.id===scene.id),patch))}
+                onEntry={(id,reroute)=>editSubscene(p=>setSceneEntry(p,scene.id,id,reroute))}
+                onOpenBeat={openSubsceneBeat} onScene={editScene} onCameras={openCameras} onOpenEditor={()=>openSubscenes()}/>
             ) : (
               renderInspector()
             )}
@@ -2769,7 +2539,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         <div className="flex-space" />
         <span>
           {tr("Выделено:")}{" "}
-          {selection.kind === "object" ? inspectedObject?.name : beatPreview(beat)}
+          {selection.kind === "object" ? inspectedObject?.name : selection.kind === "scene" ? scene.name : beatPreview(beat)}
         </span>
 
       </footer>

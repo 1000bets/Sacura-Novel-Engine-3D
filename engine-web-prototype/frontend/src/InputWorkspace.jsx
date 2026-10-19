@@ -1,6 +1,6 @@
 import {inputLabel,bindingControlLabel,keyboardLabel,bindingDirection,INPUT_DIRECTIONS,POINTER_CONTROLS,GAMEPAD_AXES,GAMEPAD_BUTTONS} from './inputPresentation.js';
 import React,{useEffect,useRef,useState} from 'react';
-import {Plus,Trash2,Keyboard,MousePointer2,Gamepad2,Smartphone,SlidersHorizontal,ChevronDown,Radio,ArrowRight,Move,Settings2} from 'lucide-react';
+import {Plus,Trash2,Keyboard,MousePointer2,Gamepad2,Smartphone,SlidersHorizontal,ChevronDown,Radio,ArrowRight,Move,Settings2,LockKeyhole} from 'lucide-react';
 import {t as tr, useLocale, message} from './i18n.jsx';
 import {uid} from './model.js';
 import {runtimeVariableType} from './variableModel.js';
@@ -19,11 +19,11 @@ const bindingSummary=bindings=>{
  return values.slice(0,4).join(' · ')+(values.length>4?' …':'');
 };
 
-export function InputContextSettings({project,beat,onChange,onOpen,disabled}){
- useLocale();const active=inputContextsFor(project,beat),custom=beat.inputContexts!==undefined;
+export function InputContextSettings({project,beat,onChange,onOpen,disabled,compact=false}){
+ useLocale();const active=inputContextsFor(project,beat),required=inputContextsFor(project,{...beat,inputContexts:[]}),custom=beat.inputContexts!==undefined;
  return <fieldset className="input-context-settings" disabled={disabled} style={{border:0,padding:0}}>
-  <p>{tr('Контекст связывает устройства с действиями в этом моменте истории. Системный контекст действует всегда.')}</p>
-  {project.input.contexts.filter(c=>c.id!=='system').map(c=><label className="check" key={c.id}><input type="checkbox" checked={active.includes(c.id)} onChange={e=>onChange({inputContexts:e.target.checked?[...active.filter(id=>id!=='system'),c.id]:active.filter(id=>id!=='system'&&id!==c.id)})}/>{inputLabel(c)}</label>)}
+  {!compact&&<p>{tr('Контекст связывает устройства с действиями в этом моменте истории. Системный контекст действует всегда.')}</p>}
+  {project.input.contexts.filter(c=>c.id!=='system').map(c=><label className="check" key={c.id} title={required.includes(c.id)?tr('Включён игровой логикой этой реплики'):undefined}><input type="checkbox" disabled={required.includes(c.id)} checked={active.includes(c.id)} onChange={e=>!required.includes(c.id)&&onChange({inputContexts:e.target.checked?[...active.filter(id=>id!=='system'),c.id]:active.filter(id=>id!=='system'&&id!==c.id)})}/>{inputLabel(c)}{required.includes(c.id)&&<LockKeyhole aria-hidden="true" size={12}/>}</label>)}
   <button onClick={onOpen}>{tr('Настроить действия и привязки')}</button>{custom&&<button onClick={()=>onChange({inputContexts:undefined})}>{tr('Вернуть автоматический контекст')}</button>}
  </fieldset>;
 }

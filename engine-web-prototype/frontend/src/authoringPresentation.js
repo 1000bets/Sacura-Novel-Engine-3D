@@ -1,4 +1,5 @@
 import {componentCallSummary,isComponentCall} from './componentCatalog.js';
+import {operationDefinition} from './operationRegistry.js';
 import {GAME_COMMANDS} from './gameplayModel.js';
 import {animationLabel} from './characterPresentation.js';
 import {t as tr,plural} from './i18n.js';
@@ -78,7 +79,13 @@ export function actionCount(count) { return plural(count,'действие','д�
 
 export function actionSummary(action, project) {
  if(action.type==='gameplay'&&isComponentCall(action.command)){const s=componentCallSummary(project,{parameters:action.value});return s.subject+' → '+s.result;}
- if(action.type==='gameplay')return tr(GAME_COMMANDS[action.command]||'Игровая команда')+' → '+JSON.stringify(action.value);
+ if(action.type==='gameplay'){
+  const value=action.value||{},definition=operationDefinition(action.command,action.operationVersion||1),label=tr(GAME_COMMANDS[action.command]||definition?.editor?.label||'Игровая команда');
+  const target=value.target||value.owner||value.objectId,id=typeof target==='string'?target:target?.mode==='direct'?target.id:null;
+  const subject=project.objects?.find(o=>o.id===id)?.name||project.subscenes?.find(s=>s.id===id)?.name||(id===project.id?project.title:null);
+  const resource=project.events?.find(e=>e.id===value.eventId)?.name||project.functions?.find(f=>f.id===value.functionId)?.name||project.gameplay?.items?.find(i=>i.id===value.itemId)?.name;
+  return subject?subject+' → '+label:resource?label+' → '+resource:label;
+ }
  const object=project.objects?.find(o=>o.id===action.target);
  const subject=object?.name||tr(TYPES[action.type]?.label)||action.type;
  const clip=action.type==='pose'&&enabledCharacterAnimations(object).find(item=>item.id===action.value);

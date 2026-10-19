@@ -23,11 +23,11 @@ export function mechanicsFor(project) {
   if(g.camera?.mode!=='authored')add('camera','camera',g.camera?.targetId||'');
   for(const id of Object.keys(g.actors))if(g.actors[id].maxHP!=null)add('health',id,id);
   for(const id of Object.keys(g.actors))if(g.actors[id].ai)add('pursuit',id,id);
-  for(const w of g.weapons)add('weapon',w.id,w.ownerId);
+  for(const w of g.weapons.filter(w=>!w.component))add('weapon',w.id,w.ownerId);
   for(const inv of [g.inventory,...g.inventories||[]].filter(i=>i.enabled)){if(!records.some(m=>m.type==='inventory'&&m.scope.id===inv.owner.id))records.push({id:'native:inventory:'+inv.owner.id,type:'inventory',scope:structuredClone(inv.owner),recordId:inv.owner.id,native:true});}
   if(g.crosshair?.enabled)add('crosshair','crosshair');
   for(const r of g.resources||[])if(!records.some(m=>m.type==='resource'&&m.recordId===r.id))records.push({id:'native:resource:'+r.id,type:'resource',recordId:r.id,scope:structuredClone(r.owner),native:true});
-  for(const i of g.items)add('pickup',i.id,i.worldObjectId);
+  for(const i of g.items.filter(i=>!i.componentPickup))add('pickup',i.id,i.worldObjectId);
   for(const r of g.rules)if(!records.some(m=>m.ruleId===r.id))records.push({id:'native:rule:'+r.id,type:'rule',ruleId:r.id,scope:r.scope|| (r.objectId?{kind:'object',id:r.objectId}:r.sceneId?{kind:'scene',id:r.sceneId}:{kind:'project',id:project.id}),native:true});
   for(const m of records){const b=m.type==='weapon'?g.weapons.find(w=>w.id===m.recordId)?.behavior:m.type==='health'?g.actors[m.recordId||m.scope.id]?.behaviors?.health:m.type==='pursuit'?g.actors[m.recordId||m.scope.id]?.behaviors?.pursuit:m.type==='pickup'?g.items.find(i=>i.id===m.recordId)?.pickupBehavior:m.capabilityId==='sacura.turn'?m.behavior:null;if(b)m.implementation={definitionId:b.definitionId,functions:{...b.functions}};}
   return records;

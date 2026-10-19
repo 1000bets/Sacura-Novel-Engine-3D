@@ -2,7 +2,7 @@ import {t as tr, useLocale} from './i18n.jsx';
 import React from 'react';
 import {Icon,Button} from './StudioParts.jsx';
 
-export default function HierarchyTree({scene,objects,groups=[],onAddObject,onRootDrop,onSelectGroup,onGroupDrop,disabled,points=[],query,selected,selectedIds=[],expanded,onExpanded,onSelectObject,onFrameObject,onVisibility,onPoint,onSelectCamera}){
+export default function HierarchyTree({scene,objects,groups=[],onAddObject,onRootDrop,onSelectGroup,onGroupDrop,disabled,playerId,points=[],query,selected,selectedIds=[],expanded,onExpanded,onSelectObject,onFrameObject,onVisibility,onPoint,onSelectCamera}){
  useLocale();
  const prefix=scene.id+':',search=query.trim().toLowerCase();
  const isOpen=key=>!!search||(expanded[prefix+key]??true);
@@ -26,7 +26,7 @@ export default function HierarchyTree({scene,objects,groups=[],onAddObject,onRoo
  const dragOver=e=>{if(!disabled&&Array.from(e.dataTransfer.types).includes('application/sacura-asset')){e.preventDefault();e.stopPropagation();}};
  const renderObject=o=><div className={'tree-object '+(o.type==='Персонаж'?'character ':'')+(selectedIds.includes(o.id)?'selected':'')} key={o.id}>
   <button draggable={!disabled} title={o.name+tr(' · Shift — добавить к выделению · двойной щелчок — в кадр')} aria-label={o.name} aria-pressed={selectedIds.includes(o.id)} onDragStart={e=>e.dataTransfer.setData('application/sacura-asset',JSON.stringify({id:o.id,kind:'objects'}))} onClick={e=>onSelectObject(o.id,{additive:e.shiftKey||e.ctrlKey||e.metaKey})} onDoubleClick={e=>{if(!e.shiftKey&&!e.ctrlKey&&!e.metaKey)onFrameObject(o.id);}}>
-   <Icon name={o.type==='Персонаж'?'PersonStanding':o.type==='Источник света'?'Lightbulb':'Box'} size={14}/><span>{o.name}</span>
+   <Icon name={o.id===playerId?'Gamepad2':o.type==='Персонаж'?'PersonStanding':o.type==='Источник света'?'Lightbulb':'Box'} size={14}/><span>{o.name}</span>{o.id===playerId&&<small className="tree-player-badge">{tr("Игрок")}</small>}
   </button>
   <button title={(o.active!==false?tr('Скрыть '):tr('Показать '))+o.name} aria-pressed={o.active!==false} onClick={()=>onVisibility(o.id)}><Icon name={o.active!==false?'Eye':'EyeOff'} size={13}/></button>
  </div>;
@@ -35,6 +35,7 @@ export default function HierarchyTree({scene,objects,groups=[],onAddObject,onRoo
    <h2>{tr('Объекты сцены')}</h2><span className="scene-object-count">{count}</span>
    {groups.length>0&&<div className="tree-controls"><Button icon="ListTree" title={tr('Развернуть все группы')} onClick={()=>onExpanded({...expanded,...Object.fromEntries(groups.map(g=>[prefix+g.id,true]))})}/><Button icon="ListMinus" title={tr('Свернуть все группы')} onClick={()=>onExpanded({...expanded,...Object.fromEntries(groups.map(g=>[prefix+g.id,false]))})}/></div>}
   </div>
+  {playerId&&objects.some(o=>o.id===playerId)&&<button className="tree-player-shortcut" aria-label={tr("Игрок")+' · '+objects.find(o=>o.id===playerId).name} title={tr("Выбрать игрока и показать место появления")} onClick={()=>onFrameObject(playerId)}><Icon name="Gamepad2" size={14}/><span>{tr("Игрок")}</span><strong>{objects.find(o=>o.id===playerId).name}</strong><Icon name="Focus" size={13}/></button>}
   <div className="scene-objects-children" onDragOver={dragOver} onDrop={e=>drop(e,null)}>
    {cameras.map(c=><button key={c.id} className={'tree-row scene-entity '+(selected===c.id?'selected':'')} title={tr('Посмотреть из камеры «')+c.name+'»'} aria-pressed={selected===c.id} onClick={()=>onSelectCamera(c.id)}><Icon name={c.mode==='follow'?'UserRoundCheck':'Video'} size={14}/><span>{c.name}</span>{c.id===scene.defaultCameraId&&<Icon name="Star" size={12}/>}</button>)}
    {visibleGroups.map(group=><div key={group.id} className="tree-object-group" onDragOver={dragOver} onDrop={e=>drop(e,group.id)}>
