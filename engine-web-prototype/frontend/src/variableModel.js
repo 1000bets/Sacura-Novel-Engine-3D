@@ -25,7 +25,7 @@ export function editVariable(p,id,patch){
  if(name!==id){
   for(const binding of p.gameplay?.variableBindings||[])if(binding.key===id)binding.key=name;
   for(const w of p.widgets||[])for(const e of w.elements){for(const binding of [e.binding,e.showIf])if(binding?.source==='variable'&&(binding.path===id||binding.path.startsWith(id+'.')))binding.path=name+binding.path.slice(id.length);if(e.maxVariable===id)e.maxVariable=name;}
-  const renamePaths=v=>{if(!v||typeof v!=='object')return;for(const [key,x]of Object.entries(v)){if(key==='path'&&typeof x==='string'&&(x==='global.'+id||x.startsWith('global.'+id+'.')))v[key]='global.'+name+x.slice(('global.'+id).length);else renamePaths(x);}};for(const f of p.functions||[])renamePaths(f);
+  const renamePaths=v=>{if(!v||typeof v!=='object'||v.op==='constant')return;for(const [key,x]of Object.entries(v)){if(['locals','default','initialState','schema','localSchema','stateSchema','resultSchema'].includes(key)||key==='value'&&['return','set'].includes(v.kind)&&!x?.op)continue;if((key==='path'&&(v.op==='get'||['set','array'].includes(v.kind))||key==='output'&&v.kind)&&typeof x==='string'&&(x==='global.'+id||x.startsWith('global.'+id+'.')))v[key]='global.'+name+x.slice(('global.'+id).length);else renamePaths(x);}};for(const f of p.functions||[])renamePaths(f);
   if(Object.hasOwn(p.variables,id)){p.variables[name]=p.variables[id];delete p.variables[id];}
   if(p.variableTypes&&Object.hasOwn(p.variableTypes,id)){p.variableTypes[name]=p.variableTypes[id];delete p.variableTypes[id];}
   for(const b of (p.chapters||[]).flatMap(c=>c.beats||[])){

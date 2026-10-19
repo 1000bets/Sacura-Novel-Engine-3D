@@ -60,6 +60,10 @@
       {
         "id": "function.graph",
         "version": 1
+      },
+      {
+        "id": "function.typed-graph",
+        "version": 1
       }
     ],
     "requiredEngineModules": []
@@ -78,6 +82,7 @@
   "content": {
     "gameplay": {
       "version": 2,
+      "behaviorSchemaVersion": 1,
       "capabilitySchemaVersion": 1,
       "resources": [
         {
@@ -188,12 +193,15 @@
                 "type": "sample.signal.reward"
               },
               "filter": {},
-              "condition": null,
               "actions": [
                 {
                   "kind": "function",
-                  "functionId": "sample-reward-function",
+                  "functionId": "definition-sample.mechanic.reward-1-reward-handler",
                   "args": {
+                    "reason": {
+                      "op": "get",
+                      "path": "args.reason"
+                    },
                     "owner": {
                       "op": "get",
                       "path": "args.owner"
@@ -214,7 +222,10 @@
               "cooldown": 0,
               "reentry": "queue",
               "maxConcurrent": 1,
-              "maxQueued": 16
+              "maxQueued": 16,
+              "handlerGraphVersion": 1,
+              "handlerFunctionId": "definition-sample.mechanic.reward-1-reward-handler",
+              "timeSource": "game"
             }
           ]
         }
@@ -327,23 +338,25 @@
       }
     },
     "version": 2,
+    "authoringGraphVersion": 1,
+    "handlerGraphVersion": 1,
     "visualExamplesVersion": 1,
     "sceneEditingVersion": 2,
     "standardEventsVersion": 1,
     "events": [
       {
-        "id": "event-376eb28b-a9b2-4398-a913-6e0aa8a00207",
+        "id": "event-fe17d5ba-0b11-4ba6-9f20-f3fbea026e1c",
         "name": "Подойти с анимацией",
         "description": "",
         "retention": "AUTO_CLOSE_ON_FLOW_END",
         "owner": "SubScene",
         "groups": [
           {
-            "id": "group-27f49a06-3c25-4200-a59a-dcd3154f8d68",
+            "id": "group-40d6eaac-4170-4e11-9296-1bac0935fe01",
             "name": "Подойти",
             "actions": [
               {
-                "id": "action-732e39fd-069e-4d98-bef8-53ee14dfb63d",
+                "id": "action-8e3cef16-5260-40d8-bb52-0fbaf03408f4",
                 "type": "move",
                 "target": "",
                 "value": [
@@ -372,18 +385,18 @@
         "standardPreset": true
       },
       {
-        "id": "event-17eba5e9-0b0d-4230-b3d8-f1feba676155",
+        "id": "event-4fb46307-9782-44e4-9db9-3f357a251101",
         "name": "Подойти и сесть",
         "description": "",
         "retention": "AUTO_CLOSE_ON_FLOW_END",
         "owner": "SubScene",
         "groups": [
           {
-            "id": "group-d104eff2-82fc-4233-8782-16a76de062e7",
+            "id": "group-999b46f6-cd78-4c48-97c6-b88319963791",
             "name": "Подойти к месту",
             "actions": [
               {
-                "id": "action-dbd3ecaf-d31b-4bd8-a349-5ae38664f400",
+                "id": "action-0a82f07a-ac2e-4175-8308-9e7aeed46190",
                 "type": "move",
                 "target": "",
                 "value": [
@@ -409,11 +422,11 @@
             ]
           },
           {
-            "id": "group-f1138925-75ab-4b03-b716-0e9c54e3ba8f",
+            "id": "group-8f0b0b36-a088-4da9-a3e8-17564baffbec",
             "name": "Сесть",
             "actions": [
               {
-                "id": "action-580a0107-71b7-424e-adf7-4ca7691cdb33",
+                "id": "action-69541791-f60c-47e0-9074-b3e712b4ec34",
                 "type": "pose",
                 "target": "",
                 "value": "сидит",
@@ -435,18 +448,18 @@
         "standardPreset": true
       },
       {
-        "id": "event-4ae296a9-41a4-4bc6-b62d-138310bd7b3b",
+        "id": "event-80110925-8d19-49e8-98b2-1984d0e924a5",
         "name": "Приветствие крупным планом",
         "description": "",
         "retention": "AUTO_CLOSE_ON_FLOW_END",
         "owner": "SubScene",
         "groups": [
           {
-            "id": "group-40c493e1-1373-4ab6-ad60-5bacc777342d",
+            "id": "group-b84db717-1998-4329-a29b-3a0e4f9521a4",
             "name": "Приветствие",
             "actions": [
               {
-                "id": "action-8a4eb0e2-96f1-4152-9051-2abb3f3088d2",
+                "id": "action-09eeae44-5f49-41bb-a928-f7506b5e03d8",
                 "type": "pose",
                 "target": "",
                 "value": "машет",
@@ -463,7 +476,7 @@
                 "fallback": "Безопасное исходное состояние"
               },
               {
-                "id": "action-22e3a66f-1767-4d4d-8484-65198703d7c7",
+                "id": "action-a0d8cbbb-f0a3-4f6e-b178-ddef47a58d1d",
                 "type": "camera",
                 "target": "camera",
                 "value": "Крупный план",
@@ -485,18 +498,18 @@
         "standardPreset": true
       },
       {
-        "id": "event-5a689b9d-0243-474a-bd11-55638c437648",
+        "id": "event-50774dfc-79b1-45ec-85f9-7d6e7e65d8bb",
         "name": "Наступает вечер",
         "description": "",
         "retention": "AUTO_CLOSE_ON_FLOW_END",
         "owner": "SubScene",
         "groups": [
           {
-            "id": "group-dddbb3bf-4635-48da-95cc-eb65c71d4a6e",
+            "id": "group-d71b6686-d4ae-41e5-b949-4a4b4f9bbb62",
             "name": "Окружение",
             "actions": [
               {
-                "id": "action-f4294a83-d105-463b-aab0-5fb132c870e8",
+                "id": "action-8ed92fb7-ea06-476d-8d3b-9417133746ed",
                 "type": "time",
                 "target": "world",
                 "value": "Закат",
@@ -513,7 +526,7 @@
                 "fallback": "Безопасное исходное состояние"
               },
               {
-                "id": "action-d925fd3f-d7ac-4b8d-850a-d4154371b871",
+                "id": "action-b63cba9e-955a-4a27-adb5-b87c9c6476b4",
                 "type": "lighting",
                 "target": "world",
                 "value": "Тёплый свет",
@@ -535,18 +548,18 @@
         "standardPreset": true
       },
       {
-        "id": "event-74755878-816a-42a2-9b34-2fadeb76c4d1",
+        "id": "event-7c9896be-4b71-4684-b9cf-110c6bafaf7d",
         "name": "Появиться в кадре",
         "description": "",
         "retention": "AUTO_CLOSE_ON_FLOW_END",
         "owner": "SubScene",
         "groups": [
           {
-            "id": "group-24485c59-69e0-43aa-ab92-b4eef61ce32d",
+            "id": "group-d4b5b48a-879b-47d5-882b-34087baa18f3",
             "name": "Появление",
             "actions": [
               {
-                "id": "action-17527571-facd-4945-8e24-f9b6548fbd85",
+                "id": "action-39aba4b5-1d0d-4bdd-b43a-07c0f23a0b62",
                 "type": "visibility",
                 "target": "",
                 "value": "Показать",
@@ -563,7 +576,7 @@
                 "fallback": "Безопасное исходное состояние"
               },
               {
-                "id": "action-491b335b-a7d3-494c-b32a-69da05e054d5",
+                "id": "action-ed350960-2676-49c9-a80e-7f548a899ac1",
                 "type": "pose",
                 "target": "",
                 "value": "стоит",
@@ -697,22 +710,407 @@
               "operationVersion": 1,
               "value": {
                 "owner": {
-                  "op": "get",
-                  "path": "args.owner"
+                  "op": "node",
+                  "nodeId": "reward-operation-value-command-value-owner",
+                  "port": "value"
                 },
                 "resource": {
-                  "op": "get",
-                  "path": "args.counter"
+                  "op": "node",
+                  "nodeId": "reward-operation-value-command-value-resource",
+                  "port": "value"
                 },
                 "amount": {
-                  "op": "get",
-                  "path": "args.amount"
+                  "op": "node",
+                  "nodeId": "reward-operation-value-command-value-amount",
+                  "port": "value"
                 }
               }
             },
             "next": null
+          },
+          {
+            "id": "reward-operation-value-command-value-owner",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "args.owner"
+            },
+            "position": {
+              "x": -1520,
+              "y": 50
+            }
+          },
+          {
+            "id": "reward-operation-value-command-value-resource",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "args.counter"
+            },
+            "position": {
+              "x": -1140,
+              "y": 50
+            }
+          },
+          {
+            "id": "reward-operation-value-command-value-amount",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "args.amount"
+            },
+            "position": {
+              "x": -760,
+              "y": 50
+            }
           }
-        ]
+        ],
+        "graphVersion": 1,
+        "stateSchema": {
+          "type": "object",
+          "properties": {}
+        },
+        "initialState": {}
+      },
+      {
+        "id": "definition-sample.mechanic.reward-1-reward-guard",
+        "name": "Новая реакция · условие",
+        "parameters": [
+          {
+            "name": "reason",
+            "label": "reason",
+            "schema": {
+              "type": "string",
+              "optional": true
+            }
+          },
+          {
+            "name": "owner",
+            "label": "Владелец счётчика",
+            "schema": {
+              "type": "union",
+              "label": "Владелец счётчика",
+              "variants": [
+                {
+                  "type": "reference",
+                  "referenceType": "project",
+                  "label": "Проект"
+                },
+                {
+                  "type": "reference",
+                  "referenceType": "scene",
+                  "label": "Сцена"
+                },
+                {
+                  "type": "reference",
+                  "referenceType": "object",
+                  "label": "Объект"
+                }
+              ]
+            }
+          },
+          {
+            "name": "counter",
+            "label": "Счётчик",
+            "schema": {
+              "type": "reference",
+              "referenceType": "resource",
+              "label": "Счётчик"
+            }
+          },
+          {
+            "name": "amount",
+            "label": "Награда",
+            "schema": {
+              "type": "integer",
+              "label": "Награда",
+              "default": 1
+            }
+          }
+        ],
+        "locals": {},
+        "resultSchema": {
+          "type": "boolean"
+        },
+        "preserveExtraArgs": true,
+        "entry": "definition-sample.mechanic.reward-1-reward-guard-return",
+        "nodes": [
+          {
+            "id": "definition-sample.mechanic.reward-1-reward-guard-return",
+            "kind": "return",
+            "name": "Условие выполнено",
+            "value": true,
+            "position": {
+              "x": 340,
+              "y": 0
+            }
+          }
+        ],
+        "graphVersion": 1
+      },
+      {
+        "id": "definition-sample.mechanic.reward-1-reward-handler",
+        "name": "Новая реакция",
+        "parameters": [
+          {
+            "name": "reason",
+            "label": "reason",
+            "schema": {
+              "type": "string",
+              "optional": true
+            }
+          },
+          {
+            "name": "owner",
+            "label": "Владелец счётчика",
+            "schema": {
+              "type": "union",
+              "label": "Владелец счётчика",
+              "variants": [
+                {
+                  "type": "reference",
+                  "referenceType": "project",
+                  "label": "Проект"
+                },
+                {
+                  "type": "reference",
+                  "referenceType": "scene",
+                  "label": "Сцена"
+                },
+                {
+                  "type": "reference",
+                  "referenceType": "object",
+                  "label": "Объект"
+                }
+              ]
+            }
+          },
+          {
+            "name": "counter",
+            "label": "Счётчик",
+            "schema": {
+              "type": "reference",
+              "referenceType": "resource",
+              "label": "Счётчик"
+            }
+          },
+          {
+            "name": "amount",
+            "label": "Награда",
+            "schema": {
+              "type": "integer",
+              "label": "Награда",
+              "default": 1
+            }
+          }
+        ],
+        "locals": {},
+        "preserveExtraArgs": true,
+        "handler": {
+          "signal": {
+            "type": "sample.signal.reward"
+          }
+        },
+        "admission": {
+          "functionId": "definition-sample.mechanic.reward-1-reward-guard",
+          "callNodeId": "definition-sample.mechanic.reward-1-reward-handler-condition",
+          "branchId": "definition-sample.mechanic.reward-1-reward-handler-branch"
+        },
+        "entry": "definition-sample.mechanic.reward-1-reward-handler-condition",
+        "nodes": [
+          {
+            "id": "definition-sample.mechanic.reward-1-reward-handler-condition",
+            "kind": "call",
+            "name": "Проверить условие",
+            "functionId": "definition-sample.mechanic.reward-1-reward-guard",
+            "args": {
+              "reason": {
+                "op": "node",
+                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-reason",
+                "port": "value"
+              },
+              "owner": {
+                "op": "node",
+                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-owner",
+                "port": "value"
+              },
+              "counter": {
+                "op": "node",
+                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-counter",
+                "port": "value"
+              },
+              "amount": {
+                "op": "node",
+                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-amount",
+                "port": "value"
+              }
+            },
+            "next": "definition-sample.mechanic.reward-1-reward-handler-branch",
+            "position": {
+              "x": 0,
+              "y": 100
+            }
+          },
+          {
+            "id": "definition-sample.mechanic.reward-1-reward-handler-branch",
+            "kind": "branch",
+            "name": "Условие реакции",
+            "condition": {
+              "op": "node",
+              "nodeId": "definition-sample.mechanic.reward-1-reward-handler-condition",
+              "port": "value"
+            },
+            "position": {
+              "x": 300,
+              "y": 100
+            },
+            "trueNext": "definition-sample.mechanic.reward-1-reward-handler-yes-0",
+            "falseNext": "definition-sample.mechanic.reward-1-reward-handler-no-end"
+          },
+          {
+            "id": "definition-sample.mechanic.reward-1-reward-handler-yes-0",
+            "name": "Действие",
+            "position": {
+              "x": 660,
+              "y": 0
+            },
+            "kind": "call",
+            "functionId": "sample-reward-function",
+            "args": {
+              "owner": {
+                "op": "node",
+                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-yes-0-value-args-owner",
+                "port": "value"
+              },
+              "counter": {
+                "op": "node",
+                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-yes-0-value-args-counter",
+                "port": "value"
+              },
+              "amount": {
+                "op": "node",
+                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-yes-0-value-args-amount",
+                "port": "value"
+              }
+            },
+            "next": "definition-sample.mechanic.reward-1-reward-handler-yes-end"
+          },
+          {
+            "id": "definition-sample.mechanic.reward-1-reward-handler-yes-end",
+            "kind": "return",
+            "name": "Завершить обработчик",
+            "value": true,
+            "position": {
+              "x": 1000,
+              "y": 0
+            }
+          },
+          {
+            "id": "definition-sample.mechanic.reward-1-reward-handler-no-end",
+            "kind": "return",
+            "name": "Завершить обработчик",
+            "value": false,
+            "position": {
+              "x": 660,
+              "y": 400
+            }
+          },
+          {
+            "id": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-reason",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "args.reason"
+            },
+            "position": {
+              "x": -1520,
+              "y": 50
+            }
+          },
+          {
+            "id": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-owner",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "args.owner"
+            },
+            "position": {
+              "x": -1140,
+              "y": 50
+            }
+          },
+          {
+            "id": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-counter",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "args.counter"
+            },
+            "position": {
+              "x": -760,
+              "y": 50
+            }
+          },
+          {
+            "id": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-amount",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "args.amount"
+            },
+            "position": {
+              "x": -380,
+              "y": 50
+            }
+          },
+          {
+            "id": "definition-sample.mechanic.reward-1-reward-handler-yes-0-value-args-owner",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "args.owner"
+            },
+            "position": {
+              "x": -1520,
+              "y": 375
+            }
+          },
+          {
+            "id": "definition-sample.mechanic.reward-1-reward-handler-yes-0-value-args-counter",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "args.counter"
+            },
+            "position": {
+              "x": -1140,
+              "y": 375
+            }
+          },
+          {
+            "id": "definition-sample.mechanic.reward-1-reward-handler-yes-0-value-args-amount",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "args.amount"
+            },
+            "position": {
+              "x": -760,
+              "y": 375
+            }
+          }
+        ],
+        "graphVersion": 1
       }
     ],
     "actionTemplates": [],

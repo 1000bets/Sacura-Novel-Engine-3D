@@ -1,3 +1,4 @@
+import {handlerOf} from './fixtures/packageDoor.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -137,7 +138,7 @@ test('capabilities: module registration extends the shared operation library wit
 
 test('capabilities: legacy shooter migration is repeatable, editable and preserves bindings when copying a project',async()=>{
  const p=parseProjectFile(readFileSync(new URL('./fixtures/legacy-shooter.sacura-template.json',import.meta.url),'utf8')).project,before=JSON.stringify(p);ensureGameplay(p);assert.equal(JSON.stringify(p),before);
- const death=p.gameplay.rules.find(r=>r.id==='legacy-death:enemy-1');assert.equal(death.version,1);assert.ok(death.actions.some(a=>a.call.id==='sacura.object.visible'));p.gameplay.rules=p.gameplay.rules.filter(r=>r.id!==death.id);p.gameplay.stateBindings=p.gameplay.stateBindings.filter(b=>b.id!=='legacy-binding-hp');ensureGameplay(p);assert.equal(p.gameplay.rules.some(r=>r.id===death.id),false);assert.equal(p.gameplay.stateBindings.some(b=>b.id==='legacy-binding-hp'),false);
+ const death=p.gameplay.rules.find(r=>r.id==='legacy-death:enemy-1');assert.equal(death.version,1);assert.ok(handlerOf(p,death).nodes.some(n=>n.kind==='operation'&&n.call.id==='sacura.object.visible'));p.gameplay.rules=p.gameplay.rules.filter(r=>r.id!==death.id);p.gameplay.stateBindings=p.gameplay.stateBindings.filter(b=>b.id!=='legacy-binding-hp');ensureGameplay(p);assert.equal(p.gameplay.rules.some(r=>r.id===death.id),false);assert.equal(p.gameplay.stateBindings.some(b=>b.id==='legacy-binding-hp'),false);
  const copy=copyProjectAs(p,'Другой шутер');assert.deepEqual(validateGameplay(copy),[]);assert.ok(copy.gameplay.stateBindings.filter(b=>b.owner.type==='project').every(b=>b.owner.id===copy.id));assert.deepEqual(readProject(JSON.stringify(copy)),copy);
 });
 

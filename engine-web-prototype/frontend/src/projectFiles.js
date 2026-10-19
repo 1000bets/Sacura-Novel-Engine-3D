@@ -5,7 +5,7 @@ import {validateWidgets} from './widgetModel.js';
 import {upgradeProject,allBeats,TYPES,validateStudio} from './studioModel.js';
 
 export function readProject(raw){
- const p=typeof raw==='string'?JSON.parse(raw):raw;
+ const p=typeof raw==='string'?JSON.parse(raw):structuredClone(raw);
  const fail=message=>{throw new Error('Проект не загружен: '+message);};
  if(!p||![1,2].includes(p.version)||!Array.isArray(p.events)||!Array.isArray(p.objects)||!Array.isArray(p.chapters))fail('неподдерживаемый формат.');
  const noStory=p.gameplay?.storyPolicy?.mode==='none';

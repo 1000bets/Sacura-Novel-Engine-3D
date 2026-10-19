@@ -2,7 +2,7 @@ import {registerOperation} from './operationRegistry.js';
 import {variableKey} from './valueSchemas.js';
 const contexts=['event','function','rule','mechanic','widget'];
 const scalar={type:'union',variants:[{type:'number'},{type:'boolean'},{type:'string'}]};
-const install=(id,label,properties,result,execute,extra={},validate)=>registerOperation({id,version:1,parameters:{type:'object',properties},result,contexts,editor:{label,category:'Общая логика'},...extra},execute,validate);
+const install=(id,label,properties,result,execute,extra={},validate)=>registerOperation({id,version:1,source:{path:'src/coreOperations.js',line:1},parameters:{type:'object',properties},result,contexts,editor:{label,category:'Общая логика'},...extra},execute,validate);
 install('sacura.variable.set','Изменить переменную',{
  variable:{type:'reference',referenceType:'variable',label:'Переменная'},value:{type:'variableValue',parameter:'variable',label:'Новое значение'}
 },{type:'void'},async(p,c)=>{const key=variableKey(c.project,p.variable),oldValue=structuredClone(c.variables[key]);c.variables[key]=structuredClone(p.value);c.emit();await c.signal('sacura.variable.changed',{variableId:p.variable,oldValue,newValue:p.value});});
@@ -18,3 +18,4 @@ install('sacura.event.run','Запустить Event',{
 
 install('sacura.story.enter','Продолжить историю',{beat:{type:'reference',referenceType:'beat',label:'Нода истории'}},{type:'void'},(p,c)=>c.enterStory(p.beat));
 install('sacura.scene.enter','Перейти в сцену',{scene:{type:'reference',referenceType:'scene',label:'Сцена'}},{type:'void'},(p,c)=>c.enterScene(p.scene));
+install('sacura.mechanic.call','Вызвать механику',{mechanic:{type:'reference',referenceType:'mechanic',label:'Механика'}},{type:'void'},async(p,c)=>{await c.capabilities.callMechanic(p.mechanic,{},c);});

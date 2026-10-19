@@ -13,9 +13,17 @@
     "prebuild": "npm run build:player"
   },
   "dependencies": {
+    "@babel/parser": "^7.29.9",
+    "@codemirror/lang-javascript": "^6.2.5",
+    "@codemirror/language": "^6.13.1",
+    "@codemirror/lint": "^6.9.7",
     "@dagrejs/dagre": "^3.1.1",
+    "@jitl/quickjs-singlefile-browser-release-sync": "^0.32.0",
+    "@lezer/highlight": "^1.2.5",
     "@xyflow/react": "^12.11.6",
+    "codemirror": "^6.0.2",
     "lucide-react": "^0.468.0",
+    "quickjs-emscripten-core": "^0.32.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "three": "^0.180.0"

@@ -1,3 +1,5 @@
+import {AuthoringNavigation} from './AuthoringNavigation.jsx';
+import {openOperationSource} from './operationSource.js';
 import {activityValue} from './runtimePresentation.js';
 import InputWorkspace,{InputContextSettings} from './InputWorkspace.jsx';
 import TouchInput from './TouchInput.jsx';
@@ -304,6 +306,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     [history, setHistory] = useState([]),
     [future,setFuture]=useState([]),
     [gameplayRequest,setGameplayRequest]=useState(null),
+    [logicReturn,setLogicReturn]=useState(null),
     [authorRequest,setAuthorRequest]=useState(null),
     [widgetRequest,setWidgetRequest]=useState(null),
     [gameMenu,setGameMenu]=useState(null),
@@ -929,6 +932,9 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     setNotice("Событие добавлено в постановку реплики.");
   };
   const openAuthoring=(kind='event',options={})=>{setAuthorRequest({kind,...options,token:uid('request')});setDock('create');maximizeWindow('create');setDetailEditor(false);setEventContext(null);setPicker(null);setMenu(null);};
+  const openImplementation=id=>{setLogicReturn({dock});setGameplayRequest({functionId:id,nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');maximizeWindow('gameplay');};
+  const openLogicEvent=id=>{setLogicReturn({dock});openAuthoring('event',id?{id}:{});};
+  const returnToLogicCaller=()=>{if(logicReturn){setDock(logicReturn.dock);setLogicReturn(null);setGameplayRequest(null);}};
   const createEvent = () => openAuthoring('event');
   const editScene=()=>{showBaseDock('scene');setGameMenu(null);setPreviewWidgetId(null);if(rt.running){if(rt.snapshot.beatId)setSelectedBeat(rt.snapshot.beatId);rt.stop();}setCameraPilotId(null);setCameraPreviewId(null);setMode('scene');setMaximized(null);setCompactPanel('workspace');};
   const openSubscenes=(mode='edit',id=displayScene.id)=>{
@@ -2265,7 +2271,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 onGraph={id=>{setEventContext({eventId:id});setSelection({kind:'event',id});setDock('event');}}
                 onPreview={draft=>{setCameraPreviewId(null);setCameraPilotId(null);const test=structuredClone(project);const i=test.events.findIndex(e=>e.id===draft.id);if(i<0)test.events.push(draft);else test.events[i]=draft;soundDesk.unlock();rt.stop();setMode('game');setMaximized(null);setFollow(false);rt.previewEvent(test,draft.id,beat.id);}}
                 onPlace={(draft,hook)=>{mutate(p=>addToBatch(p,beat.id,hook,null,draft.id));setPhase(hook);setDock('story');setMaximized(null);setNotice(tr("Добавлено: {0} · {1}", [draft.name, PHASES.find(x=>x.id===hook).label]));}}/>}
-              {dock==='create'?null:dock==='gameplay'?<GameplayWorkspace preview={preview} onObject={id=>{setSelection({kind:"object",id});openObjectTransform();}} addRequest={gameplayRequest} onUndo={undo} onRedo={redo} canUndo={!!history.length} canRedo={!!future.length} onPlay={()=>start()} selectedObjectId={selection.kind==="object"?selection.id:null} project={project} onChange={mutate} onImport={plan=>changeAssetLibrary(p=>Object.assign(p,plan.apply(p)))} sceneId={displayScene.id} running={running} onStop={()=>rt.stop()} onWidgets={()=>{setWidgetRequest({id:project.gameplay.hudWidgetId||project.ui.hud});setDock('widgets');}} onInput={()=>setDock('input')} onEvent={id=>openAuthoring('event',id?{id}:{})} onStory={()=>{setDock('story');setDetailEditor(false);}}/>:dock==='input'?<InputWorkspace project={project} onChange={mutate} beat={playBeat} preview={preview} devices={inputDevices} running={running} onStop={()=>rt.stop()}/>:dock==='event' && detailEditor && event ? (
+              {dock==='create'?null:dock==='gameplay'?<GameplayWorkspace onReturn={logicReturn?.dock!=='gameplay'&&logicReturn?returnToLogicCaller:undefined} preview={preview} onObject={id=>{setSelection({kind:"object",id});openObjectTransform();}} addRequest={gameplayRequest} onUndo={undo} onRedo={redo} canUndo={!!history.length} canRedo={!!future.length} onPlay={()=>start()} selectedObjectId={selection.kind==="object"?selection.id:null} project={project} onChange={mutate} onImport={plan=>changeAssetLibrary(p=>Object.assign(p,plan.apply(p)))} sceneId={displayScene.id} running={running} onStop={()=>rt.stop()} onWidgets={()=>{setWidgetRequest({id:project.gameplay.hudWidgetId||project.ui.hud});setDock('widgets');}} onInput={()=>setDock('input')} onEvent={openLogicEvent} onStory={()=>{setDock('story');setDetailEditor(false);}}/>:dock==='input'?<InputWorkspace project={project} onChange={mutate} beat={playBeat} preview={preview} devices={inputDevices} running={running} onStop={()=>rt.stop()}/>:dock==='event' && detailEditor && event ? (
                 <EventEditor
                   project={project}
                   event={event}
@@ -2356,6 +2362,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             </div>
   </>;
   return (
+    <AuthoringNavigation.Provider value={{onFunction:openImplementation,onEvent:openLogicEvent,onOperation:d=>openOperationSource(d).catch(e=>setNotice(e.message))}}>
     <EditorDockProvider windows={windows} onChange={changeWindows} onSelect={selectWorkspace} onClose={closeWorkspace} onPlace={revealDockArea}>
     <div
       className="editor-app"
@@ -2433,6 +2440,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         {user&&<button onClick={()=>onLogout(project)} title={tr("Выйти из аккаунта {0}", [user.login])}>{user.login} {tr("· Выйти")}</button>}
         <LanguagePicker onOpen={() => setMenu(null)} />
         <ThemePicker onOpen={() => setMenu(null)} />
+        {logicReturn&&<Button icon="ArrowLeft" onClick={returnToLogicCaller}>{tr('К месту вызова')}</Button>}
       </header>
       <div className={'editor-workspace compact-'+compactPanel+(layout.hiddenHierarchy?' hierarchy-hidden':'')+(layout.hiddenInspector?' inspector-hidden':'')+(['scene','graph'].includes(maximized)?' focus-center':maximized==='hierarchy'?' focus-hierarchy':maximized==='inspector'?' focus-inspector':'')}>
         <nav className="compact-panel-tabs" aria-label={tr("Панели редактора")}>
@@ -3039,5 +3047,6 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       />
     </div>
     </EditorDockProvider>
+    </AuthoringNavigation.Provider>
   );
 }

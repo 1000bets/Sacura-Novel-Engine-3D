@@ -4,6 +4,7 @@ import {schemaDefaults} from './valueSchemas.js';
 import React from 'react';
 import {t as tr,useLocale,optionLabel} from './i18n.jsx';
 import FunctionArguments from './FunctionArguments.jsx';
+import {AuthoringReferenceLink} from './AuthoringNavigation.jsx';
 import {GAME_COMMANDS} from './gameplayModel.js';
 export function GameField({label,children}){return <label className="game-field"><span>{tr(label)}</span>{children}</label>;}
 export function GameSelect({label,value='',options,onChange}){
@@ -28,7 +29,7 @@ export default function GameplayCommandFields({project,command='runEvent',value=
  {command==='impulse'&&<GameVector label="Импульс" value={v.velocity||[0,5,0]} onChange={velocity=>patch({velocity})}/>}
  {['startTimer','stopTimer'].includes(command)&&<GameField label="Имя таймера"><input value={v.timerId||'timer'} onChange={e=>patch({timerId:e.target.value})}/></GameField>}
  {command==='startTimer'&&<><GameNumber label="Секунды" value={v.seconds??2} onChange={seconds=>patch({seconds})}/><GameSelect label="Объект правила" value={v.objectId} options={[["","Без объекта"],...project.objects.map(o=>[o.id,o.name])]} onChange={objectId=>patch({objectId})}/><label><input type="checkbox" checked={!!v.repeat} onChange={e=>patch({repeat:e.target.checked})}/> {tr('Повторять')}</label></>}
- {command==='runEvent'&&<GameSelect label="Событие" value={v.eventId} options={ids(project.events)} onChange={eventId=>patch({eventId})}/>}
- {command==='callFunction'&&<><GameSelect label="Функция Blueprint" value={v.functionId} options={ids(project.functions||[])} onChange={functionId=>patch({functionId})}/><FunctionArguments project={project} functionId={v.functionId} value={v.args||{}} onChange={args=>patch({args})}/></>}
+ {command==='runEvent'&&<><AuthoringReferenceLink type="event" id={v.eventId}/><GameSelect label="Событие" value={v.eventId} options={ids(project.events)} onChange={eventId=>patch({eventId})}/></>}
+ {command==='callFunction'&&<><AuthoringReferenceLink type="function" id={v.functionId}/><GameSelect label="Функция Blueprint" value={v.functionId} options={ids(project.functions||[])} onChange={functionId=>patch({functionId})}/><FunctionArguments project={project} functionId={v.functionId} value={v.args||{}} onChange={args=>patch({args})}/></>}
  </>;
 }

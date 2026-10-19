@@ -26,15 +26,18 @@ export function validateOperationCall(call,context={}){
  const values={...schemaDefaults(d.parameters),...call.parameters};
  const issues=validateValue(d.parameters,values,{validateExpression,...context,parameters:values,allowExpressions:!!context.allowExpressions});if(!issues.length)issues.push(...validators.get(key(d.id,d.version))(values,context));return issues;
 }
-export async function executeOperation(call,context){
+function prepareOperation(call,context){
  const d=operationDefinition(call?.id,call?.version),parameters={...schemaDefaults(d?.parameters||{type:'object',properties:{}}),...call?.parameters};
  context.assertActive?.();const issues=validateOperationCall({...call,parameters},{...context,allowExpressions:true});if(issues.length)throw Error(issues.map(i=>i.message).join(' '));
- // Traverse assignments only; every expression delegates to the existing evaluator.
  const evaluate=value=>value?.op?context.evaluate(value):Array.isArray(value)?value.map(evaluate):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).map(([k,v])=>[k,evaluate(v)])):value;
- const evaluated=evaluate(parameters);
- // Check the resulting types before resolving references or invoking an executor.
- const after=validateOperationCall({...call,parameters:evaluated},{...context,allowExpressions:false});if(after.length)throw Error(after.map(i=>i.message).join(' '));
- const scope={...context,parameters:evaluated},values=materializeValue(d.parameters,evaluated,scope);
- const result=await executors.get(key(d.id,d.version))(values,context);context.assertActive?.();
- const invalid=validateValue(d.result,result,{...context,parameters:values});if(invalid.length)throw Error('Результат операции: '+invalid.map(i=>i.message).join(' '));return result;
+ const evaluated=evaluate(parameters),after=validateOperationCall({...call,parameters:evaluated},{...context,allowExpressions:false});if(after.length)throw Error(after.map(i=>i.message).join(' '));
+ return {d,values:materializeValue(d.parameters,evaluated,{...context,parameters:evaluated})};
 }
+function finishOperation(d,values,result,context){
+ context.assertActive?.();const invalid=validateValue(d.result,result,{...context,parameters:values});if(invalid.length)throw Error('Результат операции: '+invalid.map(i=>i.message).join(' '));return result;
+}
+export function executeOperationAuto(call,context){
+ const {d,values}=prepareOperation(call,context),result=executors.get(key(d.id,d.version))(values,context);
+ return result&&typeof result.then==='function'?Promise.resolve(result).then(value=>finishOperation(d,values,value,context)):finishOperation(d,values,result,context);
+}
+export async function executeOperation(call,context){return executeOperationAuto(call,context);}

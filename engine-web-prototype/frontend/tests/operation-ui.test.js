@@ -1,3 +1,4 @@
+import {setupCodeMirrorDom} from './helpers/codeMirrorDom.js';
 import test,{after,afterEach} from 'node:test';
 import assert from 'node:assert/strict';
 import {JSDOM} from 'jsdom';
@@ -5,8 +6,9 @@ import {createServer} from 'vite';
 import {fileURLToPath} from 'node:url';
 import React from 'react';
 const dom=new JSDOM('<!doctype html><html><body></body></html>',{url:'http://localhost/'});
-for(const key of ['window','document','navigator','HTMLElement','localStorage'])Object.defineProperty(globalThis,key,{configurable:true,value:dom.window[key]});
-globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+for(const key of ['window','document','navigator','HTMLElement','SVGElement','localStorage','getComputedStyle'])Object.defineProperty(globalThis,key,{configurable:true,value:dom.window[key]});
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;setupCodeMirrorDom(dom.window);
+globalThis.ResizeObserver=class{observe(){}unobserve(){}disconnect(){}};globalThis.requestAnimationFrame=callback=>setTimeout(callback,0);globalThis.cancelAnimationFrame=clearTimeout;
 const {render,screen,fireEvent,cleanup,act}=await import('@testing-library/react');
 const server=await createServer({root:fileURLToPath(new URL('..',import.meta.url)),server:{middlewareMode:true,watch:null,hmr:false,ws:false}});
 const {default:Fields}=await server.ssrLoadModule('/src/GameplayCommandFields.jsx');
@@ -38,8 +40,8 @@ test('description-backed mechanic joins the existing scope catalog and edits onl
  const project=createEmptyProject('UI');project.functions.push({id:'fn',name:'Существующая функция',parameters:[{name:'step',type:'number',schema:{type:'integer',default:1}}],locals:{},entry:'return',nodes:[{id:'return',kind:'return',value:{op:'get',path:'args.step'}}]});
  const d=createMechanicDefinition(project,{id:'ui.mechanic.counter',name:'Счётчик без героя',parameters:{type:'object',properties:{step:{type:'integer',default:1,label:'Шаг'}}},logic:{functionId:'fn'}});let current=project,opened=[];
  function Harness(){const [p,setP]=React.useState(project);return React.createElement(Workspace,{project:p,sceneId:p.subscenes[0].id,onChange:fn=>setP(p=>{const next=structuredClone(p);fn(next);current=next;return next;}),onEvent(){},onFunction:id=>opened.push(id)});}
- render(React.createElement(Harness));fireEvent.change(screen.getByRole('combobox',{name:'Добавить к'}),{target:{value:'project:'+project.id}});fireEvent.click(screen.getByRole('button',{name:'Добавить механику'}));fireEvent.change(screen.getByRole('combobox',{name:'Готовая механика'}),{target:{value:d.id}});fireEvent.click(screen.getByRole('button',{name:'Добавить'}));
- fireEvent.change(screen.getByRole('spinbutton',{name:'Шаг'}),{target:{value:'3'}});assert.equal(current.gameplay.mechanics[0].values.step,3);assert.equal(current.gameplay.mechanicDefinitions[0].parameters.properties.step.default,1);assert.deepEqual(current.objects,[]);assert.equal(current.gameplay.playerId,'');fireEvent.click(screen.getByRole('button',{name:'Изменить логику'}));assert.equal(screen.getByRole('button',{name:'Открыть расширенную функцию'}).disabled,false);
+ render(React.createElement(Harness));fireEvent.change(screen.getByRole('combobox',{name:'Добавить к'}),{target:{value:'project:'+project.id}});fireEvent.click(screen.getByRole('button',{name:'Добавить механику'}));fireEvent.change(screen.getByRole('combobox',{name:'Готовая механика'}),{target:{value:d.id}});fireEvent.click(screen.getByRole('button',{name:'Добавить'}));assert.ok(screen.getByRole('region',{name:'JavaScript игровых механик'}));assert.equal(screen.queryByRole('spinbutton',{name:'Шаг'}),null);fireEvent.click(screen.getByRole('button',{name:'Параметры экземпляра',exact:true}));
+ fireEvent.change(screen.getByRole('spinbutton',{name:'Шаг'}),{target:{value:'3'}});assert.equal(current.gameplay.mechanics[0].values.step,3);assert.equal(current.gameplay.mechanicDefinitions[0].parameters.properties.step.default,1);assert.deepEqual(current.objects,[]);assert.equal(current.gameplay.playerId,'');fireEvent.click(screen.getByRole('button',{name:'Параметры экземпляра',exact:true}));assert.equal(screen.getByRole('combobox',{name:'Скрипт механики',exact:true}).value,'fn');assert.ok(screen.getByRole('region',{name:'JavaScript игровых механик'}));assert.equal(screen.queryByRole('complementary',{name:'Настройки графа'}),null);
 });
 
 test('an unavailable registered operation displays a diagnostic and preserves its authored values',()=>{

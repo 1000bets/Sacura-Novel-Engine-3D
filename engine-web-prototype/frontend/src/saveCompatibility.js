@@ -13,7 +13,7 @@ export function saveCompatibility(project){
  content.engineModules=capabilityDefinitions().map(({id,version})=>({id,version}));
  const contracts=new Map(),collect=value=>{if(!value||typeof value!=='object')return;const id=value.command||(value.parameters&&value.version?value.id:null),version=value.operationVersion??value.version??1,d=operationDefinition(id,version);if(d)contracts.set(id+'@'+version,{id:d.id,version:d.version,schemaVersion:d.schemaVersion,parameters:d.parameters,result:d.result,contexts:d.contexts,pure:!!d.pure});for(const child of Object.values(value))collect(child);};collect(content);
  content.operationContracts=[...contracts.values()].sort((a,b)=>a.id.localeCompare(b.id)||a.version-b.version);
- for(const f of content.functions||[])for(const n of f.nodes||[]){delete n.position;delete n.comment;}
+ for(const f of content.functions||[]){delete f.viewport;for(const n of f.nodes||[]){delete n.position;delete n.comment;}}
  const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().filter(k=>value[k]!==undefined).map(k=>[k,canonical(value[k])])):value;
  const text=JSON.stringify(canonical(content));let a=2166136261,b=5381;for(let i=0;i<text.length;i++){a=Math.imul(a^text.charCodeAt(i),16777619);b=Math.imul(b,33)^text.charCodeAt(i);}
  return {version:1,fingerprint:text.length+':'+(a>>>0).toString(16)+':'+(b>>>0).toString(16)};

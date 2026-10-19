@@ -6,6 +6,7 @@ import {uid} from './model.js';
 import {runtimeVariableType} from './variableModel.js';
 import {INPUT_TYPES,INPUT_TRIGGERS,INPUT_BEHAVIORS,INPUT_DEVICES,inputContextsFor,validateInputSettings} from './inputModel.js';
 import {OperationFields} from './SchemaFields.jsx';
+import {AuthoringReferenceLink} from './AuthoringNavigation.jsx';
 import './inputWorkspace.css';
 const options=items=>Object.entries(items).map(([id,name])=><option key={id} value={id}>{tr(name)}</option>);
 const deviceGroups=[['keyboard','Клавиатура',Keyboard],['pointer','Мышь',MousePointer2],['gamepad','Геймпад',Gamepad2],['touch','На экране',Smartphone],['external','Другие устройства',Radio]];
@@ -94,6 +95,7 @@ export default function InputWorkspace({project,onChange,beat,preview,devices=[]
      {action.trigger==='hold'&&<label>{tr('Удержание, с')}<input type="number" min="0" step=".1" value={action.holdSeconds} onChange={e=>patchAction({holdSeconds:Math.max(0,Number(e.target.value))})}/></label>}
      {action.behavior==='event'&&<label>{tr('Событие движка')}<select value={action.eventId||''} onChange={e=>patchAction({eventId:e.target.value})}><option value="">{tr('Выберите событие')}</option>{project.events.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
     </div>
+    {action.behavior==='event'&&<AuthoringReferenceLink type="event" id={action.eventId}/>}
     {action.behavior==='operation'&&<OperationFields project={project} call={action.operation} kind="event" expressionOptions={[["args.value","Значение действия ввода"]]} onChange={operation=>patchAction({operation})}/>}
     <section className="input-bindings-section" aria-label={tr('Привязки')}><div className="input-section-heading"><h3>{tr('Привязки')}</h3><label className="input-context-picker">{tr('Контекст')}<select value={context?.id||''} onChange={e=>setContext(e.target.value)}>{input.contexts.map(item=><option key={item.id} value={item.id}>{inputLabel(item)}</option>)}</select></label></div>
      {context?deviceGroups.map(([id,label,Icon])=>{

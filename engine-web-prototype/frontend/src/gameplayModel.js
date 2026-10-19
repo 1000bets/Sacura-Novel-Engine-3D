@@ -1,3 +1,5 @@
+import {installBuiltinBehaviors} from './builtinBehaviors.js';
+import {ensureAuthoringGraphs} from './authoringGraphMigration.js';
 import {registerSignalDefinition} from './signalModel.js';
 import {validateRules} from './ruleModel.js';
 import './coreOperations.js';
@@ -16,9 +18,9 @@ const commandExtensions=new Map();
 export function registerGameCommand({id,name,execute}){if(!id||GAME_COMMANDS[id]||typeof execute!=='function')throw Error('Некорректная регистрация команды.');commandExtensions.set(id,execute);GAME_COMMANDS[id]=name;}
 export const gameCommandExtension=id=>commandExtensions.get(id);
 export function registerGameSignal(id,name,payloadSchema={type:'object',properties:{}}){if(!id||GAME_TRIGGERS[id])throw Error('Некорректная регистрация сигнала.');registerSignalDefinition({id,version:1,payloadSchema});GAME_TRIGGERS[id]=name;}
-export function defaultGameplay(){return {version:2,capabilitySchemaVersion:1,resources:[],inventories:[],movements:[],stateBindings:[],mechanicSchemaVersion:1,mechanicDefinitions:[],signals:[],variableBindings:[],enabled:false,activation:'continuous',camera:{mode:'authored',targetId:'',pointerLock:false,crosshair:false},mechanics:[],playerId:'',controller:{ownerId:'',mode:'none',speed:3.5,jumpSpeed:5,gravity:16,eyeHeight:1.25,sensitivity:.003,distance:3,fov:70},actors:{},weapons:[],items:[],recipes:[],rules:[],inventory:{slots:12,starting:[],equipment:{}},hudWidgetId:null};}
+export function defaultGameplay(){return {version:2,behaviorSchemaVersion:1,capabilitySchemaVersion:1,resources:[],inventories:[],movements:[],stateBindings:[],mechanicSchemaVersion:1,mechanicDefinitions:[],signals:[],variableBindings:[],enabled:false,activation:'continuous',camera:{mode:'authored',targetId:'',pointerLock:false,crosshair:false},mechanics:[],playerId:'',controller:{ownerId:'',mode:'none',speed:3.5,jumpSpeed:5,gravity:16,eyeHeight:1.25,sensitivity:.003,distance:3,fov:70},actors:{},weapons:[],items:[],recipes:[],rules:[],inventory:{slots:12,starting:[],equipment:{}},hudWidgetId:null};}
 export function legacyCamera(g){return {mode:({fps:'firstPerson',thirdPerson:'thirdPerson'})[g.preset]||'authored',targetId:g.playerId||'',pointerLock:['fps','thirdPerson'].includes(g.preset),crosshair:['fps','thirdPerson'].includes(g.preset)};}
-export function ensureGameplay(p){const source=p.gameplay?.version===1&&!p.gameplayMigration?structuredClone(p):null;if(!p.gameplay)p.gameplay=defaultGameplay();else {p.gameplay.activation??='gameplay-node';p.gameplay.camera??=p.gameplay.capabilitySchemaVersion===undefined?legacyCamera(p.gameplay):defaultGameplay().camera;p.gameplay.mechanics??=[];}p.functions??=[];ensureMechanicDescriptions(p);migrateCapabilities(p);finalizeGameplayMigration(p,source);return p;}
+export function ensureGameplay(p){const source=p.gameplay?.version===1&&!p.gameplayMigration?structuredClone(p):null;if(!p.gameplay)p.gameplay=defaultGameplay();else {p.gameplay.activation??='gameplay-node';p.gameplay.camera??=p.gameplay.capabilitySchemaVersion===undefined?legacyCamera(p.gameplay):defaultGameplay().camera;p.gameplay.mechanics??=[];}p.functions??=[];ensureMechanicDescriptions(p);migrateCapabilities(p);finalizeGameplayMigration(p,source);installBuiltinBehaviors(p);ensureAuthoringGraphs(p);return p;}
 export function newWeapon(){return {id:uid('weapon'),name:'Пистолет',mode:'hitscan',damage:25,range:40,magazine:6,reserve:30,cooldown:.3,reloadTime:1,projectileSpeed:20,recoil:.025};}
 export function newItem(){return {id:uid('item'),name:'Новый предмет',stackLimit:10,slot:'',weaponId:'',heal:0,consumable:false,useEventId:'',worldObjectId:''};}
 export function newRule(){return {id:uid('rule'),name:'Новое правило',trigger:'enter',sceneId:'',objectId:'',eventId:'',functionId:'',nextBeatId:'',seconds:2,repeat:false,once:true,enabled:true,center:[0,0,0],size:[3,2,3]};}
@@ -34,7 +36,7 @@ export function applyGamePreset(p,preset,playerId){
  const bindings=[['fire','pointer','primary'],['reload','keyboard','KeyR'],['jump','keyboard','Space'],['saveGame','keyboard','F5'],['loadGame','keyboard','F9'],['look','pointer','delta',[1,1]],['look','gamepad-axis','2',[1,0]],['look','gamepad-axis','3',[0,1]],['fire','gamepad-button','7'],['reload','gamepad-button','2'],['jump','gamepad-button','0']].map(([actionId,device,control,scale=1],i)=>({id:'game-action-'+i,actionId,device,control,scale,deadZone:device==='gamepad-axis'?.18:0}));
  const context={id:'game-mechanics',name:'Игровые механики',priority:40,bindings:preset==='quest'?bindings.filter(b=>['saveGame','loadGame'].includes(b.actionId)):bindings};
  p.input.contexts=p.input.contexts.filter(c=>c.id!==context.id);p.input.contexts.push(context);
- g.version=1;ensureMechanicDescriptions(p);migrateCapabilities(p,{legacy:true});finalizeGameplayMigration(p,structuredClone(p));return g;
+ g.version=1;ensureMechanicDescriptions(p);migrateCapabilities(p,{legacy:true});finalizeGameplayMigration(p,structuredClone(p));installBuiltinBehaviors(p);ensureAuthoringGraphs(p);return g;
 }
 export function validateGameplay(p){
  const g=p.gameplay,issues=[];if(!g)return issues;

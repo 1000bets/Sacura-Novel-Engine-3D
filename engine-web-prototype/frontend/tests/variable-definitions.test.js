@@ -26,3 +26,9 @@ test('used definitions cannot be deleted, unused ones can; system names are prot
  assert.equal(editVariable(p,'other',{remove:true}),null);assert.equal('other' in p.variables,false);
  assert.ok(editVariable(p,'trust',{name:'$answer'}));assert.ok(editVariable(p,'$answer',{name:'renamed'}));
 });
+
+test('renaming a project declaration rewrites executable paths while preserving literal structures and defaults',()=>{
+ const p=project(),literal={path:'global.trust',nested:{op:'get',path:'global.trust'}};
+ p.functions=[{id:'fn',parameters:[{name:'data',default:structuredClone(literal)}],locals:{data:structuredClone(literal)},nodes:[{id:'read',kind:'value',value:{op:'get',path:'global.trust'}},{id:'write',kind:'set',path:'global.trust',value:3},{id:'constant',kind:'value',value:{op:'constant',value:structuredClone(literal)}},{id:'return',kind:'return',value:structuredClone(literal)},{id:'call',kind:'operation',output:'global.trust',call:{parameters:{data:{path:'global.trust'}}}}]}];
+ assert.equal(editVariable(p,'trust',{name:'Coins'}),null);const f=p.functions[0];assert.equal(f.nodes[0].value.path,'global.Coins');assert.equal(f.nodes[1].path,'global.Coins');assert.deepEqual(f.nodes[2].value.value,literal);assert.deepEqual(f.nodes[3].value,literal);assert.deepEqual(f.parameters[0].default,literal);assert.deepEqual(f.locals.data,literal);assert.equal(f.nodes[4].output,'global.Coins');assert.deepEqual(f.nodes[4].call.parameters.data,{path:'global.trust'});
+});

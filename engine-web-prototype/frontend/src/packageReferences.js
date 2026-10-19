@@ -11,13 +11,20 @@ import {capabilityDefinitions} from './capabilityRegistry.js';
 
 export const PACKAGE_FORMAT_VERSION=2;
 export const PACKAGE_LIMITS=Object.freeze({bytes:150_000_000,assets:128,assetBytes:100*1024*1024,records:4096,depth:64,values:100000});
-export const packageContentFields=['version','visualExamplesVersion','sceneEditingVersion','standardEventsVersion','events','functions','actionTemplates','groupTemplates','widgets','audioAssets','gameplay','variables','variableTypes','objects','subscenes','chapters','input','ui','audioSettings','timelineLayout','storyLayout','variableLayout','files','folders','description','objectGroups','assetFiles','assetFolders','assetOverrides','graphLayout'];
+export const packageContentFields=['version','authoringGraphVersion','handlerGraphVersion','visualExamplesVersion','sceneEditingVersion','standardEventsVersion','events','functions','actionTemplates','groupTemplates','widgets','audioAssets','gameplay','variables','variableTypes','objects','subscenes','chapters','input','ui','audioSettings','timelineLayout','storyLayout','variableLayout','files','folders','description','objectGroups','assetFiles','assetFolders','assetOverrides','graphLayout'];
 export function visitData(value,fn,path=''){
  if(!value||typeof value!=='object')return;
  fn(value,path);
  for(const [key,child] of Object.entries(value))visitData(child,fn,path+'/'+key.replace(/~/g,'~0').replace(/\//g,'~1'));
 }
 export function visitTypedReferences(value,fn){visitData(value,(v,path)=>{if(v.kind==='reference')fn(v,path);});}
+export function visitProgramData(value,fn,path=''){
+ if(!value||typeof value!=='object')return;fn(value,path);
+ for(const [key,child]of Object.entries(value)){
+  if(['locals','variables','default','initialState','values','stateSchema','resultSchema','localSchema','schema'].includes(key)||key==='value'&&value.op==='constant'||key==='value'&&['set','return'].includes(value.kind)&&!child?.op)continue;
+  visitProgramData(child,fn,path+'/'+key);
+ }
+}
 export function inputRecords(project,input){
  const type=input.type==='story'?'beat':input.type;
  if(type==='variable'&&!input.nativeReference)return Object.keys(project.variables||{}).filter(key=>!input.valueType||(project.variableTypes?.[key]||typeof project.variables[key])===input.valueType).map(id=>({id,name:id}));
@@ -37,15 +44,19 @@ export function supportedEngineModules(){return capabilityDefinitions().map(({id
 // Adapt the export copy to ordinary editable function parameters, never all strings.
 export function parameterizeLegacyCallback(project,fn){
  const subject=fn.parameters?.find(p=>p.name==='objectId'&&p.type==='string');
- if(!subject||!project.gameplay.rules.some(r=>([r.functionId,r.conditionFunctionId].includes(fn.id)||(r.actions||[]).some(a=>a.kind==='function'&&a.functionId===fn.id))))return;
+ if(!subject)return;
+ const reachable=new Set(),visit=id=>{if(!id||reachable.has(id))return;reachable.add(id);const f=project.functions.find(f=>f.id===id);visitData(f,v=>{if(v.functionId)visit(v.functionId);if(v.admission?.functionId)visit(v.admission.functionId);});};
+ for(const r of [...project.gameplay.rules,...(project.gameplay.mechanicDefinitions||[]).flatMap(d=>[...d.rules||[],...d.machine?.transitions||[]])]){visit(r.functionId);visit(r.conditionFunctionId);visit(r.handlerFunctionId);for(const a of [...r.actions||[],...r.otherwise||[]])if(a.kind==='function')visit(a.functionId);}
+ if(!reachable.has(fn.id))return;
  const slots=new Map();
+ const resolvePure=(v,seen=new Set())=>{if(v?.op!=='node'||seen.has(v.nodeId))return v;seen.add(v.nodeId);const n=fn.nodes.find(n=>n.id===v.nodeId);return n?.kind==='value'?resolvePure(n.value,seen):v;};
  visitData(fn.nodes,e=>{
   if(!['eq','ne'].includes(e.op))return;
   for(const [literal,argument]of [['a','b'],['b','a']]){
-   if(e[argument]?.op!=='get'||e[argument].path!=='args.objectId'||typeof e[literal]!=='string')continue;
+   const actual=resolvePure(e[argument]);if(actual?.op!=='get'||actual.path!=='args.objectId'||typeof e[literal]!=='string')continue;
    const object=project.objects.find(o=>o.id===e[literal]);if(!object)continue;
    let key=slots.get(object.id);if(!key){key='comparedObject';let n=2;while(fn.parameters.some(p=>p.name===key))key='comparedObject'+n++;slots.set(object.id,key);fn.parameters.push({name:key,label:object.name,type:'string',referenceType:'object',default:object.id});}
-   e[literal]={op:'get',path:'args.'+key};subject.referenceType='object';subject.label??='Объект сигнала';
+   if(fn.graphVersion===1){let id=fn.id+'-compared-'+key;while(fn.nodes.some(n=>n.id===id))id+='-copy';fn.nodes.push({id,kind:'value',name:object.name,value:{op:'get',path:'args.'+key},position:{x:-320,y:360+slots.size*160}});e[literal]={op:'node',nodeId:id,port:'value'};}else e[literal]={op:'get',path:'args.'+key};subject.referenceType='object';subject.label??='Объект сигнала';
   }
  });
 }
@@ -55,6 +66,7 @@ export function validatePublicParameters(parameters,kind){
  for(const p of parameters){if(typeof p.name!=='string'||!p.name)throw Error('Параметру нужно имя.');assertSchema(parameterSchema(p));}
 }
 export function validateTypedContent(content,references=[],inputs=[]){
+ for(const [name,version]of Object.entries({authoringGraphVersion:content.authoringGraphVersion,handlerGraphVersion:content.handlerGraphVersion,behaviorSchemaVersion:content.gameplay?.behaviorSchemaVersion}))if(version!==undefined&&version!==1)throw Error('Версия авторской модели недоступна: '+name+'. Исходные данные сохранены.');
  content=structuredClone(content);
  const at=path=>{const parts=path.split('/').slice(2).map(s=>s.replace(/~1/g,'/').replace(/~0/g,'~'));const key=parts.pop();return {parent:parts.reduce((v,k)=>v[k],content),key};};
  const subjects={object:'objects',scene:'subscenes'};
@@ -78,10 +90,9 @@ export function validateTypedContent(content,references=[],inputs=[]){
  }
  const functionIssues=validateFunctions(project);if(functionIssues.length)throw Error(functionIssues.map(i=>i.detail).join(' '));
  const issues=validateRules(project);if(issues.length)throw Error(issues.map(i=>i.detail).join(' '));
- visitData(content,v=>{
-  if(v.op)validateExpression(v);
+ visitProgramData(content,(v,path)=>{
   const call=v.kind==='operation'?v.call:v.behavior==='operation'?v.operation:undefined;
-  if(call){const errors=validateOperationCall(call,{...context,kind:v.behavior?'event':'rule'});if(errors.length)throw Error(errors.map(e=>e.message).join(' '));}
+  if(call){const kind=/^\/functions\/\d+\/nodes\//.test(path)?'function':v.behavior?'event':'rule',errors=validateOperationCall(call,{...context,kind});if(errors.length)throw Error(errors.map(e=>e.message).join(' '));}
   if(v.conditionOperation){if(operationDefinition(v.conditionOperation.id,v.conditionOperation.version)?.result.type!=='boolean')throw Error('Условие должно возвращать логическое значение.');const errors=validateOperationCall(v.conditionOperation,{...context,kind:'rule'});if(errors.length)throw Error(errors.map(e=>e.message).join(' '));}
   if(v.kind==='function'){const f=project.functions.find(f=>f.id===v.functionId);for(const p of f?.parameters||[]){const s=parameterSchema(p),errors=validateValue(s,v.args?.[p.name]??schemaDefaults(s),context);if(errors.length)throw Error(errors.map(e=>e.message).join(' '));}}
  });

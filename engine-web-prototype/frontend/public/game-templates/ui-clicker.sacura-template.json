@@ -54,6 +54,10 @@
         "version": 1
       },
       {
+        "id": "function.typed-graph",
+        "version": 1
+      },
+      {
         "id": "mechanic.rules",
         "version": 1
       },
@@ -82,6 +86,7 @@
   "content": {
     "gameplay": {
       "version": 2,
+      "behaviorSchemaVersion": 1,
       "capabilitySchemaVersion": 1,
       "resources": [
         {
@@ -192,12 +197,15 @@
                 "type": "sample.signal.reward"
               },
               "filter": {},
-              "condition": null,
               "actions": [
                 {
                   "kind": "function",
-                  "functionId": "sample-reward-function",
+                  "functionId": "definition-sample.mechanic.reward-1-reward-handler",
                   "args": {
+                    "reason": {
+                      "op": "get",
+                      "path": "args.reason"
+                    },
                     "owner": {
                       "op": "get",
                       "path": "args.owner"
@@ -218,7 +226,10 @@
               "cooldown": 0,
               "reentry": "queue",
               "maxConcurrent": 1,
-              "maxQueued": 16
+              "maxQueued": 16,
+              "handlerGraphVersion": 1,
+              "handlerFunctionId": "definition-sample.mechanic.reward-1-reward-handler",
+              "timeSource": "game"
             }
           ]
         }
@@ -361,23 +372,18 @@
               "elementId": "coin-button"
             }
           },
-          "condition": null,
           "actions": [
             {
-              "kind": "operation",
-              "call": {
-                "id": "sacura.signal.emit",
-                "version": 1,
-                "parameters": {
-                  "signal": {
-                    "kind": "reference",
-                    "type": "signal",
-                    "mode": "direct",
-                    "id": "sample.signal.reward"
-                  },
-                  "payload": {
-                    "reason": "Нажата кнопка"
-                  }
+              "kind": "function",
+              "functionId": "rule-click-reward-handler",
+              "args": {
+                "elementId": {
+                  "op": "get",
+                  "path": "args.elementId"
+                },
+                "action": {
+                  "op": "get",
+                  "path": "args.action"
                 }
               }
             }
@@ -387,7 +393,10 @@
           "cooldown": 0,
           "reentry": "queue",
           "maxConcurrent": 1,
-          "maxQueued": 16
+          "maxQueued": 16,
+          "handlerGraphVersion": 1,
+          "handlerFunctionId": "rule-click-reward-handler",
+          "timeSource": "game"
         },
         {
           "id": "upgrade-rate",
@@ -410,28 +419,18 @@
               "elementId": "upgrade-button"
             }
           },
-          "condition": null,
           "actions": [
             {
-              "kind": "operation",
-              "call": {
-                "id": "sacura.variable.set",
-                "version": 1,
-                "parameters": {
-                  "variable": {
-                    "kind": "reference",
-                    "type": "variable",
-                    "mode": "direct",
-                    "id": "sample-variable-rate"
-                  },
-                  "value": {
-                    "op": "add",
-                    "a": {
-                      "op": "get",
-                      "path": "global.rate"
-                    },
-                    "b": 1
-                  }
+              "kind": "function",
+              "functionId": "rule-upgrade-rate-handler",
+              "args": {
+                "elementId": {
+                  "op": "get",
+                  "path": "args.elementId"
+                },
+                "action": {
+                  "op": "get",
+                  "path": "args.action"
                 }
               }
             }
@@ -441,7 +440,10 @@
           "cooldown": 0,
           "reentry": "queue",
           "maxConcurrent": 1,
-          "maxQueued": 16
+          "maxQueued": 16,
+          "handlerGraphVersion": 1,
+          "handlerFunctionId": "rule-upgrade-rate-handler",
+          "timeSource": "game"
         },
         {
           "id": "automatic-coins",
@@ -456,30 +458,14 @@
             "id": null
           },
           "filter": {},
-          "condition": null,
           "actions": [
             {
-              "kind": "operation",
-              "call": {
-                "id": "sacura.resource.add",
-                "version": 1,
-                "parameters": {
-                  "owner": {
-                    "kind": "reference",
-                    "type": "project",
-                    "mode": "direct",
-                    "id": "package-project"
-                  },
-                  "resource": {
-                    "kind": "reference",
-                    "type": "resource",
-                    "mode": "direct",
-                    "id": "coins"
-                  },
-                  "amount": {
-                    "op": "get",
-                    "path": "global.rate"
-                  }
+              "kind": "function",
+              "functionId": "rule-automatic-coins-handler",
+              "args": {
+                "objectId": {
+                  "op": "get",
+                  "path": "args.objectId"
                 }
               }
             }
@@ -491,7 +477,10 @@
           "maxConcurrent": 1,
           "maxQueued": 16,
           "seconds": 1,
-          "repeat": true
+          "repeat": true,
+          "handlerGraphVersion": 1,
+          "handlerFunctionId": "rule-automatic-coins-handler",
+          "timeSource": "game"
         }
       ],
       "inventory": {
@@ -519,23 +508,25 @@
       }
     },
     "version": 2,
+    "authoringGraphVersion": 1,
+    "handlerGraphVersion": 1,
     "visualExamplesVersion": 1,
     "sceneEditingVersion": 2,
     "standardEventsVersion": 1,
     "events": [
       {
-        "id": "event-b5b9e36a-09b4-4544-8370-91b7ba235afb",
+        "id": "event-088bfd62-a879-4457-9387-09997ca9aab2",
         "name": "Подойти с анимацией",
         "description": "",
         "retention": "AUTO_CLOSE_ON_FLOW_END",
         "owner": "SubScene",
         "groups": [
           {
-            "id": "group-272610ff-7f22-4175-afea-213f520f8f52",
+            "id": "group-a4ef302c-c262-43e6-b578-f03eee0cd8d4",
             "name": "Подойти",
             "actions": [
               {
-                "id": "action-59ef1305-69e2-4977-9eed-cdf2b9dc6827",
+                "id": "action-04f5347f-e1a6-405d-9d89-975488d2d2b4",
                 "type": "move",
                 "target": "",
                 "value": [
@@ -564,18 +555,18 @@
         "standardPreset": true
       },
       {
-        "id": "event-7bcbebdf-db98-4002-9ad3-8ccce69acdb1",
+        "id": "event-ef82d385-03f3-4c60-8a98-98806d294419",
         "name": "Подойти и сесть",
         "description": "",
         "retention": "AUTO_CLOSE_ON_FLOW_END",
         "owner": "SubScene",
         "groups": [
           {
-            "id": "group-c1e0ee47-9625-4fd3-b3ce-f2db8d2be682",
+            "id": "group-200ba1a9-94db-4e01-9031-6e3c1e38b2af",
             "name": "Подойти к месту",
             "actions": [
               {
-                "id": "action-8d250d16-9870-4c22-b413-e35ae41254d7",
+                "id": "action-6cfa89d9-823f-46f1-a8f0-25ec1c8c50b2",
                 "type": "move",
                 "target": "",
                 "value": [
@@ -601,11 +592,11 @@
             ]
           },
           {
-            "id": "group-fecb0f7d-d5e8-491c-8291-4e1b534fdaa5",
+            "id": "group-dfd02386-a3c9-4835-aff1-d5b434e99e42",
             "name": "Сесть",
             "actions": [
               {
-                "id": "action-261fd1ee-3817-458e-80ce-cc5e380faddf",
+                "id": "action-1d5d5824-e553-43bf-852a-639abe6726b1",
                 "type": "pose",
                 "target": "",
                 "value": "сидит",
@@ -627,18 +618,18 @@
         "standardPreset": true
       },
       {
-        "id": "event-61613968-c9b4-4cb0-b8b7-2c7483e44337",
+        "id": "event-9940ac70-6f4c-4706-b76b-b22e8c219138",
         "name": "Приветствие крупным планом",
         "description": "",
         "retention": "AUTO_CLOSE_ON_FLOW_END",
         "owner": "SubScene",
         "groups": [
           {
-            "id": "group-e14c7f10-797c-4949-9fe2-f21a6a879ac4",
+            "id": "group-135021dc-21fd-4a6c-b8bd-f60049b8c92b",
             "name": "Приветствие",
             "actions": [
               {
-                "id": "action-c6bef859-4d5b-4425-bff6-c040ee5da582",
+                "id": "action-2929a939-508b-426c-bdfe-4b08d4fb4ab0",
                 "type": "pose",
                 "target": "",
                 "value": "машет",
@@ -655,7 +646,7 @@
                 "fallback": "Безопасное исходное состояние"
               },
               {
-                "id": "action-3cb2e77d-068b-4784-b399-119bcb8e33af",
+                "id": "action-cbde440f-11db-4e0e-bb40-8a17209e38bb",
                 "type": "camera",
                 "target": "camera",
                 "value": "Крупный план",
@@ -677,18 +668,18 @@
         "standardPreset": true
       },
       {
-        "id": "event-2ca8b687-4671-444b-9b17-d3d0946dbb02",
+        "id": "event-1e130bae-0542-452a-879e-b6b083d3b6eb",
         "name": "Наступает вечер",
         "description": "",
         "retention": "AUTO_CLOSE_ON_FLOW_END",
         "owner": "SubScene",
         "groups": [
           {
-            "id": "group-6d2019be-8f9f-40cc-8a26-1b8e664b7909",
+            "id": "group-7a47994b-209d-4945-8938-13e39b206cf1",
             "name": "Окружение",
             "actions": [
               {
-                "id": "action-6f0f8781-7219-4f4d-9e71-ab0d39027384",
+                "id": "action-62ad5ea3-1baf-4598-9efc-e8dde1e9e6d0",
                 "type": "time",
                 "target": "world",
                 "value": "Закат",
@@ -705,7 +696,7 @@
                 "fallback": "Безопасное исходное состояние"
               },
               {
-                "id": "action-e02724d6-e386-4c0e-9d81-34602428845d",
+                "id": "action-ad533579-444d-462a-a928-d6c22c9c6406",
                 "type": "lighting",
                 "target": "world",
                 "value": "Тёплый свет",
@@ -727,18 +718,18 @@
         "standardPreset": true
       },
       {
-        "id": "event-62f16f7b-b5d3-4e1d-83cd-d219049a106d",
+        "id": "event-20ace86f-c30c-4c16-80a7-7c0c7738f4e5",
         "name": "Появиться в кадре",
         "description": "",
         "retention": "AUTO_CLOSE_ON_FLOW_END",
         "owner": "SubScene",
         "groups": [
           {
-            "id": "group-7c1ffec3-9937-4161-b49f-47e158526bb3",
+            "id": "group-a1f63b61-a607-4c96-98c0-92ffe617bf65",
             "name": "Появление",
             "actions": [
               {
-                "id": "action-704cd0cf-7708-48f1-8bad-7140bff15229",
+                "id": "action-6dd4ab19-f922-45c1-aa5b-0fac0c301c6f",
                 "type": "visibility",
                 "target": "",
                 "value": "Показать",
@@ -755,7 +746,7 @@
                 "fallback": "Безопасное исходное состояние"
               },
               {
-                "id": "action-4c766377-90e1-463b-b023-498e5ce78d58",
+                "id": "action-92c66aa5-b1e5-462f-81e3-2a4a8c7e8bc9",
                 "type": "pose",
                 "target": "",
                 "value": "стоит",
@@ -846,22 +837,986 @@
               "operationVersion": 1,
               "value": {
                 "owner": {
-                  "op": "get",
-                  "path": "args.owner"
+                  "op": "node",
+                  "nodeId": "reward-operation-value-command-value-owner",
+                  "port": "value"
                 },
                 "resource": {
-                  "op": "get",
-                  "path": "args.counter"
+                  "op": "node",
+                  "nodeId": "reward-operation-value-command-value-resource",
+                  "port": "value"
                 },
                 "amount": {
-                  "op": "get",
-                  "path": "args.amount"
+                  "op": "node",
+                  "nodeId": "reward-operation-value-command-value-amount",
+                  "port": "value"
                 }
               }
             },
             "next": null
+          },
+          {
+            "id": "reward-operation-value-command-value-owner",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "args.owner"
+            },
+            "position": {
+              "x": -1520,
+              "y": 50
+            }
+          },
+          {
+            "id": "reward-operation-value-command-value-resource",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "args.counter"
+            },
+            "position": {
+              "x": -1140,
+              "y": 50
+            }
+          },
+          {
+            "id": "reward-operation-value-command-value-amount",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "args.amount"
+            },
+            "position": {
+              "x": -760,
+              "y": 50
+            }
           }
-        ]
+        ],
+        "graphVersion": 1,
+        "stateSchema": {
+          "type": "object",
+          "properties": {}
+        },
+        "initialState": {}
+      },
+      {
+        "id": "rule-click-reward-guard",
+        "name": "Кнопка → награда · условие",
+        "parameters": [
+          {
+            "name": "elementId",
+            "label": "elementId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "label": "action",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "locals": {},
+        "resultSchema": {
+          "type": "boolean"
+        },
+        "preserveExtraArgs": true,
+        "entry": "rule-click-reward-guard-return",
+        "nodes": [
+          {
+            "id": "rule-click-reward-guard-return",
+            "kind": "return",
+            "name": "Условие выполнено",
+            "value": true,
+            "position": {
+              "x": 340,
+              "y": 0
+            }
+          }
+        ],
+        "graphVersion": 1
+      },
+      {
+        "id": "rule-click-reward-handler",
+        "name": "Кнопка → награда",
+        "parameters": [
+          {
+            "name": "elementId",
+            "label": "elementId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "label": "action",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "locals": {},
+        "preserveExtraArgs": true,
+        "handler": {
+          "signal": {
+            "type": "button"
+          }
+        },
+        "admission": {
+          "functionId": "rule-click-reward-guard",
+          "callNodeId": "rule-click-reward-handler-condition",
+          "branchId": "rule-click-reward-handler-branch"
+        },
+        "entry": "rule-click-reward-handler-condition",
+        "nodes": [
+          {
+            "id": "rule-click-reward-handler-condition",
+            "kind": "call",
+            "name": "Проверить условие",
+            "functionId": "rule-click-reward-guard",
+            "args": {
+              "elementId": {
+                "op": "node",
+                "nodeId": "rule-click-reward-handler-condition-value-args-elementId",
+                "port": "value"
+              },
+              "action": {
+                "op": "node",
+                "nodeId": "rule-click-reward-handler-condition-value-args-action",
+                "port": "value"
+              }
+            },
+            "next": "rule-click-reward-handler-branch",
+            "position": {
+              "x": 0,
+              "y": 100
+            }
+          },
+          {
+            "id": "rule-click-reward-handler-branch",
+            "kind": "branch",
+            "name": "Условие реакции",
+            "condition": {
+              "op": "node",
+              "nodeId": "rule-click-reward-handler-condition",
+              "port": "value"
+            },
+            "position": {
+              "x": 300,
+              "y": 100
+            },
+            "trueNext": "rule-click-reward-handler-yes-0",
+            "falseNext": "rule-click-reward-handler-no-end"
+          },
+          {
+            "id": "rule-click-reward-handler-yes-0",
+            "name": "Действие",
+            "position": {
+              "x": 660,
+              "y": 0
+            },
+            "kind": "operation",
+            "call": {
+              "id": "sacura.signal.emit",
+              "version": 1,
+              "parameters": {
+                "signal": {
+                  "kind": "reference",
+                  "type": "signal",
+                  "mode": "direct",
+                  "id": "sample.signal.reward"
+                },
+                "payload": {
+                  "reason": "Нажата кнопка"
+                }
+              }
+            },
+            "next": "rule-click-reward-handler-yes-end"
+          },
+          {
+            "id": "rule-click-reward-handler-yes-end",
+            "kind": "return",
+            "name": "Завершить обработчик",
+            "value": true,
+            "position": {
+              "x": 1000,
+              "y": 0
+            }
+          },
+          {
+            "id": "rule-click-reward-handler-no-end",
+            "kind": "return",
+            "name": "Завершить обработчик",
+            "value": false,
+            "position": {
+              "x": 660,
+              "y": 400
+            }
+          },
+          {
+            "id": "rule-click-reward-handler-condition-value-args-elementId",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "args.elementId"
+            },
+            "position": {
+              "x": -1520,
+              "y": 50
+            }
+          },
+          {
+            "id": "rule-click-reward-handler-condition-value-args-action",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "args.action"
+            },
+            "position": {
+              "x": -1140,
+              "y": 50
+            }
+          }
+        ],
+        "graphVersion": 1
+      },
+      {
+        "id": "rule-upgrade-rate-guard",
+        "name": "Улучшение → быстрее получать монеты · условие",
+        "parameters": [
+          {
+            "name": "elementId",
+            "label": "elementId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "label": "action",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "locals": {},
+        "resultSchema": {
+          "type": "boolean"
+        },
+        "preserveExtraArgs": true,
+        "entry": "rule-upgrade-rate-guard-return",
+        "nodes": [
+          {
+            "id": "rule-upgrade-rate-guard-return",
+            "kind": "return",
+            "name": "Условие выполнено",
+            "value": true,
+            "position": {
+              "x": 340,
+              "y": 0
+            }
+          }
+        ],
+        "graphVersion": 1
+      },
+      {
+        "id": "rule-upgrade-rate-handler",
+        "name": "Улучшение → быстрее получать монеты",
+        "parameters": [
+          {
+            "name": "elementId",
+            "label": "elementId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "label": "action",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "locals": {},
+        "preserveExtraArgs": true,
+        "handler": {
+          "signal": {
+            "type": "button"
+          }
+        },
+        "admission": {
+          "functionId": "rule-upgrade-rate-guard",
+          "callNodeId": "rule-upgrade-rate-handler-condition",
+          "branchId": "rule-upgrade-rate-handler-branch"
+        },
+        "entry": "rule-upgrade-rate-handler-condition",
+        "nodes": [
+          {
+            "id": "rule-upgrade-rate-handler-condition",
+            "kind": "call",
+            "name": "Проверить условие",
+            "functionId": "rule-upgrade-rate-guard",
+            "args": {
+              "elementId": {
+                "op": "node",
+                "nodeId": "rule-upgrade-rate-handler-condition-value-args-elementId",
+                "port": "value"
+              },
+              "action": {
+                "op": "node",
+                "nodeId": "rule-upgrade-rate-handler-condition-value-args-action",
+                "port": "value"
+              }
+            },
+            "next": "rule-upgrade-rate-handler-branch",
+            "position": {
+              "x": 0,
+              "y": 100
+            }
+          },
+          {
+            "id": "rule-upgrade-rate-handler-branch",
+            "kind": "branch",
+            "name": "Условие реакции",
+            "condition": {
+              "op": "node",
+              "nodeId": "rule-upgrade-rate-handler-condition",
+              "port": "value"
+            },
+            "position": {
+              "x": 300,
+              "y": 100
+            },
+            "trueNext": "rule-upgrade-rate-handler-yes-0",
+            "falseNext": "rule-upgrade-rate-handler-no-end"
+          },
+          {
+            "id": "rule-upgrade-rate-handler-yes-0",
+            "name": "Действие",
+            "position": {
+              "x": 660,
+              "y": 0
+            },
+            "kind": "operation",
+            "call": {
+              "id": "sacura.variable.set",
+              "version": 1,
+              "parameters": {
+                "variable": {
+                  "kind": "reference",
+                  "type": "variable",
+                  "mode": "direct",
+                  "id": "sample-variable-rate"
+                },
+                "value": {
+                  "op": "node",
+                  "nodeId": "rule-upgrade-rate-handler-yes-0-value-call-parameters-value",
+                  "port": "value"
+                }
+              }
+            },
+            "next": "rule-upgrade-rate-handler-yes-end"
+          },
+          {
+            "id": "rule-upgrade-rate-handler-yes-end",
+            "kind": "return",
+            "name": "Завершить обработчик",
+            "value": true,
+            "position": {
+              "x": 1000,
+              "y": 0
+            }
+          },
+          {
+            "id": "rule-upgrade-rate-handler-no-end",
+            "kind": "return",
+            "name": "Завершить обработчик",
+            "value": false,
+            "position": {
+              "x": 660,
+              "y": 400
+            }
+          },
+          {
+            "id": "rule-upgrade-rate-handler-condition-value-args-elementId",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "args.elementId"
+            },
+            "position": {
+              "x": -1520,
+              "y": 50
+            }
+          },
+          {
+            "id": "rule-upgrade-rate-handler-condition-value-args-action",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "args.action"
+            },
+            "position": {
+              "x": -1140,
+              "y": 50
+            }
+          },
+          {
+            "id": "rule-upgrade-rate-handler-yes-0-value-call-parameters-value-a",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "global.rate"
+            },
+            "position": {
+              "x": -760,
+              "y": 50
+            }
+          },
+          {
+            "id": "rule-upgrade-rate-handler-yes-0-value-call-parameters-value",
+            "kind": "value",
+            "name": "Сложить",
+            "value": {
+              "op": "add",
+              "a": {
+                "op": "node",
+                "nodeId": "rule-upgrade-rate-handler-yes-0-value-call-parameters-value-a",
+                "port": "value"
+              },
+              "b": 1
+            },
+            "position": {
+              "x": -380,
+              "y": 50
+            }
+          }
+        ],
+        "graphVersion": 1
+      },
+      {
+        "id": "rule-automatic-coins-guard",
+        "name": "Каждую секунду → монеты с выбранной скоростью · условие",
+        "parameters": [
+          {
+            "name": "objectId",
+            "label": "objectId",
+            "schema": {
+              "type": "string",
+              "optional": true
+            }
+          }
+        ],
+        "locals": {},
+        "resultSchema": {
+          "type": "boolean"
+        },
+        "preserveExtraArgs": true,
+        "entry": "rule-automatic-coins-guard-return",
+        "nodes": [
+          {
+            "id": "rule-automatic-coins-guard-return",
+            "kind": "return",
+            "name": "Условие выполнено",
+            "value": true,
+            "position": {
+              "x": 340,
+              "y": 0
+            }
+          }
+        ],
+        "graphVersion": 1
+      },
+      {
+        "id": "rule-automatic-coins-handler",
+        "name": "Каждую секунду → монеты с выбранной скоростью",
+        "parameters": [
+          {
+            "name": "objectId",
+            "label": "objectId",
+            "schema": {
+              "type": "string",
+              "optional": true
+            }
+          }
+        ],
+        "locals": {},
+        "preserveExtraArgs": true,
+        "handler": {
+          "signal": {
+            "type": "tick"
+          }
+        },
+        "admission": {
+          "functionId": "rule-automatic-coins-guard",
+          "callNodeId": "rule-automatic-coins-handler-condition",
+          "branchId": "rule-automatic-coins-handler-branch"
+        },
+        "entry": "rule-automatic-coins-handler-condition",
+        "nodes": [
+          {
+            "id": "rule-automatic-coins-handler-condition",
+            "kind": "call",
+            "name": "Проверить условие",
+            "functionId": "rule-automatic-coins-guard",
+            "args": {
+              "objectId": {
+                "op": "node",
+                "nodeId": "rule-automatic-coins-handler-condition-value-args-objectId",
+                "port": "value"
+              }
+            },
+            "next": "rule-automatic-coins-handler-branch",
+            "position": {
+              "x": 0,
+              "y": 100
+            }
+          },
+          {
+            "id": "rule-automatic-coins-handler-branch",
+            "kind": "branch",
+            "name": "Условие реакции",
+            "condition": {
+              "op": "node",
+              "nodeId": "rule-automatic-coins-handler-condition",
+              "port": "value"
+            },
+            "position": {
+              "x": 300,
+              "y": 100
+            },
+            "trueNext": "rule-automatic-coins-handler-yes-0",
+            "falseNext": "rule-automatic-coins-handler-no-end"
+          },
+          {
+            "id": "rule-automatic-coins-handler-yes-0",
+            "name": "Действие",
+            "position": {
+              "x": 660,
+              "y": 0
+            },
+            "kind": "operation",
+            "call": {
+              "id": "sacura.resource.add",
+              "version": 1,
+              "parameters": {
+                "owner": {
+                  "kind": "reference",
+                  "type": "project",
+                  "mode": "direct",
+                  "id": "package-project"
+                },
+                "resource": {
+                  "kind": "reference",
+                  "type": "resource",
+                  "mode": "direct",
+                  "id": "coins"
+                },
+                "amount": {
+                  "op": "node",
+                  "nodeId": "rule-automatic-coins-handler-yes-0-value-call-parameters-amount",
+                  "port": "value"
+                }
+              }
+            },
+            "next": "rule-automatic-coins-handler-yes-end"
+          },
+          {
+            "id": "rule-automatic-coins-handler-yes-end",
+            "kind": "return",
+            "name": "Завершить обработчик",
+            "value": true,
+            "position": {
+              "x": 1000,
+              "y": 0
+            }
+          },
+          {
+            "id": "rule-automatic-coins-handler-no-end",
+            "kind": "return",
+            "name": "Завершить обработчик",
+            "value": false,
+            "position": {
+              "x": 660,
+              "y": 400
+            }
+          },
+          {
+            "id": "rule-automatic-coins-handler-condition-value-args-objectId",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "args.objectId"
+            },
+            "position": {
+              "x": -1520,
+              "y": 50
+            }
+          },
+          {
+            "id": "rule-automatic-coins-handler-yes-0-value-call-parameters-amount",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "global.rate"
+            },
+            "position": {
+              "x": -1140,
+              "y": 50
+            }
+          }
+        ],
+        "graphVersion": 1
+      },
+      {
+        "id": "definition-sample.mechanic.reward-1-reward-guard",
+        "name": "Новая реакция · условие",
+        "parameters": [
+          {
+            "name": "reason",
+            "label": "reason",
+            "schema": {
+              "type": "string",
+              "optional": true
+            }
+          },
+          {
+            "name": "owner",
+            "label": "Владелец счётчика",
+            "schema": {
+              "type": "union",
+              "label": "Владелец счётчика",
+              "variants": [
+                {
+                  "type": "reference",
+                  "referenceType": "project",
+                  "label": "Проект"
+                },
+                {
+                  "type": "reference",
+                  "referenceType": "scene",
+                  "label": "Сцена"
+                },
+                {
+                  "type": "reference",
+                  "referenceType": "object",
+                  "label": "Объект"
+                }
+              ]
+            }
+          },
+          {
+            "name": "counter",
+            "label": "Счётчик",
+            "schema": {
+              "type": "reference",
+              "referenceType": "resource",
+              "label": "Счётчик"
+            }
+          },
+          {
+            "name": "amount",
+            "label": "Награда",
+            "schema": {
+              "type": "integer",
+              "label": "Награда",
+              "default": 1
+            }
+          }
+        ],
+        "locals": {},
+        "resultSchema": {
+          "type": "boolean"
+        },
+        "preserveExtraArgs": true,
+        "entry": "definition-sample.mechanic.reward-1-reward-guard-return",
+        "nodes": [
+          {
+            "id": "definition-sample.mechanic.reward-1-reward-guard-return",
+            "kind": "return",
+            "name": "Условие выполнено",
+            "value": true,
+            "position": {
+              "x": 340,
+              "y": 0
+            }
+          }
+        ],
+        "graphVersion": 1
+      },
+      {
+        "id": "definition-sample.mechanic.reward-1-reward-handler",
+        "name": "Новая реакция",
+        "parameters": [
+          {
+            "name": "reason",
+            "label": "reason",
+            "schema": {
+              "type": "string",
+              "optional": true
+            }
+          },
+          {
+            "name": "owner",
+            "label": "Владелец счётчика",
+            "schema": {
+              "type": "union",
+              "label": "Владелец счётчика",
+              "variants": [
+                {
+                  "type": "reference",
+                  "referenceType": "project",
+                  "label": "Проект"
+                },
+                {
+                  "type": "reference",
+                  "referenceType": "scene",
+                  "label": "Сцена"
+                },
+                {
+                  "type": "reference",
+                  "referenceType": "object",
+                  "label": "Объект"
+                }
+              ]
+            }
+          },
+          {
+            "name": "counter",
+            "label": "Счётчик",
+            "schema": {
+              "type": "reference",
+              "referenceType": "resource",
+              "label": "Счётчик"
+            }
+          },
+          {
+            "name": "amount",
+            "label": "Награда",
+            "schema": {
+              "type": "integer",
+              "label": "Награда",
+              "default": 1
+            }
+          }
+        ],
+        "locals": {},
+        "preserveExtraArgs": true,
+        "handler": {
+          "signal": {
+            "type": "sample.signal.reward"
+          }
+        },
+        "admission": {
+          "functionId": "definition-sample.mechanic.reward-1-reward-guard",
+          "callNodeId": "definition-sample.mechanic.reward-1-reward-handler-condition",
+          "branchId": "definition-sample.mechanic.reward-1-reward-handler-branch"
+        },
+        "entry": "definition-sample.mechanic.reward-1-reward-handler-condition",
+        "nodes": [
+          {
+            "id": "definition-sample.mechanic.reward-1-reward-handler-condition",
+            "kind": "call",
+            "name": "Проверить условие",
+            "functionId": "definition-sample.mechanic.reward-1-reward-guard",
+            "args": {
+              "reason": {
+                "op": "node",
+                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-reason",
+                "port": "value"
+              },
+              "owner": {
+                "op": "node",
+                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-owner",
+                "port": "value"
+              },
+              "counter": {
+                "op": "node",
+                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-counter",
+                "port": "value"
+              },
+              "amount": {
+                "op": "node",
+                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-amount",
+                "port": "value"
+              }
+            },
+            "next": "definition-sample.mechanic.reward-1-reward-handler-branch",
+            "position": {
+              "x": 0,
+              "y": 100
+            }
+          },
+          {
+            "id": "definition-sample.mechanic.reward-1-reward-handler-branch",
+            "kind": "branch",
+            "name": "Условие реакции",
+            "condition": {
+              "op": "node",
+              "nodeId": "definition-sample.mechanic.reward-1-reward-handler-condition",
+              "port": "value"
+            },
+            "position": {
+              "x": 300,
+              "y": 100
+            },
+            "trueNext": "definition-sample.mechanic.reward-1-reward-handler-yes-0",
+            "falseNext": "definition-sample.mechanic.reward-1-reward-handler-no-end"
+          },
+          {
+            "id": "definition-sample.mechanic.reward-1-reward-handler-yes-0",
+            "name": "Действие",
+            "position": {
+              "x": 660,
+              "y": 0
+            },
+            "kind": "call",
+            "functionId": "sample-reward-function",
+            "args": {
+              "owner": {
+                "op": "node",
+                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-yes-0-value-args-owner",
+                "port": "value"
+              },
+              "counter": {
+                "op": "node",
+                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-yes-0-value-args-counter",
+                "port": "value"
+              },
+              "amount": {
+                "op": "node",
+                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-yes-0-value-args-amount",
+                "port": "value"
+              }
+            },
+            "next": "definition-sample.mechanic.reward-1-reward-handler-yes-end"
+          },
+          {
+            "id": "definition-sample.mechanic.reward-1-reward-handler-yes-end",
+            "kind": "return",
+            "name": "Завершить обработчик",
+            "value": true,
+            "position": {
+              "x": 1000,
+              "y": 0
+            }
+          },
+          {
+            "id": "definition-sample.mechanic.reward-1-reward-handler-no-end",
+            "kind": "return",
+            "name": "Завершить обработчик",
+            "value": false,
+            "position": {
+              "x": 660,
+              "y": 400
+            }
+          },
+          {
+            "id": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-reason",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "args.reason"
+            },
+            "position": {
+              "x": -1520,
+              "y": 50
+            }
+          },
+          {
+            "id": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-owner",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "args.owner"
+            },
+            "position": {
+              "x": -1140,
+              "y": 50
+            }
+          },
+          {
+            "id": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-counter",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "args.counter"
+            },
+            "position": {
+              "x": -760,
+              "y": 50
+            }
+          },
+          {
+            "id": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-amount",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "args.amount"
+            },
+            "position": {
+              "x": -380,
+              "y": 50
+            }
+          },
+          {
+            "id": "definition-sample.mechanic.reward-1-reward-handler-yes-0-value-args-owner",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "args.owner"
+            },
+            "position": {
+              "x": -1520,
+              "y": 375
+            }
+          },
+          {
+            "id": "definition-sample.mechanic.reward-1-reward-handler-yes-0-value-args-counter",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "args.counter"
+            },
+            "position": {
+              "x": -1140,
+              "y": 375
+            }
+          },
+          {
+            "id": "definition-sample.mechanic.reward-1-reward-handler-yes-0-value-args-amount",
+            "kind": "value",
+            "name": "Прочитать",
+            "value": {
+              "op": "get",
+              "path": "args.amount"
+            },
+            "position": {
+              "x": -760,
+              "y": 375
+            }
+          }
+        ],
+        "graphVersion": 1
       }
     ],
     "actionTemplates": [],

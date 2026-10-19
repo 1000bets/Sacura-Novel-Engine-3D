@@ -10,6 +10,7 @@ import {widgetValue} from '../src/widgetBindings.js';
 import {addMechanic} from '../src/mechanicsModel.js';
 import {makeAction} from '../src/model.js';
 import {exportAuthoringPackage,planPackageImport} from '../src/mechanicPackages.js';
+import {setHandlerEvent} from '../src/handlerGraphs.js';
 
 // Read shipped authoring data, never substitute a simulated gameplay executor.
 const template=name=>parseProjectFile(readFileSync(new URL(`./fixtures/legacy-${name}.sacura-template.json`,import.meta.url),'utf8')).project;
@@ -158,7 +159,7 @@ test('characterization: separate quest function imports with a different variabl
 // Fixes must change these assertions explicitly alongside the audit's defect record.
 test('regression D1: exporting a legacy signal callback exposes its compared object and preserves the source',async()=>{
   const a=template('shooter'),fn=a.functions.find(f=>f.id==='award-kill'),pkg=await exportAuthoringPackage(a,fn,{...metadata,kind:'function'});
-  assert.equal(fn.nodes[0].condition.b,'shooter-hero');assert.equal(pkg.content.functions[0].nodes[0].condition.b.op,'get');assert.equal(pkg.inputs.some(i=>i.type==='object'),true);
+  const compared=fn.nodes.find(n=>n.kind==='value'&&n.value.op==='ne');assert.equal(compared.value.b,'shooter-hero');const exportedCompared=pkg.content.functions.find(f=>f.id===fn.id).nodes.find(n=>n.id===compared.id);assert.equal(exportedCompared.value.b.op,'node');const boundValue=pkg.content.functions.find(f=>f.id===fn.id).nodes.find(n=>n.id===exportedCompared.value.b.nodeId);assert.equal(boundValue.value.op,'get');assert.ok(boundValue.value.path.startsWith('args.'));assert.equal(pkg.inputs.some(i=>i.type==='object'),true);
   const b=createEmptyProject('Function destination');b.variables={score:0,results:{defeated:[]}};b.variableTypes={score:'integer',results:'struct'};
   b.objects.push({id:'destination-hero',name:'Свой герой',type:'Меш',active:true,subsceneId:b.subscenes[0].id});
   const next=(await planPackageImport(b,pkg,Object.fromEntries(pkg.inputs.map(i=>[i.id,i.type==='object'?'destination-hero':i.name])))).apply(b),copy=next.functions.find(f=>f.name===fn.name),rt=runtime();
@@ -173,9 +174,9 @@ test('regression D2: interaction and pickup both react on the same object',async
 
 test('regression D3: save rejects pending rule work and restores a completed once reaction',async()=>{
   const p=createEmptyProject('Pending signal'),timer=addMechanic(p,'timer',{kind:'project',id:p.id}),rule=p.gameplay.rules.find(r=>r.id===timer.ruleId);p.variables.finished=false;
-  p.events.push({id:'pending-event',name:'Pending',owner:'GameSession',retention:'AUTO_CLOSE_ON_FLOW_END',groups:[{id:'delay',actions:[{...makeAction('wait'),duration:.05}]},{id:'complete',actions:[makeAction('variable','finished',true)]}]});rule.actions=[{kind:'event',eventId:'pending-event',join:'FLOW_END'}];
+  p.events.push({id:'pending-event',name:'Pending',owner:'GameSession',retention:'AUTO_CLOSE_ON_FLOW_END',groups:[{id:'delay',actions:[{...makeAction('wait'),duration:.05}]},{id:'complete',actions:[makeAction('variable','finished',true)]}]});setHandlerEvent(p,rule,'pending-event');
   const rt=runtime();try{
-    await rt.start(p,p.subscenes[0].entry);const task=rt.game.fireRule(rule);while(!Object.values(rt.snapshot.instances).some(i=>i.eventId==='pending-event'&&i.status==='running'))await new Promise(r=>setTimeout(r,1));
+    await rt.start(p,p.subscenes[0].entry);const task=rt.game.fireRule(rule),deadline=Date.now()+2500;while(!Object.values(rt.snapshot.instances).some(i=>i.eventId==='pending-event'&&i.status==='running')&&Date.now()<deadline)await new Promise(r=>setTimeout(r,1));
     assert.ok(Object.values(rt.snapshot.instances).some(i=>i.eventId==='pending-event'&&i.status==='running'));assert.equal(rt.snapshot.ready,true);
     assert.throws(()=>gameSave(rt),/после выполнения/);for(let n=0;n<300&&!rt.game.ruleRuntime.idle;n++){rt.game.tick(.05);await new Promise(r=>setTimeout(r,2));}await task;assert.equal(rt.snapshot.variables.finished,true);
     const saved=JSON.parse(JSON.stringify(gameSave(rt)));assert.equal(saved.world.game.rules[rule.id].fired,true);

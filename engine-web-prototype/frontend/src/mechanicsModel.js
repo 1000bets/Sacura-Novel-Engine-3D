@@ -1,3 +1,4 @@
+import {setHandlerConditionArgument} from './handlerGraphs.js';
 import {capabilityDataDefinitions,capabilityDataDefinition} from './capabilityRegistry.js';
 import {schemaDefaults} from './valueSchemas.js';
 import {addMechanicInstance,descriptionFor} from './mechanicDescriptions.js';
@@ -8,11 +9,12 @@ import {newItem, newWeapon, ensureGameplay} from './gameplayModel.js';
 
 // Trusted engine registrations only. Imported authoring packages contain data, never installers.
 const definitions = new Map();
+const nativeSources={movement:'src/capabilities/movement.js',camera:'src/capabilities/camera.js',physics:'src/gamePhysics.js',inventory:'src/capabilities/inventory.js',resource:'src/capabilities/resources.js',crosshair:'src/runtimePresentation.js',health:'src/capabilities/health.js',weapon:'src/capabilities/weapons.js',pursuit:'src/capabilities/behavior.js',pickup:'src/capabilities/interaction.js',timer:'src/capabilities/timers.js'};
 export function registerMechanic(definition) {
   if (!definition?.id || definitions.has(definition.id) || typeof definition.add !== 'function') throw Error('Некорректная регистрация механики.');
-  definitions.set(definition.id, Object.freeze(definition));
+  definitions.set(definition.id, Object.freeze({...definition,...(!definition.source&&nativeSources[definition.id]?{source:{path:nativeSources[definition.id],line:1}}:{})}));
 }
-export const mechanicDefinitions = project => [...definitions.values(),...capabilityDataDefinitions(),...(project?.gameplay?.mechanicDefinitions||[]).map(d=>({...d,id:d.version===1?d.id:d.id+'@'+d.version,name:d.version===1?d.name:d.name+' · v'+d.version,description:d.description||'Редактируемая функция и параметры.'}))];
+export const mechanicDefinitions = project => [...definitions.values(),...capabilityDataDefinitions(),...(project?.gameplay?.mechanicDefinitions||[]).filter(d=>!d.builtin).map(d=>({...d,id:d.version===1?d.id:d.id+'@'+d.version,name:d.version===1?d.name:d.name+' · v'+d.version,description:d.description||'Редактируемая функция и параметры.'}))];
 export const mechanicDefinition = (id,project,version=1) => definitions.get(id)||capabilityDataDefinition(id)||descriptionFor(project||{},id.split('@')[0],id.includes('@')?Number(id.split('@')[1]):version);
 export function mechanicsFor(project) {
   const g=project.gameplay, records=[...(g.mechanics||[])];
@@ -27,11 +29,12 @@ export function mechanicsFor(project) {
   for(const r of g.resources||[])if(!records.some(m=>m.type==='resource'&&m.recordId===r.id))records.push({id:'native:resource:'+r.id,type:'resource',recordId:r.id,scope:structuredClone(r.owner),native:true});
   for(const i of g.items)add('pickup',i.id,i.worldObjectId);
   for(const r of g.rules)if(!records.some(m=>m.ruleId===r.id))records.push({id:'native:rule:'+r.id,type:'rule',ruleId:r.id,scope:r.scope|| (r.objectId?{kind:'object',id:r.objectId}:r.sceneId?{kind:'scene',id:r.sceneId}:{kind:'project',id:project.id}),native:true});
+  for(const m of records){const b=m.type==='weapon'?g.weapons.find(w=>w.id===m.recordId)?.behavior:m.type==='health'?g.actors[m.recordId||m.scope.id]?.behaviors?.health:m.type==='pursuit'?g.actors[m.recordId||m.scope.id]?.behaviors?.pursuit:m.type==='pickup'?g.items.find(i=>i.id===m.recordId)?.pickupBehavior:m.capabilityId==='sacura.turn'?m.behavior:null;if(b)m.implementation={definitionId:b.definitionId,functions:{...b.functions}};}
   return records;
 }
 export function addMechanic(project,type,scope) {
   const [descriptionId,descriptionVersion]=type.split('@');if(descriptionFor(project,descriptionId,Number(descriptionVersion||1)))return addMechanicInstance(project,descriptionId,scope,{},Number(descriptionVersion||1));
-  const data=capabilityDataDefinitions().find(d=>d.id===type);if(data){if(!data.scopes.includes(scope.kind))throw Error('Выберите подходящее размещение.');const m={id:uid('mechanic'),type:'capability',name:data.name,capabilityId:data.id,capabilityVersion:data.version,scope:structuredClone(scope),values:schemaDefaults(data.parameters)};project.gameplay.mechanics.push(m);project.gameplay.enabled=true;return m;}
+  const data=capabilityDataDefinitions().find(d=>d.id===type);if(data){if(!data.scopes.includes(scope.kind))throw Error('Выберите подходящее размещение.');const m={id:uid('mechanic'),type:'capability',name:data.name,capabilityId:data.id,capabilityVersion:data.version,scope:structuredClone(scope),values:schemaDefaults(data.parameters)};project.gameplay.mechanics.push(m);project.gameplay.enabled=true;ensureGameplay(project);return m;}
   const def=definitions.get(type);if(!def)throw Error('Эта механика не поддерживается.');
   if(!def.scopes.includes(scope.kind))throw Error('Выберите подходящий объект, сцену или проект.');
   if(scope.kind==='object'&&!project.objects.some(o=>o.id===scope.id))throw Error('Сначала выберите объект.');
@@ -44,13 +47,13 @@ export function addMechanic(project,type,scope) {
   if(type==='health'&&g.actors[scope.id]?.maxHP!=null||type==='pursuit'&&g.actors[scope.id]?.ai||type==='physics'&&project.objects.find(o=>o.id===scope.id)?.physics)throw Error('Эта возможность уже подключена к объекту.');
   const m={id:uid('mechanic'),type,scope:structuredClone(scope)};
   // Installers create ordinary native definitions; they never execute authoring logic.
-  def.add(project,m);project.gameplay.mechanics??=[];project.gameplay.mechanics.push(m);project.gameplay.enabled=true;
+  def.add(project,m);project.gameplay.mechanics??=[];project.gameplay.mechanics.push(m);project.gameplay.enabled=true;ensureGameplay(project);
   return m;
 }
 export function bindDoorKey(project,m,objectId) {
   let item=project.gameplay.items.find(i=>i.worldObjectId===objectId);
   if(!item&&objectId){const pickup=addMechanic(project,'pickup',{kind:'object',id:objectId});item=project.gameplay.items.find(i=>i.id===pickup.recordId);}
-  project.gameplay.rules.find(r=>r.id===m.ruleId).conditionArgs={key:item?.id||''};
+  setHandlerConditionArgument(project,project.gameplay.rules.find(r=>r.id===m.ruleId),'key',item?.id||'');
 }
 function connectInput(p,behaviors,m) {
   const controls={look:['Смотреть','axis2d','pointer','delta'],shoot:['Стрелять','boolean','pointer','primary'],reload:['Перезарядить','boolean','keyboard','KeyR'],jump:['Прыгнуть','boolean','keyboard','Space']};

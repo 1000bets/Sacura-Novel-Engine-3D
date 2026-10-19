@@ -2,7 +2,8 @@ import {reference} from '../valueSchemas.js';
 export const ref=(type,label,extra={})=>({type:'reference',referenceType:type,label,...extra});
 export const ownerSchema={type:'union',label:'Владелец',variants:[ref('object','Объект'),ref('scene','Сцена'),ref('project','Проект')]};
 export const number=(label,defaultValue=25)=>({type:'number',min:0,default:defaultValue,label});
-export const operation=(id,label,properties,result,execute,extra={})=>({definition:{id,parameters:{type:'object',properties},result,editor:{label},...extra},execute});
+const sourceFiles={health:'health',game:'health',signal:'health',behavior:'behavior',movement:'movement',weapon:'weapons',inventory:'inventory',interaction:'interaction',object:'interaction',timer:'timers',camera:'camera',resource:'resources',turn:'turns'};
+export const operation=(id,label,properties,result,execute,extra={})=>({definition:{...(sourceFiles[id.split('.')[1]]?{source:{path:'src/capabilities/'+sourceFiles[id.split('.')[1]]+'.js',line:1}}:{}),id,parameters:{type:'object',properties},result,editor:{label},...extra},execute});
 export const length=v=>Math.hypot(...v),sub=(a,b)=>a.map((v,i)=>v-b[i]);
 export const finiteVector=v=>Array.isArray(v)&&v.length===3&&v.every(Number.isFinite);
 export function ownerScope(project,owner){

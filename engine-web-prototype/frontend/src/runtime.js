@@ -646,7 +646,16 @@ export class PreviewRuntime {
     activity.status=this.snapshot.states[a.id];activity.progress=1;
     this.emit();
   }
-  async waitReactionWork(reactionId){const ids=Object.values(this.snapshot.instances).filter(i=>i.operationContext?.reactionId===reactionId).map(i=>i.id);await Promise.all(ids.map(id=>this.eventFlows?.get(id)).filter(Boolean));}
+  async waitReactionWork(reactionId){
+    const seen=new Set();
+    for(;;){
+      const events=Object.values(this.snapshot.instances).filter(i=>i.operationContext?.reactionId===reactionId).map(i=>this.eventFlows?.get(i.id));
+      const graphs=[...(this.game?.graphScopes?.values()||[])].filter(scope=>scope.context.reactionId===reactionId).map(scope=>scope.promise);
+      const pending=[...new Set([...events,...graphs].filter(p=>p&&!seen.has(p)))];
+      if(!pending.length)return;
+      pending.forEach(p=>seen.add(p));await Promise.all(pending);
+    }
+  }
   saveGame(){const saved=gameSave(this),storage=this.storage||globalThis.localStorage;if(!storage)throw new Error('Хранилище сохранений недоступно.');storage.setItem('sacura-save:'+this.project.id,JSON.stringify(saved));this.snapshot.hint='Прохождение сохранено';this.emit();}
   async loadGame(project=this.project){if(!project)throw Error('Выберите проект для загрузки сохранения.');const storage=this.storage||globalThis.localStorage,raw=storage?.getItem('sacura-save:'+project.id);if(!raw)throw new Error('Сохранение ещё не создано.');await restoreGameSave(this,JSON.parse(raw),project);this.emit();}
   async uiAction(action,element={},sourceProject){const token=this.generation;const widget=this.project?.widgets?.find(w=>w.elements?.some(e=>e.id===element.id)),context={kind:'widget',version:element.operationVersion??1,...(widget?{source:{type:'widget',id:widget.id,elementId:element.id}}:{})};try{
