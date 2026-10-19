@@ -59,7 +59,10 @@ function connectInput(p,behaviors,m) {
   const controls={look:['Смотреть','axis2d','pointer','delta'],shoot:['Стрелять','boolean','pointer','primary'],reload:['Перезарядить','boolean','keyboard','KeyR'],jump:['Прыгнуть','boolean','keyboard','Space']};
   let context=p.input.contexts.find(c=>c.id==='game-mechanics');
   if(!context){context={id:'game-mechanics',name:'Действия механик',priority:40,bindings:[]};p.input.contexts.push(context);}
-  for(const behavior of behaviors){const [name,valueType,device,control]=controls[behavior];const operationId=({look:'sacura.camera.look',shoot:'sacura.weapon.shoot',reload:'sacura.weapon.reload',jump:'sacura.movement.jump'})[behavior];let a=p.input.actions.find(a=>a.mechanicId===m.id&&a.operation?.id===operationId);if(!a){a={id:uid('input-action'),name,behavior:'operation',mechanicId:m.id,operation:{id:operationId,version:1,parameters:behavior==='look'?{delta:{op:'get',path:'args.value'},device:'pointer'}:{owner:{kind:'reference',type:'object',mode:'direct',id:m.scope.id},...(behavior==='shoot'||behavior==='reload'?{weapon:{kind:'reference',type:'weapon',mode:'direct',id:m.recordId}}:{})}},valueType,trigger:valueType==='axis2d'?'continuous':'pressed',holdSeconds:.4,consume:true};p.input.actions.push(a);}if(!context.bindings.some(b=>b.actionId===a.id))context.bindings.push({id:uid('binding'),actionId:a.id,device,control,scale:valueType==='axis2d'?[1,1]:1,deadZone:0});}
+  for(const behavior of behaviors){const [name,valueType,device,control]=controls[behavior];const operationId=({look:'sacura.camera.look',shoot:'sacura.weapon.shoot',reload:'sacura.weapon.reload',jump:'sacura.movement.jump'})[behavior];let a=p.input.actions.find(a=>a.mechanicId===m.id&&a.operation?.id===operationId);
+    // Reuse an existing unowned action only when its exact native receiver matches.
+    if(!a)a=p.input.actions.find(a=>!a.mechanicId&&a.behavior==='operation'&&a.valueType===valueType&&a.trigger===(valueType==='axis2d'?'continuous':'pressed')&&a.operation?.id===operationId&&a.operation.version===1&&(behavior==='look'?a.operation.parameters?.delta?.op==='get'&&a.operation.parameters.delta.path==='args.value'&&(a.operation.parameters.device==='pointer'||a.operation.parameters.device?.op==='get'&&a.operation.parameters.device.path==='args.device'):a.operation.parameters?.owner?.mode==='direct'&&a.operation.parameters.owner.type==='object'&&a.operation.parameters.owner.id===m.scope.id&&(!['shoot','reload'].includes(behavior)||a.operation.parameters.weapon?.mode==='direct'&&a.operation.parameters.weapon.id===m.recordId)));
+    if(!a){a={id:uid('input-action'),name,behavior:'operation',mechanicId:m.id,operation:{id:operationId,version:1,parameters:behavior==='look'?{delta:{op:'get',path:'args.value'},device:'pointer'}:{owner:{kind:'reference',type:'object',mode:'direct',id:m.scope.id},...(behavior==='shoot'||behavior==='reload'?{weapon:{kind:'reference',type:'weapon',mode:'direct',id:m.recordId}}:{})}},valueType,trigger:valueType==='axis2d'?'continuous':'pressed',holdSeconds:.4,consume:true};p.input.actions.push(a);}if(!p.input.contexts.some(c=>c.bindings.some(b=>b.actionId===a.id&&b.device===device&&b.control===control)))context.bindings.push({id:uid('binding'),actionId:a.id,device,control,scale:valueType==='axis2d'?[1,1]:1,deadZone:0});}
 }
 export function removeMechanic(project,m) {
   const g=project.gameplay;
@@ -79,7 +82,18 @@ export function removeMechanic(project,m) {
   // Authored events/functions remain in their libraries: they may be used elsewhere.
 }
 const pInputIds=(p,id)=>new Set(p.input.actions.filter(a=>a.mechanicId===id).map(a=>a.id));
-export function connectMechanicInput(p,m){connectInput(p,m.type==='weapon'?['shoot','reload']:m.type==='camera'?['look']:['jump'],m);}
+export function retainMechanicAttachment(p,m){
+  const current=mechanicsFor(p).find(x=>x.id===m.id);
+  if(!current)throw Error('Подключение недоступно. Выберите существующую механику.');
+  // Store only the attachment identity, never a second camera/controller config.
+  // The inspector can re-enable it even after movement is switched off.
+  if(!p.gameplay.mechanics.some(x=>x.id===current.id))p.gameplay.mechanics.push({id:current.id,type:current.type,recordId:current.recordId,scope:structuredClone(current.scope)});
+  return current;
+}
+export function connectMechanicInput(p,m){
+  const current=retainMechanicAttachment(p,m);
+  connectInput(p,current.type==='weapon'?['shoot','reload']:current.type==='camera'?['look']:['jump'],current);
+}
 function ruleFor(p,m,signal){const r=createRule({signal,scope:structuredClone(m.scope),once:true,name:definitions.get(m.type).name,filter:m.scope.kind==='object'?{[signal==='interact'?'target':'source']:{kind:'reference',type:'object',mode:'context',role:'self'}}:{}});p.gameplay.rules.push(r);m.ruleId=r.id;return r;}
 function eventFor(p,m,name,actions){const e={id:uid('event'),name,description:'Редактируемая механика',owner:m.scope.kind==='project'?'GameSession':'SubScene',retention:'AUTO_CLOSE_ON_FLOW_END',groups:[{id:uid('group'),name:'Сделать',actions}]};p.events.push(e);m.eventId=e.id;return e;}
 const definition=(id,name,scopes,description,add)=>registerMechanic({id,name,scopes,description,add});

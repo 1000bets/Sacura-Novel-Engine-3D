@@ -3255,5 +3255,21 @@
   "Положение — место появления при запуске сцены.": "Position is the spawn location when the scene starts.",
   "Размещение события": "Event placement",
   "Убрать из реплики": "Remove from beat",
-  "Старт игрока": "Player start"
+  "Старт игрока": "Player start",
+  "Основная": "Default",
+  "Неподвижная": "Fixed",
+  "Слежение": "Follow",
+  "Персонаж недоступен. Используется сохранённый кадр.": "Character unavailable. Using the saved shot.",
+  "В сцене": "In scene",
+  "Взять текущий вид": "Use current view",
+  "Подберите кадр мышью и сохраните ракурс.": "Adjust the shot with the mouse, then save it.",
+  "Координаты": "Coordinates",
+  "Плавность, с": "Smoothing, s",
+  "Ракурс, °": "Angle, °",
+  "Высота взгляда": "Eye height",
+  "Камеры сцены": "Scene cameras",
+  "Подключить клавиши и мышь": "Connect keyboard and mouse",
+  "Прыжок и гравитация": "Jump and gravity",
+  "Захватывать мышь": "Capture mouse",
+  "Объявлено в коде · SerializeField. Измените объявление и скомпилируйте скрипт.": "Declared in code · SerializeField. Edit the declaration and compile the script."
 }

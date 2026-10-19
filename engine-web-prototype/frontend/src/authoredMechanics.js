@@ -1,3 +1,4 @@
+import {assertScriptFieldParameters} from './serializedFields.js';
 import {signalDefinition} from './signalModel.js';
 import {isComponent,assertComponentDefinition} from './componentModel.js';
 import {uid} from './model.js';
@@ -47,6 +48,8 @@ export function validateAuthoredDefinition(project,d){
 export function planAuthoringChange(project,build){const next=structuredClone(project),record=build(next),paths=[['logicResources'],['gameplay','signals'],['functions'],['events'],['gameplay','mechanicDefinitions'],['gameplay','mechanics'],['gameplay','rules'],['gameplay','variableBindings']];const at=(p,path)=>path.reduce((p,k)=>p[k],p);const additions=paths.map(path=>[path,(at(next,path)||[]).filter(r=>!(at(project,path)||[]).some(x=>x.id===r.id))]);return {record,apply(p){for(const [path,records]of additions){const target=at(p,path);for(const r of records){if(target.some(x=>x.id===r.id))throw Error('Копия уже добавлена.');target.push(structuredClone(r));}}p.gameplay.enabled=next.gameplay.enabled;}};}
 export function updateDefinitionParameters(project,id,version,schema,defaults){
  const d=descriptionFor(project,id,version),removed=Object.keys(d.parameters.properties).filter(k=>!Object.hasOwn(schema.properties,k));
+ const source=project.functions.find(f=>f.id===d.logic?.functionId);
+ if(source?.mechanicScript)assertScriptFieldParameters({...source,parameters:Object.entries(schema.properties).map(([name,s])=>({name,label:s.label||name,schema:{...s,...(defaults[name]!==undefined?{default:defaults[name]}:{})},...(defaults[name]!==undefined?{default:defaults[name]}:{})}))});
  d.parameters={...schema,properties:Object.fromEntries(Object.entries(schema.properties).map(([key,s])=>[key,{...s,...(defaults[key]!==undefined?{default:structuredClone(defaults[key])}:{})}]))};
  d.exposed=(d.exposed||Object.keys(d.parameters.properties)).filter(k=>Object.hasOwn(schema.properties,k));
  for(const m of project.gameplay.mechanics.filter(m=>m.definitionId===id&&m.definitionVersion===version))for(const key of removed)delete m.values[key];

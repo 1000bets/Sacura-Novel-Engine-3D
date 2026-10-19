@@ -1,43 +1,41 @@
 import {t as tr, useLocale, literalLabel} from './i18n.jsx';
 import React from 'react';
 import {Icon,Button,Field,Select} from './StudioParts.jsx';
+import Section from './InspectorSection.jsx';
 import {cameraPose} from './cameraModel.js';
-
-function Section({title,children}){
- useLocale();
- return <details className="inspector-section" open><summary><Icon name="ChevronRight" size={12}/><span>{tr(title)}</span></summary><div className="inspector-fields">{children}</div></details>;
-}
+import './cameraInspector.css';
 
 export default function CameraInspector({camera:c,scene,objects,state,onChange,onDefault,onDelete,onPilot,onView,onCapture,piloting,running,onEdit}){
  useLocale();
  const characters=objects.filter(o=>o.type==='Персонаж'&&o.active!==false),pose=cameraPose(c,state,objects,scene.kind);
- const patch=value=>onChange(c.id,value);
- const hints={fov:'Меньше угол — крупнее герой; больше — больше окружения в кадре.',smoothing:'0 — мгновенное изменение. Чем больше значение, тем плавнее движение.',distance:'Расстояние от персонажа до камеры.',height:'Высота камеры над уровнем персонажа.',yaw:'Поворот камеры вокруг персонажа.',targetHeight:'Высота точки взгляда: например, лицо героя.'};
- const range=(key,label,min,max,step,unit)=><label className="camera-range" title={tr(hints[key])} data-help-title={tr(label)} data-help={tr(hints[key])}><span>{tr(label)}<b>{Number(c[key]).toFixed(step<1?1:0)}{tr(unit)}</b></span><input aria-label={tr(label)} type="range" min={min} max={max} step={step} value={c[key]} onChange={e=>patch({[key]:Number(e.target.value)})}/></label>;
- return <div className="camera-inspector">
-  {running&&<p className="camera-step-note">{tr("Остановите предпросмотр, чтобы изменить камеру. ")}<Button icon="Square" onClick={onEdit}>{tr("Остановить")}</Button></p>}
-  <Section title={tr("Камера")}>
+ const patch=value=>onChange(c.id,value),following=c.mode==='follow';
+ const number=(key,label,min,max,step=.1)=><Field label={label}><input aria-label={tr(label)} type="number" min={min} max={max} step={step} value={Number(c[key].toFixed(3))} onChange={e=>{if(e.target.value!==''&&Number.isFinite(e.target.valueAsNumber))patch({[key]:e.target.valueAsNumber});}}/></Field>;
+ return <div className="story-inspector camera-inspector">
+  <header className="story-inspector-heading"><Icon name="Camera" size={16}/><strong>{tr('Камера')}</strong>{c.id===scene.defaultCameraId&&<small><Icon name="Star" size={12}/>{tr('Основная')}</small>}</header>
+  {running&&<div className="camera-play-notice"><span>{tr('Предпросмотр')}</span><Button icon="Square" onClick={onEdit}>{tr('Остановить')}</Button></div>}
+  <fieldset disabled={running} className="inspector-primary-fields">
+   <Field label="Название"><input aria-label={tr('Название камеры')} value={c.name} onChange={e=>patch({name:e.target.value})}/></Field>
+   <Field label="Режим"><Select value={c.mode} options={[["fixed","Неподвижная"],...(characters.length||following?[["follow","Слежение"]]:[])]} onChange={mode=>patch(mode==='fixed'?{mode,position:pose.position,target:pose.target}:{mode,followTargetId:c.followTargetId||characters[0]?.id})}/></Field>
+   {following&&<><Field label="Персонаж"><Select value={c.followTargetId||''} options={[["","Выберите персонажа"],...(!characters.some(o=>o.id===c.followTargetId)&&c.followTargetId?[[c.followTargetId,'Персонаж недоступен']]:[]),...characters.map(o=>[o.id,literalLabel(o.name)])]} onChange={followTargetId=>patch({followTargetId})}/></Field>{pose.targetMissing&&<p role="alert" className="camera-error">{tr('Персонаж недоступен. Используется сохранённый кадр.')}</p>}</>}
+   {number('fov','Угол обзора',20,90,1)}
+   {following&&<>{number('distance','Расстояние',.6,20)}{number('height','Высота камеры',undefined,undefined)}</>}
+   {c.id!==scene.defaultCameraId&&<Button icon="Star" onClick={()=>onDefault(c.id)}>{tr('Сделать основной')}</Button>}
+  </fieldset>
+  <div className="camera-shot-actions">
+   <Button icon="Eye" onClick={()=>onView(c.id)}>{tr('Посмотреть')}</Button>
+   <Button icon="Move" disabled={running} aria-pressed={piloting===c.id} className={piloting===c.id?'active':''} onClick={()=>onPilot(c.id)}>{tr('В сцене')}</Button>
+   <Button icon="ScanLine" disabled={running} onClick={()=>onCapture(c.id)}>{piloting===c.id?tr('Сохранить ракурс'):tr('Взять текущий вид')}</Button>
+   {piloting===c.id&&<p className="camera-pilot-hint">{tr('Подберите кадр мышью и сохраните ракурс.')}</p>}
+  </div>
+  {!following&&<Section title="Координаты" open={false}>
+   <fieldset disabled={running} className="camera-coordinate-fields">{['position','target'].map(key=><div className="camera-vector" key={key}><span>{key==='position'?tr('Положение камеры'):tr('Точка взгляда')}</span><div>{c[key].map((value,i)=><label key={i}><b className={'axis-'+'XYZ'[i]}>{'XYZ'[i]}</b><input aria-label={`${tr(key==='position'?'Камера':'Точка взгляда')} ${'XYZ'[i]}`} type="number" step=".1" value={Number(value.toFixed(2))} onChange={e=>{if(e.target.value!==''&&Number.isFinite(e.target.valueAsNumber))patch({[key]:c[key].map((n,j)=>i===j?e.target.valueAsNumber:n)});}}/></label>)}</div></div>)}</fieldset>
+  </Section>}
+  <Section title="Дополнительно" open={false}>
    <fieldset disabled={running}>
-    <Field label={tr("Название")}><input aria-label={tr("Название камеры")} value={c.name} onChange={e=>patch({name:e.target.value})}/></Field>
-    {c.id===scene.defaultCameraId?<span className="camera-default"><Icon name="Star" size={14}/>{tr("Основная камера")}</span>:<Button icon="StarOff" onClick={()=>onDefault(c.id)}>{tr("Сделать основной")}</Button>}
-    <Field label={tr("Режим")}><Select value={c.mode} options={[["fixed","Стоит на месте"],...(characters.length||c.mode==='follow'?[["follow","Следует за персонажем"]]:[])]} onChange={mode=>patch(mode==='fixed'?{mode,position:pose.position,target:pose.target}:{mode,followTargetId:c.followTargetId||characters[0]?.id})}/></Field>
-    {c.mode==='follow'&&<><Field label={tr("Персонаж")}><Select value={c.followTargetId||''} options={[["","Выберите персонажа"],...(!characters.some(o=>o.id===c.followTargetId)&&c.followTargetId?[[c.followTargetId,'Персонаж недоступен']]:[]),...characters.map(o=>[o.id,literalLabel(o.name)])]} onChange={followTargetId=>patch({followTargetId})}/></Field>{pose.targetMissing&&<p className="camera-error">{tr("Персонаж скрыт или отсутствует в этой сабсцене. Используется сохранённый неподвижный кадр.")}</p>}</>}
+    {number('smoothing','Плавность, с',0,2)}
+    {following&&<>{number('yaw','Ракурс, °',-180,180,1)}{number('targetHeight','Высота взгляда',undefined,undefined)}</>}
    </fieldset>
   </Section>
-  <Section title={tr("Объектив и движение")}>
-   <fieldset disabled={running} className="camera-lens-grid">
-    {range('fov','Угол обзора',20,90,1,'°')}{range('smoothing','Плавность',0,2,.1,' с')}
-    {c.mode==='follow'&&<>{range('distance','Расстояние',.6,10,.1,' м')}{range('height','Высота камеры',.3,5,.1,' м')}{range('yaw','Ракурс вокруг героя',-180,180,1,'°')}{range('targetHeight','Смотреть на высоту',.2,1.6,.1,' м')}</>}
-   </fieldset>
-  </Section>
-  <Section title={tr("Положение и точка взгляда")}>
-   {c.mode==='follow'&&<p className="camera-step-note">{tr("Координаты вычисляются по положению персонажа. Настройте расстояние, высоту и ракурс выше.")}</p>}
-   <fieldset disabled={running||c.mode==='follow'} className="camera-coordinate-fields">{['position','target'].map(key=><div className="camera-vector" key={key}><span>{key==='position'?tr("Положение камеры"):tr("Точка взгляда")}</span><div>{c[key].map((value,i)=><label key={i}><b className={'axis-'+'XYZ'[i]}>{'XYZ'[i]}</b><input aria-label={`${tr(key==='position'?'Камера':'Точка взгляда')} ${'XYZ'[i]}`} type="number" step=".1" value={Number(value.toFixed(2))} onChange={e=>patch({[key]:c[key].map((n,j)=>i===j?Number(e.target.value):n)})}/></label>)}</div></div>)}</fieldset>
-  </Section>
-  <Section title={tr("Настроить кадр в сцене")}>
-   <div className="camera-shot-actions"><Button icon="Eye" onClick={()=>onView(c.id)}>{tr("Посмотреть кадр")}</Button><Button icon="Move" disabled={running} className={piloting===c.id?'active':''} onClick={()=>onPilot(c.id)}>{piloting===c.id?tr("Настройка в сцене…"):tr("Настроить в сцене")}</Button><Button icon="ScanLine" disabled={running} onClick={()=>onCapture(c.id)}>{piloting===c.id?tr("Сохранить ракурс"):tr("Взять текущий вид сцены")}</Button></div>
-   {piloting===c.id&&<p className="camera-step-note">{tr("Подберите кадр мышью в сцене, затем нажмите «Сохранить ракурс». Крестик над сценой отменяет настройку.")}</p>}
-  </Section>
-  <Button icon="Trash2" disabled={running} onClick={()=>onDelete(c.id)}>{tr("Удалить камеру")}</Button>
+  <div className="inspector-footer-action"><Button icon="Trash2" disabled={running} onClick={()=>onDelete(c.id)}>{tr('Удалить камеру')}</Button></div>
  </div>;
 }

@@ -1,3 +1,4 @@
+import {assertScriptFieldParameters} from './serializedFields.js';
 import {assertPublishedSource,componentExecutableSource} from './componentSources.js';
 import {assertComponentMethodReceiver,componentFunctionOwner} from './componentCatalog.js';
 import {variableType} from './variableModel.js';
@@ -141,7 +142,7 @@ export function validateFunctions(p){
   if(!f?.id||!Array.isArray(f.parameters)||!Array.isArray(f.nodes)||f.nodes.some(n=>!n||typeof n!=='object')||!f.logicResourceId&&!f.nodes.some(n=>n.id===f.entry)){bad(f?.id,'Функции нужны параметры, ноды и точка входа.');continue;}
   if(functionIds.has(f.id))bad(f.id,'ID функций повторяются.');functionIds.add(f.id);
   if(f.localSchema)try{assertSchema(f.localSchema);for(const e of validateValue(f.localSchema,f.locals,{project:p,allowDeferred:true}))bad(f.id,e.message);}catch(e){bad(f.id,e.message);}
-  if(f.mechanicScript)try{assertMechanicScript(f.mechanicScript);}catch(e){bad(f.id,e.message);}
+  if(f.mechanicScript)try{assertMechanicScript(f.mechanicScript);assertScriptFieldParameters(f);}catch(e){bad(f.id,e.message);}
   if(f.resultSchema)try{assertSchema(f.resultSchema);}catch(e){bad(f.id,e.message);}
   const params=new Set();for(const a of f.parameters){if(a?.schema){try{assertSchema(a.schema);}catch(e){bad(f.id,e.message);}}if(!a||typeof a.name!=='string'||!a.name||!safe(a.name)||params.has(a.name)||!a.schema&&!['number','boolean','string','array','struct'].includes(a.type)||a.referenceType&&(!['object','item','scene','event','function'].includes(a.referenceType)||a.type!=='string'))bad(f.id,'Проверьте имена и типы параметров.');params.add(a?.name);}
   if(!f.logicResourceId)for(const issue of validateFunctionGraph(p,f))bad(issue.nodeId,issue.message);
