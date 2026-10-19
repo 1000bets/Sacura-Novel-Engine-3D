@@ -19,6 +19,7 @@ enum class PropertyAccessContext : uint8_t
 
 struct PropertyAccess
 {
+    static ReflectionDiagnostic ValidatePropertyValue(const PropertyDescriptor& Descriptor, const ReflectedValue& Value);
     static ReflectionDiagnostic GetProperty(
         Object* Instance,
         const PropertyId& Property,

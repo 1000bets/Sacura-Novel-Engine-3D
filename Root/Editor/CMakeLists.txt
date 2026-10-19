@@ -45,6 +45,7 @@ set(EDITOR_HDR
     inc/Viewport/EditorViewportWidget.h
     inc/Launcher/ProjectBrowserDialog.h
     inc/Panels/ReflectionInspector.h
+    inc/Panels/ReflectionValueEditor.h
     inc/Launcher/TemplateCardWidget.h
 )
 

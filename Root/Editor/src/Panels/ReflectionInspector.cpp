@@ -1,5 +1,5 @@
 #include "Panels/ReflectionInspector.h"
-#include "Panels/MaterialBindingsDialog.h"
+#include "Panels/ReflectionValueEditor.h"
 
 #include "Core/Object/Object.h"
 #include "Assets/AssetRegistry.h"
@@ -232,7 +232,7 @@ void ReflectionInspector::ApplyBoolValue(const PropertyId& Property, bool Value)
 
 void ReflectionInspector::ApplyFloatValue(const PropertyId& Property, double Value)
 {
-    if (CommitProperty(Property, ReflectedValue::MakeFloat(static_cast<float>(Value))))
+    if (CommitProperty(Property, ReflectedValue::MakeFloat64(Value)))
     {
         emit PropertyChanged();
     }
@@ -257,23 +257,6 @@ void ReflectionInspector::ApplyStringValue(const PropertyId& Property, const QSt
 void ReflectionInspector::ApplyVector3Value(const PropertyId& Property, float X, float Y, float Z)
 {
     float Values[3] = {X, Y, Z};
-    ReflectedValue Updated = ReflectedValue::MakeEmpty();
-    Updated.ValueKind = ReflectedValue::Kind::Bytes;
-    Updated.BytesValue.resize(sizeof(Values));
-    std::memcpy(Updated.BytesValue.data(), Values, sizeof(Values));
-    if (CommitProperty(Property, Updated))
-    {
-        emit PropertyChanged();
-    }
-    else
-    {
-        Rebuild();
-    }
-}
-
-void ReflectionInspector::ApplyColorValue(const PropertyId& Property, float R, float G, float B, float A)
-{
-    float Values[4] = {R, G, B, A};
     ReflectedValue Updated = ReflectedValue::MakeEmpty();
     Updated.ValueKind = ReflectedValue::Kind::Bytes;
     Updated.BytesValue.resize(sizeof(Values));
@@ -379,26 +362,35 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
     QHBoxLayout* FieldLayout = new QHBoxLayout(FieldWidget);
     FieldLayout->setContentsMargins(0, 0, 0, 0);
 
-    if (Descriptor.ValueTypeId.Value == "engine.MaterialSlots" || Descriptor.ValueTypeId.Value == "engine.PostProcessEffects")
+    if (CurrentValue.ValueKind == ReflectedValue::Kind::Struct
+        || CurrentValue.ValueKind == ReflectedValue::Kind::Array
+        || CurrentValue.ValueKind == ReflectedValue::Kind::TypeId
+        || CurrentValue.ValueKind == ReflectedValue::Kind::ObjectReference
+        || CurrentValue.ValueKind == ReflectedValue::Kind::AssetReference
+        || CurrentValue.ValueKind == ReflectedValue::Kind::Enum
+        || Descriptor.ValueTypeId.Value == "engine.Quaternion"
+        || Descriptor.ValueTypeId.Value == "engine.EulerAngles")
     {
-        auto* Edit = new QPushButton(tr("Edit Material Bindings…"), FieldWidget);
-        Edit->setEnabled(bEditable && Registry != nullptr);
-        FieldLayout->addWidget(Edit, 1);
-        connect(Edit, &QPushButton::clicked, this, [this, Descriptor]()
+        Scene* World = nullptr;
+        if (Component* InspectedComponent = dynamic_cast<Component*>(InspectedObject))
         {
-            ReflectedValue Current;
-            if (!PropertyAccess::GetProperty(InspectedObject, Descriptor, Current, PropertyAccessContext::Inspector).bOk)
+            if (GameObject* Owner = InspectedComponent->GetGameObject())
             {
-                return;
+                World = Owner->GetScene();
             }
-            MaterialBindingsDialog Dialog(*Registry, nlohmann::json::parse(Current.StringValue),
-                Descriptor.ValueTypeId.Value == "engine.PostProcessEffects", this);
-            if (Dialog.exec() == QDialog::Accepted && CommitProperty(Descriptor.Id, ReflectedValue::MakeString(Dialog.GetEntries().dump())))
+        }
+        auto* Editor = new ReflectionValueEditor(Descriptor.ValueTypeId, CurrentValue, Descriptor.Attributes,
+            bEditable, Registry, World, [this, Property](const ReflectedValue& Updated)
             {
-                Rebuild();
-                emit PropertyChanged();
-            }
-        });
+                const bool bCommitted = CommitProperty(Property, Updated);
+                if (bCommitted)
+                {
+                    emit PropertyChanged();
+                }
+                return bCommitted;
+            }, FieldWidget);
+        Editor->setObjectName(QString::fromStdString(Property.Value));
+        FieldLayout->addWidget(Editor);
     }
     else if (Descriptor.Attributes.AssetTypeFilter != nullptr || !Descriptor.Attributes.AllowedAssetTypes.empty())
     {
@@ -648,43 +640,6 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
             connect(SpinX, qOverload<double>(&QDoubleSpinBox::valueChanged), this, CommitVector);
             connect(SpinY, qOverload<double>(&QDoubleSpinBox::valueChanged), this, CommitVector);
             connect(SpinZ, qOverload<double>(&QDoubleSpinBox::valueChanged), this, CommitVector);
-        }
-    }
-    else if (Descriptor.ValueTypeId.Value == "engine.Color")
-    {
-        float Values[4] = {1.f, 1.f, 1.f, 1.f};
-        if (CurrentValue.ValueKind == ReflectedValue::Kind::Bytes && CurrentValue.BytesValue.size() == sizeof(float) * 4)
-        {
-            std::memcpy(Values, CurrentValue.BytesValue.data(), sizeof(Values));
-        }
-
-        QPushButton* ColorButton = new QPushButton(FieldWidget);
-        const QColor CurrentColor = QColor::fromRgbF(Values[0], Values[1], Values[2], Values[3]);
-        ColorButton->setText(CurrentColor.name(QColor::HexArgb));
-        ColorButton->setEnabled(bEditable);
-        FieldLayout->addWidget(ColorButton, 1);
-
-        if (bEditable)
-        {
-            connect(ColorButton, &QPushButton::clicked, this, [this, Property, ColorButton, CurrentColor]()
-            {
-                const QColor Picked = QColorDialog::getColor(
-                    CurrentColor,
-                    this,
-                    tr("Pick Color"),
-                    QColorDialog::ShowAlphaChannel);
-                if (!Picked.isValid())
-                {
-                    return;
-                }
-                ColorButton->setText(Picked.name(QColor::HexArgb));
-                ApplyColorValue(
-                    Property,
-                    static_cast<float>(Picked.redF()),
-                    static_cast<float>(Picked.greenF()),
-                    static_cast<float>(Picked.blueF()),
-                    static_cast<float>(Picked.alphaF()));
-            });
         }
     }
     else

@@ -333,6 +333,7 @@ SceneSerializeResult SceneSerializer::DeserializeFromJson(const std::string& Jso
     std::unordered_set<std::string> SeenObjectIds;
     std::unordered_set<std::string> SeenComponentIds;
     std::vector<Component*> DeferredCreate;
+    std::vector<std::pair<Component*, ReflectionJsonDocument>> PendingDocuments;
 
     const nlohmann::json& ObjectsJson = Root.at("objects");
     for (const nlohmann::json& ObjectJson : ObjectsJson)
@@ -475,14 +476,7 @@ SceneSerializeResult SceneSerializer::DeserializeFromJson(const std::string& Jso
                     ComponentDocument.Properties = nlohmann::json::object();
                 }
 
-                ReflectionDiagnostic Applied = ReflectionJson::DeserializeInto(ComponentInstance, ComponentDocument, true);
-                if (!Applied.bOk)
-                {
-                    Memory->DestroyObject(ComponentInstance);
-                    Result.Error = Applied.Message;
-                    DestroyPartialScene(CreatedScene, Memory);
-                    return Result;
-                }
+                PendingDocuments.emplace_back(ComponentInstance, std::move(ComponentDocument));
 
                 if (ComponentJson.contains("bEnabled") && ComponentJson.at("bEnabled").is_boolean())
                 {
@@ -526,6 +520,18 @@ SceneSerializeResult SceneSerializer::DeserializeFromJson(const std::string& Jso
         if (!ChildIterator->second->SetParent(ParentIterator->second))
         {
             Result.Error = "Failed to apply parent '" + Pair.second + "' to '" + Pair.first + "'";
+            DestroyPartialScene(CreatedScene, Memory);
+            return Result;
+        }
+    }
+
+    for (const auto& Pending : PendingDocuments)
+    {
+        ReflectionDiagnostic Applied = ReflectionJson::DeserializeInto(
+            Pending.first, Pending.second, true, ReflectionJson::MakeSceneResolver(*CreatedScene));
+        if (!Applied.bOk)
+        {
+            Result.Error = Applied.Message;
             DestroyPartialScene(CreatedScene, Memory);
             return Result;
         }
@@ -864,6 +870,7 @@ SceneSerializeResult SceneSerializer::DeserializeSubtreeFromJson(
         }
     }
     std::vector<Component*> DeferredCreate;
+    std::vector<std::pair<Component*, ReflectionJsonDocument>> PendingDocuments;
     std::vector<GameObject*> CreatedObjects;
     std::string RootDocumentId;
 
@@ -994,14 +1001,7 @@ SceneSerializeResult SceneSerializer::DeserializeSubtreeFromJson(
                 ComponentDocument.Properties = nlohmann::json::object();
             }
 
-            ReflectionDiagnostic Applied = ReflectionJson::DeserializeInto(ComponentInstance, ComponentDocument, true);
-            if (!Applied.bOk)
-            {
-                Memory->DestroyObject(ComponentInstance);
-                Result.Error = Applied.Message;
-                DestroyCreatedSubtreeObjects(TargetScene, CreatedObjects);
-                return Result;
-            }
+            PendingDocuments.emplace_back(ComponentInstance, std::move(ComponentDocument));
 
             if (ComponentJson.contains("bEnabled") && ComponentJson.at("bEnabled").is_boolean())
             {
@@ -1049,6 +1049,18 @@ SceneSerializeResult SceneSerializer::DeserializeSubtreeFromJson(
         if (!RestoredRoot->SetParent(OptionalParent))
         {
             Result.Error = "Failed to attach restored subtree to parent";
+            DestroyCreatedSubtreeObjects(TargetScene, CreatedObjects);
+            return Result;
+        }
+    }
+
+    for (const auto& Pending : PendingDocuments)
+    {
+        ReflectionDiagnostic Applied = ReflectionJson::DeserializeInto(
+            Pending.first, Pending.second, true, ReflectionJson::MakeSceneResolver(TargetScene));
+        if (!Applied.bOk)
+        {
+            Result.Error = Applied.Message;
             DestroyCreatedSubtreeObjects(TargetScene, CreatedObjects);
             return Result;
         }
@@ -1176,7 +1188,19 @@ SceneSerializeResult SceneSerializer::DeserializeComponentFromJson(
         ComponentDocument.Properties = nlohmann::json::object();
     }
 
-    ReflectionDiagnostic Applied = ReflectionJson::DeserializeInto(ComponentInstance, ComponentDocument, true);
+    ReflectionJson::ObjectResolver ResolveObject = [ComponentInstance, &Owner](const std::string& Identity)
+    {
+        if (ComponentInstance->GetPersistentId() == Identity)
+        {
+            return ComponentInstance->GetObjectHandle();
+        }
+        if (Scene* World = Owner.GetScene())
+        {
+            return ReflectionJson::MakeSceneResolver(*World)(Identity);
+        }
+        return ObjectHandle{};
+    };
+    ReflectionDiagnostic Applied = ReflectionJson::DeserializeInto(ComponentInstance, ComponentDocument, true, ResolveObject);
     if (!Applied.bOk)
     {
         Memory->DestroyObject(ComponentInstance);

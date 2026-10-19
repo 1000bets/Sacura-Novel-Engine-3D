@@ -138,6 +138,7 @@ set(ENGINE_HDR
     inc/Reflection/Class.h
     inc/Reflection/ClassRef.h
     inc/Reflection/EnumDescriptor.h
+    inc/Reflection/EulerAngles.h
     inc/Reflection/Json/ReflectionJson.h
     inc/Reflection/PendingRegistry.h
     inc/Reflection/PropertyAccess.h

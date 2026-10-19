@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Reflection/TypeId.h"
+#include "Core/Object/ObjectHandle.h"
+#include "Assets/AssetTypes.h"
 
 #include <cstdint>
 #include <string>
@@ -21,7 +23,12 @@ struct ReflectedValue
         String,
         TypeId,
         ObjectId,
-        Bytes
+        Bytes,
+        Struct,
+        Array,
+        ObjectReference,
+        AssetReference,
+        Enum
     };
 
     Kind ValueKind = Kind::Empty;
@@ -32,6 +39,22 @@ struct ReflectedValue
     TypeId TypeIdValue{};
     uint64_t ObjectIdValue = 0;
     std::vector<uint8_t> BytesValue;
+    ObjectHandle ObjectValue{};
+    AssetKey AssetValue{};
+    std::vector<std::string> FieldNames;
+    std::vector<ReflectedValue> Values;
+
+    const ReflectedValue* FindField(const std::string& Name) const
+    {
+        for (size_t FieldIndex = 0; FieldIndex < FieldNames.size() && FieldIndex < Values.size(); ++FieldIndex)
+        {
+            if (FieldNames[FieldIndex] == Name)
+            {
+                return &Values[FieldIndex];
+            }
+        }
+        return nullptr;
+    }
 
     static ReflectedValue MakeEmpty() { return {}; }
     static ReflectedValue MakeBool(bool Value);

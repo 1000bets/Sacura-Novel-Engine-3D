@@ -10,6 +10,8 @@
 #include "World/GameObject.h"
 #include "World/Components/ScriptComponent.h"
 #include "Reflection/PropertyAccess.h"
+#include "Reflection/ReflectionValueCodec.h"
+#include "Reflection/Json/ReflectionJson.h"
 #include "Reflection/ReflectionSubsystem.h"
 
 #include <cstring>
@@ -79,63 +81,40 @@ TypeId ResolvePythonValueTypeId(const py::object& TypeObject)
     }
     if (py::isinstance<py::str>(TypeObject))
     {
-        return TypeId{TypeObject.cast<std::string>()};
+        const TypeId Candidate{TypeObject.cast<std::string>()};
+        if (ReflectionSubsystem::Get().FindType(Candidate) != nullptr)
+        {
+            return Candidate;
+        }
+        const std::string Prefix = "engine.ClassRef<";
+        if (Candidate.Value.find(Prefix) == 0 && Candidate.Value.back() == '>')
+        {
+            const TypeId BaseType{Candidate.Value.substr(Prefix.size(), Candidate.Value.size() - Prefix.size() - 1)};
+            if (ReflectionSubsystem::Get().FindClass(BaseType) != nullptr)
+            {
+                return RegisterReflectionClassType(BaseType);
+            }
+        }
+        return {};
     }
     return {};
 }
 
+ReflectedValue PythonToReflected(const py::object& Value, const TypeId& ValueTypeId);
+
 ReflectedValue MakeDefaultFromPython(const TypeId& ValueTypeId, const py::object& DefaultObject)
 {
-    if (DefaultObject.is_none())
+    if (!DefaultObject.is_none())
     {
-        if (ValueTypeId.Value == "engine.bool")
-        {
-            return ReflectedValue::MakeBool(false);
-        }
-        if (ValueTypeId.Value == "engine.int64")
-        {
-            return ReflectedValue::MakeInt64(0);
-        }
-        if (ValueTypeId.Value == "engine.float" || ValueTypeId.Value == "engine.double")
-        {
-            return ReflectedValue::MakeFloat(0.f);
-        }
-        if (ValueTypeId.Value == "engine.string")
-        {
-            return ReflectedValue::MakeString("");
-        }
-        return ReflectedValue::MakeEmpty();
+        return PythonToReflected(DefaultObject, ValueTypeId);
     }
-
-    if (ValueTypeId.Value == "engine.bool")
+    ReflectedValue Result;
+    ReflectionDiagnostic Converted = MakeDefaultReflectionValue(ValueTypeId, Result);
+    if (!Converted.bOk)
     {
-        return ReflectedValue::MakeBool(DefaultObject.cast<bool>());
+        throw py::value_error(Converted.Message);
     }
-    if (ValueTypeId.Value == "engine.int64")
-    {
-        return ReflectedValue::MakeInt64(DefaultObject.cast<int64_t>());
-    }
-    if (ValueTypeId.Value == "engine.float" || ValueTypeId.Value == "engine.double")
-    {
-        return ReflectedValue::MakeFloat(static_cast<float>(DefaultObject.cast<double>()));
-    }
-    if (ValueTypeId.Value == "engine.string")
-    {
-        return ReflectedValue::MakeString(DefaultObject.cast<std::string>());
-    }
-    if (ValueTypeId.Value == "engine.Vector3")
-    {
-        const float X = DefaultObject.attr("x").cast<float>();
-        const float Y = DefaultObject.attr("y").cast<float>();
-        const float Z = DefaultObject.attr("z").cast<float>();
-        ReflectedValue Value = ReflectedValue::MakeEmpty();
-        Value.ValueKind = ReflectedValue::Kind::Bytes;
-        Value.BytesValue.resize(sizeof(float) * 3);
-        float Values[3] = {X, Y, Z};
-        std::memcpy(Value.BytesValue.data(), Values, sizeof(Values));
-        return Value;
-    }
-    return ReflectedValue::MakeEmpty();
+    return Result;
 }
 
 py::object ReflectedToPython(const ReflectedValue& Value)
@@ -150,23 +129,156 @@ py::object ReflectedToPython(const ReflectedValue& Value)
         return py::float_(Value.Float64Value);
     case ReflectedValue::Kind::String:
         return py::str(Value.StringValue);
-    case ReflectedValue::Kind::Bytes:
-        if (Value.BytesValue.size() == sizeof(float) * 3)
+    case ReflectedValue::Kind::TypeId:
+        return py::str(Value.TypeIdValue.Value);
+    case ReflectedValue::Kind::ObjectReference:
+        if (Value.ObjectValue.IsValid())
         {
-            float Values[3] = {};
-            std::memcpy(Values, Value.BytesValue.data(), sizeof(Values));
-            py::module_ EngineModule = py::module_::import("engine");
-            return EngineModule.attr("Vector3")(Values[0], Values[1], Values[2]);
+            return py::module_::import("engine").attr("Object")(Value.ObjectValue.Id, Value.ObjectValue.Generation);
         }
-        break;
-    default:
-        break;
+        return py::none();
+    case ReflectedValue::Kind::AssetReference:
+    {
+        py::dict Result;
+        Result["assetId"] = Value.AssetValue.Asset.ToString();
+        Result["subAssetId"] = py::none();
+        if (Value.AssetValue.SubAsset.has_value())
+        {
+            Result["subAssetId"] = py::str(Value.AssetValue.SubAsset->ToString());
+        }
+        return Result;
     }
-    return py::none();
+    case ReflectedValue::Kind::Struct:
+    {
+        py::dict Result;
+        for (size_t FieldIndex = 0; FieldIndex < Value.Values.size(); ++FieldIndex)
+        {
+            Result[py::str(Value.FieldNames[FieldIndex])] = ReflectedToPython(Value.Values[FieldIndex]);
+        }
+        return Result;
+    }
+    case ReflectedValue::Kind::Array:
+    {
+        py::list Result;
+        for (const ReflectedValue& Element : Value.Values)
+        {
+            Result.append(ReflectedToPython(Element));
+        }
+        return Result;
+    }
+    case ReflectedValue::Kind::Enum:
+        for (const auto& Entry : ReflectionSubsystem::Get().FindEnum(Value.TypeIdValue)->Values)
+        {
+            if (Entry.Value == Value.Int64Value)
+            {
+                return py::str(Entry.Name);
+            }
+        }
+        throw py::value_error("Unknown enum value");
+    case ReflectedValue::Kind::Bytes:
+    {
+        const size_t ChannelCount = Value.BytesValue.size() / sizeof(float);
+        py::tuple Result(ChannelCount);
+        for (size_t ChannelIndex = 0; ChannelIndex < ChannelCount; ++ChannelIndex)
+        {
+            float Channel = 0.f;
+            std::memcpy(&Channel, Value.BytesValue.data() + ChannelIndex * sizeof(float), sizeof(float));
+            Result[ChannelIndex] = Channel;
+        }
+        if (ChannelCount == 3 && Value.TypeIdValue.Value != "engine.EulerAngles")
+        {
+            return py::module_::import("engine").attr("Vector3")(Result[0], Result[1], Result[2]);
+        }
+        return Result;
+    }
+    default:
+        return py::none();
+    }
 }
 
 ReflectedValue PythonToReflected(const py::object& Value, const TypeId& ValueTypeId)
 {
+    const TypeDescriptor* Type = ReflectionSubsystem::Get().FindType(ValueTypeId);
+    if (Type != nullptr && Type->Kind == TypeKind::Struct)
+    {
+        ReflectedValue Result;
+        ReflectionDiagnostic Defaulted = MakeDefaultReflectionValue(ValueTypeId, Result);
+        if (!Defaulted.bOk)
+        {
+            throw py::value_error(Defaulted.Message);
+        }
+        const py::dict Fields = Value.cast<py::dict>();
+        for (auto Entry : Fields)
+        {
+            const std::string Name = py::str(Entry.first);
+            const PropertyDescriptor* Field = ReflectionSubsystem::Get().FindStructProperty(ValueTypeId, PropertyId{Name});
+            if (Field == nullptr)
+            {
+                throw py::key_error(Name);
+            }
+            for (size_t FieldIndex = 0; FieldIndex < Result.FieldNames.size(); ++FieldIndex)
+            {
+                if (Result.FieldNames[FieldIndex] == Name)
+                {
+                    Result.Values[FieldIndex] = PythonToReflected(py::reinterpret_borrow<py::object>(Entry.second), Field->ValueTypeId);
+                }
+            }
+        }
+        return Result;
+    }
+    if (Type != nullptr && Type->Kind == TypeKind::Array)
+    {
+        ReflectedValue Result;
+        Result.ValueKind = ReflectedValue::Kind::Array;
+        Result.TypeIdValue = Type->ElementTypeId;
+        for (auto Element : Value.cast<py::sequence>())
+        {
+            Result.Values.push_back(PythonToReflected(py::reinterpret_borrow<py::object>(Element), Type->ElementTypeId));
+        }
+        return Result;
+    }
+    if (ValueTypeId.Value == "engine.ObjectHandle")
+    {
+        ObjectHandle Identity;
+        if (!Value.is_none())
+        {
+            Identity = {Value.attr("_id").cast<uint64_t>(), Value.attr("_generation").cast<uint32_t>()};
+        }
+        ReflectedValue Result;
+        ReadReflectionObject(Identity, Result);
+        if (Identity.IsValid() && !Result.ObjectValue.IsValid())
+        {
+            throw py::value_error("Object reference is stale");
+        }
+        return Result;
+    }
+    if (ValueTypeId.Value == "engine.Vector3" || ValueTypeId.Value == "engine.EulerAngles" || ValueTypeId.Value == "engine.Quaternion")
+    {
+        size_t ChannelCount = 3;
+        if (ValueTypeId.Value == "engine.Quaternion")
+        {
+            ChannelCount = 4;
+        }
+        ReflectedValue Result;
+        Result.ValueKind = ReflectedValue::Kind::Bytes;
+        Result.TypeIdValue = ValueTypeId;
+        Result.BytesValue.resize(ChannelCount * sizeof(float));
+        const char* Names[] = {"x", "y", "z", "w"};
+        for (size_t ChannelIndex = 0; ChannelIndex < ChannelCount; ++ChannelIndex)
+        {
+            float Channel = 0.f;
+            if (py::isinstance<py::sequence>(Value))
+            {
+                Channel = Value.cast<py::sequence>()[ChannelIndex].cast<float>();
+            }
+            else
+            {
+                Channel = Value.attr(Names[ChannelIndex]).cast<float>();
+            }
+            std::memcpy(Result.BytesValue.data() + ChannelIndex * sizeof(float), &Channel, sizeof(float));
+        }
+        return Result;
+    }
     if (ValueTypeId.Value == "engine.bool")
     {
         return ReflectedValue::MakeBool(Value.cast<bool>());
@@ -177,25 +289,30 @@ ReflectedValue PythonToReflected(const py::object& Value, const TypeId& ValueTyp
     }
     if (ValueTypeId.Value == "engine.float" || ValueTypeId.Value == "engine.double")
     {
-        return ReflectedValue::MakeFloat(static_cast<float>(Value.cast<double>()));
+        return ReflectedValue::MakeFloat64(Value.cast<double>());
     }
     if (ValueTypeId.Value == "engine.string")
     {
         return ReflectedValue::MakeString(Value.cast<std::string>());
     }
-    if (ValueTypeId.Value == "engine.Vector3")
+    const std::string Json = py::module_::import("json").attr("dumps")(Value).cast<std::string>();
+    ReflectedValue Result;
+    ReflectionDiagnostic Converted = ReflectionJson::JsonToReflectedValue(ValueTypeId, nlohmann::json::parse(Json), Result);
+    if (!Converted.bOk)
     {
-        const float X = Value.attr("x").cast<float>();
-        const float Y = Value.attr("y").cast<float>();
-        const float Z = Value.attr("z").cast<float>();
-        ReflectedValue Out = ReflectedValue::MakeEmpty();
-        Out.ValueKind = ReflectedValue::Kind::Bytes;
-        Out.BytesValue.resize(sizeof(float) * 3);
-        float Values[3] = {X, Y, Z};
-        std::memcpy(Out.BytesValue.data(), Values, sizeof(Values));
-        return Out;
+        throw py::value_error(Converted.Message);
     }
-    return ReflectedValue::MakeEmpty();
+    const std::string ClassPrefix = "engine.ClassRef<";
+    if (ValueTypeId.Value.find(ClassPrefix) == 0)
+    {
+        ReflectionDiagnostic Validated = ValidateReflectionClass(Result.TypeIdValue,
+            TypeId{ValueTypeId.Value.substr(ClassPrefix.size(), ValueTypeId.Value.size() - ClassPrefix.size() - 1)});
+        if (!Validated.bOk)
+        {
+            throw py::value_error(Validated.Message);
+        }
+    }
+    return Result;
 }
 
 Object* ResolveObjectOrThrow(uint64_t Id, uint32_t Generation)

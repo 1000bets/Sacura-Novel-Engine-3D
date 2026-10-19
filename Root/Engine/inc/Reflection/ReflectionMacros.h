@@ -48,6 +48,10 @@ struct ReflectionEditorHiddenTag
 {
 };
 
+struct ReflectionCollectionIndexTag
+{
+};
+
 inline void ApplyReflectArgument(PropertyAttributes& Attributes, PropertyFlags Flags)
 {
     Attributes.Flags = Attributes.Flags | Flags;
@@ -93,6 +97,11 @@ inline void ApplyReflectArgument(PropertyAttributes& Attributes, ReflectionEdito
     Attributes.bEditorHidden = true;
 }
 
+inline void ApplyReflectArgument(PropertyAttributes& Attributes, ReflectionCollectionIndexTag)
+{
+    Attributes.bCollectionIndex = true;
+}
+
 inline void BuildPropertyAttributes(PropertyAttributes&)
 {
 }
@@ -122,11 +131,12 @@ inline PropertyAttributes MakePropertyAttributes(Arguments&&... Values)
 #define RF_ASSET_TYPES(...) ReflectionAssetTypesTag{{__VA_ARGS__}}
 #define RF_COMPANION_PROPERTY(TextLiteral) ReflectionCompanionPropertyTag{TextLiteral}
 #define RF_EDITOR_HIDDEN ReflectionEditorHiddenTag{}
+#define RF_COLLECTION_INDEX ReflectionCollectionIndexTag{}
 
 template <typename ClassType, typename MemberType>
 MemberType ReflectionMemberTypeProbe(MemberType ClassType::*);
 
-template <typename OwnerType, typename MemberType, MemberType OwnerType::*MemberPointer>
+template <typename OwnerType, typename MemberType, auto MemberPointer>
 struct ReflectionFieldAccess
 {
     static ReflectionDiagnostic ReadObject(
@@ -471,9 +481,14 @@ private:
     inline StructName::StructName##_ReflectionStructRegistrar StructName::s_ReflectionStructRegistrar{}; \
     inline void StructName::StructName##_ReflectionStructRegistrar::Bind() \
     { \
-        ReflectionSubsystem::Get().GetOrCreateStructDuringBind( \
+        TypeDescriptor* Descriptor = ReflectionSubsystem::Get().GetOrCreateStructDuringBind( \
             StructName::StaticReflectionTypeId(), \
             StructName::StaticReflectionSchemaVersion()); \
+        Descriptor->ByteSize = sizeof(StructName); \
+        Descriptor->MakeDefault = [](ReflectedValue& OutValue) \
+        { \
+            return ReflectionValueCodec<StructName>::ToReflected(StructName{}, OutValue); \
+        }; \
     }
 
 #define ENGINE_REFLECT_FIELD(OwnerType, MemberName, PropertyIdLiteral, ...) \
@@ -579,7 +594,13 @@ private:
             Entry.Attributes); \
     }
 
-#define ENGINE_REFLECT_ENUM(EnumType, TypeIdLiteral, SchemaVersionValue) \
+#define ENGINE_ENUM_VALUE(EnumType, ValueName) EnumValueDescriptor{#ValueName, static_cast<int64_t>(EnumType::ValueName)}
+
+#define ENGINE_REFLECT_ENUM(EnumType, TypeIdLiteral, SchemaVersionValue, ...) \
+    template <> struct ReflectionEnumType<EnumType> \
+    { \
+        static TypeId GetTypeId() { return TypeId{TypeIdLiteral}; } \
+    }; \
     struct EnumType##_ReflectionEnumRegistrar \
     { \
         EnumType##_ReflectionEnumRegistrar() noexcept \
@@ -590,6 +611,13 @@ private:
             Recipe.Bind = &EnumType##_ReflectionEnumRegistrar::Bind; \
             PendingRegistry::Get().AddEnumRecipe(Recipe); \
         } \
-        static void Bind(); \
+        static void Bind() \
+        { \
+            EnumDescriptor Descriptor; \
+            Descriptor.Id = TypeId{TypeIdLiteral}; \
+            Descriptor.SchemaVersion = SchemaVersionValue; \
+            Descriptor.Values = {__VA_ARGS__}; \
+            ReflectionSubsystem::Get().RegisterEnumDescriptor(std::move(Descriptor)); \
+        } \
     }; \
     static inline EnumType##_ReflectionEnumRegistrar s_ReflectionEnumRegistrar_##EnumType{}

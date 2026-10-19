@@ -42,6 +42,10 @@ void FillBuiltinType(TypeDescriptor& Descriptor, const char* TypeIdString, size_
     Descriptor.Id = TypeId{TypeIdString};
     Descriptor.SchemaVersion = 1;
     Descriptor.ByteSize = ByteSize;
+    Descriptor.MakeDefault = [](ReflectedValue& OutValue)
+    {
+        return ReflectionValueCodec<ValueType>::ToReflected(ValueType{}, OutValue);
+    };
     Descriptor.Construct = [](void* Destination)
     {
         new (Destination) ValueType();
@@ -117,18 +121,63 @@ void ReflectionSubsystem::RegisterBuiltinValueTypes()
     {
         TypeDescriptor Descriptor;
         FillBuiltinType<Color>(Descriptor, "engine.Color", sizeof(Color));
+        Descriptor.Kind = TypeKind::Struct;
         RegisterTypeDescriptor(std::move(Descriptor));
+        ReflectionFieldAccess<Color, float, &Color::x>::Publish("engine.Color", "r", MakePropertyAttributes(RF_SERIALIZABLE, RF_EDITOR_EDITABLE));
+        ReflectionFieldAccess<Color, float, &Color::y>::Publish("engine.Color", "g", MakePropertyAttributes(RF_SERIALIZABLE, RF_EDITOR_EDITABLE));
+        ReflectionFieldAccess<Color, float, &Color::z>::Publish("engine.Color", "b", MakePropertyAttributes(RF_SERIALIZABLE, RF_EDITOR_EDITABLE));
+        ReflectionFieldAccess<Color, float, &Color::w>::Publish("engine.Color", "a", MakePropertyAttributes(RF_SERIALIZABLE, RF_EDITOR_EDITABLE));
     }
     {
         TypeDescriptor Descriptor;
         FillBuiltinType<MaterialSlotOverrides>(Descriptor, "engine.MaterialSlots", sizeof(MaterialSlotOverrides));
+        Descriptor.Kind = TypeKind::Struct;
         RegisterTypeDescriptor(std::move(Descriptor));
     }
     {
         TypeDescriptor Descriptor;
         FillBuiltinType<MaterialPostProcessEffects>(Descriptor, "engine.PostProcessEffects", sizeof(MaterialPostProcessEffects));
+        Descriptor.Kind = TypeKind::Struct;
         RegisterTypeDescriptor(std::move(Descriptor));
     }
+    {
+        TypeDescriptor Descriptor;
+        FillBuiltinType<EulerAngles>(Descriptor, "engine.EulerAngles", sizeof(EulerAngles));
+        RegisterTypeDescriptor(std::move(Descriptor));
+    }
+    {
+        TypeDescriptor Descriptor;
+        FillBuiltinType<TypeId>(Descriptor, "engine.TypeId", sizeof(TypeId));
+        RegisterTypeDescriptor(std::move(Descriptor));
+    }
+    {
+        TypeDescriptor Descriptor;
+        FillBuiltinType<ObjectHandle>(Descriptor, "engine.ObjectHandle", sizeof(ObjectHandle));
+        Descriptor.Kind = TypeKind::Reference;
+        RegisterTypeDescriptor(std::move(Descriptor));
+    }
+    {
+        TypeDescriptor Descriptor;
+        FillBuiltinType<AssetKey>(Descriptor, "engine.AssetRef", sizeof(AssetKey));
+        Descriptor.Kind = TypeKind::Reference;
+        RegisterTypeDescriptor(std::move(Descriptor));
+    }
+}
+
+void ReflectionSubsystem::RegisterEnumDescriptor(EnumDescriptor Descriptor)
+{
+    if (EnumsById.find(Descriptor.Id) != EnumsById.end())
+    {
+        return;
+    }
+    TypeDescriptor ValueDescriptor;
+    ValueDescriptor.Id = Descriptor.Id;
+    ValueDescriptor.Kind = TypeKind::Enum;
+    ValueDescriptor.SchemaVersion = Descriptor.SchemaVersion;
+    RegisterTypeDescriptor(std::move(ValueDescriptor));
+    EnumDescriptor* Stored = new EnumDescriptor(std::move(Descriptor));
+    EnumsById.emplace(Stored->Id, Stored);
+    Catalog.Enums.push_back(Stored);
 }
 
 void ReflectionSubsystem::RegisterTypeDescriptor(TypeDescriptor Descriptor)
@@ -205,7 +254,7 @@ TypeDescriptor* ReflectionSubsystem::GetOrCreateStructDuringBind(const char* Typ
     }
 
     TypeDescriptor Descriptor;
-    Descriptor.Kind = TypeKind::Value;
+    Descriptor.Kind = TypeKind::Struct;
     Descriptor.Id = Id;
     Descriptor.SchemaVersion = SchemaVersion;
     TypeDescriptor* Stored = new TypeDescriptor(std::move(Descriptor));
@@ -318,6 +367,18 @@ ReflectionDiagnostic ReflectionSubsystem::DetectDuplicateTypeIds() const
         }
     }
 
+    std::unordered_set<std::string> SeenEnumIds;
+    for (EnumRecipe* Recipe = PendingRegistry::Get().GetEnumRecipes(); Recipe != nullptr; Recipe = Recipe->Next)
+    {
+        if (Recipe->TypeIdString != nullptr)
+        {
+            const std::string Identity = Recipe->TypeIdString;
+            if (!SeenEnumIds.insert(Identity).second || SeenClassIds.count(Identity) != 0 || SeenTypeIds.count(Identity) != 0)
+            {
+                return ReflectionDiagnostic::Fail("Duplicate Enum TypeId: " + Identity, TypeId{Identity});
+            }
+        }
+    }
     return ReflectionDiagnostic::Ok();
 }
 

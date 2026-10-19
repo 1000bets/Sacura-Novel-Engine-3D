@@ -1,12 +1,38 @@
 #include "Reflection/Json/ReflectionJson.h"
 
 #include "Assets/Guid.h"
+#include "Assets/AssetMetadata.h"
+#include "Reflection/ReflectionValueCodec.h"
+#include "World/Scene.h"
+#include "World/GameObject.h"
 #include "Core/Object/Object.h"
 #include "Reflection/Class.h"
 #include "Reflection/PropertyAccess.h"
 #include "Reflection/ReflectionSubsystem.h"
 
 #include <cstring>
+
+ReflectionJson::ObjectResolver ReflectionJson::MakeSceneResolver(const Scene& World)
+{
+    return [&World](const std::string& Identity)
+    {
+        for (GameObject* Instance : World.GetAllObjects())
+        {
+            if (Instance->GetPersistentId() == Identity)
+            {
+                return Instance->GetObjectHandle();
+            }
+            for (Component* ComponentInstance : Instance->GetAllComponents())
+            {
+                if (ComponentInstance->GetPersistentId() == Identity)
+                {
+                    return ComponentInstance->GetObjectHandle();
+                }
+            }
+        }
+        return ObjectHandle{};
+    };
+}
 
 namespace
 {
@@ -41,17 +67,70 @@ ReflectionDiagnostic ReflectionJson::ReflectedValueToJson(
     const ReflectedValue& Value,
     nlohmann::json& OutJson)
 {
-    if (ValueTypeId.Value == "engine.MaterialSlots" || ValueTypeId.Value == "engine.PostProcessEffects")
+    if (Value.ValueKind == ReflectedValue::Kind::Struct)
     {
-        try
+        if (Value.TypeIdValue != ValueTypeId || Value.FieldNames.size() != Value.Values.size())
         {
-            OutJson = nlohmann::json::parse(Value.StringValue);
-            return ReflectionDiagnostic::Ok();
+            return ReflectionDiagnostic::Fail("Invalid reflected struct", ValueTypeId);
         }
-        catch (const std::exception& Exception)
+        OutJson = nlohmann::json::object();
+        for (size_t FieldIndex = 0; FieldIndex < Value.Values.size(); ++FieldIndex)
         {
-            return ReflectionDiagnostic::Fail(Exception.what());
+            const PropertyDescriptor* Field = ReflectionSubsystem::Get().FindStructProperty(
+                ValueTypeId, PropertyId{Value.FieldNames[FieldIndex]});
+            if (Field == nullptr)
+            {
+                return ReflectionDiagnostic::Fail("Unknown struct field", ValueTypeId);
+            }
+            ReflectionDiagnostic Converted = ReflectedValueToJson(
+                Field->ValueTypeId, Value.Values[FieldIndex], OutJson[Field->Id.Value]);
+            if (!Converted.bOk)
+            {
+                return Converted;
+            }
         }
+        return ReflectionDiagnostic::Ok();
+    }
+    if (Value.ValueKind == ReflectedValue::Kind::Array)
+    {
+        OutJson = nlohmann::json::array();
+        for (const ReflectedValue& Element : Value.Values)
+        {
+            nlohmann::json JsonElement;
+            ReflectionDiagnostic Converted = ReflectedValueToJson(Value.TypeIdValue, Element, JsonElement);
+            if (!Converted.bOk)
+            {
+                return Converted;
+            }
+            OutJson.push_back(std::move(JsonElement));
+        }
+        return ReflectionDiagnostic::Ok();
+    }
+    if (Value.ValueKind == ReflectedValue::Kind::AssetReference)
+    {
+        OutJson = AssetMetadataIO::AssetRefToJson(Value.AssetValue);
+        return ReflectionDiagnostic::Ok();
+    }
+    if (Value.ValueKind == ReflectedValue::Kind::ObjectReference)
+    {
+        OutJson = {{"object", Value.StringValue}};
+        return ReflectionDiagnostic::Ok();
+    }
+    if (Value.ValueKind == ReflectedValue::Kind::Enum)
+    {
+        const EnumDescriptor* Descriptor = ReflectionSubsystem::Get().FindEnum(ValueTypeId);
+        if (Descriptor != nullptr)
+        {
+            for (const EnumValueDescriptor& Entry : Descriptor->Values)
+            {
+                if (Entry.Value == Value.Int64Value)
+                {
+                    OutJson = Entry.Name;
+                    return ReflectionDiagnostic::Ok();
+                }
+            }
+        }
+        return ReflectionDiagnostic::Fail("Unknown enum value", ValueTypeId);
     }
     if (ValueTypeId.Value == "engine.bool")
     {
@@ -89,7 +168,7 @@ ReflectionDiagnostic ReflectionJson::ReflectedValueToJson(
         OutJson = Value.StringValue;
         return ReflectionDiagnostic::Ok();
     }
-    if (ValueTypeId.Value == "engine.Vector3")
+    if ((ValueTypeId.Value == "engine.Vector3" || ValueTypeId.Value == "engine.EulerAngles"))
     {
         if (Value.ValueKind != ReflectedValue::Kind::Bytes || Value.BytesValue.size() != sizeof(float) * 3)
         {
@@ -133,16 +212,113 @@ ReflectionDiagnostic ReflectionJson::ReflectedValueToJson(
 ReflectionDiagnostic ReflectionJson::JsonToReflectedValue(
     const TypeId& ValueTypeId,
     const nlohmann::json& JsonValue,
-    ReflectedValue& OutValue)
+    ReflectedValue& OutValue,
+    const ObjectResolver& ResolveObject)
 {
-    if (ValueTypeId.Value == "engine.MaterialSlots" || ValueTypeId.Value == "engine.PostProcessEffects")
+    const TypeDescriptor* Type = ReflectionSubsystem::Get().FindType(ValueTypeId);
+    if (Type != nullptr && Type->Kind == TypeKind::Struct)
+    {
+        nlohmann::json Fields = JsonValue;
+        if (JsonValue.is_array() && ValueTypeId.Value == "engine.Color" && JsonValue.size() == 4)
+        {
+            Fields = {{"r", JsonValue[0]}, {"g", JsonValue[1]}, {"b", JsonValue[2]}, {"a", JsonValue[3]}};
+        }
+        else if (JsonValue.is_array()
+            && (ValueTypeId.Value == "engine.MaterialSlots" || ValueTypeId.Value == "engine.PostProcessEffects"))
+        {
+            Fields = {{"entries", JsonValue}};
+        }
+        if (!Fields.is_object())
+        {
+            return ReflectionDiagnostic::Fail("Expected struct object", ValueTypeId);
+        }
+        ReflectedValue Result;
+        Result.ValueKind = ReflectedValue::Kind::Struct;
+        Result.TypeIdValue = ValueTypeId;
+        for (auto Field = Fields.begin(); Field != Fields.end(); ++Field)
+        {
+            const PropertyDescriptor* Property = ReflectionSubsystem::Get().FindStructProperty(
+                ValueTypeId, PropertyId{Field.key()});
+            if (Property == nullptr)
+            {
+                return ReflectionDiagnostic::Fail("Unknown struct field", ValueTypeId, PropertyId{Field.key()});
+            }
+            ReflectedValue Value;
+            ReflectionDiagnostic Converted = JsonToReflectedValue(Property->ValueTypeId, Field.value(), Value, ResolveObject);
+            if (!Converted.bOk)
+            {
+                return Converted;
+            }
+            Result.FieldNames.push_back(Field.key());
+            Result.Values.push_back(std::move(Value));
+        }
+        OutValue = std::move(Result);
+        return ReflectionDiagnostic::Ok();
+    }
+    if (Type != nullptr && Type->Kind == TypeKind::Array)
     {
         if (!JsonValue.is_array())
         {
-            return ReflectionDiagnostic::Fail("Expected material bindings array");
+            return ReflectionDiagnostic::Fail("Expected array", ValueTypeId);
         }
-        OutValue = ReflectedValue::MakeString(JsonValue.dump());
+        ReflectedValue Result;
+        Result.ValueKind = ReflectedValue::Kind::Array;
+        Result.TypeIdValue = Type->ElementTypeId;
+        for (const nlohmann::json& Element : JsonValue)
+        {
+            ReflectedValue Converted;
+            ReflectionDiagnostic Parsed = JsonToReflectedValue(Type->ElementTypeId, Element, Converted, ResolveObject);
+            if (!Parsed.bOk)
+            {
+                return Parsed;
+            }
+            Result.Values.push_back(std::move(Converted));
+        }
+        OutValue = std::move(Result);
         return ReflectionDiagnostic::Ok();
+    }
+    if (ValueTypeId.Value == "engine.AssetRef")
+    {
+        AssetKey Key;
+        AssetDiagnostic Diagnostic;
+        if (!AssetMetadataIO::TryAssetRefFromJson(JsonValue, Key, Diagnostic))
+        {
+            return ReflectionDiagnostic::Fail(Diagnostic.Message, ValueTypeId);
+        }
+        return ReflectionValueCodec<AssetKey>::ToReflected(Key, OutValue);
+    }
+    if (ValueTypeId.Value == "engine.ObjectHandle")
+    {
+        if (!JsonValue.is_object() || !JsonValue.contains("object") || !JsonValue["object"].is_string())
+        {
+            return ReflectionDiagnostic::Fail("Expected persistent object reference", ValueTypeId);
+        }
+        const std::string Identity = JsonValue["object"].get<std::string>();
+        ObjectHandle Target;
+        if (!Identity.empty())
+        {
+            if (!ResolveObject)
+            {
+                return ReflectionDiagnostic::Fail("Object reference requires a scene resolver", ValueTypeId);
+            }
+            Target = ResolveObject(Identity);
+        }
+        return ReadReflectionObject(Target, OutValue);
+    }
+    if (const EnumDescriptor* Descriptor = ReflectionSubsystem::Get().FindEnum(ValueTypeId))
+    {
+        for (const EnumValueDescriptor& Entry : Descriptor->Values)
+        {
+            if ((JsonValue.is_string() && JsonValue.get<std::string>() == Entry.Name)
+                || (JsonValue.is_number_integer() && JsonValue.get<int64_t>() == Entry.Value))
+            {
+                OutValue = ReflectedValue::MakeInt64(Entry.Value);
+                OutValue.ValueKind = ReflectedValue::Kind::Enum;
+                OutValue.TypeIdValue = ValueTypeId;
+                return ReflectionDiagnostic::Ok();
+            }
+        }
+        return ReflectionDiagnostic::Fail("Unknown enum value", ValueTypeId);
     }
     if (ValueTypeId.Value == "engine.bool")
     {
@@ -180,7 +356,7 @@ ReflectionDiagnostic ReflectionJson::JsonToReflectedValue(
         OutValue = ReflectedValue::MakeString(JsonValue.get<std::string>());
         return ReflectionDiagnostic::Ok();
     }
-    if (ValueTypeId.Value == "engine.Vector3")
+    if ((ValueTypeId.Value == "engine.Vector3" || ValueTypeId.Value == "engine.EulerAngles"))
     {
         if (!JsonValue.is_array() || JsonValue.size() != 3)
         {
@@ -353,7 +529,8 @@ ReflectionDiagnostic ReflectionJson::SerializeObject(const Object* Instance, std
 ReflectionDiagnostic ReflectionJson::DeserializeInto(
     Object* Instance,
     const ReflectionJsonDocument& Document,
-    bool bAllowMigration)
+    bool bAllowMigration,
+    const ObjectResolver& ResolveObject)
 {
     if (Instance == nullptr)
     {
@@ -409,7 +586,7 @@ ReflectionDiagnostic ReflectionJson::DeserializeInto(
         }
 
         ReflectedValue Converted;
-        ReflectionDiagnostic Parsed = JsonToReflectedValue(Descriptor->ValueTypeId, It.value(), Converted);
+        ReflectionDiagnostic Parsed = JsonToReflectedValue(Descriptor->ValueTypeId, It.value(), Converted, ResolveObject);
         if (!Parsed.bOk)
         {
             Parsed.Type = Document.Type;
@@ -441,6 +618,11 @@ ReflectionDiagnostic ReflectionJson::DeserializeInto(
             }
         }
 
+        ReflectionDiagnostic Validated = PropertyAccess::ValidatePropertyValue(*Descriptor, Converted);
+        if (!Validated.bOk)
+        {
+            return Validated;
+        }
         PendingWrites.emplace_back(Descriptor, std::move(Converted));
     }
 
@@ -463,7 +645,8 @@ ReflectionDiagnostic ReflectionJson::DeserializeInto(
 ReflectionDiagnostic ReflectionJson::DeserializeInto(
     Object* Instance,
     const std::string& JsonText,
-    bool bAllowMigration)
+    bool bAllowMigration,
+    const ObjectResolver& ResolveObject)
 {
     ReflectionJsonDocument Document;
     ReflectionDiagnostic Parsed = ParseDocument(JsonText, Document);
@@ -471,5 +654,5 @@ ReflectionDiagnostic ReflectionJson::DeserializeInto(
     {
         return Parsed;
     }
-    return DeserializeInto(Instance, Document, bAllowMigration);
+    return DeserializeInto(Instance, Document, bAllowMigration, ResolveObject);
 }

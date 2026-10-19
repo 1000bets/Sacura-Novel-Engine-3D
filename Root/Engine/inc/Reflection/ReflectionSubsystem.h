@@ -49,6 +49,7 @@ public:
     Component* CreateComponent(GameObject& Owner, const TypeId& Id);
 
     void RegisterTypeDescriptor(TypeDescriptor Descriptor);
+    void RegisterEnumDescriptor(EnumDescriptor Descriptor);
     void RegisterPendingProperty(PropertyDescriptor Descriptor);
 
     ReflectionDiagnostic PublishPythonClass(

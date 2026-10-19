@@ -11,6 +11,8 @@ struct TypeDescriptor
     TypeId Id{};
     uint32_t SchemaVersion = 1;
     size_t ByteSize = 0;
+    TypeId ElementTypeId{};
+    TypeId ReferencedTypeId{};
 
     using ConstructFunction = void (*)(void* Destination);
     using DestroyFunction = void (*)(void* Destination);
@@ -19,6 +21,7 @@ struct TypeDescriptor
     using ToReflectedFunction = ReflectionDiagnostic (*)(const void* Source, ReflectedValue& OutValue);
     using FromReflectedFunction = ReflectionDiagnostic (*)(void* Destination, const ReflectedValue& InValue);
     using ValidateFunction = ReflectionDiagnostic (*)(const ReflectedValue& InValue, const PropertyAttributes* Attributes);
+    using MakeDefaultFunction = ReflectionDiagnostic (*)(ReflectedValue& OutValue);
 
     ConstructFunction Construct = nullptr;
     DestroyFunction Destroy = nullptr;
@@ -27,4 +30,5 @@ struct TypeDescriptor
     ToReflectedFunction ToReflected = nullptr;
     FromReflectedFunction FromReflected = nullptr;
     ValidateFunction Validate = nullptr;
+    MakeDefaultFunction MakeDefault = nullptr;
 };

@@ -54,7 +54,9 @@ enum class TypeKind : uint8_t
     Value,
     Enum,
     Class,
-    Reference
+    Reference,
+    Struct,
+    Array
 };
 
 enum class CreationPolicy : uint8_t

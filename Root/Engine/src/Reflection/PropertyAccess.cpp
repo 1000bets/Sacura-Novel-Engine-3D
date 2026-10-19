@@ -4,6 +4,9 @@
 #include "Reflection/Class.h"
 #include "Reflection/ReflectionSubsystem.h"
 #include "Reflection/TypeDescriptor.h"
+#include "Reflection/ReflectionValueCodec.h"
+#include <cmath>
+#include <unordered_set>
 
 namespace
 {
@@ -53,8 +56,116 @@ bool AllowsWrite(const PropertyDescriptor& Descriptor, PropertyAccessContext Con
     }
 }
 
+ReflectionDiagnostic ValidateIncomingValue(const PropertyDescriptor& Descriptor, const ReflectedValue& InValue);
+
+ReflectionDiagnostic ValidateValueType(const TypeId& Type, const ReflectedValue& Value)
+{
+    ReflectionSubsystem& Reflection = ReflectionSubsystem::Get();
+    if (Value.ValueKind == ReflectedValue::Kind::Struct)
+    {
+        const TypeDescriptor* StructType = Reflection.FindType(Type);
+        if (StructType == nullptr || StructType->Kind != TypeKind::Struct
+            || Value.TypeIdValue != Type || Value.FieldNames.size() != Value.Values.size())
+        {
+            return ReflectionDiagnostic::Fail("Struct type mismatch", Type);
+        }
+        std::unordered_set<std::string> SeenFields;
+        for (size_t FieldIndex = 0; FieldIndex < Value.Values.size(); ++FieldIndex)
+        {
+            const PropertyDescriptor* Field = Reflection.FindStructProperty(Type, PropertyId{Value.FieldNames[FieldIndex]});
+            if (Field == nullptr || !SeenFields.insert(Field->Id.Value).second)
+            {
+                return ReflectionDiagnostic::Fail("Unknown or duplicate struct field", Type);
+            }
+            ReflectionDiagnostic Validated = ValidateIncomingValue(*Field, Value.Values[FieldIndex]);
+            if (!Validated.bOk)
+            {
+                return Validated;
+            }
+        }
+        return ReflectionDiagnostic::Ok();
+    }
+    if (Value.ValueKind == ReflectedValue::Kind::Array)
+    {
+        const TypeDescriptor* Descriptor = Reflection.FindType(Type);
+        if (Descriptor == nullptr || Descriptor->Kind != TypeKind::Array || Descriptor->ElementTypeId != Value.TypeIdValue)
+        {
+            return ReflectionDiagnostic::Fail("Array type mismatch", Type);
+        }
+        std::unordered_map<std::string, std::unordered_set<int64_t>> CollectionIndices;
+        for (const ReflectedValue& Element : Value.Values)
+        {
+            ReflectionDiagnostic Validated = ValidateValueType(Value.TypeIdValue, Element);
+            if (!Validated.bOk)
+            {
+                return Validated;
+            }
+            if (const auto* Fields = Reflection.FindStructProperties(Value.TypeIdValue))
+            {
+                for (const PropertyDescriptor& Field : *Fields)
+                {
+                    if (Field.Attributes.bCollectionIndex)
+                    {
+                        const ReflectedValue* Index = Element.FindField(Field.Id.Value);
+                        if (Index == nullptr || Index->ValueKind != ReflectedValue::Kind::Int64
+                            || !CollectionIndices[Field.Id.Value].insert(Index->Int64Value).second)
+                        {
+                            return ReflectionDiagnostic::Fail("Missing or duplicate collection index", Type, Field.Id);
+                        }
+                    }
+                }
+            }
+        }
+        return ReflectionDiagnostic::Ok();
+    }
+    if (Reflection.FindEnum(Type) != nullptr)
+    {
+        if (Value.ValueKind != ReflectedValue::Kind::Enum || Value.TypeIdValue != Type)
+        {
+            return ReflectionDiagnostic::Fail("Enum type mismatch", Type);
+        }
+        return ValidateReflectionEnum(Type, Value.Int64Value);
+    }
+    const std::string ClassPrefix = "engine.ClassRef<";
+    if (Type.Value.find(ClassPrefix) == 0)
+    {
+        if (Value.ValueKind != ReflectedValue::Kind::TypeId)
+        {
+            return ReflectionDiagnostic::Fail("Expected class reference", Type);
+        }
+        return ValidateReflectionClass(Value.TypeIdValue,
+            TypeId{Type.Value.substr(ClassPrefix.size(), Type.Value.size() - ClassPrefix.size() - 1)});
+    }
+    if (Type.Value == "engine.ObjectHandle")
+    {
+        ObjectHandle Target;
+        return WriteReflectionObject(Target, Value);
+    }
+    const bool bValid = (Type.Value == "engine.bool" && Value.ValueKind == ReflectedValue::Kind::Bool)
+        || (Type.Value == "engine.int64" && Value.ValueKind == ReflectedValue::Kind::Int64)
+        || ((Type.Value == "engine.float" || Type.Value == "engine.double")
+            && Value.ValueKind == ReflectedValue::Kind::Float64 && std::isfinite(Value.Float64Value))
+        || (Type.Value == "engine.string" && Value.ValueKind == ReflectedValue::Kind::String)
+        || (Type.Value == "engine.TypeId" && Value.ValueKind == ReflectedValue::Kind::TypeId)
+        || (Type.Value == "engine.AssetRef" && Value.ValueKind == ReflectedValue::Kind::AssetReference)
+        || ((Type.Value == "engine.Vector3" || Type.Value == "engine.EulerAngles")
+            && Value.ValueKind == ReflectedValue::Kind::Bytes && Value.BytesValue.size() == sizeof(float) * 3)
+        || (Type.Value == "engine.Quaternion" && Value.ValueKind == ReflectedValue::Kind::Bytes
+            && Value.BytesValue.size() == sizeof(float) * 4);
+    if (!bValid)
+    {
+        return ReflectionDiagnostic::Fail("Reflected value type mismatch", Type);
+    }
+    return ReflectionDiagnostic::Ok();
+}
+
 ReflectionDiagnostic ValidateIncomingValue(const PropertyDescriptor& Descriptor, const ReflectedValue& InValue)
 {
+    ReflectionDiagnostic ValueValidation = ValidateValueType(Descriptor.ValueTypeId, InValue);
+    if (!ValueValidation.bOk)
+    {
+        return ValueValidation;
+    }
     if (Descriptor.ValueTypeId.IsValid())
     {
         if (TypeDescriptor* Type = ReflectionSubsystem::Get().FindType(Descriptor.ValueTypeId))
@@ -106,6 +217,11 @@ const PropertyDescriptor* FindStructProperty(const TypeId& DeclaringTypeId, cons
 {
     return ReflectionSubsystem::Get().FindStructProperty(DeclaringTypeId, Property);
 }
+}
+
+ReflectionDiagnostic PropertyAccess::ValidatePropertyValue(const PropertyDescriptor& Descriptor, const ReflectedValue& Value)
+{
+    return ValidateIncomingValue(Descriptor, Value);
 }
 
 ReflectionDiagnostic PropertyAccess::GetProperty(

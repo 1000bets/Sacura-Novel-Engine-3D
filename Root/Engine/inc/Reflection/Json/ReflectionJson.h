@@ -9,6 +9,7 @@
 #include <unordered_map>
 
 class Object;
+class Scene;
 
 struct ReflectionJsonDocument
 {
@@ -25,18 +26,22 @@ using ReflectionJsonMigrationFunction = std::function<ReflectionDiagnostic(
 class ReflectionJson
 {
 public:
+    using ObjectResolver = std::function<ObjectHandle(const std::string&)>;
+    static ObjectResolver MakeSceneResolver(const Scene& World);
     static ReflectionDiagnostic SerializeObject(const Object* Instance, std::string& OutJsonText);
     static ReflectionDiagnostic SerializeObject(const Object* Instance, ReflectionJsonDocument& OutDocument);
 
     static ReflectionDiagnostic DeserializeInto(
         Object* Instance,
         const std::string& JsonText,
-        bool bAllowMigration = true);
+        bool bAllowMigration = true,
+        const ObjectResolver& ResolveObject = {});
 
     static ReflectionDiagnostic DeserializeInto(
         Object* Instance,
         const ReflectionJsonDocument& Document,
-        bool bAllowMigration = true);
+        bool bAllowMigration = true,
+        const ObjectResolver& ResolveObject = {});
 
     static ReflectionDiagnostic ParseDocument(const std::string& JsonText, ReflectionJsonDocument& OutDocument);
 
@@ -48,7 +53,6 @@ public:
 
     static void ClearMigrations();
 
-private:
     static ReflectionDiagnostic ReflectedValueToJson(
         const TypeId& ValueTypeId,
         const ReflectedValue& Value,
@@ -57,8 +61,10 @@ private:
     static ReflectionDiagnostic JsonToReflectedValue(
         const TypeId& ValueTypeId,
         const nlohmann::json& JsonValue,
-        ReflectedValue& OutValue);
+        ReflectedValue& OutValue,
+        const ObjectResolver& ResolveObject = {});
 
+private:
     static ReflectionDiagnostic ApplyMigrations(
         const TypeId& Type,
         uint32_t& TypeVersion,

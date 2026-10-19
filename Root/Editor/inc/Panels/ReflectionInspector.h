@@ -56,7 +56,6 @@ private:
     void ApplyFloatValue(const PropertyId& Property, double Value);
     void ApplyStringValue(const PropertyId& Property, const QString& Value);
     void ApplyVector3Value(const PropertyId& Property, float X, float Y, float Z);
-    void ApplyColorValue(const PropertyId& Property, float R, float G, float B, float A);
     void ApplyAssetValue(const PropertyDescriptor& Descriptor, const AssetKey& Key);
     void OnResetPropertyClicked(const PropertyId Property);
     void OnResetAllClicked();

@@ -50,6 +50,7 @@ struct PropertyAttributes
     std::vector<std::string> AllowedAssetTypes;
     const char* CompanionProperty = nullptr;
     bool bEditorHidden = false;
+    bool bCollectionIndex = false;
     bool bHasRange = false;
     double RangeMinimum = 0.0;
     double RangeMaximum = 0.0;
