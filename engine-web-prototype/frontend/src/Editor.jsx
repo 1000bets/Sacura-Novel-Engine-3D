@@ -45,6 +45,7 @@ import {playbackStartId,deleteStoryNode,insertStoryNode,changeStoryNodeKind,STOR
 import {applyConnections,connectionError} from './storyConnections.js';
 import {InfoView, FloatingWindow} from './EditorHelp.jsx';
 import './editorHelp.css';
+import './objectInspector.css';
 import ThemePicker from './ThemePicker.jsx';
 import {normalizeSidechain} from './audioSettings.js';
 import React, {
@@ -1359,7 +1360,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             ),
           );
       return (
-        <>
+        <div className="object-inspector">
           <div className="inspector-identity">
             <span className="identity-icon" style={{ color: o.color }}>
               <Icon
@@ -1369,6 +1370,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             </span>
             <div>
               <input
+                aria-label={tr("Имя объекта")}
+                disabled={running}
                 value={o.name}
                 onChange={(e) => patch({ name: e.target.value })}
               />
@@ -1376,20 +1379,19 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             </div>
             <input
               type="checkbox"
+              aria-label={tr("Объект активен")}
+              disabled={running}
               checked={o.active}
               onChange={(e) => patch({ active: e.target.checked })}
               title={tr("Объект активен")}
             />
           </div>
-          <ComponentInstancesInspector key={'components:'+o.id} project={project} scope={{kind:'object',id:o.id}} onChange={mutate} preview={preview} running={running} onOpen={(resourceId,mechanicId)=>{setGameplayRequest({resourceId,mechanicId,nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');}} onOpenFunction={(functionId,mechanicId)=>{setGameplayRequest({functionId,mechanicId,nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');}} onCreate={()=>{setGameplayRequest({createComponent:true,nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');}}/>
-          <Button disabled={running} icon="Plus" onClick={()=>{setGameplayRequest({objectId:o.id,nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');}}>{tr("Добавить механику")}</Button>
-          <Field label={tr("Группа в иерархии")}><Select disabled={running} value={project.objectGroups?.find(g=>g.sceneId===scene.id&&g.objectIds.includes(o.id))?.id||''} options={[["","Объекты сцены · корень"],...(project.objectGroups||[]).filter(g=>g.sceneId===scene.id).map(g=>[g.id,literalLabel(g.name)])]} onChange={groupId=>mutate(p=>groupId?addObjectsToGroup(p,groupId,[o.id]):removeObjectsFromGroups(p,scene.id,[o.id]))}/></Field>
-          {o.type==='Персонаж'&&<Fold title={tr("Виджет диалога")} icon="PanelsTopLeft"><WidgetAssignment project={project} character={o} onCustomize={()=>customizeWidget({characterId:o.id})} onChange={dialogueWidgetId=>patch({dialogueWidgetId})} onEdit={openWidgets} disabled={running}/></Fold>}
-          {o.type==='Персонаж'&&<Button icon="Users" onClick={()=>{setDock('characters');setCompactPanel('workspace');}}>{tr("Модель и анимации персонажа")}</Button>}
-          <TransformInspector object={o} scene={scene} disabled={running} onChange={value=>transformObject(o.id,value)}
+          <ComponentInstancesInspector key={'components:'+o.id} project={project} scope={{kind:'object',id:o.id}} onChange={mutate} preview={preview} running={running} onOpen={(resourceId,mechanicId)=>{setGameplayRequest({resourceId,mechanicId,nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');}} onOpenFunction={(functionId,mechanicId)=>{setGameplayRequest({functionId,mechanicId,nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');}} onCreate={()=>{setGameplayRequest({createComponent:true,scope:{kind:'object',id:o.id},nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');}}/>
+          <TransformInspector compact object={o} scene={scene} disabled={running} onChange={value=>transformObject(o.id,value)}
             onReset={()=>mutate(p=>{const x=p.objects.find(x=>x.id===o.id);if(x.transforms)delete x.transforms[scene.id];})}
             onFocus={()=>{editScene();setFocusRequest({nonce:uid('focus')});}} onDuplicate={()=>duplicateObject(o)} onDelete={()=>deleteObject(o.id)}/>
-          <CollisionInspector object={o} disabled={running} onChange={collision=>patch({collision})}/>
+          <Fold title={tr("Коллизия")} open={false}><CollisionInspector compact object={o} disabled={running} onChange={collision=>patch({collision})}/></Fold>
+          {o.type==='Персонаж'&&<Fold title={tr("Виджет диалога")} icon="PanelsTopLeft" open={false}><WidgetAssignment project={project} character={o} onCustomize={()=>customizeWidget({characterId:o.id})} onChange={dialogueWidgetId=>patch({dialogueWidgetId})} onEdit={openWidgets} disabled={running}/><Button icon="Users" onClick={()=>{setDock('characters');setCompactPanel('workspace');}}>{tr("Модель и анимации персонажа")}</Button></Fold>}
           {o.type!=='Персонаж'&&o.type!=='Источник света'&&<MeshInspector key={o.id} object={o} disabled={running}
             allowUpload={!o.builtin&&!['letter','door','fireplace','garden-note','ticket'].includes(o.id)}
             onChange={async values=>{
@@ -1402,7 +1404,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               mutate(p=>{const target=p.objects.find(x=>x.id===o.id);if(!target)return;if('model' in values&&target.model?.src!==values.model?.src)retainObjectModel(p,target);Object.assign(target,values);});
             }}/>}
           {running&&<Button icon="Square" onClick={editScene}>{tr("Остановить и редактировать сцену")}</Button>}
-          <Fold title={tr("Объект сцены")} icon="Box">
+          <Fold title={tr("Объект сцены")} icon="Box" open={false}>
+          <Field label={tr("Группа в иерархии")}><Select disabled={running} value={project.objectGroups?.find(g=>g.sceneId===scene.id&&g.objectIds.includes(o.id))?.id||''} options={[["","Объекты сцены · корень"],...(project.objectGroups||[]).filter(g=>g.sceneId===scene.id).map(g=>[g.id,literalLabel(g.name)])]} onChange={groupId=>mutate(p=>groupId?addObjectsToGroup(p,groupId,[o.id]):removeObjectsFromGroups(p,scene.id,[o.id]))}/></Field>
             <Field label={tr("Опорная точка")}>
               <Select
                 value=""
@@ -1432,7 +1435,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           </Fold>
           {o.type==='Источник света'&&<Fold title={tr("Освещение")} icon="Lightbulb"><Field label={tr("Интенсивность")}><input type="number" min="0" step="1" disabled={running} value={o.light?.intensity??35} onChange={e=>patch({light:{...o.light,intensity:Math.max(0,Number(e.target.value))}})}/></Field><Field label={tr("Дальность, м")}><input type="number" min="0" step="0.5" disabled={running} value={o.light?.distance??10} onChange={e=>patch({light:{...o.light,distance:Math.max(0,Number(e.target.value))}})}/></Field><p className="resource-note">{tr("Точечный источник светит во все стороны. Дальность 0 — без ограничения.")}</p></Fold>}
           {o.type === "Активный меш" && (
-            <Fold title={tr("Взаимодействие")} icon="MousePointer2">
+            <Fold title={tr("Участие в истории")} icon="MousePointer2" open={false}>
               <Field label={tr("Действие игрока")}>
                 <input
                   value={o.interaction || ""}
@@ -1455,7 +1458,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             onClick={() => openAuthoring('action',{target:o.id})}
           >
             {tr("Создать действие с объектом")}</Button>
-        </>
+        </div>
       );
     }
     if (

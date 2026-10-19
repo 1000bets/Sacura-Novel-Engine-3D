@@ -3215,5 +3215,14 @@
   "Что открыть → Reward.award. Что изменить → прибавить 5 к формуле. Результат → кнопка и таймер дают больше монет.": "Open Reward.award and add 5 to its formula. The button and timer award more coins.",
   "Добавьте метод bonus и выберите его у кнопки. PeriodicReward.stop останавливает собственный таймер.": "Add a bonus method and select it for the button. PeriodicReward.stop stops only its own timer.",
   "История, музыка и открываемые компоненты доверия, осмотра предметов и двери.": "A story with music and editable components for trust, objects and doors.",
-  "Что открыть → «Алиса» → Reward, «Письмо» → StoryFlag. Что изменить → формулу награды или действие осмотра. Результат → меняются доверие и доступность ответа.": "Open Alice → Reward or Letter → StoryFlag. Change the reward formula or inspection action to change trust and available replies."
+  "Что открыть → «Алиса» → Reward, «Письмо» → StoryFlag. Что изменить → формулу награды или действие осмотра. Результат → меняются доверие и доступность ответа.": "Open Alice → Reward or Letter → StoryFlag. Change the reward formula or inspection action to change trust and available replies.",
+  "Имя объекта": "Object name",
+  "Коллизия": "Collision",
+  "Участие в истории": "Story interaction",
+  "Наследовать": "Inherit",
+  "Редактировать": "Edit",
+  "Создать независимую копию виджета": "Create an independent widget copy",
+  "изменения только в этой сабсцене": "changes apply only to this subscene",
+  "Трансформация": "Transform",
+  "Размер по геометрии объекта": "Size from object geometry"
 }
