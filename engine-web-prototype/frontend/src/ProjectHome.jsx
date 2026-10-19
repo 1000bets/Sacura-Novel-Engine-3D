@@ -1,4 +1,4 @@
-import {builtinTemplates,loadBuiltinTemplate} from './builtinTemplates.js';
+import {builtinTemplates,loadBuiltinTemplate,createBuiltinProject} from './builtinTemplates.js';
 import {instantiateAuthoringTemplate} from './authoringTemplates.js';
 import LanguagePicker from './LanguagePicker.jsx';
 import {t as tr, useLocale, localeTag, message} from './i18n.jsx';
@@ -74,17 +74,17 @@ export default function ProjectHome({user=null,onLogout}) {
     <article className="project-home-featured">
      <ProjectArtwork/>
      <div className="project-home-featured-top"><span><BookOpen aria-hidden="true" size={14}/>{tr('Знакомство с движком')}</span><span>3D</span></div>
-     <div className="project-home-featured-caption"><div><p>{tr('СТАНДАРТНЫЙ ШАБЛОН')}</p><h2>{tr('Письма после дождя')}</h2><span>{tr('История, музыка и мир, который можно исследовать.')}</span></div><button disabled={busy} className="project-home-featured-open" aria-label={tr('Открыть «Письма после дождя»')} title={tr('Открыть шаблон')} onClick={()=>run(()=>open(createStandardProject(),{save:true}))}><ArrowUpRight aria-hidden="true" size={23}/></button></div>
+     <div className="project-home-featured-caption"><div><p>{tr('СТАНДАРТНЫЙ ШАБЛОН')}</p><h2>{tr('Письма после дождя')}</h2><span>{tr('История, музыка и мир, который можно исследовать.')}</span></div><button disabled={busy} className="project-home-featured-open" aria-label={tr('Открыть «Письма после дождя»')} title={tr('Открыть шаблон')} onClick={()=>run(async()=>open(await createBuiltinProject('builtin-standard'),{save:true}))}><ArrowUpRight aria-hidden="true" size={23}/></button></div>
     </article>
    </section>
 
    {error&&!creating&&<p className="project-home-error" role="alert">{message(error)}</p>}
    <section id="project-templates" className="project-home-templates" aria-labelledby="templates-title">
     <div className="project-home-section-heading"><div><h2 id="templates-title">{tr('Начните с готовой идеи')}</h2></div><span className="project-home-section-meta">{tr('4 шаблона · разные жанры')}</span></div>
-    <div className="project-home-template-grid">{builtinTemplates.map(template=>{
+    <div className="project-home-template-grid">{builtinTemplates.filter(t=>!t.featured).map(template=>{
      const presentation=templatePresentation[template.id];
      return <article key={template.id} className="project-template-entry">
-      <button className="project-template-open" disabled={busy} aria-label={tr('Открыть шаблон: {0}',[tr(template.name)])} onClick={()=>run(async()=>open(await instantiateAuthoringTemplate(await loadBuiltinTemplate(template.id)),{save:true}))}>
+      <button className="project-template-open" disabled={busy} aria-label={tr('Открыть шаблон: {0}',[tr(template.name)])} onClick={()=>run(async()=>open(await createBuiltinProject(template.id),{save:true}))}>
        <div className="project-template-art"><ProjectArtwork variant={presentation.art}/><span className="project-template-number">{presentation.icon}</span><span className="project-template-arrow"><ArrowUpRight aria-hidden="true" size={20}/></span></div>
        <div className="project-template-copy"><span className="project-template-genre">{tr(presentation.detail)}</span><h3>{tr(presentation.label)}</h3><p>{tr(template.description)}</p></div>
       </button>

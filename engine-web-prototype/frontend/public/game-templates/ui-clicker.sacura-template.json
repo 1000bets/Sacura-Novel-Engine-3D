@@ -1,11 +1,17 @@
 {
   "format": "sacura-authoring-package",
-  "formatVersion": 2,
+  "formatVersion": 3,
+  "sourceContract": {
+    "version": 1,
+    "language": "javascript",
+    "runtime": "sacura-sdk",
+    "execution": "gameplay-only"
+  },
   "metadata": {
     "id": "sacura.template.ui-clicker",
-    "version": "1.0.0",
-    "name": "Монеты",
-    "description": "Редактируемый пример на общих возможностях Sacura.",
+    "version": "3.0.0",
+    "name": "UI-кликер · Награда и улучшение",
+    "description": "Что открыть → «Экономика кликера» → Reward → award. Что изменить → base * multiplier * factor на base * multiplier * factor + 5. Результат → кнопка и таймер начисляют на 5 больше.\nДобавьте публичный метод bonus в Reward и выберите его для кнопки; список обновляется после сохранения. PeriodicReward.upgrade меняет правило улучшения, stop останавливает только собственный таймер.",
     "author": "Sacura contributors",
     "license": "MIT",
     "sources": []
@@ -14,39 +20,31 @@
     "projectSchemaVersion": 2,
     "requiredCapabilities": [
       {
-        "id": "capability.sacura.resource",
+        "id": "component.resources",
         "version": 1
       },
       {
-        "id": "action.variable",
+        "id": "mechanic.javascript",
         "version": 1
       },
       {
-        "id": "action.move",
+        "id": "operation.sacura.variable.set",
         "version": 1
       },
       {
-        "id": "action.pose",
+        "id": "operation.sacura.timer.start",
         "version": 1
       },
       {
-        "id": "action.camera",
+        "id": "operation.sacura.timer.stop",
         "version": 1
       },
       {
-        "id": "action.time",
+        "id": "mechanic.components",
         "version": 1
       },
       {
-        "id": "action.lighting",
-        "version": 1
-      },
-      {
-        "id": "action.visibility",
-        "version": 1
-      },
-      {
-        "id": "operation.sacura.resource.add",
+        "id": "operation.sacura.component.call",
         "version": 1
       },
       {
@@ -55,18 +53,6 @@
       },
       {
         "id": "function.typed-graph",
-        "version": 1
-      },
-      {
-        "id": "mechanic.rules",
-        "version": 1
-      },
-      {
-        "id": "operation.sacura.signal.emit",
-        "version": 1
-      },
-      {
-        "id": "operation.sacura.variable.set",
         "version": 1
       }
     ],
@@ -88,178 +74,405 @@
       "version": 2,
       "behaviorSchemaVersion": 1,
       "capabilitySchemaVersion": 1,
-      "resources": [
-        {
-          "id": "coins",
-          "name": "Монеты",
-          "owner": {
-            "kind": "project",
-            "id": null
-          },
-          "type": "integer",
-          "initial": 0
-        }
-      ],
+      "resources": [],
       "inventories": [],
       "movements": [],
-      "stateBindings": [
-        {
-          "id": "sample-binding-coins",
-          "variable": {
-            "kind": "reference",
-            "type": "variable",
-            "mode": "direct",
-            "id": "sample-variable-coins"
-          },
-          "source": "capability",
-          "capability": "sacura.resource",
-          "owner": {
-            "kind": "reference",
-            "type": "project",
-            "mode": "direct",
-            "id": "package-project"
-          },
-          "field": "value",
-          "valueType": "integer",
-          "recordId": "coins"
-        }
-      ],
+      "stateBindings": [],
       "mechanicSchemaVersion": 1,
       "mechanicDefinitions": [
         {
-          "id": "sample.mechanic.reward",
+          "id": "sample.component.counter",
           "version": 1,
           "scopes": [
-            "project",
+            "object",
             "scene",
-            "object"
+            "project"
           ],
-          "when": "sample.signal.reward",
+          "when": "start",
           "stateSchema": {
             "type": "object",
-            "properties": {}
-          },
-          "initialState": {},
-          "requirements": [],
-          "name": "Награда за действие",
-          "description": "Один сигнал увеличивает выбранный счётчик. Подходит для отношения, очков, монет.",
-          "parameters": {
-            "type": "object",
             "properties": {
-              "owner": {
-                "type": "union",
-                "label": "Владелец счётчика",
-                "variants": [
-                  {
-                    "type": "reference",
-                    "referenceType": "project",
-                    "label": "Проект"
-                  },
-                  {
-                    "type": "reference",
-                    "referenceType": "scene",
-                    "label": "Сцена"
-                  },
-                  {
-                    "type": "reference",
-                    "referenceType": "object",
-                    "label": "Объект"
-                  }
-                ]
-              },
-              "counter": {
-                "type": "reference",
-                "referenceType": "resource",
-                "label": "Счётчик"
-              },
-              "amount": {
-                "type": "integer",
-                "label": "Награда",
-                "default": 1
+              "value": {
+                "type": "number",
+                "default": 0,
+                "label": "Текущее значение"
               }
             }
           },
-          "exposed": [
-            "owner",
-            "counter",
-            "amount"
-          ],
-          "logic": {
-            "functionId": "sample-reward-function"
-          },
-          "rules": [
-            {
-              "id": "reward",
-              "name": "Новая реакция",
-              "version": 1,
-              "enabled": true,
-              "signal": {
-                "type": "sample.signal.reward"
+          "initialState": {},
+          "requirements": [],
+          "name": "Counter",
+          "componentVersion": 1,
+          "stateVersion": 1,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "initial": {
+                "type": "number",
+                "default": 0,
+                "label": "Начальное значение"
               },
-              "filter": {},
-              "actions": [
-                {
-                  "kind": "function",
-                  "functionId": "definition-sample.mechanic.reward-1-reward-handler",
-                  "args": {
-                    "reason": {
-                      "op": "get",
-                      "path": "args.reason"
-                    },
-                    "owner": {
-                      "op": "get",
-                      "path": "args.owner"
-                    },
-                    "counter": {
-                      "op": "get",
-                      "path": "args.counter"
-                    },
-                    "amount": {
-                      "op": "get",
-                      "path": "args.amount"
-                    }
+              "storySource": {
+                "type": "boolean",
+                "default": false,
+                "label": "Менять источник постоянной привязки явно"
+              },
+              "step": {
+                "type": "number",
+                "default": 1,
+                "label": "Множитель изменения"
+              }
+            }
+          },
+          "references": {
+            "type": "object",
+            "properties": {}
+          },
+          "methods": {
+            "add": {
+              "name": "Добавить",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "amount": {
+                    "type": "number",
+                    "default": 1,
+                    "label": "Количество"
                   }
                 }
-              ],
-              "otherwise": [],
-              "once": false,
-              "cooldown": 0,
-              "reentry": "queue",
-              "maxConcurrent": 1,
-              "maxQueued": 16,
-              "handlerGraphVersion": 1,
-              "handlerFunctionId": "definition-sample.mechanic.reward-1-reward-handler",
-              "timeSource": "game"
+              },
+              "result": {
+                "type": "number"
+              },
+              "logic": {
+                "functionId": "sample-method-Counter-add"
+              }
+            },
+            "read": {
+              "name": "Прочитать",
+              "parameters": {
+                "type": "object",
+                "properties": {}
+              },
+              "result": {
+                "type": "number"
+              },
+              "logic": {
+                "functionId": "sample-method-Counter-read"
+              }
+            },
+            "multiply": {
+              "name": "Умножить",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "factor": {
+                    "type": "number",
+                    "default": 2,
+                    "label": "Множитель"
+                  }
+                }
+              },
+              "result": {
+                "type": "number"
+              },
+              "logic": {
+                "functionId": "sample-method-Counter-multiply"
+              }
+            }
+          },
+          "events": {
+            "changed": {
+              "name": "Значение изменилось",
+              "signalId": "user.component-signal.sample-source--ounter.changed",
+              "payloadSchema": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          },
+          "logicResourceId": "sample-source-Counter",
+          "stateFromParameters": {
+            "value": "initial"
+          },
+          "lifecycle": {},
+          "subscriptions": []
+        },
+        {
+          "id": "sample.component.reward",
+          "version": 1,
+          "scopes": [
+            "object",
+            "scene",
+            "project"
+          ],
+          "when": "start",
+          "stateSchema": {
+            "type": "object",
+            "properties": {
+              "awards": {
+                "type": "integer",
+                "default": 0,
+                "label": "Выдано наград"
+              }
+            }
+          },
+          "initialState": {},
+          "requirements": [],
+          "name": "Reward",
+          "componentVersion": 1,
+          "stateVersion": 1,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "base": {
+                "type": "number",
+                "default": 1,
+                "label": "Базовая награда"
+              },
+              "multiplier": {
+                "type": "number",
+                "default": 1,
+                "label": "Множитель награды"
+              }
+            }
+          },
+          "references": {
+            "type": "object",
+            "properties": {
+              "counter": {
+                "type": "reference",
+                "referenceType": "mechanic",
+                "label": "Куда начислять · Counter"
+              }
+            }
+          },
+          "methods": {
+            "award": {
+              "name": "Начислить награду",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "factor": {
+                    "type": "number",
+                    "default": 1,
+                    "label": "Разовый множитель"
+                  }
+                }
+              },
+              "result": {
+                "type": "number"
+              },
+              "logic": {
+                "functionId": "sample-method-Reward-award"
+              }
+            }
+          },
+          "events": {
+            "awarded": {
+              "name": "Награда выдана",
+              "signalId": "user.component-signal.sample-source--eward.awarded",
+              "payloadSchema": {
+                "type": "object",
+                "properties": {
+                  "amount": {
+                    "type": "number"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          },
+          "logicResourceId": "sample-source-Reward",
+          "stateFromParameters": {},
+          "lifecycle": {},
+          "subscriptions": []
+        },
+        {
+          "id": "sample.component.periodicreward",
+          "version": 1,
+          "scopes": [
+            "object",
+            "scene",
+            "project"
+          ],
+          "when": "start",
+          "stateSchema": {
+            "type": "object",
+            "properties": {
+              "rate": {
+                "type": "number",
+                "default": 1,
+                "label": "Награда за тик"
+              },
+              "running": {
+                "type": "boolean",
+                "default": false,
+                "label": "Таймер включён"
+              }
+            }
+          },
+          "initialState": {},
+          "requirements": [],
+          "name": "PeriodicReward",
+          "componentVersion": 1,
+          "stateVersion": 1,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "seconds": {
+                "type": "number",
+                "min": 0.05,
+                "default": 1,
+                "label": "Интервал"
+              },
+              "initialRate": {
+                "type": "number",
+                "default": 1,
+                "label": "Начальная скорость"
+              },
+              "autoStart": {
+                "type": "boolean",
+                "default": true,
+                "label": "Запустить после подготовки"
+              }
+            }
+          },
+          "references": {
+            "type": "object",
+            "properties": {
+              "reward": {
+                "type": "reference",
+                "referenceType": "mechanic",
+                "label": "Общая награда"
+              }
+            }
+          },
+          "methods": {
+            "prepare": {
+              "name": "Подготовить таймер",
+              "parameters": {
+                "type": "object",
+                "properties": {}
+              },
+              "result": {
+                "type": "void"
+              },
+              "logic": {
+                "functionId": "sample-method-PeriodicReward-prepare"
+              }
+            },
+            "start": {
+              "name": "Запустить таймер",
+              "parameters": {
+                "type": "object",
+                "properties": {}
+              },
+              "result": {
+                "type": "void"
+              },
+              "logic": {
+                "functionId": "sample-method-PeriodicReward-start"
+              }
+            },
+            "stop": {
+              "name": "Остановить таймер",
+              "parameters": {
+                "type": "object",
+                "properties": {}
+              },
+              "result": {
+                "type": "void"
+              },
+              "logic": {
+                "functionId": "sample-method-PeriodicReward-stop"
+              }
+            },
+            "tick": {
+              "name": "Выдать периодическую награду",
+              "parameters": {
+                "type": "object",
+                "properties": {}
+              },
+              "result": {
+                "type": "void"
+              },
+              "logic": {
+                "functionId": "sample-method-PeriodicReward-tick"
+              }
+            },
+            "upgrade": {
+              "name": "Улучшить",
+              "parameters": {
+                "type": "object",
+                "properties": {}
+              },
+              "result": {
+                "type": "number"
+              },
+              "logic": {
+                "functionId": "sample-method-PeriodicReward-upgrade"
+              }
+            }
+          },
+          "events": {},
+          "logicResourceId": "sample-source-PeriodicReward",
+          "stateFromParameters": {
+            "rate": "initialRate",
+            "running": "autoStart"
+          },
+          "lifecycle": {
+            "enable": "prepare",
+            "disable": "stop"
+          },
+          "subscriptions": [
+            {
+              "id": "own-timer",
+              "match": "timer",
+              "methodId": "tick",
+              "signalId": "timer"
             }
           ]
         }
       ],
       "signals": [
         {
-          "id": "sample.signal.reward",
+          "id": "user.component-signal.sample-source--ounter.changed",
           "version": 1,
-          "name": "Получена награда",
+          "name": "Counter · Значение изменилось",
           "payloadSchema": {
             "type": "object",
             "properties": {
-              "reason": {
-                "type": "string",
-                "optional": true
+              "value": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        {
+          "id": "user.component-signal.sample-source--eward.awarded",
+          "version": 1,
+          "name": "Reward · Награда выдана",
+          "payloadSchema": {
+            "type": "object",
+            "properties": {
+              "amount": {
+                "type": "number"
+              },
+              "value": {
+                "type": "number"
               }
             }
           }
         }
       ],
-      "variableBindings": [
-        {
-          "id": "sample-variable-coins",
-          "key": "coins"
-        },
-        {
-          "id": "sample-variable-rate",
-          "key": "rate"
-        }
-      ],
+      "variableBindings": [],
       "enabled": true,
       "activation": "continuous",
       "camera": {
@@ -270,68 +483,71 @@
       },
       "mechanics": [
         {
-          "id": "sample-resource-coins",
-          "type": "resource",
-          "recordId": "coins",
-          "scope": {
-            "kind": "project",
-            "id": null
-          }
-        },
-        {
-          "id": "sample-reward-coins",
+          "id": "coins-counter",
           "type": "definition",
-          "definitionId": "sample.mechanic.reward",
+          "definitionId": "sample.component.counter",
           "definitionVersion": 1,
           "scope": {
-            "kind": "project",
-            "id": null
+            "kind": "object",
+            "id": "clicker-owner"
           },
           "values": {
-            "amount": 1,
-            "owner": {
-              "kind": "reference",
-              "type": "project",
-              "mode": "direct",
-              "id": "package-project"
-            },
+            "initial": 0,
+            "storySource": false,
+            "step": 1
+          },
+          "enabled": true,
+          "references": {},
+          "name": "Монеты"
+        },
+        {
+          "id": "coins-reward",
+          "type": "definition",
+          "definitionId": "sample.component.reward",
+          "definitionVersion": 1,
+          "scope": {
+            "kind": "object",
+            "id": "clicker-owner"
+          },
+          "values": {
+            "base": 1,
+            "multiplier": 1
+          },
+          "enabled": true,
+          "references": {
             "counter": {
               "kind": "reference",
-              "type": "resource",
+              "type": "mechanic",
               "mode": "direct",
-              "id": "coins"
+              "id": "coins-counter"
             }
-          }
+          },
+          "name": "Награда"
         },
         {
-          "id": "sample-rule-click-reward",
-          "type": "rule",
-          "name": "Кнопка → награда",
+          "id": "coins-periodic",
+          "type": "definition",
+          "definitionId": "sample.component.periodicreward",
+          "definitionVersion": 1,
           "scope": {
-            "kind": "project",
-            "id": null
+            "kind": "object",
+            "id": "clicker-owner"
           },
-          "ruleId": "click-reward"
-        },
-        {
-          "id": "sample-rule-upgrade-rate",
-          "type": "rule",
-          "name": "Улучшение → быстрее получать монеты",
-          "scope": {
-            "kind": "project",
-            "id": null
+          "values": {
+            "seconds": 1,
+            "initialRate": 1,
+            "autoStart": true
           },
-          "ruleId": "upgrade-rate"
-        },
-        {
-          "id": "sample-rule-automatic-coins",
-          "type": "rule",
-          "name": "Каждую секунду → монеты с выбранной скоростью",
-          "scope": {
-            "kind": "project",
-            "id": null
+          "enabled": true,
+          "references": {
+            "reward": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "coins-reward"
+            }
           },
-          "ruleId": "automatic-coins"
+          "name": "Периодическая награда"
         }
       ],
       "playerId": "",
@@ -350,148 +566,16 @@
       "weapons": [],
       "items": [],
       "recipes": [],
-      "rules": [
-        {
-          "id": "click-reward",
-          "name": "Кнопка → награда",
-          "version": 1,
-          "enabled": true,
-          "signal": {
-            "type": "button"
-          },
-          "scope": {
-            "kind": "project",
-            "id": null
-          },
-          "filter": {
-            "source": {
-              "kind": "reference",
-              "type": "widget",
-              "mode": "direct",
-              "id": "clicker-controls",
-              "elementId": "coin-button"
-            }
-          },
-          "actions": [
-            {
-              "kind": "function",
-              "functionId": "rule-click-reward-handler",
-              "args": {
-                "elementId": {
-                  "op": "get",
-                  "path": "args.elementId"
-                },
-                "action": {
-                  "op": "get",
-                  "path": "args.action"
-                }
-              }
-            }
-          ],
-          "otherwise": [],
-          "once": false,
-          "cooldown": 0,
-          "reentry": "queue",
-          "maxConcurrent": 1,
-          "maxQueued": 16,
-          "handlerGraphVersion": 1,
-          "handlerFunctionId": "rule-click-reward-handler",
-          "timeSource": "game"
-        },
-        {
-          "id": "upgrade-rate",
-          "name": "Улучшение → быстрее получать монеты",
-          "version": 1,
-          "enabled": true,
-          "signal": {
-            "type": "button"
-          },
-          "scope": {
-            "kind": "project",
-            "id": null
-          },
-          "filter": {
-            "source": {
-              "kind": "reference",
-              "type": "widget",
-              "mode": "direct",
-              "id": "clicker-controls",
-              "elementId": "upgrade-button"
-            }
-          },
-          "actions": [
-            {
-              "kind": "function",
-              "functionId": "rule-upgrade-rate-handler",
-              "args": {
-                "elementId": {
-                  "op": "get",
-                  "path": "args.elementId"
-                },
-                "action": {
-                  "op": "get",
-                  "path": "args.action"
-                }
-              }
-            }
-          ],
-          "otherwise": [],
-          "once": false,
-          "cooldown": 0,
-          "reentry": "queue",
-          "maxConcurrent": 1,
-          "maxQueued": 16,
-          "handlerGraphVersion": 1,
-          "handlerFunctionId": "rule-upgrade-rate-handler",
-          "timeSource": "game"
-        },
-        {
-          "id": "automatic-coins",
-          "name": "Каждую секунду → монеты с выбранной скоростью",
-          "version": 1,
-          "enabled": true,
-          "signal": {
-            "type": "tick"
-          },
-          "scope": {
-            "kind": "project",
-            "id": null
-          },
-          "filter": {},
-          "actions": [
-            {
-              "kind": "function",
-              "functionId": "rule-automatic-coins-handler",
-              "args": {
-                "objectId": {
-                  "op": "get",
-                  "path": "args.objectId"
-                }
-              }
-            }
-          ],
-          "otherwise": [],
-          "once": false,
-          "cooldown": 0,
-          "reentry": "queue",
-          "maxConcurrent": 1,
-          "maxQueued": 16,
-          "seconds": 1,
-          "repeat": true,
-          "handlerGraphVersion": 1,
-          "handlerFunctionId": "rule-automatic-coins-handler",
-          "timeSource": "game"
-        }
-      ],
+      "rules": [],
       "inventory": {
-        "slots": 12,
-        "starting": [],
-        "equipment": {},
         "owner": {
           "kind": "project",
           "id": null
         },
-        "enabled": false
+        "enabled": false,
+        "slots": 12,
+        "starting": [],
+        "equipment": {}
       },
       "hudWidgetId": "clicker-controls",
       "cameraSettings": {
@@ -507,1316 +591,298 @@
         "ending": "continue"
       }
     },
+    "logicResources": [
+      {
+        "id": "sample-source-Counter",
+        "version": 1,
+        "kind": "component.code",
+        "name": "Counter",
+        "path": "Компоненты/Counter.js",
+        "definitionId": "sample.component.counter",
+        "status": "ready",
+        "approved": true,
+        "source": "// Откройте Add: измените умножение на params.step — результат изменится во всех вызовах.\n// Один исходник, независимое value у каждого подключения.\nconst component = {\n  name: \"Counter\",\n  parameters: {\n    type: \"object\",\n    properties: {\n      initial: { type: \"number\", default: 0, label: \"Начальное значение\" },\n      storySource: {\n        type: \"boolean\",\n        default: false,\n        label: \"Менять источник постоянной привязки явно\",\n      },\n      step: { type: \"number\", default: 1, label: \"Множитель изменения\" },\n    },\n  },\n  state: {\n    type: \"object\",\n    properties: { value: { type: \"number\", default: 0, label: \"Текущее значение\" } },\n  },\n  stateFromParameters: { value: \"initial\" },\n  signals: {\n    changed: {\n      name: \"Значение изменилось\",\n      payloadSchema: { type: \"object\", properties: { value: { type: \"number\" } } },\n    },\n  },\n  methods: {\n    add: {\n      name: \"Добавить\",\n      parameters: {\n        type: \"object\",\n        properties: { amount: { type: \"number\", default: 1, label: \"Количество\" } },\n      },\n      result: { type: \"number\" },\n      async run({ args, params, state, engine }) {\n        const next = state.value + args.amount * params.step;\n        if (params.storySource) await engine.writeBinding(\"value\", next);\n        else state.value = next;\n        await engine.emit(\"changed\", { value: state.value });\n        return state.value;\n      },\n    },\n    read: {\n      name: \"Прочитать\",\n      result: { type: \"number\" },\n      run({ state }) {\n        return state.value;\n      },\n    },\n    multiply: {\n      name: \"Умножить\",\n      parameters: {\n        type: \"object\",\n        properties: { factor: { type: \"number\", default: 2, label: \"Множитель\" } },\n      },\n      result: { type: \"number\" },\n      async run({ args, params, state, engine }) {\n        const next = state.value * args.factor;\n        if (params.storySource) await engine.writeBinding(\"value\", next);\n        else state.value = next;\n        await engine.emit(\"changed\", { value: state.value });\n        return state.value;\n      },\n    },\n  },\n};\n",
+        "fingerprint": "2083:e0bc205",
+        "dependencies": {
+          "functions": {},
+          "events": {},
+          "references": {},
+          "globals": {},
+          "signals": {},
+          "operations": {
+            "sacura.variable.set": {
+              "operationId": "sacura.variable.set",
+              "operationVersion": 1
+            }
+          }
+        },
+        "signalBindings": {
+          "changed": {
+            "signalId": "user.component-signal.sample-source--ounter.changed"
+          }
+        },
+        "lesson": "Что открыть → Counter.add. Что изменить → умножение на step. Результат → меняются начисления каждого подключения независимо.",
+        "locations": {
+          "add": {
+            "line": 36,
+            "column": 7
+          },
+          "read": {
+            "line": 47,
+            "column": 7
+          },
+          "multiply": {
+            "line": 58,
+            "column": 7
+          }
+        }
+      },
+      {
+        "id": "sample-source-Reward",
+        "version": 1,
+        "kind": "component.code",
+        "name": "Reward",
+        "path": "Компоненты/Reward.js",
+        "definitionId": "sample.component.reward",
+        "status": "ready",
+        "approved": true,
+        "source": "// Упражнение: замените base * multiplier на base * multiplier + 5.\n// Получатель — явная ссылка на Counter, одинаковая логика для очков, монет и отношения.\n// Добавьте новый метод bonus с вызовом engine.invoke(refs.counter, \"add\", {amount: ...}).\nconst component = {\n  name: \"Reward\",\n  parameters: {\n    type: \"object\",\n    properties: {\n      base: { type: \"number\", default: 1, label: \"Базовая награда\" },\n      multiplier: { type: \"number\", default: 1, label: \"Множитель награды\" },\n    },\n  },\n  references: {\n    type: \"object\",\n    properties: {\n      counter: { type: \"reference\", referenceType: \"mechanic\", label: \"Куда начислять · Counter\" },\n    },\n  },\n  state: {\n    type: \"object\",\n    properties: { awards: { type: \"integer\", default: 0, label: \"Выдано наград\" } },\n  },\n  signals: {\n    awarded: {\n      name: \"Награда выдана\",\n      payloadSchema: {\n        type: \"object\",\n        properties: { amount: { type: \"number\" }, value: { type: \"number\" } },\n      },\n    },\n  },\n  methods: {\n    award: {\n      name: \"Начислить награду\",\n      parameters: {\n        type: \"object\",\n        properties: { factor: { type: \"number\", default: 1, label: \"Разовый множитель\" } },\n      },\n      result: { type: \"number\" },\n      async run({ args, params, refs, state, engine }) {\n        const amount = params.base * params.multiplier * args.factor;\n        const value = await engine.invoke(refs.counter, \"add\", { amount });\n        state.awards += 1;\n        await engine.emit(\"awarded\", { amount, value });\n        return value;\n      },\n    },\n  },\n};\n",
+        "fingerprint": "1563:65abf1e6",
+        "dependencies": {
+          "functions": {},
+          "events": {},
+          "references": {},
+          "globals": {},
+          "signals": {},
+          "operations": {}
+        },
+        "signalBindings": {
+          "awarded": {
+            "signalId": "user.component-signal.sample-source--eward.awarded"
+          }
+        },
+        "lesson": "Что открыть → Reward.award. Что изменить → формулу amount; добавьте bonus. Результат → кнопка/история/награда используют изменённый метод.",
+        "locations": {
+          "award": {
+            "line": 40,
+            "column": 7
+          }
+        }
+      },
+      {
+        "id": "sample-source-PeriodicReward",
+        "version": 1,
+        "kind": "component.code",
+        "name": "PeriodicReward",
+        "path": "Компоненты/PeriodicReward.js",
+        "definitionId": "sample.component.periodicreward",
+        "status": "ready",
+        "approved": true,
+        "source": "// Timer — сериализуемый native handle этого компонента. Tick вызывает тот же Reward,\n// что кнопка. Disable/Stop удаляет только его таймер; восстановление сохраняет remaining.\nconst component = {\n  name: \"PeriodicReward\",\n  parameters: {\n    type: \"object\",\n    properties: {\n      seconds: { type: \"number\", min: 0.05, default: 1, label: \"Интервал\" },\n      initialRate: { type: \"number\", default: 1, label: \"Начальная скорость\" },\n      autoStart: { type: \"boolean\", default: true, label: \"Запустить после подготовки\" },\n    },\n  },\n  state: {\n    type: \"object\",\n    properties: {\n      rate: { type: \"number\", default: 1, label: \"Награда за тик\" },\n      running: { type: \"boolean\", default: false, label: \"Таймер включён\" },\n    },\n  },\n  stateFromParameters: { rate: \"initialRate\", running: \"autoStart\" },\n  references: {\n    type: \"object\",\n    properties: {\n      reward: { type: \"reference\", referenceType: \"mechanic\", label: \"Общая награда\" },\n    },\n  },\n  lifecycle: { enable: \"prepare\", disable: \"stop\" },\n  subscriptions: [{ id: \"own-timer\", signal: \"timer\", match: \"timer\", methodId: \"tick\" }],\n  methods: {\n    prepare: {\n      name: \"Подготовить таймер\",\n      async run({ state, self, engine }) {\n        if (state.running) await engine.invoke(self, \"start\", {});\n      },\n    },\n    start: {\n      name: \"Запустить таймер\",\n      async run({ params, state, owner, engine }) {\n        state.running = true;\n        await engine.operation(\"sacura.timer.start\", {\n          owner,\n          name: \"reward\",\n          seconds: params.seconds,\n          repeat: true,\n          restart: false,\n        });\n      },\n    },\n    stop: {\n      name: \"Остановить таймер\",\n      async run({ state, owner, engine }) {\n        state.running = false;\n        await engine.operation(\"sacura.timer.stop\", { owner, name: \"reward\" });\n      },\n    },\n    tick: {\n      name: \"Выдать периодическую награду\",\n      async run({ state, refs, engine }) {\n        if (state.running) await engine.invoke(refs.reward, \"award\", { factor: state.rate });\n      },\n    },\n    upgrade: {\n      name: \"Улучшить\",\n      result: { type: \"number\" },\n      run({ state }) {\n        state.rate += 1;\n        return state.rate;\n      },\n    },\n  },\n};\n",
+        "fingerprint": "2234:939e1006",
+        "dependencies": {
+          "functions": {},
+          "events": {},
+          "references": {},
+          "globals": {},
+          "signals": {},
+          "operations": {
+            "sacura.timer.start": {
+              "operationId": "sacura.timer.start",
+              "operationVersion": 1
+            },
+            "sacura.timer.stop": {
+              "operationId": "sacura.timer.stop",
+              "operationVersion": 1
+            }
+          }
+        },
+        "signalBindings": {},
+        "lesson": "Что открыть → PeriodicReward.tick / upgrade. Измените правило улучшения. Таймер принадлежит подключению и удаляется при остановке.",
+        "locations": {
+          "prepare": {
+            "line": 32,
+            "column": 7
+          },
+          "start": {
+            "line": 38,
+            "column": 7
+          },
+          "stop": {
+            "line": 51,
+            "column": 7
+          },
+          "tick": {
+            "line": 58,
+            "column": 7
+          },
+          "upgrade": {
+            "line": 65,
+            "column": 7
+          }
+        }
+      }
+    ],
     "version": 2,
     "authoringGraphVersion": 1,
     "handlerGraphVersion": 1,
     "visualExamplesVersion": 1,
     "sceneEditingVersion": 2,
     "standardEventsVersion": 1,
-    "events": [
-      {
-        "id": "event-088bfd62-a879-4457-9387-09997ca9aab2",
-        "name": "Подойти с анимацией",
-        "description": "",
-        "retention": "AUTO_CLOSE_ON_FLOW_END",
-        "owner": "SubScene",
-        "groups": [
-          {
-            "id": "group-a4ef302c-c262-43e6-b578-f03eee0cd8d4",
-            "name": "Подойти",
-            "actions": [
-              {
-                "id": "action-04f5347f-e1a6-405d-9d89-975488d2d2b4",
-                "type": "move",
-                "target": "",
-                "value": [
-                  0,
-                  0,
-                  0
-                ],
-                "wait": "COMPLETED",
-                "scope": "SELF",
-                "conflict": "FAIL_NEW",
-                "footstepAssetId": "",
-                "footstepVolume": 1,
-                "duration": 2,
-                "queueTimeout": 10,
-                "startTimeout": 5,
-                "executionTimeout": 30,
-                "stopTimeout": 3,
-                "onFailure": "Остановить событие",
-                "finalState": "Сохранить результат",
-                "fallback": "Безопасное исходное состояние",
-                "animationId": "ходит"
-              }
-            ]
-          }
-        ],
-        "standardPreset": true
-      },
-      {
-        "id": "event-ef82d385-03f3-4c60-8a98-98806d294419",
-        "name": "Подойти и сесть",
-        "description": "",
-        "retention": "AUTO_CLOSE_ON_FLOW_END",
-        "owner": "SubScene",
-        "groups": [
-          {
-            "id": "group-200ba1a9-94db-4e01-9031-6e3c1e38b2af",
-            "name": "Подойти к месту",
-            "actions": [
-              {
-                "id": "action-6cfa89d9-823f-46f1-a8f0-25ec1c8c50b2",
-                "type": "move",
-                "target": "",
-                "value": [
-                  0,
-                  0,
-                  0
-                ],
-                "wait": "COMPLETED",
-                "scope": "SELF",
-                "conflict": "FAIL_NEW",
-                "footstepAssetId": "",
-                "footstepVolume": 1,
-                "duration": 2,
-                "queueTimeout": 10,
-                "startTimeout": 5,
-                "executionTimeout": 30,
-                "stopTimeout": 3,
-                "onFailure": "Остановить событие",
-                "finalState": "Сохранить результат",
-                "fallback": "Безопасное исходное состояние",
-                "animationId": "ходит"
-              }
-            ]
-          },
-          {
-            "id": "group-dfd02386-a3c9-4835-aff1-d5b434e99e42",
-            "name": "Сесть",
-            "actions": [
-              {
-                "id": "action-1d5d5824-e553-43bf-852a-639abe6726b1",
-                "type": "pose",
-                "target": "",
-                "value": "сидит",
-                "wait": "COMPLETED",
-                "scope": "SELF",
-                "conflict": "FAIL_NEW",
-                "duration": 2,
-                "queueTimeout": 10,
-                "startTimeout": 5,
-                "executionTimeout": 30,
-                "stopTimeout": 3,
-                "onFailure": "Остановить событие",
-                "finalState": "Сохранить результат",
-                "fallback": "Безопасное исходное состояние"
-              }
-            ]
-          }
-        ],
-        "standardPreset": true
-      },
-      {
-        "id": "event-9940ac70-6f4c-4706-b76b-b22e8c219138",
-        "name": "Приветствие крупным планом",
-        "description": "",
-        "retention": "AUTO_CLOSE_ON_FLOW_END",
-        "owner": "SubScene",
-        "groups": [
-          {
-            "id": "group-135021dc-21fd-4a6c-b8bd-f60049b8c92b",
-            "name": "Приветствие",
-            "actions": [
-              {
-                "id": "action-2929a939-508b-426c-bdfe-4b08d4fb4ab0",
-                "type": "pose",
-                "target": "",
-                "value": "машет",
-                "wait": "COMPLETED",
-                "scope": "SELF",
-                "conflict": "FAIL_NEW",
-                "duration": 2,
-                "queueTimeout": 10,
-                "startTimeout": 5,
-                "executionTimeout": 30,
-                "stopTimeout": 3,
-                "onFailure": "Остановить событие",
-                "finalState": "Сохранить результат",
-                "fallback": "Безопасное исходное состояние"
-              },
-              {
-                "id": "action-cbde440f-11db-4e0e-bb40-8a17209e38bb",
-                "type": "camera",
-                "target": "camera",
-                "value": "Крупный план",
-                "wait": "COMPLETED",
-                "scope": "SELF",
-                "conflict": "REPLACE_CURRENT",
-                "duration": 2,
-                "queueTimeout": 10,
-                "startTimeout": 5,
-                "executionTimeout": 30,
-                "stopTimeout": 3,
-                "onFailure": "Остановить событие",
-                "finalState": "Сохранить результат",
-                "fallback": "Безопасное исходное состояние"
-              }
-            ]
-          }
-        ],
-        "standardPreset": true
-      },
-      {
-        "id": "event-1e130bae-0542-452a-879e-b6b083d3b6eb",
-        "name": "Наступает вечер",
-        "description": "",
-        "retention": "AUTO_CLOSE_ON_FLOW_END",
-        "owner": "SubScene",
-        "groups": [
-          {
-            "id": "group-7a47994b-209d-4945-8938-13e39b206cf1",
-            "name": "Окружение",
-            "actions": [
-              {
-                "id": "action-62ad5ea3-1baf-4598-9efc-e8dde1e9e6d0",
-                "type": "time",
-                "target": "world",
-                "value": "Закат",
-                "wait": "COMPLETED",
-                "scope": "SELF",
-                "conflict": "FAIL_NEW",
-                "duration": 2,
-                "queueTimeout": 10,
-                "startTimeout": 5,
-                "executionTimeout": 30,
-                "stopTimeout": 3,
-                "onFailure": "Остановить событие",
-                "finalState": "Сохранить результат",
-                "fallback": "Безопасное исходное состояние"
-              },
-              {
-                "id": "action-ad533579-444d-462a-a928-d6c22c9c6406",
-                "type": "lighting",
-                "target": "world",
-                "value": "Тёплый свет",
-                "wait": "COMPLETED",
-                "scope": "SELF",
-                "conflict": "FAIL_NEW",
-                "duration": 2,
-                "queueTimeout": 10,
-                "startTimeout": 5,
-                "executionTimeout": 30,
-                "stopTimeout": 3,
-                "onFailure": "Остановить событие",
-                "finalState": "Сохранить результат",
-                "fallback": "Безопасное исходное состояние"
-              }
-            ]
-          }
-        ],
-        "standardPreset": true
-      },
-      {
-        "id": "event-20ace86f-c30c-4c16-80a7-7c0c7738f4e5",
-        "name": "Появиться в кадре",
-        "description": "",
-        "retention": "AUTO_CLOSE_ON_FLOW_END",
-        "owner": "SubScene",
-        "groups": [
-          {
-            "id": "group-a1f63b61-a607-4c96-98c0-92ffe617bf65",
-            "name": "Появление",
-            "actions": [
-              {
-                "id": "action-6dd4ab19-f922-45c1-aa5b-0fac0c301c6f",
-                "type": "visibility",
-                "target": "",
-                "value": "Показать",
-                "wait": "COMPLETED",
-                "scope": "SELF",
-                "conflict": "FAIL_NEW",
-                "duration": 2,
-                "queueTimeout": 10,
-                "startTimeout": 5,
-                "executionTimeout": 30,
-                "stopTimeout": 3,
-                "onFailure": "Остановить событие",
-                "finalState": "Сохранить результат",
-                "fallback": "Безопасное исходное состояние"
-              },
-              {
-                "id": "action-92c66aa5-b1e5-462f-81e3-2a4a8c7e8bc9",
-                "type": "pose",
-                "target": "",
-                "value": "стоит",
-                "wait": "COMPLETED",
-                "scope": "SELF",
-                "conflict": "FAIL_NEW",
-                "duration": 2,
-                "queueTimeout": 10,
-                "startTimeout": 5,
-                "executionTimeout": 30,
-                "stopTimeout": 3,
-                "onFailure": "Остановить событие",
-                "finalState": "Сохранить результат",
-                "fallback": "Безопасное исходное состояние"
-              }
-            ]
-          }
-        ],
-        "standardPreset": true
-      }
-    ],
+    "events": [],
     "functions": [
       {
-        "id": "sample-reward-function",
-        "name": "Начислить награду",
+        "id": "sample-method-Counter-add",
+        "name": "Counter · Добавить",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-Counter",
+        "componentMethodId": "add",
         "parameters": [
           {
-            "name": "owner",
-            "label": "Владелец счётчика",
-            "schema": {
-              "type": "union",
-              "label": "Владелец счётчика",
-              "variants": [
-                {
-                  "type": "reference",
-                  "referenceType": "project",
-                  "label": "Проект"
-                },
-                {
-                  "type": "reference",
-                  "referenceType": "scene",
-                  "label": "Сцена"
-                },
-                {
-                  "type": "reference",
-                  "referenceType": "object",
-                  "label": "Объект"
-                }
-              ]
-            }
-          },
-          {
-            "name": "counter",
-            "label": "Счётчик",
-            "schema": {
-              "type": "reference",
-              "referenceType": "resource",
-              "label": "Счётчик"
-            }
-          },
-          {
             "name": "amount",
-            "label": "Награда",
             "schema": {
-              "type": "integer",
-              "label": "Награда",
-              "default": 1
+              "type": "number",
+              "default": 1,
+              "label": "Количество"
             }
           }
         ],
+        "resultSchema": {
+          "type": "number"
+        },
         "locals": {},
+        "entry": "",
+        "nodes": []
+      },
+      {
+        "id": "sample-method-Counter-read",
+        "name": "Counter · Прочитать",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-Counter",
+        "componentMethodId": "read",
+        "parameters": [],
+        "resultSchema": {
+          "type": "number"
+        },
+        "locals": {},
+        "entry": "",
+        "nodes": []
+      },
+      {
+        "id": "sample-method-Counter-multiply",
+        "name": "Counter · Умножить",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-Counter",
+        "componentMethodId": "multiply",
+        "parameters": [
+          {
+            "name": "factor",
+            "schema": {
+              "type": "number",
+              "default": 2,
+              "label": "Множитель"
+            }
+          }
+        ],
+        "resultSchema": {
+          "type": "number"
+        },
+        "locals": {},
+        "entry": "",
+        "nodes": []
+      },
+      {
+        "id": "sample-method-Reward-award",
+        "name": "Reward · Начислить награду",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-Reward",
+        "componentMethodId": "award",
+        "parameters": [
+          {
+            "name": "factor",
+            "schema": {
+              "type": "number",
+              "default": 1,
+              "label": "Разовый множитель"
+            }
+          }
+        ],
+        "resultSchema": {
+          "type": "number"
+        },
+        "locals": {},
+        "entry": "",
+        "nodes": []
+      },
+      {
+        "id": "sample-method-PeriodicReward-prepare",
+        "name": "PeriodicReward · Подготовить таймер",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-PeriodicReward",
+        "componentMethodId": "prepare",
+        "parameters": [],
         "resultSchema": {
           "type": "void"
         },
-        "entry": "reward-operation",
-        "nodes": [
-          {
-            "id": "reward-operation",
-            "kind": "command",
-            "name": "Изменить выбранный счётчик",
-            "position": {
-              "x": 120,
-              "y": 100
-            },
-            "comment": "Общая операция для отношения, очков и монет.",
-            "command": {
-              "command": "sacura.resource.add",
-              "operationVersion": 1,
-              "value": {
-                "owner": {
-                  "op": "node",
-                  "nodeId": "reward-operation-value-command-value-owner",
-                  "port": "value"
-                },
-                "resource": {
-                  "op": "node",
-                  "nodeId": "reward-operation-value-command-value-resource",
-                  "port": "value"
-                },
-                "amount": {
-                  "op": "node",
-                  "nodeId": "reward-operation-value-command-value-amount",
-                  "port": "value"
-                }
-              }
-            },
-            "next": null
-          },
-          {
-            "id": "reward-operation-value-command-value-owner",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "args.owner"
-            },
-            "position": {
-              "x": -1520,
-              "y": 50
-            }
-          },
-          {
-            "id": "reward-operation-value-command-value-resource",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "args.counter"
-            },
-            "position": {
-              "x": -1140,
-              "y": 50
-            }
-          },
-          {
-            "id": "reward-operation-value-command-value-amount",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "args.amount"
-            },
-            "position": {
-              "x": -760,
-              "y": 50
-            }
-          }
-        ],
+        "locals": {},
+        "entry": "",
+        "nodes": []
+      },
+      {
+        "id": "sample-method-PeriodicReward-start",
+        "name": "PeriodicReward · Запустить таймер",
         "graphVersion": 1,
-        "stateSchema": {
-          "type": "object",
-          "properties": {}
-        },
-        "initialState": {}
-      },
-      {
-        "id": "rule-click-reward-guard",
-        "name": "Кнопка → награда · условие",
-        "parameters": [
-          {
-            "name": "elementId",
-            "label": "elementId",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "action",
-            "label": "action",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "locals": {},
+        "logicResourceId": "sample-source-PeriodicReward",
+        "componentMethodId": "start",
+        "parameters": [],
         "resultSchema": {
-          "type": "boolean"
+          "type": "void"
         },
-        "preserveExtraArgs": true,
-        "entry": "rule-click-reward-guard-return",
-        "nodes": [
-          {
-            "id": "rule-click-reward-guard-return",
-            "kind": "return",
-            "name": "Условие выполнено",
-            "value": true,
-            "position": {
-              "x": 340,
-              "y": 0
-            }
-          }
-        ],
-        "graphVersion": 1
+        "locals": {},
+        "entry": "",
+        "nodes": []
       },
       {
-        "id": "rule-click-reward-handler",
-        "name": "Кнопка → награда",
-        "parameters": [
-          {
-            "name": "elementId",
-            "label": "elementId",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "action",
-            "label": "action",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "locals": {},
-        "preserveExtraArgs": true,
-        "handler": {
-          "signal": {
-            "type": "button"
-          }
-        },
-        "admission": {
-          "functionId": "rule-click-reward-guard",
-          "callNodeId": "rule-click-reward-handler-condition",
-          "branchId": "rule-click-reward-handler-branch"
-        },
-        "entry": "rule-click-reward-handler-condition",
-        "nodes": [
-          {
-            "id": "rule-click-reward-handler-condition",
-            "kind": "call",
-            "name": "Проверить условие",
-            "functionId": "rule-click-reward-guard",
-            "args": {
-              "elementId": {
-                "op": "node",
-                "nodeId": "rule-click-reward-handler-condition-value-args-elementId",
-                "port": "value"
-              },
-              "action": {
-                "op": "node",
-                "nodeId": "rule-click-reward-handler-condition-value-args-action",
-                "port": "value"
-              }
-            },
-            "next": "rule-click-reward-handler-branch",
-            "position": {
-              "x": 0,
-              "y": 100
-            }
-          },
-          {
-            "id": "rule-click-reward-handler-branch",
-            "kind": "branch",
-            "name": "Условие реакции",
-            "condition": {
-              "op": "node",
-              "nodeId": "rule-click-reward-handler-condition",
-              "port": "value"
-            },
-            "position": {
-              "x": 300,
-              "y": 100
-            },
-            "trueNext": "rule-click-reward-handler-yes-0",
-            "falseNext": "rule-click-reward-handler-no-end"
-          },
-          {
-            "id": "rule-click-reward-handler-yes-0",
-            "name": "Действие",
-            "position": {
-              "x": 660,
-              "y": 0
-            },
-            "kind": "operation",
-            "call": {
-              "id": "sacura.signal.emit",
-              "version": 1,
-              "parameters": {
-                "signal": {
-                  "kind": "reference",
-                  "type": "signal",
-                  "mode": "direct",
-                  "id": "sample.signal.reward"
-                },
-                "payload": {
-                  "reason": "Нажата кнопка"
-                }
-              }
-            },
-            "next": "rule-click-reward-handler-yes-end"
-          },
-          {
-            "id": "rule-click-reward-handler-yes-end",
-            "kind": "return",
-            "name": "Завершить обработчик",
-            "value": true,
-            "position": {
-              "x": 1000,
-              "y": 0
-            }
-          },
-          {
-            "id": "rule-click-reward-handler-no-end",
-            "kind": "return",
-            "name": "Завершить обработчик",
-            "value": false,
-            "position": {
-              "x": 660,
-              "y": 400
-            }
-          },
-          {
-            "id": "rule-click-reward-handler-condition-value-args-elementId",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "args.elementId"
-            },
-            "position": {
-              "x": -1520,
-              "y": 50
-            }
-          },
-          {
-            "id": "rule-click-reward-handler-condition-value-args-action",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "args.action"
-            },
-            "position": {
-              "x": -1140,
-              "y": 50
-            }
-          }
-        ],
-        "graphVersion": 1
-      },
-      {
-        "id": "rule-upgrade-rate-guard",
-        "name": "Улучшение → быстрее получать монеты · условие",
-        "parameters": [
-          {
-            "name": "elementId",
-            "label": "elementId",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "action",
-            "label": "action",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "locals": {},
+        "id": "sample-method-PeriodicReward-stop",
+        "name": "PeriodicReward · Остановить таймер",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-PeriodicReward",
+        "componentMethodId": "stop",
+        "parameters": [],
         "resultSchema": {
-          "type": "boolean"
+          "type": "void"
         },
-        "preserveExtraArgs": true,
-        "entry": "rule-upgrade-rate-guard-return",
-        "nodes": [
-          {
-            "id": "rule-upgrade-rate-guard-return",
-            "kind": "return",
-            "name": "Условие выполнено",
-            "value": true,
-            "position": {
-              "x": 340,
-              "y": 0
-            }
-          }
-        ],
-        "graphVersion": 1
+        "locals": {},
+        "entry": "",
+        "nodes": []
       },
       {
-        "id": "rule-upgrade-rate-handler",
-        "name": "Улучшение → быстрее получать монеты",
-        "parameters": [
-          {
-            "name": "elementId",
-            "label": "elementId",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "action",
-            "label": "action",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "locals": {},
-        "preserveExtraArgs": true,
-        "handler": {
-          "signal": {
-            "type": "button"
-          }
-        },
-        "admission": {
-          "functionId": "rule-upgrade-rate-guard",
-          "callNodeId": "rule-upgrade-rate-handler-condition",
-          "branchId": "rule-upgrade-rate-handler-branch"
-        },
-        "entry": "rule-upgrade-rate-handler-condition",
-        "nodes": [
-          {
-            "id": "rule-upgrade-rate-handler-condition",
-            "kind": "call",
-            "name": "Проверить условие",
-            "functionId": "rule-upgrade-rate-guard",
-            "args": {
-              "elementId": {
-                "op": "node",
-                "nodeId": "rule-upgrade-rate-handler-condition-value-args-elementId",
-                "port": "value"
-              },
-              "action": {
-                "op": "node",
-                "nodeId": "rule-upgrade-rate-handler-condition-value-args-action",
-                "port": "value"
-              }
-            },
-            "next": "rule-upgrade-rate-handler-branch",
-            "position": {
-              "x": 0,
-              "y": 100
-            }
-          },
-          {
-            "id": "rule-upgrade-rate-handler-branch",
-            "kind": "branch",
-            "name": "Условие реакции",
-            "condition": {
-              "op": "node",
-              "nodeId": "rule-upgrade-rate-handler-condition",
-              "port": "value"
-            },
-            "position": {
-              "x": 300,
-              "y": 100
-            },
-            "trueNext": "rule-upgrade-rate-handler-yes-0",
-            "falseNext": "rule-upgrade-rate-handler-no-end"
-          },
-          {
-            "id": "rule-upgrade-rate-handler-yes-0",
-            "name": "Действие",
-            "position": {
-              "x": 660,
-              "y": 0
-            },
-            "kind": "operation",
-            "call": {
-              "id": "sacura.variable.set",
-              "version": 1,
-              "parameters": {
-                "variable": {
-                  "kind": "reference",
-                  "type": "variable",
-                  "mode": "direct",
-                  "id": "sample-variable-rate"
-                },
-                "value": {
-                  "op": "node",
-                  "nodeId": "rule-upgrade-rate-handler-yes-0-value-call-parameters-value",
-                  "port": "value"
-                }
-              }
-            },
-            "next": "rule-upgrade-rate-handler-yes-end"
-          },
-          {
-            "id": "rule-upgrade-rate-handler-yes-end",
-            "kind": "return",
-            "name": "Завершить обработчик",
-            "value": true,
-            "position": {
-              "x": 1000,
-              "y": 0
-            }
-          },
-          {
-            "id": "rule-upgrade-rate-handler-no-end",
-            "kind": "return",
-            "name": "Завершить обработчик",
-            "value": false,
-            "position": {
-              "x": 660,
-              "y": 400
-            }
-          },
-          {
-            "id": "rule-upgrade-rate-handler-condition-value-args-elementId",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "args.elementId"
-            },
-            "position": {
-              "x": -1520,
-              "y": 50
-            }
-          },
-          {
-            "id": "rule-upgrade-rate-handler-condition-value-args-action",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "args.action"
-            },
-            "position": {
-              "x": -1140,
-              "y": 50
-            }
-          },
-          {
-            "id": "rule-upgrade-rate-handler-yes-0-value-call-parameters-value-a",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "global.rate"
-            },
-            "position": {
-              "x": -760,
-              "y": 50
-            }
-          },
-          {
-            "id": "rule-upgrade-rate-handler-yes-0-value-call-parameters-value",
-            "kind": "value",
-            "name": "Сложить",
-            "value": {
-              "op": "add",
-              "a": {
-                "op": "node",
-                "nodeId": "rule-upgrade-rate-handler-yes-0-value-call-parameters-value-a",
-                "port": "value"
-              },
-              "b": 1
-            },
-            "position": {
-              "x": -380,
-              "y": 50
-            }
-          }
-        ],
-        "graphVersion": 1
-      },
-      {
-        "id": "rule-automatic-coins-guard",
-        "name": "Каждую секунду → монеты с выбранной скоростью · условие",
-        "parameters": [
-          {
-            "name": "objectId",
-            "label": "objectId",
-            "schema": {
-              "type": "string",
-              "optional": true
-            }
-          }
-        ],
-        "locals": {},
+        "id": "sample-method-PeriodicReward-tick",
+        "name": "PeriodicReward · Выдать периодическую награду",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-PeriodicReward",
+        "componentMethodId": "tick",
+        "parameters": [],
         "resultSchema": {
-          "type": "boolean"
+          "type": "void"
         },
-        "preserveExtraArgs": true,
-        "entry": "rule-automatic-coins-guard-return",
-        "nodes": [
-          {
-            "id": "rule-automatic-coins-guard-return",
-            "kind": "return",
-            "name": "Условие выполнено",
-            "value": true,
-            "position": {
-              "x": 340,
-              "y": 0
-            }
-          }
-        ],
-        "graphVersion": 1
+        "locals": {},
+        "entry": "",
+        "nodes": []
       },
       {
-        "id": "rule-automatic-coins-handler",
-        "name": "Каждую секунду → монеты с выбранной скоростью",
-        "parameters": [
-          {
-            "name": "objectId",
-            "label": "objectId",
-            "schema": {
-              "type": "string",
-              "optional": true
-            }
-          }
-        ],
-        "locals": {},
-        "preserveExtraArgs": true,
-        "handler": {
-          "signal": {
-            "type": "tick"
-          }
-        },
-        "admission": {
-          "functionId": "rule-automatic-coins-guard",
-          "callNodeId": "rule-automatic-coins-handler-condition",
-          "branchId": "rule-automatic-coins-handler-branch"
-        },
-        "entry": "rule-automatic-coins-handler-condition",
-        "nodes": [
-          {
-            "id": "rule-automatic-coins-handler-condition",
-            "kind": "call",
-            "name": "Проверить условие",
-            "functionId": "rule-automatic-coins-guard",
-            "args": {
-              "objectId": {
-                "op": "node",
-                "nodeId": "rule-automatic-coins-handler-condition-value-args-objectId",
-                "port": "value"
-              }
-            },
-            "next": "rule-automatic-coins-handler-branch",
-            "position": {
-              "x": 0,
-              "y": 100
-            }
-          },
-          {
-            "id": "rule-automatic-coins-handler-branch",
-            "kind": "branch",
-            "name": "Условие реакции",
-            "condition": {
-              "op": "node",
-              "nodeId": "rule-automatic-coins-handler-condition",
-              "port": "value"
-            },
-            "position": {
-              "x": 300,
-              "y": 100
-            },
-            "trueNext": "rule-automatic-coins-handler-yes-0",
-            "falseNext": "rule-automatic-coins-handler-no-end"
-          },
-          {
-            "id": "rule-automatic-coins-handler-yes-0",
-            "name": "Действие",
-            "position": {
-              "x": 660,
-              "y": 0
-            },
-            "kind": "operation",
-            "call": {
-              "id": "sacura.resource.add",
-              "version": 1,
-              "parameters": {
-                "owner": {
-                  "kind": "reference",
-                  "type": "project",
-                  "mode": "direct",
-                  "id": "package-project"
-                },
-                "resource": {
-                  "kind": "reference",
-                  "type": "resource",
-                  "mode": "direct",
-                  "id": "coins"
-                },
-                "amount": {
-                  "op": "node",
-                  "nodeId": "rule-automatic-coins-handler-yes-0-value-call-parameters-amount",
-                  "port": "value"
-                }
-              }
-            },
-            "next": "rule-automatic-coins-handler-yes-end"
-          },
-          {
-            "id": "rule-automatic-coins-handler-yes-end",
-            "kind": "return",
-            "name": "Завершить обработчик",
-            "value": true,
-            "position": {
-              "x": 1000,
-              "y": 0
-            }
-          },
-          {
-            "id": "rule-automatic-coins-handler-no-end",
-            "kind": "return",
-            "name": "Завершить обработчик",
-            "value": false,
-            "position": {
-              "x": 660,
-              "y": 400
-            }
-          },
-          {
-            "id": "rule-automatic-coins-handler-condition-value-args-objectId",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "args.objectId"
-            },
-            "position": {
-              "x": -1520,
-              "y": 50
-            }
-          },
-          {
-            "id": "rule-automatic-coins-handler-yes-0-value-call-parameters-amount",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "global.rate"
-            },
-            "position": {
-              "x": -1140,
-              "y": 50
-            }
-          }
-        ],
-        "graphVersion": 1
-      },
-      {
-        "id": "definition-sample.mechanic.reward-1-reward-guard",
-        "name": "Новая реакция · условие",
-        "parameters": [
-          {
-            "name": "reason",
-            "label": "reason",
-            "schema": {
-              "type": "string",
-              "optional": true
-            }
-          },
-          {
-            "name": "owner",
-            "label": "Владелец счётчика",
-            "schema": {
-              "type": "union",
-              "label": "Владелец счётчика",
-              "variants": [
-                {
-                  "type": "reference",
-                  "referenceType": "project",
-                  "label": "Проект"
-                },
-                {
-                  "type": "reference",
-                  "referenceType": "scene",
-                  "label": "Сцена"
-                },
-                {
-                  "type": "reference",
-                  "referenceType": "object",
-                  "label": "Объект"
-                }
-              ]
-            }
-          },
-          {
-            "name": "counter",
-            "label": "Счётчик",
-            "schema": {
-              "type": "reference",
-              "referenceType": "resource",
-              "label": "Счётчик"
-            }
-          },
-          {
-            "name": "amount",
-            "label": "Награда",
-            "schema": {
-              "type": "integer",
-              "label": "Награда",
-              "default": 1
-            }
-          }
-        ],
-        "locals": {},
+        "id": "sample-method-PeriodicReward-upgrade",
+        "name": "PeriodicReward · Улучшить",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-PeriodicReward",
+        "componentMethodId": "upgrade",
+        "parameters": [],
         "resultSchema": {
-          "type": "boolean"
+          "type": "number"
         },
-        "preserveExtraArgs": true,
-        "entry": "definition-sample.mechanic.reward-1-reward-guard-return",
-        "nodes": [
-          {
-            "id": "definition-sample.mechanic.reward-1-reward-guard-return",
-            "kind": "return",
-            "name": "Условие выполнено",
-            "value": true,
-            "position": {
-              "x": 340,
-              "y": 0
-            }
-          }
-        ],
-        "graphVersion": 1
-      },
-      {
-        "id": "definition-sample.mechanic.reward-1-reward-handler",
-        "name": "Новая реакция",
-        "parameters": [
-          {
-            "name": "reason",
-            "label": "reason",
-            "schema": {
-              "type": "string",
-              "optional": true
-            }
-          },
-          {
-            "name": "owner",
-            "label": "Владелец счётчика",
-            "schema": {
-              "type": "union",
-              "label": "Владелец счётчика",
-              "variants": [
-                {
-                  "type": "reference",
-                  "referenceType": "project",
-                  "label": "Проект"
-                },
-                {
-                  "type": "reference",
-                  "referenceType": "scene",
-                  "label": "Сцена"
-                },
-                {
-                  "type": "reference",
-                  "referenceType": "object",
-                  "label": "Объект"
-                }
-              ]
-            }
-          },
-          {
-            "name": "counter",
-            "label": "Счётчик",
-            "schema": {
-              "type": "reference",
-              "referenceType": "resource",
-              "label": "Счётчик"
-            }
-          },
-          {
-            "name": "amount",
-            "label": "Награда",
-            "schema": {
-              "type": "integer",
-              "label": "Награда",
-              "default": 1
-            }
-          }
-        ],
         "locals": {},
-        "preserveExtraArgs": true,
-        "handler": {
-          "signal": {
-            "type": "sample.signal.reward"
-          }
-        },
-        "admission": {
-          "functionId": "definition-sample.mechanic.reward-1-reward-guard",
-          "callNodeId": "definition-sample.mechanic.reward-1-reward-handler-condition",
-          "branchId": "definition-sample.mechanic.reward-1-reward-handler-branch"
-        },
-        "entry": "definition-sample.mechanic.reward-1-reward-handler-condition",
-        "nodes": [
-          {
-            "id": "definition-sample.mechanic.reward-1-reward-handler-condition",
-            "kind": "call",
-            "name": "Проверить условие",
-            "functionId": "definition-sample.mechanic.reward-1-reward-guard",
-            "args": {
-              "reason": {
-                "op": "node",
-                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-reason",
-                "port": "value"
-              },
-              "owner": {
-                "op": "node",
-                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-owner",
-                "port": "value"
-              },
-              "counter": {
-                "op": "node",
-                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-counter",
-                "port": "value"
-              },
-              "amount": {
-                "op": "node",
-                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-amount",
-                "port": "value"
-              }
-            },
-            "next": "definition-sample.mechanic.reward-1-reward-handler-branch",
-            "position": {
-              "x": 0,
-              "y": 100
-            }
-          },
-          {
-            "id": "definition-sample.mechanic.reward-1-reward-handler-branch",
-            "kind": "branch",
-            "name": "Условие реакции",
-            "condition": {
-              "op": "node",
-              "nodeId": "definition-sample.mechanic.reward-1-reward-handler-condition",
-              "port": "value"
-            },
-            "position": {
-              "x": 300,
-              "y": 100
-            },
-            "trueNext": "definition-sample.mechanic.reward-1-reward-handler-yes-0",
-            "falseNext": "definition-sample.mechanic.reward-1-reward-handler-no-end"
-          },
-          {
-            "id": "definition-sample.mechanic.reward-1-reward-handler-yes-0",
-            "name": "Действие",
-            "position": {
-              "x": 660,
-              "y": 0
-            },
-            "kind": "call",
-            "functionId": "sample-reward-function",
-            "args": {
-              "owner": {
-                "op": "node",
-                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-yes-0-value-args-owner",
-                "port": "value"
-              },
-              "counter": {
-                "op": "node",
-                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-yes-0-value-args-counter",
-                "port": "value"
-              },
-              "amount": {
-                "op": "node",
-                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-yes-0-value-args-amount",
-                "port": "value"
-              }
-            },
-            "next": "definition-sample.mechanic.reward-1-reward-handler-yes-end"
-          },
-          {
-            "id": "definition-sample.mechanic.reward-1-reward-handler-yes-end",
-            "kind": "return",
-            "name": "Завершить обработчик",
-            "value": true,
-            "position": {
-              "x": 1000,
-              "y": 0
-            }
-          },
-          {
-            "id": "definition-sample.mechanic.reward-1-reward-handler-no-end",
-            "kind": "return",
-            "name": "Завершить обработчик",
-            "value": false,
-            "position": {
-              "x": 660,
-              "y": 400
-            }
-          },
-          {
-            "id": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-reason",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "args.reason"
-            },
-            "position": {
-              "x": -1520,
-              "y": 50
-            }
-          },
-          {
-            "id": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-owner",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "args.owner"
-            },
-            "position": {
-              "x": -1140,
-              "y": 50
-            }
-          },
-          {
-            "id": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-counter",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "args.counter"
-            },
-            "position": {
-              "x": -760,
-              "y": 50
-            }
-          },
-          {
-            "id": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-amount",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "args.amount"
-            },
-            "position": {
-              "x": -380,
-              "y": 50
-            }
-          },
-          {
-            "id": "definition-sample.mechanic.reward-1-reward-handler-yes-0-value-args-owner",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "args.owner"
-            },
-            "position": {
-              "x": -1520,
-              "y": 375
-            }
-          },
-          {
-            "id": "definition-sample.mechanic.reward-1-reward-handler-yes-0-value-args-counter",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "args.counter"
-            },
-            "position": {
-              "x": -1140,
-              "y": 375
-            }
-          },
-          {
-            "id": "definition-sample.mechanic.reward-1-reward-handler-yes-0-value-args-amount",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "args.amount"
-            },
-            "position": {
-              "x": -760,
-              "y": 375
-            }
-          }
-        ],
-        "graphVersion": 1
+        "entry": "",
+        "nodes": []
       }
     ],
     "actionTemplates": [],
@@ -2398,7 +1464,7 @@
       },
       {
         "id": "clicker-controls",
-        "name": "Монеты и улучшение",
+        "name": "Интерфейс примера",
         "kind": "hud",
         "referenceSize": [
           1280,
@@ -2411,26 +1477,26 @@
             "type": "text",
             "parentId": null,
             "role": "none",
-            "text": "Новый текст",
+            "text": "Монеты",
             "action": "none",
             "visible": true,
             "layout": {
               "anchorMin": [
-                0.5,
-                0.5
+                0,
+                0
               ],
               "anchorMax": [
-                0.5,
-                0.5
+                0,
+                0
               ],
               "pivot": [
-                0.5,
-                0.5
+                0,
+                0
               ],
-              "x": 0,
-              "y": -160,
+              "x": 24,
+              "y": 24,
               "width": 380,
-              "height": 65
+              "height": 42
             },
             "style": {
               "background": "transparent",
@@ -2447,46 +1513,44 @@
               "gap": 8
             },
             "binding": {
-              "source": "capability",
-              "capability": "sacura.resource",
-              "owner": {
+              "source": "component",
+              "instance": {
                 "kind": "reference",
-                "type": "project",
+                "type": "mechanic",
                 "mode": "direct",
-                "id": "package-project"
+                "id": "coins-counter"
               },
-              "recordId": "coins",
               "field": "value",
-              "valueType": "integer",
+              "valueType": "number",
               "format": "Монеты: {value}"
             }
           },
           {
             "id": "rate-text",
-            "name": "Скорость получения",
+            "name": "За тик",
             "type": "text",
             "parentId": null,
             "role": "none",
-            "text": "Новый текст",
+            "text": "За тик",
             "action": "none",
             "visible": true,
             "layout": {
               "anchorMin": [
-                0.5,
-                0.5
+                0,
+                0
               ],
               "anchorMax": [
-                0.5,
-                0.5
+                0,
+                0
               ],
               "pivot": [
-                0.5,
-                0.5
+                0,
+                0
               ],
-              "x": 0,
-              "y": -90,
+              "x": 24,
+              "y": 70,
               "width": 380,
-              "height": 65
+              "height": 42
             },
             "style": {
               "background": "transparent",
@@ -2503,9 +1567,16 @@
               "gap": 8
             },
             "binding": {
-              "source": "variable",
-              "path": "rate",
-              "format": "Монет за тик: {value}"
+              "source": "component",
+              "instance": {
+                "kind": "reference",
+                "type": "mechanic",
+                "mode": "direct",
+                "id": "coins-periodic"
+              },
+              "field": "rate",
+              "valueType": "number",
+              "format": "За тик: {value}"
             }
           },
           {
@@ -2515,25 +1586,25 @@
             "parentId": null,
             "role": "none",
             "text": "Получить монету",
-            "action": "none",
+            "action": "gameplay",
             "visible": true,
             "layout": {
               "anchorMin": [
-                0.5,
-                0.5
+                0,
+                0
               ],
               "anchorMax": [
-                0.5,
-                0.5
+                0,
+                0
               ],
               "pivot": [
-                0.5,
-                0.5
+                0,
+                0
               ],
-              "x": 0,
-              "y": 0,
+              "x": 24,
+              "y": 130,
               "width": 380,
-              "height": 65
+              "height": 50
             },
             "style": {
               "background": "#704e7c",
@@ -2548,34 +1619,46 @@
               "opacity": 1,
               "textAlign": "left",
               "gap": 8
-            }
+            },
+            "command": "sacura.component.call",
+            "value": {
+              "instance": {
+                "kind": "reference",
+                "type": "mechanic",
+                "mode": "direct",
+                "id": "coins-reward"
+              },
+              "methodId": "award",
+              "args": {}
+            },
+            "operationVersion": 1
           },
           {
             "id": "upgrade-button",
-            "name": "Улучшить скорость",
+            "name": "Улучшить (+1 за тик)",
             "type": "button",
             "parentId": null,
             "role": "none",
-            "text": "Улучшить скорость (+1)",
-            "action": "none",
+            "text": "Улучшить (+1 за тик)",
+            "action": "gameplay",
             "visible": true,
             "layout": {
               "anchorMin": [
-                0.5,
-                0.5
+                0,
+                0
               ],
               "anchorMax": [
-                0.5,
-                0.5
+                0,
+                0
               ],
               "pivot": [
-                0.5,
-                0.5
+                0,
+                0
               ],
-              "x": 0,
-              "y": 85,
+              "x": 24,
+              "y": 195,
               "width": 380,
-              "height": 65
+              "height": 50
             },
             "style": {
               "background": "#704e7c",
@@ -2590,26 +1673,169 @@
               "opacity": 1,
               "textAlign": "left",
               "gap": 8
-            }
+            },
+            "command": "sacura.component.call",
+            "value": {
+              "instance": {
+                "kind": "reference",
+                "type": "mechanic",
+                "mode": "direct",
+                "id": "coins-periodic"
+              },
+              "methodId": "upgrade",
+              "args": {}
+            },
+            "operationVersion": 1
+          },
+          {
+            "id": "stop-button",
+            "name": "Остановить таймер",
+            "type": "button",
+            "parentId": null,
+            "role": "none",
+            "text": "Остановить таймер",
+            "action": "gameplay",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 24,
+              "y": 260,
+              "width": 380,
+              "height": 50
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "fontFamily": "system-ui",
+              "fontWeight": 400,
+              "borderColor": "#ad849d",
+              "borderWidth": 0,
+              "borderRadius": 12,
+              "padding": 12,
+              "opacity": 1,
+              "textAlign": "left",
+              "gap": 8
+            },
+            "command": "sacura.component.call",
+            "value": {
+              "instance": {
+                "kind": "reference",
+                "type": "mechanic",
+                "mode": "direct",
+                "id": "coins-periodic"
+              },
+              "methodId": "stop",
+              "args": {}
+            },
+            "operationVersion": 1
+          },
+          {
+            "id": "start-button",
+            "name": "Запустить таймер",
+            "type": "button",
+            "parentId": null,
+            "role": "none",
+            "text": "Запустить таймер",
+            "action": "gameplay",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 24,
+              "y": 325,
+              "width": 380,
+              "height": 50
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "fontFamily": "system-ui",
+              "fontWeight": 400,
+              "borderColor": "#ad849d",
+              "borderWidth": 0,
+              "borderRadius": 12,
+              "padding": 12,
+              "opacity": 1,
+              "textAlign": "left",
+              "gap": 8
+            },
+            "command": "sacura.component.call",
+            "value": {
+              "instance": {
+                "kind": "reference",
+                "type": "mechanic",
+                "mode": "direct",
+                "id": "coins-periodic"
+              },
+              "methodId": "start",
+              "args": {}
+            },
+            "operationVersion": 1
           }
         ],
         "css": ""
       }
     ],
     "audioAssets": [],
-    "variables": {
-      "coins": 0,
-      "rate": 1
-    },
-    "variableTypes": {
-      "coins": "integer",
-      "rate": "integer"
-    },
-    "objects": [],
+    "variables": {},
+    "variableTypes": {},
+    "objects": [
+      {
+        "id": "clicker-owner",
+        "name": "Экономика кликера",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#94785b",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        }
+      }
+    ],
     "subscenes": [
       {
         "id": "sample-scene",
-        "name": "Новая сцена",
+        "name": "Сцена",
         "location": "Пустая сцена",
         "kind": "empty",
         "entry": null,
@@ -3019,7 +2245,8 @@
         "attack": 0.6,
         "release": 0.9
       }
-    }
+    },
+    "description": "Что открыть → «Экономика кликера» → Reward → award. Что изменить → base * multiplier * factor на base * multiplier * factor + 5. Результат → кнопка и таймер начисляют на 5 больше.\nДобавьте публичный метод bonus в Reward и выберите его для кнопки; список обновляется после сохранения. PeriodicReward.upgrade меняет правило улучшения, stop останавливает только собственный таймер."
   },
   "references": [],
   "assets": []

@@ -1,4 +1,6 @@
+import {assertComponentFieldBindings} from './componentFieldBindings.js';
 import {validateAuthoredDefinition} from './authoredMechanics.js';
+import {isComponent} from './componentModel.js';
 import {validateRules} from './ruleModel.js';
 import {signalDefinition} from './signalModel.js';
 import {uid} from './model.js';
@@ -35,7 +37,7 @@ export function addMechanicInstance(project,definitionId,scope,values={},version
  const parameters={...schemaDefaults(d.parameters),...structuredClone(values)};
  // Missing values remain editable, but malformed assigned values are rejected.
  const errors=validateValue(d.parameters,parameters,{project,scope,allowDeferred:true});if(errors.some(e=>!e.message.includes('обязательно')))throw Error(errors.map(e=>e.message).join(' '));
- const m={id:uid('mechanic'),type:'definition',definitionId,definitionVersion:version,scope:structuredClone(scope),values:parameters};if(!d.rules&&!d.machine)m.ruleId=m.id+'-rule';
+ const m={id:uid('mechanic'),type:'definition',definitionId,definitionVersion:version,scope:structuredClone(scope),values:parameters,...(isComponent(d)?{enabled:true,references:schemaDefaults(d.references||{type:'object',properties:{}})}:{})};if(isComponent(d)){const used=new Set(project.gameplay.mechanics.filter(x=>x.scope?.kind===scope.kind&&x.scope.id===scope.id).map(x=>x.name||descriptionFor(project,x.definitionId,x.definitionVersion)?.name));m.name=d.name;let suffix=2;while(used.has(m.name))m.name=d.name+' '+suffix++;}if(!isComponent(d)&&!d.rules&&!d.machine)m.ruleId=m.id+'-rule';
  project.gameplay.mechanics.push(m);if(m.ruleId)project.gameplay.rules.push({id:m.ruleId,name:d.name,mechanicInstanceId:m.id,trigger:d.when,sceneId:scope.kind==='scene'?scope.id:'',objectId:scope.kind==='object'?scope.id:'',once:false,enabled:true,seconds:2,repeat:false,center:[0,0,0],size:[3,2,3]});project.gameplay.enabled=true;return m;
 }
 export function validateMechanicDescriptions(project,{allowExpressions=false,validateExpression,checkReferences=true,isKnownSignal}={}){
@@ -53,6 +55,7 @@ export function validateMechanicDescriptions(project,{allowExpressions=false,val
  }catch(e){bad(d.id,e.message);}
  for(const m of g.mechanics||[])if(m.definitionId){const d=descriptionFor(project,m.definitionId,m.definitionVersion);if(!d){bad(m.id,'Неизвестное определение или версия: '+m.definitionId+'. Данные сохранены.');continue;}
   if(!d.scopes.includes(m.scope?.kind))bad(m.id,'Это размещение не поддерживается.');
+  if(isComponent(d)){try{assertComponentFieldBindings(project,m,d);}catch(e){bad(m.id,e.message);}if(typeof m.enabled!=='boolean')bad(m.id,'У компонента нужно состояние enabled.');for(const e of validateValue(d.references||{type:'object',properties:{}},m.references||{},{project,scope:m.scope,allowDeferred:true,checkReferences}))bad(m.id,e.message);}
   for(const e of validateValue(d.parameters,{...schemaDefaults(d.parameters),...m.values},{project,scope:m.scope,allowDeferred:true,checkReferences,allowExpressions,validateExpression}))bad(m.id+'-'+e.path,e.message);
  }
  return issues;

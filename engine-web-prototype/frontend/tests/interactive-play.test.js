@@ -33,7 +33,7 @@ for(const order of [['letter','rain-keepsake'],['rain-keepsake','letter']])test(
 });
 test('clicking twice while an interaction event executes cannot double-run it or continue early',async()=>{
  const {p,b}=example();const e=p.events.find(e=>e.id===b.interactionEvents['rain-keepsake']);e.groups.unshift({id:'wait-step',actions:[{...makeAction('wait'),duration:.05}]});const rt=new PreviewRuntime(desk());await rt.start(p,b.id);
- const pending=rt.advance(null,'rain-keepsake');await rt.advance(null,'rain-keepsake');await rt.advance(null,'letter');assert.equal(Object.values(rt.snapshot.instances).filter(i=>i.eventId===e.id).length,1);await pending;assert.deepEqual(rt.snapshot.interacted,['rain-keepsake']);rt.stop();
+ const pending=rt.advance(null,'rain-keepsake');for(let i=0;i<100&&!Object.values(rt.snapshot.instances).some(i=>i.eventId===e.id);i++)await new Promise(r=>setTimeout(r,2));await rt.advance(null,'rain-keepsake');await rt.advance(null,'letter');assert.equal(Object.values(rt.snapshot.instances).filter(i=>i.eventId===e.id).length,1);await pending;assert.deepEqual(rt.snapshot.interacted,['rain-keepsake']);rt.stop();
 });
 test('movement respects pause, bounds and obstacles; click walks and interacts only after arrival',async()=>{
  const {p,b}=example();b.controls.radius=1.5;const rt=new PreviewRuntime(desk());rt.physicsApi={current:{sceneId:()=> 'living',planMotion:(o,from,to)=>[from,to],validateStep(){}}};await rt.start(p,b.id);

@@ -1,3 +1,4 @@
+import {callAdapter} from '../componentAdapters.js';
 import {runBuiltin} from '../builtinBehaviors.js';
 import {reference} from '../valueSchemas.js';
 import {registerCapability} from '../capabilityRegistry.js';
@@ -28,7 +29,7 @@ registerCapability({id:'sacura.inventory',sync(){const owner=defaultOwner(this.c
   if(!Number.isInteger(count)||count<1||this.count(id,owner)<count)throw Error('Не хватает предметов.');const inv=this.inventoryFor(owner);
   for(const slot of inv.items.filter(x=>x.itemId===id)){const n=Math.min(count,slot.count);slot.count-=n;count-=n;}inv.items=inv.items.filter(x=>x.count);
   if(!this.count(id,owner))for(const [slot,value]of Object.entries(inv.equipment))if(value===id)delete inv.equipment[slot];
-  if(!this.count(id,owner)&&this.config.items.find(i=>i.id===id)?.weaponId===this.state.selectedWeapons[owner])this.state.selectedWeapons[owner]=this.config.weapons.find(w=>w.ownerId===owner)?.id||'';
+  if(!this.count(id,owner)&&this.config.items.find(i=>i.id===id)?.weaponId===this.state.selectedWeapons[owner])this.state.selectedWeapons[owner]=this.config.weapons.some(w=>w.ownerId===owner&&w.component?.selector)?'':this.config.weapons.find(w=>w.ownerId===owner)?.id||'';
   this.sync();
  },
  equip(id,owner=defaultOwner(this.config),context={}){
@@ -39,7 +40,7 @@ registerCapability({id:'sacura.inventory',sync(){const owner=defaultOwner(this.c
   const owner=context.ownerId||defaultOwner(this.config),key='item:'+owner+':'+id;if(this.flights.has(key))return;this.flights.add(key);const generation=this.host.generation;
   const capabilityOwner=ownerScope(this.host.project,owner);context={...context,ownerId:owner,capabilityOwner,...(capabilityOwner.kind!=='project'?{capabilitySceneId:this.scene.id}:{})};
   try{this.assertReaction(context);const item=this.config.items.find(i=>i.id===id);if(!item)throw Error('Предмет отсутствует.');
-   try{await runBuiltin(this,item.behavior,'use',{owner,item:id},context,false);}catch(error){if(!error.message.startsWith('INSTANCE_STOPPED')||!context.capabilitySceneId||context.capabilitySceneId===this.scene.id)throw error;}this.host.assert(generation);if(!context.capabilitySceneId||context.capabilitySceneId===this.scene.id)this.assertReaction(context);
+   try{if(item.componentUse)await callAdapter(this,item.componentUse,'use',{},context);else await runBuiltin(this,item.behavior,'use',{owner,item:id},context,false);}catch(error){if(!error.message.startsWith('INSTANCE_STOPPED')||!context.capabilitySceneId||context.capabilitySceneId===this.scene.id)throw error;}this.host.assert(generation);if(!context.capabilitySceneId||context.capabilitySceneId===this.scene.id)this.assertReaction(context);
    if(!context.capabilitySceneId||context.capabilitySceneId===this.scene.id)await this.flushTransition();this.host.emit();
   }finally{this.flights.delete(key);}
  },

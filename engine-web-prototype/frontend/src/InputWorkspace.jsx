@@ -96,6 +96,7 @@ export default function InputWorkspace({project,onChange,beat,preview,devices=[]
      {action.behavior==='event'&&<label>{tr('Событие движка')}<select value={action.eventId||''} onChange={e=>patchAction({eventId:e.target.value})}><option value="">{tr('Выберите событие')}</option>{project.events.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
     </div>
     {action.behavior==='event'&&<AuthoringReferenceLink type="event" id={action.eventId}/>}
+    <button type="button" onClick={()=>patchAction({behavior:'operation',operation:{id:'sacura.component.call',version:1,parameters:{}}})}>Вызвать метод компонента</button>
     {action.behavior==='operation'&&<OperationFields project={project} call={action.operation} kind="event" expressionOptions={[["args.value","Значение действия ввода"]]} onChange={operation=>patchAction({operation})}/>}
     <section className="input-bindings-section" aria-label={tr('Привязки')}><div className="input-section-heading"><h3>{tr('Привязки')}</h3><label className="input-context-picker">{tr('Контекст')}<select value={context?.id||''} onChange={e=>setContext(e.target.value)}>{input.contexts.map(item=><option key={item.id} value={item.id}>{inputLabel(item)}</option>)}</select></label></div>
      {context?deviceGroups.map(([id,label,Icon])=>{

@@ -1,11 +1,17 @@
 {
   "format": "sacura-authoring-package",
-  "formatVersion": 2,
+  "formatVersion": 3,
+  "sourceContract": {
+    "version": 1,
+    "language": "javascript",
+    "runtime": "sacura-sdk",
+    "execution": "gameplay-only"
+  },
   "metadata": {
     "id": "sacura.recipe.reward",
-    "version": "1.0.0",
-    "name": "Награда за действие",
-    "description": "Сигнал → счётчик для разных жанров.",
+    "version": "3.0.0",
+    "name": "Награда · Reward + Counter",
+    "description": "Открываемая формула награды; Counter — явная зависимость. Создайте подключения и назначьте Counter в ссылках Reward. Подходит для очков, отношения и монет.",
     "author": "Sacura contributors",
     "license": "MIT",
     "sources": []
@@ -14,7 +20,19 @@
     "projectSchemaVersion": 2,
     "requiredCapabilities": [
       {
-        "id": "operation.sacura.resource.add",
+        "id": "component.resources",
+        "version": 1
+      },
+      {
+        "id": "mechanic.javascript",
+        "version": 1
+      },
+      {
+        "id": "operation.sacura.variable.set",
+        "version": 1
+      },
+      {
+        "id": "mechanic.components",
         "version": 1
       },
       {
@@ -29,197 +47,270 @@
     "requiredEngineModules": []
   },
   "roots": {
-    "kind": "mechanic",
+    "kind": "component",
     "entries": [
-      "/content/gameplay/mechanics/0"
+      "/content/gameplay/mechanicDefinitions/0",
+      "/content/gameplay/mechanicDefinitions/1"
     ],
+    "instances": [],
     "parameters": {
       "type": "object",
-      "properties": {
-        "owner": {
-          "type": "union",
-          "label": "Владелец счётчика",
-          "variants": [
-            {
-              "type": "reference",
-              "referenceType": "project",
-              "label": "Проект"
-            },
-            {
-              "type": "reference",
-              "referenceType": "scene",
-              "label": "Сцена"
-            },
-            {
-              "type": "reference",
-              "referenceType": "object",
-              "label": "Объект"
-            }
-          ]
-        },
-        "counter": {
-          "type": "reference",
-          "referenceType": "resource",
-          "label": "Счётчик"
-        },
-        "amount": {
-          "type": "integer",
-          "label": "Награда",
-          "default": 1
-        }
-      }
+      "properties": {}
     }
   },
-  "inputs": [
-    {
-      "id": "input-c7218a8a-c868-403d-84d3-38c4903f0c73",
-      "name": "Новая сцена",
-      "description": "Выберите в своём проекте.",
-      "type": "scene",
-      "required": true
-    }
-  ],
+  "inputs": [],
   "content": {
     "gameplay": {
       "version": 2,
       "behaviorSchemaVersion": 1,
       "capabilitySchemaVersion": 1,
-      "resources": [
-        {
-          "id": "relationship",
-          "name": "Отношение",
-          "owner": {
-            "kind": "project",
-            "id": null
-          },
-          "type": "integer",
-          "initial": 0
-        }
-      ],
+      "resources": [],
       "inventories": [],
       "movements": [],
       "stateBindings": [],
       "mechanicSchemaVersion": 1,
       "mechanicDefinitions": [
         {
-          "id": "sample.mechanic.reward",
+          "id": "sample.component.reward",
           "version": 1,
           "scopes": [
-            "project",
+            "object",
             "scene",
-            "object"
+            "project"
           ],
-          "when": "sample.signal.reward",
+          "when": "start",
           "stateSchema": {
             "type": "object",
-            "properties": {}
-          },
-          "initialState": {},
-          "requirements": [],
-          "name": "Награда за действие",
-          "description": "Один сигнал увеличивает выбранный счётчик. Подходит для отношения, очков, монет.",
-          "parameters": {
-            "type": "object",
             "properties": {
-              "owner": {
-                "type": "union",
-                "label": "Владелец счётчика",
-                "variants": [
-                  {
-                    "type": "reference",
-                    "referenceType": "project",
-                    "label": "Проект"
-                  },
-                  {
-                    "type": "reference",
-                    "referenceType": "scene",
-                    "label": "Сцена"
-                  },
-                  {
-                    "type": "reference",
-                    "referenceType": "object",
-                    "label": "Объект"
-                  }
-                ]
-              },
-              "counter": {
-                "type": "reference",
-                "referenceType": "resource",
-                "label": "Счётчик"
-              },
-              "amount": {
+              "awards": {
                 "type": "integer",
-                "label": "Награда",
-                "default": 1
+                "default": 0,
+                "label": "Выдано наград"
               }
             }
           },
-          "exposed": [
-            "owner",
-            "counter",
-            "amount"
-          ],
-          "logic": {
-            "functionId": "sample-reward-function"
-          },
-          "rules": [
-            {
-              "id": "reward",
-              "name": "Новая реакция",
-              "version": 1,
-              "enabled": true,
-              "signal": {
-                "type": "sample.signal.reward"
+          "initialState": {},
+          "requirements": [],
+          "name": "Reward",
+          "componentVersion": 1,
+          "stateVersion": 1,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "base": {
+                "type": "number",
+                "default": 1,
+                "label": "Базовая награда"
               },
-              "filter": {},
-              "actions": [
-                {
-                  "kind": "function",
-                  "functionId": "definition-sample.mechanic.reward-1-reward-handler",
-                  "args": {
-                    "reason": {
-                      "op": "get",
-                      "path": "args.reason"
-                    },
-                    "owner": {
-                      "op": "get",
-                      "path": "args.owner"
-                    },
-                    "counter": {
-                      "op": "get",
-                      "path": "args.counter"
-                    },
-                    "amount": {
-                      "op": "get",
-                      "path": "args.amount"
-                    }
+              "multiplier": {
+                "type": "number",
+                "default": 1,
+                "label": "Множитель награды"
+              }
+            }
+          },
+          "references": {
+            "type": "object",
+            "properties": {
+              "counter": {
+                "type": "reference",
+                "referenceType": "mechanic",
+                "label": "Куда начислять · Counter"
+              }
+            }
+          },
+          "methods": {
+            "award": {
+              "name": "Начислить награду",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "factor": {
+                    "type": "number",
+                    "default": 1,
+                    "label": "Разовый множитель"
                   }
                 }
-              ],
-              "otherwise": [],
-              "once": false,
-              "cooldown": 0,
-              "reentry": "queue",
-              "maxConcurrent": 1,
-              "maxQueued": 16,
-              "handlerGraphVersion": 1,
-              "handlerFunctionId": "definition-sample.mechanic.reward-1-reward-handler",
-              "timeSource": "game"
+              },
+              "result": {
+                "type": "number"
+              },
+              "logic": {
+                "functionId": "sample-method-Reward-award"
+              }
             }
-          ]
+          },
+          "events": {
+            "awarded": {
+              "name": "Награда выдана",
+              "signalId": "user.component-signal.sample-source--eward.awarded",
+              "payloadSchema": {
+                "type": "object",
+                "properties": {
+                  "amount": {
+                    "type": "number"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          },
+          "logicResourceId": "sample-source-Reward",
+          "stateFromParameters": {},
+          "lifecycle": {},
+          "subscriptions": []
+        },
+        {
+          "id": "sample.component.counter",
+          "version": 1,
+          "scopes": [
+            "object",
+            "scene",
+            "project"
+          ],
+          "when": "start",
+          "stateSchema": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "number",
+                "default": 0,
+                "label": "Текущее значение"
+              }
+            }
+          },
+          "initialState": {},
+          "requirements": [],
+          "name": "Counter",
+          "componentVersion": 1,
+          "stateVersion": 1,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "initial": {
+                "type": "number",
+                "default": 0,
+                "label": "Начальное значение"
+              },
+              "storySource": {
+                "type": "boolean",
+                "default": false,
+                "label": "Менять источник постоянной привязки явно"
+              },
+              "step": {
+                "type": "number",
+                "default": 1,
+                "label": "Множитель изменения"
+              }
+            }
+          },
+          "references": {
+            "type": "object",
+            "properties": {}
+          },
+          "methods": {
+            "add": {
+              "name": "Добавить",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "amount": {
+                    "type": "number",
+                    "default": 1,
+                    "label": "Количество"
+                  }
+                }
+              },
+              "result": {
+                "type": "number"
+              },
+              "logic": {
+                "functionId": "sample-method-Counter-add"
+              }
+            },
+            "read": {
+              "name": "Прочитать",
+              "parameters": {
+                "type": "object",
+                "properties": {}
+              },
+              "result": {
+                "type": "number"
+              },
+              "logic": {
+                "functionId": "sample-method-Counter-read"
+              }
+            },
+            "multiply": {
+              "name": "Умножить",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "factor": {
+                    "type": "number",
+                    "default": 2,
+                    "label": "Множитель"
+                  }
+                }
+              },
+              "result": {
+                "type": "number"
+              },
+              "logic": {
+                "functionId": "sample-method-Counter-multiply"
+              }
+            }
+          },
+          "events": {
+            "changed": {
+              "name": "Значение изменилось",
+              "signalId": "user.component-signal.sample-source--ounter.changed",
+              "payloadSchema": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          },
+          "logicResourceId": "sample-source-Counter",
+          "stateFromParameters": {
+            "value": "initial"
+          },
+          "lifecycle": {},
+          "subscriptions": []
         }
       ],
       "signals": [
         {
-          "id": "sample.signal.reward",
+          "id": "user.component-signal.sample-source--eward.awarded",
           "version": 1,
-          "name": "Получена награда",
+          "name": "Reward · Награда выдана",
           "payloadSchema": {
             "type": "object",
             "properties": {
-              "reason": {
-                "type": "string",
-                "optional": true
+              "amount": {
+                "type": "number"
+              },
+              "value": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        {
+          "id": "user.component-signal.sample-source--ounter.changed",
+          "version": 1,
+          "name": "Counter · Значение изменилось",
+          "payloadSchema": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "number"
               }
             }
           }
@@ -234,33 +325,7 @@
         "pointerLock": false,
         "crosshair": false
       },
-      "mechanics": [
-        {
-          "id": "sample-reward-relationship",
-          "type": "definition",
-          "definitionId": "sample.mechanic.reward",
-          "definitionVersion": 1,
-          "scope": {
-            "kind": "scene",
-            "id": null
-          },
-          "values": {
-            "amount": 1,
-            "owner": {
-              "kind": "reference",
-              "type": "project",
-              "mode": "direct",
-              "id": "package-project"
-            },
-            "counter": {
-              "kind": "reference",
-              "type": "resource",
-              "mode": "direct",
-              "id": "relationship"
-            }
-          }
-        }
-      ],
+      "mechanics": [],
       "playerId": "",
       "controller": {
         "ownerId": "",
@@ -287,482 +352,169 @@
     },
     "functions": [
       {
-        "id": "sample-reward-function",
-        "name": "Начислить награду",
-        "parameters": [
-          {
-            "name": "owner",
-            "label": "Владелец счётчика",
-            "schema": {
-              "type": "union",
-              "label": "Владелец счётчика",
-              "variants": [
-                {
-                  "type": "reference",
-                  "referenceType": "project",
-                  "label": "Проект"
-                },
-                {
-                  "type": "reference",
-                  "referenceType": "scene",
-                  "label": "Сцена"
-                },
-                {
-                  "type": "reference",
-                  "referenceType": "object",
-                  "label": "Объект"
-                }
-              ]
-            }
-          },
-          {
-            "name": "counter",
-            "label": "Счётчик",
-            "schema": {
-              "type": "reference",
-              "referenceType": "resource",
-              "label": "Счётчик"
-            }
-          },
-          {
-            "name": "amount",
-            "label": "Награда",
-            "schema": {
-              "type": "integer",
-              "label": "Награда",
-              "default": 1
-            }
-          }
-        ],
-        "locals": {},
-        "resultSchema": {
-          "type": "void"
-        },
-        "entry": "reward-operation",
-        "nodes": [
-          {
-            "id": "reward-operation",
-            "kind": "command",
-            "name": "Изменить выбранный счётчик",
-            "position": {
-              "x": 120,
-              "y": 100
-            },
-            "comment": "Общая операция для отношения, очков и монет.",
-            "command": {
-              "command": "sacura.resource.add",
-              "operationVersion": 1,
-              "value": {
-                "owner": {
-                  "op": "node",
-                  "nodeId": "reward-operation-value-command-value-owner",
-                  "port": "value"
-                },
-                "resource": {
-                  "op": "node",
-                  "nodeId": "reward-operation-value-command-value-resource",
-                  "port": "value"
-                },
-                "amount": {
-                  "op": "node",
-                  "nodeId": "reward-operation-value-command-value-amount",
-                  "port": "value"
-                }
-              }
-            },
-            "next": null
-          },
-          {
-            "id": "reward-operation-value-command-value-owner",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "args.owner"
-            },
-            "position": {
-              "x": -1520,
-              "y": 50
-            }
-          },
-          {
-            "id": "reward-operation-value-command-value-resource",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "args.counter"
-            },
-            "position": {
-              "x": -1140,
-              "y": 50
-            }
-          },
-          {
-            "id": "reward-operation-value-command-value-amount",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "args.amount"
-            },
-            "position": {
-              "x": -760,
-              "y": 50
-            }
-          }
-        ],
+        "id": "sample-method-Reward-award",
+        "name": "Reward · Начислить награду",
         "graphVersion": 1,
-        "stateSchema": {
-          "type": "object",
-          "properties": {}
-        },
-        "initialState": {}
-      },
-      {
-        "id": "definition-sample.mechanic.reward-1-reward-handler",
-        "name": "Новая реакция",
+        "logicResourceId": "sample-source-Reward",
+        "componentMethodId": "award",
         "parameters": [
           {
-            "name": "reason",
-            "label": "reason",
+            "name": "factor",
             "schema": {
-              "type": "string",
-              "optional": true
-            }
-          },
-          {
-            "name": "owner",
-            "label": "Владелец счётчика",
-            "schema": {
-              "type": "union",
-              "label": "Владелец счётчика",
-              "variants": [
-                {
-                  "type": "reference",
-                  "referenceType": "project",
-                  "label": "Проект"
-                },
-                {
-                  "type": "reference",
-                  "referenceType": "scene",
-                  "label": "Сцена"
-                },
-                {
-                  "type": "reference",
-                  "referenceType": "object",
-                  "label": "Объект"
-                }
-              ]
-            }
-          },
-          {
-            "name": "counter",
-            "label": "Счётчик",
-            "schema": {
-              "type": "reference",
-              "referenceType": "resource",
-              "label": "Счётчик"
-            }
-          },
-          {
-            "name": "amount",
-            "label": "Награда",
-            "schema": {
-              "type": "integer",
-              "label": "Награда",
-              "default": 1
+              "type": "number",
+              "default": 1,
+              "label": "Разовый множитель"
             }
           }
         ],
-        "locals": {},
-        "preserveExtraArgs": true,
-        "handler": {
-          "signal": {
-            "type": "sample.signal.reward"
-          }
-        },
-        "admission": {
-          "functionId": "definition-sample.mechanic.reward-1-reward-guard",
-          "callNodeId": "definition-sample.mechanic.reward-1-reward-handler-condition",
-          "branchId": "definition-sample.mechanic.reward-1-reward-handler-branch"
-        },
-        "entry": "definition-sample.mechanic.reward-1-reward-handler-condition",
-        "nodes": [
-          {
-            "id": "definition-sample.mechanic.reward-1-reward-handler-condition",
-            "kind": "call",
-            "name": "Проверить условие",
-            "functionId": "definition-sample.mechanic.reward-1-reward-guard",
-            "args": {
-              "reason": {
-                "op": "node",
-                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-reason",
-                "port": "value"
-              },
-              "owner": {
-                "op": "node",
-                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-owner",
-                "port": "value"
-              },
-              "counter": {
-                "op": "node",
-                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-counter",
-                "port": "value"
-              },
-              "amount": {
-                "op": "node",
-                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-amount",
-                "port": "value"
-              }
-            },
-            "next": "definition-sample.mechanic.reward-1-reward-handler-branch",
-            "position": {
-              "x": 0,
-              "y": 100
-            }
-          },
-          {
-            "id": "definition-sample.mechanic.reward-1-reward-handler-branch",
-            "kind": "branch",
-            "name": "Условие реакции",
-            "condition": {
-              "op": "node",
-              "nodeId": "definition-sample.mechanic.reward-1-reward-handler-condition",
-              "port": "value"
-            },
-            "position": {
-              "x": 300,
-              "y": 100
-            },
-            "trueNext": "definition-sample.mechanic.reward-1-reward-handler-yes-0",
-            "falseNext": "definition-sample.mechanic.reward-1-reward-handler-no-end"
-          },
-          {
-            "id": "definition-sample.mechanic.reward-1-reward-handler-yes-0",
-            "name": "Действие",
-            "position": {
-              "x": 660,
-              "y": 0
-            },
-            "kind": "call",
-            "functionId": "sample-reward-function",
-            "args": {
-              "owner": {
-                "op": "node",
-                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-yes-0-value-args-owner",
-                "port": "value"
-              },
-              "counter": {
-                "op": "node",
-                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-yes-0-value-args-counter",
-                "port": "value"
-              },
-              "amount": {
-                "op": "node",
-                "nodeId": "definition-sample.mechanic.reward-1-reward-handler-yes-0-value-args-amount",
-                "port": "value"
-              }
-            },
-            "next": "definition-sample.mechanic.reward-1-reward-handler-yes-end"
-          },
-          {
-            "id": "definition-sample.mechanic.reward-1-reward-handler-yes-end",
-            "kind": "return",
-            "name": "Завершить обработчик",
-            "value": true,
-            "position": {
-              "x": 1000,
-              "y": 0
-            }
-          },
-          {
-            "id": "definition-sample.mechanic.reward-1-reward-handler-no-end",
-            "kind": "return",
-            "name": "Завершить обработчик",
-            "value": false,
-            "position": {
-              "x": 660,
-              "y": 400
-            }
-          },
-          {
-            "id": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-reason",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "args.reason"
-            },
-            "position": {
-              "x": -1520,
-              "y": 50
-            }
-          },
-          {
-            "id": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-owner",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "args.owner"
-            },
-            "position": {
-              "x": -1140,
-              "y": 50
-            }
-          },
-          {
-            "id": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-counter",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "args.counter"
-            },
-            "position": {
-              "x": -760,
-              "y": 50
-            }
-          },
-          {
-            "id": "definition-sample.mechanic.reward-1-reward-handler-condition-value-args-amount",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "args.amount"
-            },
-            "position": {
-              "x": -380,
-              "y": 50
-            }
-          },
-          {
-            "id": "definition-sample.mechanic.reward-1-reward-handler-yes-0-value-args-owner",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "args.owner"
-            },
-            "position": {
-              "x": -1520,
-              "y": 375
-            }
-          },
-          {
-            "id": "definition-sample.mechanic.reward-1-reward-handler-yes-0-value-args-counter",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "args.counter"
-            },
-            "position": {
-              "x": -1140,
-              "y": 375
-            }
-          },
-          {
-            "id": "definition-sample.mechanic.reward-1-reward-handler-yes-0-value-args-amount",
-            "kind": "value",
-            "name": "Прочитать",
-            "value": {
-              "op": "get",
-              "path": "args.amount"
-            },
-            "position": {
-              "x": -760,
-              "y": 375
-            }
-          }
-        ],
-        "graphVersion": 1
-      },
-      {
-        "id": "definition-sample.mechanic.reward-1-reward-guard",
-        "name": "Новая реакция · условие",
-        "parameters": [
-          {
-            "name": "reason",
-            "label": "reason",
-            "schema": {
-              "type": "string",
-              "optional": true
-            }
-          },
-          {
-            "name": "owner",
-            "label": "Владелец счётчика",
-            "schema": {
-              "type": "union",
-              "label": "Владелец счётчика",
-              "variants": [
-                {
-                  "type": "reference",
-                  "referenceType": "project",
-                  "label": "Проект"
-                },
-                {
-                  "type": "reference",
-                  "referenceType": "scene",
-                  "label": "Сцена"
-                },
-                {
-                  "type": "reference",
-                  "referenceType": "object",
-                  "label": "Объект"
-                }
-              ]
-            }
-          },
-          {
-            "name": "counter",
-            "label": "Счётчик",
-            "schema": {
-              "type": "reference",
-              "referenceType": "resource",
-              "label": "Счётчик"
-            }
-          },
-          {
-            "name": "amount",
-            "label": "Награда",
-            "schema": {
-              "type": "integer",
-              "label": "Награда",
-              "default": 1
-            }
-          }
-        ],
-        "locals": {},
         "resultSchema": {
-          "type": "boolean"
+          "type": "number"
         },
-        "preserveExtraArgs": true,
-        "entry": "definition-sample.mechanic.reward-1-reward-guard-return",
-        "nodes": [
+        "locals": {},
+        "entry": "",
+        "nodes": []
+      },
+      {
+        "id": "sample-method-Counter-add",
+        "name": "Counter · Добавить",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-Counter",
+        "componentMethodId": "add",
+        "parameters": [
           {
-            "id": "definition-sample.mechanic.reward-1-reward-guard-return",
-            "kind": "return",
-            "name": "Условие выполнено",
-            "value": true,
-            "position": {
-              "x": 340,
-              "y": 0
+            "name": "amount",
+            "schema": {
+              "type": "number",
+              "default": 1,
+              "label": "Количество"
             }
           }
         ],
-        "graphVersion": 1
+        "resultSchema": {
+          "type": "number"
+        },
+        "locals": {},
+        "entry": "",
+        "nodes": []
+      },
+      {
+        "id": "sample-method-Counter-read",
+        "name": "Counter · Прочитать",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-Counter",
+        "componentMethodId": "read",
+        "parameters": [],
+        "resultSchema": {
+          "type": "number"
+        },
+        "locals": {},
+        "entry": "",
+        "nodes": []
+      },
+      {
+        "id": "sample-method-Counter-multiply",
+        "name": "Counter · Умножить",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-Counter",
+        "componentMethodId": "multiply",
+        "parameters": [
+          {
+            "name": "factor",
+            "schema": {
+              "type": "number",
+              "default": 2,
+              "label": "Множитель"
+            }
+          }
+        ],
+        "resultSchema": {
+          "type": "number"
+        },
+        "locals": {},
+        "entry": "",
+        "nodes": []
+      }
+    ],
+    "logicResources": [
+      {
+        "id": "sample-source-Reward",
+        "version": 1,
+        "kind": "component.code",
+        "name": "Reward",
+        "path": "Компоненты/Reward.js",
+        "definitionId": "sample.component.reward",
+        "status": "ready",
+        "approved": true,
+        "source": "// Упражнение: замените base * multiplier на base * multiplier + 5.\n// Получатель — явная ссылка на Counter, одинаковая логика для очков, монет и отношения.\n// Добавьте новый метод bonus с вызовом engine.invoke(refs.counter, \"add\", {amount: ...}).\nconst component = {\n  name: \"Reward\",\n  parameters: {\n    type: \"object\",\n    properties: {\n      base: { type: \"number\", default: 1, label: \"Базовая награда\" },\n      multiplier: { type: \"number\", default: 1, label: \"Множитель награды\" },\n    },\n  },\n  references: {\n    type: \"object\",\n    properties: {\n      counter: { type: \"reference\", referenceType: \"mechanic\", label: \"Куда начислять · Counter\" },\n    },\n  },\n  state: {\n    type: \"object\",\n    properties: { awards: { type: \"integer\", default: 0, label: \"Выдано наград\" } },\n  },\n  signals: {\n    awarded: {\n      name: \"Награда выдана\",\n      payloadSchema: {\n        type: \"object\",\n        properties: { amount: { type: \"number\" }, value: { type: \"number\" } },\n      },\n    },\n  },\n  methods: {\n    award: {\n      name: \"Начислить награду\",\n      parameters: {\n        type: \"object\",\n        properties: { factor: { type: \"number\", default: 1, label: \"Разовый множитель\" } },\n      },\n      result: { type: \"number\" },\n      async run({ args, params, refs, state, engine }) {\n        const amount = params.base * params.multiplier * args.factor;\n        const value = await engine.invoke(refs.counter, \"add\", { amount });\n        state.awards += 1;\n        await engine.emit(\"awarded\", { amount, value });\n        return value;\n      },\n    },\n  },\n};\n",
+        "fingerprint": "1563:65abf1e6",
+        "dependencies": {
+          "functions": {},
+          "events": {},
+          "references": {},
+          "globals": {},
+          "signals": {},
+          "operations": {}
+        },
+        "signalBindings": {
+          "awarded": {
+            "signalId": "user.component-signal.sample-source--eward.awarded"
+          }
+        },
+        "lesson": "Что открыть → Reward.award. Что изменить → формулу amount; добавьте bonus. Результат → кнопка/история/награда используют изменённый метод.",
+        "locations": {
+          "award": {
+            "line": 40,
+            "column": 7
+          }
+        }
+      },
+      {
+        "id": "sample-source-Counter",
+        "version": 1,
+        "kind": "component.code",
+        "name": "Counter",
+        "path": "Компоненты/Counter.js",
+        "definitionId": "sample.component.counter",
+        "status": "ready",
+        "approved": true,
+        "source": "// Откройте Add: измените умножение на params.step — результат изменится во всех вызовах.\n// Один исходник, независимое value у каждого подключения.\nconst component = {\n  name: \"Counter\",\n  parameters: {\n    type: \"object\",\n    properties: {\n      initial: { type: \"number\", default: 0, label: \"Начальное значение\" },\n      storySource: {\n        type: \"boolean\",\n        default: false,\n        label: \"Менять источник постоянной привязки явно\",\n      },\n      step: { type: \"number\", default: 1, label: \"Множитель изменения\" },\n    },\n  },\n  state: {\n    type: \"object\",\n    properties: { value: { type: \"number\", default: 0, label: \"Текущее значение\" } },\n  },\n  stateFromParameters: { value: \"initial\" },\n  signals: {\n    changed: {\n      name: \"Значение изменилось\",\n      payloadSchema: { type: \"object\", properties: { value: { type: \"number\" } } },\n    },\n  },\n  methods: {\n    add: {\n      name: \"Добавить\",\n      parameters: {\n        type: \"object\",\n        properties: { amount: { type: \"number\", default: 1, label: \"Количество\" } },\n      },\n      result: { type: \"number\" },\n      async run({ args, params, state, engine }) {\n        const next = state.value + args.amount * params.step;\n        if (params.storySource) await engine.writeBinding(\"value\", next);\n        else state.value = next;\n        await engine.emit(\"changed\", { value: state.value });\n        return state.value;\n      },\n    },\n    read: {\n      name: \"Прочитать\",\n      result: { type: \"number\" },\n      run({ state }) {\n        return state.value;\n      },\n    },\n    multiply: {\n      name: \"Умножить\",\n      parameters: {\n        type: \"object\",\n        properties: { factor: { type: \"number\", default: 2, label: \"Множитель\" } },\n      },\n      result: { type: \"number\" },\n      async run({ args, params, state, engine }) {\n        const next = state.value * args.factor;\n        if (params.storySource) await engine.writeBinding(\"value\", next);\n        else state.value = next;\n        await engine.emit(\"changed\", { value: state.value });\n        return state.value;\n      },\n    },\n  },\n};\n",
+        "fingerprint": "2083:e0bc205",
+        "dependencies": {
+          "functions": {},
+          "events": {},
+          "references": {},
+          "globals": {},
+          "signals": {},
+          "operations": {
+            "sacura.variable.set": {
+              "operationId": "sacura.variable.set",
+              "operationVersion": 1
+            }
+          }
+        },
+        "signalBindings": {
+          "changed": {
+            "signalId": "user.component-signal.sample-source--ounter.changed"
+          }
+        },
+        "lesson": "Что открыть → Counter.add. Что изменить → умножение на step. Результат → меняются начисления каждого подключения независимо.",
+        "locations": {
+          "add": {
+            "line": 36,
+            "column": 7
+          },
+          "read": {
+            "line": 47,
+            "column": 7
+          },
+          "multiply": {
+            "line": 58,
+            "column": 7
+          }
+        }
       }
     ]
   },
-  "references": [
-    {
-      "at": "/content/gameplay/mechanics/0/scope/id",
-      "inputId": "input-c7218a8a-c868-403d-84d3-38c4903f0c73"
-    }
-  ],
+  "references": [],
   "assets": []
 }

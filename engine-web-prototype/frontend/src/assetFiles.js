@@ -5,7 +5,8 @@ import {importMeshFile} from './meshAssets.js';
 export function cleanAssetPath(path){return String(path||'').replaceAll('\\','/').split('/').filter(part=>part&&part!=='.'&&part!=='..').join('/');}
 export function fileKind(name){const ext=String(name).split('.').at(-1).toLowerCase();return ['glb','obj'].includes(ext)?'model':['png','jpg','jpeg','webp','gif','svg'].includes(ext)?'image':['wav','mp3','ogg','m4a','aac','flac','webm'].includes(ext)?'audio':'file';}
 export function collectAssetFiles(project,audio=[]){
- const files=(project.assetFiles||[]).map(file=>({...file,users:[]}));
+ const logic=(project.logicResources||[]).map(r=>({id:r.id,name:r.path.split('/').at(-1),path:r.path,kind:'logic',logicResourceId:r.id,users:[]}));
+ const files=[...logic,...(project.assetFiles||[])].map(file=>({...file,users:[]}));
  for(const object of project.objects||[]){
   if(!object.model?.src)continue;
   let file=files.find(file=>file.src===object.model.src);

@@ -1,3 +1,4 @@
+import {componentCallSummary,isComponentCall} from './componentCatalog.js';
 import {GAME_COMMANDS} from './gameplayModel.js';
 import {animationLabel} from './characterPresentation.js';
 import {t as tr,plural} from './i18n.js';
@@ -54,6 +55,7 @@ export function describeAction(action, project, scene) {
   const point=findStagingPoint(sceneStagingPoints(scene,project.objects),action.value);
   const audio=projectAudioAssets(project).find(asset=>asset.id===action.assetId);
   const value=Array.isArray(action.value)?action.value.join(', '):String(action.value??'');
+  if(action.type==='gameplay'&&isComponentCall(action.command))return {...componentCallSummary(project,{parameters:action.value}),icon:'Puzzle'};
   if(action.type==='gameplay')return {subject:tr('Игровая команда'),result:tr(GAME_COMMANDS[action.command]||action.command),detail:JSON.stringify(action.value),icon:'Gamepad2'};
   if(action.type==='move')return {subject:source,result:point?.label||value||tr('Выберите точку'),detail:tr("{0} с", [action.duration??2]),icon:'MapPin'};
   if(action.type==='pose')return {subject:source,result:enabledCharacterAnimations(object).find(a=>a.id===action.value)?.name||value||tr('Выберите анимацию'),detail:tr("Применить позу"),icon:'PersonStanding'};
@@ -75,6 +77,7 @@ export function actionTiming(action) {
 export function actionCount(count) { return plural(count,'действие','действия','действий','action'); }
 
 export function actionSummary(action, project) {
+ if(action.type==='gameplay'&&isComponentCall(action.command)){const s=componentCallSummary(project,{parameters:action.value});return s.subject+' → '+s.result;}
  if(action.type==='gameplay')return tr(GAME_COMMANDS[action.command]||'Игровая команда')+' → '+JSON.stringify(action.value);
  const object=project.objects?.find(o=>o.id===action.target);
  const subject=object?.name||tr(TYPES[action.type]?.label)||action.type;

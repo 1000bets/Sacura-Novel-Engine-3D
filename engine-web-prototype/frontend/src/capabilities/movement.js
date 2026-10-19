@@ -1,3 +1,4 @@
+import {ownComponentNativeHandle} from '../componentAdapters.js';
 import {registerCapability} from '../capabilityRegistry.js';
 import {bodyBounds,moveBody,clamp} from '../gamePhysics.js';
 import {operation,ref,number,finiteVector,length,sub,session} from './shared.js';
@@ -23,6 +24,6 @@ const boxes=this.colliders();for(const o of this.objects){const isPlayer=o.id===
  operation('sacura.movement.jump','Прыгнуть',{owner:ref('object','Управляемый объект')},{type:'void'},(p,c)=>session(c).jump(p.owner)),
  operation('sacura.movement.impulse','Толкнуть объект',{owner:ref('object','Объект'),velocity:{type:'vector',size:3,label:'Импульс'}},{type:'void'},(p,c)=>session(c).impulse(p.owner,p.velocity)),
  operation('sacura.movement.enabled','Разрешить управление объектом',{owner:ref('object','Объект'),enabled:{type:'boolean',default:false,label:'Разрешить'}},{type:'void'},(p,c)=>session(c).movementEnabled(p.owner,p.enabled)),
- operation('sacura.movement.direction','Задать направление движения',{owner:ref('object','Объект'),direction:{type:'vector',size:3,label:'Направление',default:[0,0,0]}},{type:'void'},(p,c)=>{const g=session(c);if(!controllerFor(g.config,p.owner))throw Error('У объекта не подключено движение.');g.state.directions[p.owner]=p.direction;if(p.owner===g.controlledId)g.direction=p.direction;}),
+ operation('sacura.movement.direction','Задать направление движения',{owner:ref('object','Объект'),direction:{type:'vector',size:3,label:'Направление',default:[0,0,0]}},{type:'void'},(p,c)=>{const g=session(c);if(!controllerFor(g.config,p.owner))throw Error('У объекта не подключено движение.');g.state.directions[p.owner]=p.direction;ownComponentNativeHandle(g,'direction:'+p.owner,c,()=>{g.state.directions[p.owner]=[0,0,0];if(p.owner===g.controlledId)g.direction=[0,0,0];});if(p.owner===g.controlledId)g.direction=p.direction;}),
  operation('sacura.movement.destination','Идти к точке',{owner:ref('object','Управляемый объект'),point:{type:'vector',size:3,label:'Точка'}},{type:'void'},(p,c)=>{const g=session(c);if(p.owner!==g.controlledId)throw Error('Выберите владельца подключённого управления по щелчку.');g.setDestination(p.point);})
  ]});

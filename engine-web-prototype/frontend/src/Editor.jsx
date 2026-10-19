@@ -1,3 +1,10 @@
+import {copyObjectComponents} from './componentObjectCopies.js';
+import ComponentFeedback from './ComponentFeedback.jsx';
+import ComponentRuntimeIssue from './ComponentRuntimeIssue.jsx';
+import ComponentStoryAction from './ComponentStoryAction.jsx';
+import ComponentCallFields from './ComponentCallFields.jsx';
+import {componentCallSummary} from './componentCatalog.js';
+import ComponentInstancesInspector from './ComponentInstancesInspector.jsx';
 import {AuthoringNavigation} from './AuthoringNavigation.jsx';
 import {openOperationSource} from './operationSource.js';
 import {activityValue} from './runtimePresentation.js';
@@ -7,7 +14,7 @@ import GameplayWorkspace from './GameplayWorkspace.jsx';
 import GameHUD from './GameHUD.jsx';
 import {exportPlayableGame} from './gameExport.js';
 import {instantiateAuthoringTemplate} from './authoringTemplates.js';
-import {builtinTemplates,loadBuiltinTemplate} from './builtinTemplates.js';
+import {builtinTemplates,loadBuiltinTemplate,createBuiltinProject} from './builtinTemplates.js';
 import {inputContextsFor,inputHelp} from './inputModel.js';
 import LanguagePicker from './LanguagePicker.jsx';
 import WidgetWorkspace from './WidgetWorkspace.jsx';
@@ -283,6 +290,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     [showGrid, setShowGrid] = useState(true),
     [maximized, setMaximized] = useState(dockTabs(layout.windows).length && defaultWindowId === "gameplay" ? "graph" : null),
     [preview, setPreview] = useState(null),
+    [componentDraft,setComponentDraft]=useState(null),
     [follow, setFollow] = useState(true),
     [query, setQuery] = useState(""),
     [historyQuery, setHistoryQuery] = useState(""),
@@ -324,6 +332,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   const windowPreferences=useRef(windows);windowPreferences.current=windows;
   const sceneTool=activeDockWindow(windows,'scene'), hierarchyTool=activeDockWindow(windows,'hierarchy'), inspectorTool=activeDockWindow(windows,'inspector');
   const sideWorkspace=windows.position!=='bottom'&&viewportWidth>1000;
+  useEffect(()=>{document.title='Sacura Studio · '+project.title;},[project.title]);
   useEffect(()=>{if(!workspaceTabCount)setMaximized(current=>current==='graph'?null:current);},[workspaceTabCount]);
   useEffect(()=>{
     const resize=()=>setViewportWidth(window.innerWidth);
@@ -409,6 +418,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             particlesPaused:preview.effects.particles?.status==='paused',
             interactionTarget:
               preview.phase === "WAITING_OBJECT" && !preview.world.playerControl ? playBeat.signal : null,
+            componentInteractions:playProject.objects.filter(o=>o.active!==false&&o.interactionCall&&isObjectInScene(o,playScene)).map(o=>o.id),
             interactionTargets:preview.phase==='WAITING_OBJECT'?interactionTargets(playBeat).filter(id=>!preview.interacted?.includes(id)):[],
           }
         : {
@@ -438,7 +448,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   }),[objects,displayScene.id]);
   const [positionPick,setPositionPick]=useState(null);
   const [eventSearch,setEventSearch]=useState('');
-  useEffect(()=>{if(picker?.kind==='event')setEventSearch('');},[picker?.kind,picker?.phase,picker?.batchId]);
+  useEffect(()=>{if(picker?.kind==='event'){setEventSearch('');setComponentDraft(null);}},[picker?.kind,picker?.phase,picker?.batchId]);
   useEffect(()=>{const cancel=e=>{if(e.key==='Escape')setPositionPick(null);};window.addEventListener('keydown',cancel);return ()=>window.removeEventListener('keydown',cancel);},[]);
   const issues = useMemo(() => validateStudio(project), [project]),
     variables = running ? preview.variables : project.variables,
@@ -751,6 +761,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     }
   },[selection.kind,selection.id,mode,running,dock]);
   const interact = (id) => {
+    if(mode==='game'&&running&&id&&rt.project.objects.find(o=>o.id===id)?.interactionCall){rt.playerClick(null,id);return;}
     if(mode==='game'&&running&&preview.phase==='WAITING_INPUT'){rt.advance();return;}
     const o = objects.find((o) => o.id === id);
     if (
@@ -815,7 +826,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   };
   const submitProjectDialog = ({name,templateId}) => runFileOperation(async()=>{
     if(projectDialog==='new'){
-      const template=projectTemplates.find(t=>t.id===templateId);const next=template?await instantiateAuthoringTemplate(template.builtin?await loadBuiltinTemplate(template.id):template,name):createEmptyProject(name);
+      const template=projectTemplates.find(t=>t.id===templateId);const next=template?template.builtin?await createBuiltinProject(template.id,name):await instantiateAuthoringTemplate(template,name):createEmptyProject(name);
       replaceProject(next);setNotice(template?tr("Создан проект из шаблона «{0}».", [template.name]):'Создан пустой проект.');
     } else if(projectDialog==='template'){
       storeTemplate(accountStorage,createProjectTemplate(project,name));
@@ -985,8 +996,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   const transformObjects=changes=>{if(rt.running)return;mutate(p=>{for(const {id,value}of changes)setObjectTransform(p,id,scene.id,value);});};
   const objectClipboard=command=>{
     if(rt.running)return;
-    if(command==='copy'){if(!selectedObjects.length)return;clipboard.current={kind:'objects',items:copySceneObjects(selectedObjects,scene),step:0};setNotice('Объекты скопированы. Ctrl+V — вставить.');}
-    else if(clipboard.current?.kind==='objects'){const copies=pasteSceneObjects(clipboard.current.items,scene,++clipboard.current.step);mutate(p=>p.objects.push(...copies));setSelection({kind:'object',id:copies.at(-1).id,ids:copies.map(o=>o.id)});setFocusRequest({nonce:uid('focus')});setNotice('Объекты вставлены. Ctrl+Z — отменить.');}
+    if(command==='copy'){if(!selectedObjects.length)return;clipboard.current={kind:'objects',items:copySceneObjects(selectedObjects,scene),componentSource:structuredClone({id:project.id,gameplay:project.gameplay}),step:0};setNotice('Объекты скопированы. Ctrl+V — вставить.');}
+    else if(clipboard.current?.kind==='objects'){const copies=pasteSceneObjects(clipboard.current.items,scene,++clipboard.current.step);mutate(p=>{copyObjectComponents(p,clipboard.current.items,copies,clipboard.current.componentSource);p.objects.push(...copies);});setSelection({kind:'object',id:copies.at(-1).id,ids:copies.map(o=>o.id)});setFocusRequest({nonce:uid('focus')});setNotice('Объекты вставлены. Ctrl+Z — отменить.');}
   };
   const graphClipboard=(command,graphNodes,graphKey)=>{
     if(rt.running)return;
@@ -1011,12 +1022,12 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   };
   const duplicateObjects=()=>{
     if(rt.running)return;const copies=selectedObjects.map(object=>{const copy=structuredClone(object);copy.id=uid('object');copy.name=object.name+' · копия';copy.subsceneId=scene.id;copy.builtin=object.builtin||(['letter','door','fireplace','garden-note','ticket'].includes(object.id)?object.id:undefined);const value=objectTransform(object,scene.id,scene.kind);value.position[0]+=.65;copy.transforms={[scene.id]:value};return copy;});
-    mutate(p=>p.objects.push(...copies));setSelection({kind:'object',id:copies.at(-1)?.id,ids:copies.map(object=>object.id)});setFocusRequest({nonce:uid('focus')});
+    mutate(p=>{copyObjectComponents(p,selectedObjects,copies);p.objects.push(...copies);});setSelection({kind:'object',id:copies.at(-1)?.id,ids:copies.map(object=>object.id)});setFocusRequest({nonce:uid('focus')});
   };
   const deleteObjects=()=>{if(rt.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSelectionIds.includes(object.id));p.objects=p.objects.filter(object=>!objectSelectionIds.includes(object.id));removed.forEach(object=>retainObjectModel(p,object));});setSelection({kind:'scene',id:scene.id});setNotice('Выделенные объекты удалены. Ctrl+Z — вернуть всю группу.');};
   const duplicateObject=(object)=>{
     const copy=structuredClone(object);copy.id=uid('object');copy.name=object.name+' · копия';copy.subsceneId=scene.id;copy.builtin=object.builtin||(['letter','door','fireplace','garden-note','ticket'].includes(object.id)?object.id:undefined);const t=objectTransform(object,scene.id,scene.kind);t.position[0]+=.65;copy.transforms={[scene.id]:t};
-    mutate(p=>p.objects.push(copy));setSelection({kind:'object',id:copy.id});setFocusRequest({nonce:uid('focus')});
+    mutate(p=>{copyObjectComponents(p,[object],[copy]);p.objects.push(copy);});setSelection({kind:'object',id:copy.id});setFocusRequest({nonce:uid('focus')});
   };
   const deleteObject=id=>{mutate(p=>{const removed=p.objects.find(o=>o.id===id);p.objects=p.objects.filter(o=>o.id!==id);retainObjectModel(p,removed);});setSelection({kind:'scene',id:scene.id});setNotice('Объект удалён. Ctrl+Z — вернуть; ссылки в событиях видны во вкладке «Ошибки».');};
   const addStagingPoint=()=>{
@@ -1370,6 +1381,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               title={tr("Объект активен")}
             />
           </div>
+          <ComponentInstancesInspector key={'components:'+o.id} project={project} scope={{kind:'object',id:o.id}} onChange={mutate} preview={preview} running={running} onOpen={(resourceId,mechanicId)=>{setGameplayRequest({resourceId,mechanicId,nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');}} onOpenFunction={(functionId,mechanicId)=>{setGameplayRequest({functionId,mechanicId,nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');}} onCreate={()=>{setGameplayRequest({createComponent:true,nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');}}/>
           <Button disabled={running} icon="Plus" onClick={()=>{setGameplayRequest({objectId:o.id,nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');}}>{tr("Добавить механику")}</Button>
           <Field label={tr("Группа в иерархии")}><Select disabled={running} value={project.objectGroups?.find(g=>g.sceneId===scene.id&&g.objectIds.includes(o.id))?.id||''} options={[["","Объекты сцены · корень"],...(project.objectGroups||[]).filter(g=>g.sceneId===scene.id).map(g=>[g.id,literalLabel(g.name)])]} onChange={groupId=>mutate(p=>groupId?addObjectsToGroup(p,groupId,[o.id]):removeObjectsFromGroups(p,scene.id,[o.id]))}/></Field>
           {o.type==='Персонаж'&&<Fold title={tr("Виджет диалога")} icon="PanelsTopLeft"><WidgetAssignment project={project} character={o} onCustomize={()=>customizeWidget({characterId:o.id})} onChange={dialogueWidgetId=>patch({dialogueWidgetId})} onEdit={openWidgets} disabled={running}/></Fold>}
@@ -2308,7 +2320,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 onReset={(id,sceneId)=>editSubscene(p=>{const character=p.objects.find(object=>object.id===id);if(character?.transforms)delete character.transforms[sceneId];})}
                 onPlace={(id,sceneId)=>{openSubscenes("edit",sceneId);editScene();setSelection({kind:"object",id});setFocusRequest({nonce:uid("focus")});}}
                 onDuplicate={duplicateCharacter} onDelete={id=>{if(!rt.running)deleteObject(id);}}/> : dock === "files" ? (
-                <AssetExplorer onSelectFile={id=>{setSelection({kind:'file',id});setLayout(l=>({...l,hiddenInspector:false}));setCompactPanel('inspector');setMaximized(null);}} project={project} audioAssets={projectAudioAssets(project)} disabled={running}
+                <AssetExplorer onLogic={resourceId=>{setGameplayRequest({resourceId,nonce:uid('request')});setDock('gameplay');maximizeWindow('gameplay');}} onSelectFile={id=>{setSelection({kind:'file',id});setLayout(l=>({...l,hiddenInspector:false}));setCompactPanel('inspector');setMaximized(null);}} project={project} audioAssets={projectAudioAssets(project)} disabled={running}
                   onImport={importProjectAudioFiles}
                   onCreateFolder={path=>changeAssetLibrary(p=>{p.assetFolders=[...new Set([...(p.assetFolders||[]),path])];})}
                   onSelectObject={selectObject} onPlaceModel={placeLibraryModel} onAudio={()=>{setDock('sound');setDetailEditor(false);}}/>
@@ -2523,6 +2535,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               <div className="flex-space" />
               <Button icon="PanelsTopLeft" title={tr("Редактор интерфейса игры")} onClick={()=>openWidgets(resolveWidget(project,'dialogue',beat).id)}/>
               {mode==='game'&&<Button icon="Menu" title={tr("Главное меню игры")} onClick={()=>{rt.stop();setGameMenu('mainMenu');setPreviewWidgetId(null);}}>{tr("Меню")}</Button>}
+              {mode==='game'&&running&&!preview.audition&&<><Button icon="Save" title={tr("Сохранить прохождение")} onClick={()=>widgetAction('save')}>{tr("Сохранить прохождение")}</Button><Button icon="FolderOpen" title={tr("Загрузить прохождение")} onClick={()=>widgetAction('load')}>{tr("Загрузить прохождение")}</Button></>}
               <button
                 title={tr("Диалог в игровом кадре")}
                 hidden={mode !== "game"}
@@ -2618,6 +2631,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 }
                 show={mode==="game"&&showDialogue&&!preview?.audition&&!gameMenu&&!preview?.paused}
               />
+              {running&&mode==='game'&&!(playProject.gameplay?.hudWidgetId&&(preview?.world.game?.active||preview?.phase==='PLAYING'))&&<ComponentFeedback game={preview?.world.game}/>}
               {running&&(preview?.phase==='PLAYING'||playProject.gameplay?.hudWidgetId&&preview?.world.game?.active)&&<GameHUD project={playProject} preview={preview} onAction={widgetAction} text={preview.phase==='PLAYING'&&preview.beatId?playBeat.text:''}/>}
               {mode==='game'&&(gameMenu==='mainMenu'||(running&&preview?.paused&&!preview?.audition))&&<WidgetMenu label={gameMenu==='mainMenu'?tr('Главное меню'):tr('Пауза')} widget={project.widgets.find(w=>w.id===previewWidgetId&&w.kind===(gameMenu==='mainMenu'?'mainMenu':'pauseMenu'))||resolveWidget(project,gameMenu==='mainMenu'?'mainMenu':'pauseMenu')}
                   context={{project:playProject,variables,game:preview?.world.game,title:project.title,paused:!!preview?.paused}} onAction={widgetAction}/>}
@@ -2643,6 +2657,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   : tr("3D · примитивы")}
               </div>}
             </div>
+            <ComponentRuntimeIssue diagnostic={preview?.componentError} onOpen={issue=>{rt.stop();if(issue.owner.kind==='object'&&project.objects.some(o=>o.id===issue.owner.id))setSelection({kind:'object',id:issue.owner.id});setGameplayRequest({resourceId:issue.resourceId,functionId:issue.functionId,mechanicId:issue.instanceId,nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');maximizeWindow('gameplay');}}/>
             {(running || [...soundDesk.tracks.values()].some(t=>["playing","error"].includes(t.status))) && <div className="live-strip">
               <output className="audio-output" title={tr("Измеренный уровень на аудиовыходе")} aria-label={tr("Уровень звукового выхода")}><Icon name="Volume2" size={13}/><meter min="0" max="1" value={[...soundDesk.tracks.values()].some(t=>t.status==='playing')?(soundDesk.output?.level()||0):0}/><span>{soundDesk.output?.context?.state==='running'?tr("Аудио включено"):tr("Аудио · нажмите Play")}</span></output>
               <button onClick={() => setDock("active")}>
@@ -2796,6 +2811,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             </button><button disabled={!future.length} onClick={()=>{redo();setMenu(null);}}><Icon name="Redo2"/>{tr("Повторить ")}<kbd>Ctrl Shift Z</kbd></button></>
           ) : menu === "Создать" ? (
             <>
+              <button disabled={running} onClick={()=>{setMenu(null);setGameplayRequest({createComponent:true,nonce:uid('request')});setDock('gameplay');maximizeWindow('gameplay');}}><Icon name="Puzzle"/>{tr("Компонент")}</button>
               <button onClick={()=>openSubscenes('create')}><Icon name="PanelsTopLeft"/>{tr("Сабсцена")}</button>
               <button onClick={()=>openAuthoring('action')}><Icon name="MousePointer2"/>{tr("Действие")}</button>
               <button onClick={()=>openAuthoring('group')}><Icon name="Columns2"/>{tr("Группа действий")}</button>
@@ -2924,6 +2940,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   </Field>
 
                 </div>
+                <Button icon="Puzzle" onClick={()=>setComponentDraft({id:'sacura.component.call',version:1,parameters:{}})}>Вызвать метод компонента</Button>
+                {componentDraft&&<ComponentStoryAction project={project} beatId={beat.id} phase={picker.phase||'ON_START'} batchId={picker.batchId||null} onChange={mutate} onAdded={()=>{setPicker(null);setDock('story');}}/>}
                 <input type="search" aria-label={tr("Поиск событий")} placeholder={tr("Найти событие…")} value={eventSearch} onChange={e=>setEventSearch(e.target.value)}/>
                 <div className="event-selection-list">
                   {project.events

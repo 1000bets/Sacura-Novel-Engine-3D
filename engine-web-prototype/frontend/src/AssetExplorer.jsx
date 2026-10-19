@@ -6,7 +6,7 @@ import {collectAssetFiles,assetFolders,folderContents,cleanAssetPath,importAsset
 import './assetExplorer.css';
 
 const icons={model:'FileBox',image:'Image',audio:'FileAudio',file:'File'};
-export default function AssetExplorer({project,audioAssets,onImport,onCreateFolder,onSelectObject,onSelectFile,onPlaceModel,onAudio,disabled}){
+export default function AssetExplorer({project,audioAssets,onImport,onCreateFolder,onSelectObject,onSelectFile,onPlaceModel,onAudio,onLogic,disabled}){
  useLocale();
  const [dragging,setDragging]=useState(false),[folder,setFolder]=useState(''),[search,setSearch]=useState(''),[selected,setSelected]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[newFolder,setNewFolder]=useState(null),[expanded,setExpanded]=useState(new Set(['']));
  const input=useRef(),directory=useRef(),uploading=useRef(false),dragDepth=useRef(0);
@@ -23,7 +23,7 @@ export default function AssetExplorer({project,audioAssets,onImport,onCreateFold
   <button className="asset-folder-toggle" aria-label={`${tr(expanded.has(item)?'Свернуть':'Развернуть')} ${item}`} disabled={!children} aria-expanded={children?expanded.has(item):undefined} onClick={()=>setExpanded(previous=>{const next=new Set(previous);next.has(item)?next.delete(item):next.add(item);return next;})}><Icon name={expanded.has(item)?'ChevronDown':'ChevronRight'} size={12}/></button>
   <button className={path===item?'selected':''} aria-current={path===item?'location':undefined} onClick={()=>navigate(item)}><Icon name="Folder" size={15}/><span>{item.split('/').at(-1)}</span></button>
  </div>{expanded.has(item)&&tree(item,depth+1)}</React.Fragment>;});
- const open=item=>{if(item.kind==='model')onPlaceModel(item);else if(item.audioId)onAudio();};
+ const open=item=>{if(item.logicResourceId)onLogic?.(item.logicResourceId);else if(item.kind==='model')onPlaceModel(item);else if(item.audioId)onAudio();};
  const hasFiles=hasDroppedFiles;
  const dragOver=event=>{if(!hasFiles(event))return;event.preventDefault();event.stopPropagation();event.dataTransfer.dropEffect=disabled||busy?'none':'copy';};
  const dragEnter=event=>{if(!hasFiles(event))return;event.preventDefault();event.stopPropagation();dragDepth.current++;if(!disabled&&!busy)setDragging(true);};
@@ -40,7 +40,7 @@ export default function AssetExplorer({project,audioAssets,onImport,onCreateFold
   <div className="asset-explorer-body"><nav className="asset-folder-tree" aria-label={tr("Папки проекта")}><button className={'asset-root '+(!path?'selected':'')} onClick={()=>navigate('')}><Icon name="FolderOpen" size={16}/>Assets</button>{tree()}</nav>
    <div className="asset-file-area">
     <div className="asset-file-grid" aria-label={tr("Файлы и папки")}>{contents.folders.map(item=><button key={item} className="asset-file-tile folder" onClick={()=>navigate(item)}><Icon name="Folder" size={34}/><strong>{item.split('/').at(-1)}</strong><small>{tr("Папка")}</small></button>)}
-     {contents.files.map(item=><button key={item.id} className={'asset-file-tile '+(selected===item.id?'selected':'')} aria-pressed={selected===item.id} onClick={()=>{setSelected(item.id);onSelectFile?.(item.id);}} onDoubleClick={()=>!disabled&&open(item)}>
+     {contents.files.map(item=><button key={item.id} className={'asset-file-tile '+(selected===item.id?'selected':'')} aria-pressed={selected===item.id} onClick={()=>{setSelected(item.id);if(item.logicResourceId)onLogic?.(item.logicResourceId);else onSelectFile?.(item.id);}} onDoubleClick={()=>!disabled&&open(item)}>
       {item.kind==='image'&&!/\.svg$/i.test(item.name)?<img src={item.src} alt=""/>:<Icon name={icons[item.kind]||'File'} size={32}/>}<strong>{item.name}</strong><small>{item.builtin?tr("Встроенный файл"):item.bytes!=null?tr("{0} КБ", [(item.bytes/1024).toFixed(1)]):tr("Файл проекта")}</small>{search&&<small>{item.path}</small>}
      </button>)}
     </div>
@@ -49,6 +49,6 @@ export default function AssetExplorer({project,audioAssets,onImport,onCreateFold
   </div>
   {dragging&&<div className="asset-drop-overlay" role="status"><Icon name="Upload" size={32}/><strong>{tr("Отпустите файлы для загрузки")}</strong><span>{tr("В папку ")}{path||'Assets'} {tr("· до 100 МБ на файл")}</span></div>}
   <p className="asset-drop-hint" role="status">{busy?tr("Загружаем файлы…"):tr("Перетащите файлы из проводника компьютера сюда · до 100 МБ на файл")}</p>
-  <footer className="asset-explorer-details">{file?<><Icon name={icons[file.kind]||'File'} size={16}/><span><strong>{file.name}</strong><small>{file.path}{file.users.length?tr(" · Используется: {0}", [file.users.map(user=>user.name).join(', ')]):''}</small></span>{file.kind==='model'&&<Button icon="Plus" disabled={disabled||busy} onClick={()=>onPlaceModel(file)}>{tr("Добавить в сцену")}</Button>}{file.users.map(user=><Button key={user.id} icon="Focus" onClick={()=>onSelectObject(user.id)}>{user.name}</Button>)}{file.audioId&&<Button icon="Music2" onClick={onAudio}>{tr("Открыть звук")}</Button>}</>:<span>{files.length} {tr("файлов в проекте · выберите файл для подробностей · импорт до 100 МБ на файл")}</span>}</footer>
+  <footer className="asset-explorer-details">{file?<><Icon name={icons[file.kind]||'File'} size={16}/><span><strong>{file.name}</strong><small>{file.path}{file.users.length?tr(" · Используется: {0}", [file.users.map(user=>user.name).join(', ')]):''}</small></span>{file.logicResourceId&&<Button icon="Code2" onClick={()=>onLogic?.(file.logicResourceId)}>Открыть компонент</Button>}{file.kind==='model'&&<Button icon="Plus" disabled={disabled||busy} onClick={()=>onPlaceModel(file)}>{tr("Добавить в сцену")}</Button>}{file.users.map(user=><Button key={user.id} icon="Focus" onClick={()=>onSelectObject(user.id)}>{user.name}</Button>)}{file.audioId&&<Button icon="Music2" onClick={onAudio}>{tr("Открыть звук")}</Button>}</>:<span>{files.length} {tr("файлов в проекте · выберите файл для подробностей · импорт до 100 МБ на файл")}</span>}</footer>
  </section>;
 }

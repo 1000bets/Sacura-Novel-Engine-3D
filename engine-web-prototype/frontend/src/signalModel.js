@@ -16,7 +16,7 @@ export function signalContext(project,type,payload,context={},sceneId){
  // Legacy subject fields are adapted here. Absence stays absent, never playerId.
  const legacySource=type==='pickup'?object(payload.objectId):type==='collision'?object(payload.actorId):undefined;
  const legacyTarget=['interact','hit','death','collision','enter','exit'].includes(type)?object(payload.objectId):undefined;
- const lineage=Object.fromEntries(['bindings','rootId','causeChain','nativeRunId','reactionId','mechanicInstanceId'].filter(k=>context[k]!==undefined).map(k=>[k,structuredClone(context[k])]));
+ const lineage=Object.fromEntries(['bindings','rootId','causeChain','nativeRunId','reactionId','mechanicInstanceId','emitterInstanceId'].filter(k=>context[k]!==undefined).map(k=>[k,structuredClone(context[k])]));
  const result={...lineage,source:context.source||object(context.sourceId)||legacySource,target:context.target||object(context.targetId)||legacyTarget,initiator:context.initiator||object(context.initiatorId),sceneId:context.sceneId||sceneId};
  for(const name of ['source','target','initiator'])if(result[name])resolveReference(reference(result[name].type,result[name].id),result[name].type,{project});
  if(result.sceneId&&!project.subscenes.some(s=>s.id===result.sceneId))throw Error('Сцена сигнала недоступна.');

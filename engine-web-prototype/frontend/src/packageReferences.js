@@ -11,7 +11,7 @@ import {capabilityDefinitions} from './capabilityRegistry.js';
 
 export const PACKAGE_FORMAT_VERSION=2;
 export const PACKAGE_LIMITS=Object.freeze({bytes:150_000_000,assets:128,assetBytes:100*1024*1024,records:4096,depth:64,values:100000});
-export const packageContentFields=['version','authoringGraphVersion','handlerGraphVersion','visualExamplesVersion','sceneEditingVersion','standardEventsVersion','events','functions','actionTemplates','groupTemplates','widgets','audioAssets','gameplay','variables','variableTypes','objects','subscenes','chapters','input','ui','audioSettings','timelineLayout','storyLayout','variableLayout','files','folders','description','objectGroups','assetFiles','assetFolders','assetOverrides','graphLayout'];
+export const packageContentFields=['logicResources','version','authoringGraphVersion','handlerGraphVersion','visualExamplesVersion','sceneEditingVersion','standardEventsVersion','events','functions','actionTemplates','groupTemplates','widgets','audioAssets','gameplay','variables','variableTypes','objects','subscenes','chapters','input','ui','audioSettings','timelineLayout','storyLayout','variableLayout','files','folders','description','objectGroups','assetFiles','assetFolders','assetOverrides','graphLayout'];
 export function visitData(value,fn,path=''){
  if(!value||typeof value!=='object')return;
  fn(value,path);

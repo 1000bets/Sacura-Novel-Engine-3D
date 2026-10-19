@@ -1,3 +1,4 @@
+import {validateComponentAdapters} from './componentAdapters.js';
 import {validateCapabilityData} from './capabilityRegistry.js';
 import {validateCapabilityBinding} from './capabilityBindings.js';
 import {inventoryConfig} from './capabilities/inventory.js';
@@ -23,5 +24,5 @@ export function validateCapabilities(project){
  const ids=new Set();for(const b of g.stateBindings){if(!b?.id||ids.has(b.id))bad('Повторяющаяся привязка состояния.');ids.add(b?.id);for(const e of validateCapabilityBinding(project,b))bad(e.message);
   try{const key=variableKey(project,resolveReference(b.variable,'variable',{project})),type=project.variableTypes?.[key]||schemaFromValue(project.variables[key]).type;if(!(type===b.valueType||type==='number'&&b.valueType==='integer'||type==='integer'&&b.valueType==='number'||type==='array'&&b.valueType==='collection'))bad('Тип переменной истории не совпадает с привязкой.');}catch(e){bad(e.message);}
  }
- for(const e of validateCapabilityData(project))bad(e);return issues;
+ for(const e of [...validateCapabilityData(project),...validateComponentAdapters(project)])bad(e);return issues;
 }

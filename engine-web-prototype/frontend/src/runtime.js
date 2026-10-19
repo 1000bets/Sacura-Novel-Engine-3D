@@ -139,6 +139,7 @@ export class PreviewRuntime {
       paused: false,
       ready: false,
       error: null,
+      componentError: null,
       states: {},
       effects: {},
       instances: {},
@@ -216,6 +217,7 @@ export class PreviewRuntime {
     for (const i of Object.values(this.snapshot.instances))
       if (i.status === "running") i.status = "error";
     this.snapshot.error = e.message;
+    this.snapshot.componentError = e.componentDiagnostic||null;
     this.snapshot.phase = "ERROR";
     this.snapshot.ready = false;
     this.emit();
@@ -265,7 +267,7 @@ export class PreviewRuntime {
     }
     this.snapshot.world.stagingPoints=sceneStagingPoints(scene,this.project.objects);this.playerDestination=null;this.game?.cleanupOwners();
   }
-  async enterScene(sceneId,token=this.generation){this.assert(token);const errors=validateStudio(this.project).filter(i=>i.id?.startsWith('capability-')&&i.level==='error');if(errors.length)throw Error(errors.map(i=>i.detail||i.title).join(' · '));const scene=this.project.subscenes.find(s=>s.id===sceneId);if(!scene)throw Error('Сцена удалена.');this.applyScene(scene);this.snapshot.beatId=null;this.snapshot.phase='PLAYING';this.snapshot.ready=true;this.snapshot.textVisible=false;this.snapshot.interacted=[];this.game.enter();this.emit();}
+  async enterScene(sceneId,token=this.generation){this.assert(token);const errors=validateStudio(this.project).filter(i=>i.id?.startsWith('capability-')&&i.level==='error');if(errors.length)throw Error(errors.map(i=>i.detail||i.title).join(' · '));const scene=this.project.subscenes.find(s=>s.id===sceneId);if(!scene)throw Error('Сцена удалена.');this.applyScene(scene);this.snapshot.beatId=null;this.snapshot.phase='PLAYING';this.snapshot.ready=true;this.snapshot.textVisible=false;this.snapshot.interacted=[];await this.game.enter();this.emit();}
   async enter(id, token, automaticDepth=0) {
     if(automaticDepth>100)throw new Error("Проверки образовали бесконечный цикл. Подключите выход к реплике или концовке.");
     this.assert(token);
@@ -295,6 +297,8 @@ export class PreviewRuntime {
       (i) => (i.beatId === id || (!i.beatId && ['input-','game-','function-','widget-','capability-'].some(prefix=>i.id?.startsWith(prefix)))) && i.level === "error",
     );
     if (errors.length) throw new Error(`Реплика «${id}»: `+errors.map((i) => i.title).join(" · "));
+    await this.game?.enterComponents();
+    this.assert(token);
     await this.phase(b, "BEFORE", token);
     if(await this.game?.flushTransition())return;
     if(isPureNode(b))throw new Error('Эта нода вычисляет значение. Запустите реплику или If.');
@@ -326,7 +330,7 @@ export class PreviewRuntime {
     this.snapshot.gateElapsed = 0;
     const controls=playerControls(b);
     if(b.kind==='gate'&&controls.characterId&&controls.mode!=='none')this.snapshot.world.playerControl=controls;
-    if(this.game){this.game.state.active=b.kind==='gameplay'||(this.game.config.storyPolicy?.mechanics||this.game.config.activation)==='continuous'&&(b.kind!=='end'||this.game.config.storyPolicy?.ending==='continue');if(this.game.state.active)this.game.enter();}
+    if(this.game){this.game.state.active=b.kind==='gameplay'||(this.game.config.storyPolicy?.mechanics||this.game.config.activation)==='continuous'&&(b.kind!=='end'||this.game.config.storyPolicy?.ending==='continue');if(this.game.state.active)await this.game.enter();}
     if(b.kind==='choice')this.snapshot.inputChoiceId=b.choices.find(c=>conditionPass(c,this.snapshot.variables,this.project,this.snapshot.choiceResults))?.id||null;
     this.emit();
     if (b.kind === "gate") {
@@ -559,7 +563,7 @@ export class PreviewRuntime {
       case "resume":
         if (this.audio.get("background")) await this.audio.resume("background",audioActionOptions(a));
         else
-          this.audio.play("music-main", {
+          this.audio.play(a.assetId || "music-main", {
             key: "background",
             volume: 0.42,
             loop: true,
@@ -664,7 +668,7 @@ export class PreviewRuntime {
     if(token!==this.generation||!this.running)return;
     if(element.id)await this.game?.trigger('button',{elementId:element.id,action},undefined,context);
     if(token!==this.generation||!this.running)return;await this.game?.flushTransition();this.emit();
-   }catch(e){if(token===this.generation&&!['CANCELLED','INSTANCE_STOPPED'].includes(e.message)){this.snapshot.hint=e.message;this.emit();}}}
+   }catch(e){if(token===this.generation&&!['CANCELLED','INSTANCE_STOPPED'].includes(e.message)){this.snapshot.hint=e.message;this.snapshot.componentError=e.componentDiagnostic||null;this.emit();}}}
 
   writeInputValue(action,value){
     this.snapshot.inputValues??={};const changed=JSON.stringify(this.snapshot.inputValues[action.id])!==JSON.stringify(value);this.snapshot.inputValues[action.id]=value;
@@ -696,7 +700,7 @@ export class PreviewRuntime {
     if(this.game&&['shoot','reload','jump','look','saveGame','loadGame'].includes(action.behavior)){try{if(action.behavior==='look')this.game.look(payload?.delta||value,device);else await this.game.command(({shoot:'shoot',saveGame:'save',loadGame:'load'})[action.behavior]||action.behavior,payload||{});if(inputGeneration!==this.generation)return;await this.game.flushTransition();this.emit();}catch(e){this.game.error(e);}return;}
     if(action.behavior==='move')return; // The scene adapter converts 2D input to camera-relative movement.
     if(action.behavior==='interact'){if(this.snapshot.world.playerControl)this.playerInteract();else await this.advance(null,interactionTargets(beat).find(id=>!this.snapshot.interacted?.includes(id)));return;}
-    if(action.behavior==='point'){if(this.game?.state.active&&payload?.id&&(this.game.config.items.some(i=>i.worldObjectId===payload.id)||this.hasInteraction(payload.id))){this.playerClick(payload.point,payload.id);return;}if(this.snapshot.world.playerControl)this.playerClick(payload?.point,payload?.id);else await this.advance(null,payload?.id);return;}
+    if(action.behavior==='point'){if(payload?.id&&this.project.objects.find(o=>o.id===payload.id)?.interactionCall){this.playerClick(payload.point,payload.id);return;}if(this.game?.state.active&&payload?.id&&(this.game.config.items.some(i=>i.worldObjectId===payload.id)||this.hasInteraction(payload.id))){this.playerClick(payload.point,payload.id);return;}if(this.snapshot.world.playerControl)this.playerClick(payload?.point,payload?.id);else await this.advance(null,payload?.id);return;}
     if(action.behavior==='advance'){
       const choices=beat?.choices?.filter(c=>conditionPass(c,this.snapshot.variables,this.project,this.snapshot.choiceResults));
       await this.advance(beat?.kind==='choice'?(this.snapshot.inputChoiceId||choices?.[0]?.id):undefined);return;
@@ -719,10 +723,14 @@ export class PreviewRuntime {
     if(!object||object.active===false||!isObjectInScene(object,scene)||this.snapshot.world.visible?.[object.id]===false)return null;
     return {control,scene,object,world:this.snapshot.world,beat:allBeats(this.project).find(b=>b.id===this.snapshot.beatId)};
   }
-  hasInteraction(id){return !!this.game&&this.game.rules.some(r=>ruleMatches(this.project,normalizeRule(this.project,r),{type:'interact',payload:{objectId:id},context:{target:{type:'object',id},sceneId:this.game.scene.id}}));}
+  hasInteraction(id){return !!this.game&&(!!this.project.objects.find(o=>o.id===id)?.interactionCall||this.game.rules.some(r=>ruleMatches(this.project,normalizeRule(this.project,r),{type:'interact',payload:{objectId:id},context:{target:{type:'object',id},sceneId:this.game.scene.id}})));}
   playerClick(point,id){
-    if(!this.running||this.snapshot.paused||this.game&&!this.game.controlAllowed)return;
-    if(this.game?.state.active&&id){const pickup=this.game.interact(id),hasRule=this.hasInteraction(id);if(hasRule)this.game.post('interact',{objectId:id});if(pickup||hasRule)return;}
+    if(!this.running||this.snapshot.paused)return;
+    const componentCall=this.project.objects.find(o=>o.id===id)?.interactionCall,activeBeat=allBeats(this.project).find(b=>b.id===this.snapshot.beatId),componentGate=!!componentCall&&activeBeat?.kind==='gate'&&interactionTargets(activeBeat).includes(id);
+    if(componentGate&&!this.playerContext()){void this.advance(null,id);return;}
+    if(componentCall&&!componentGate&&this.game&&this.snapshot.ready){this.game.execute(componentCall,{kind:'event',scope:{kind:'object',id},sceneId:this.game.scene.id,target:{type:'object',id},source:{type:'object',id}}).then(()=>this.emit()).catch(e=>this.game.error(e));return;}
+    if(this.game&&!this.game.controlAllowed)return;
+    if(this.game?.state.active&&id&&!componentGate){const pickup=this.game.interact(id),hasRule=this.hasInteraction(id);if(hasRule)this.game.post('interact',{objectId:id});if(pickup||hasRule)return;}
     if(this.game?.state.active&&this.game.controlledId&&point&&['point-click','both'].includes(this.game.config.controller.mode)){this.game.setDestination(point);return;}
     if(this.snapshot.phase==='PLAYING'&&this.game){if(id&&this.game.interact(id))return;if(point&&['point-click','both'].includes(this.game.config.controller.mode))this.game.setDestination(point);return;}
     const context=this.playerContext();if(!context)return;
@@ -787,13 +795,14 @@ export class PreviewRuntime {
       this.playerDestination=null;
       if(this.snapshot.world.playerControl)delete this.snapshot.world.motions?.[this.snapshot.world.playerControl.characterId];
       try {
+        const call=item.interactionCall;if(call){const accepted=await this.game.execute(call,{kind:'event',scope:{kind:'object',id:objectId},sceneId:scene.id,target:{type:'object',id:objectId},source:{type:'object',id:objectId}});if(accepted===false){this.snapshot.ready=true;this.emit();return;}}
         const eventId=b.interactionEvents?.[objectId];
         if(eventId)await this.binding({id:'interact:'+b.id+':'+objectId,eventId,join:'FLOW_END',overrides:{},actionOverrides:{}},token);
         this.assert(token);
       }catch(e){this.handle(e);return;}
       this.snapshot.interacted.push(objectId);
-      this.snapshot.variables[objectId]=true;
-      if ((item.builtin||item.id) === "letter") this.snapshot.variables.letter = true;
+      if(!item.interactionCall)this.snapshot.variables[objectId]=true;
+      if (!item.interactionCall && (item.builtin||item.id) === "letter") this.snapshot.variables.letter = true;
       if(!interactionTargets(b).every(id=>this.snapshot.interacted.includes(id))){this.snapshot.ready=true;this.snapshot.hint=null;this.emit();return;}
       this.snapshot.world.playerControl=null;
     }
@@ -867,7 +876,7 @@ export class PreviewRuntime {
       i.resumeStatus = i.status;
       i.status = "paused";
     } else if (command === "resume") i.status = i.resumeStatus || "running";
-    else {i.status = "stopped";this.closeEventAudio(i);}
+    else {i.status = "stopped";this.game?.cancelNativeComponentTasks(id);this.closeEventAudio(i);}
     for(const m of Object.values(this.snapshot.world.motions||{}))if(m.runId===id){m.paused=command==='pause';if(command==='stop')m.stopped=true;}
     for(const a of this.snapshot.activity||[])if(a.runId===id&&a.status==='running'&&command==='stop')a.status='stopped';
     // A shared music output may already belong to a newer instance.

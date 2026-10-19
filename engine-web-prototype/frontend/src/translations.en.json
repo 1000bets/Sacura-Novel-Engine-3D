@@ -1,4 +1,5 @@
 {
+  "Компонент": "Component",
   "Игра экспортирована в HTML. Откройте скачанный файл в браузере.": "Game exported to HTML. Open the downloaded file in your browser.",
   "Выбрать вручную на сцене": "Pick manually in the scene",
   "Повторять по кругу": "Loop playback",
@@ -3198,5 +3199,21 @@
   "Точка входа не подключена.": "The entry point is not connected.",
   "Не подключено к основному потоку": "Not connected to the main flow",
   "Неиспользуемое вычисление": "Unused calculation",
-  "Скрипты механик": "Mechanic scripts"
+  "Скрипты механик": "Mechanic scripts",
+  "Две двери с общей логикой: ключ, разблокировка из истории и отдельное открытие.": "Two doors share editable logic: a key, a story unlock and a separate open action.",
+  "Что открыть → LockedDoor.canUnlock. Что изменить → count > 0 на count >= 2. Результат → дверь требует два ключа.": "Open LockedDoor.canUnlock. Change count > 0 to count >= 2. The door now requires two keys.",
+  "Склад разблокируется после реплики, открывается следующим взаимодействием или отдельным Open.": "The story unlocks the warehouse after a line. A later interaction or a separate Open method opens it.",
+  "Выберите объект в иерархии → его подключение → «Открыть реализацию». Исходники сохраняются в проекте. «Игровые механики» → «Разбор проекта и упражнения» открывает нужный компонент.": "Select an object in the hierarchy → its component → Open implementation. Sources are saved in the project. Game mechanics → Project walkthrough and exercises opens the relevant component.",
+  "Общий исходник один для всех подключений; параметры и состояние у каждого свои. Для переноса экспортируйте компонент с зависимостями.": "Instances share one implementation, with their own settings and state. Export a component with its dependencies to reuse it.",
+  "Открываемые Health, Weapon, награда, задание и дерево поведения противников.": "Editable Health, Weapon, rewards, objectives and enemy behavior trees.",
+  "Что открыть → Weapon.shoot. Что изменить → damage * 1 на damage * 2 или cost = 1 на cost = 2. Результат → другой урон или расход патронов.": "Open Weapon.shoot. Change damage * 1 to damage * 2, or cost = 1 to cost = 2. Damage or ammunition consumption changes.",
+  "EnemyBehavior вызывает EnemyAgent. Измените chase: направление со знаком минус заставит врагов отступать. Бой явно запускает история.": "EnemyBehavior calls EnemyAgent. Negate the chase direction to make enemies retreat. The story explicitly starts combat.",
+  "Награда за ответ, постоянная привязка отношения и разовый снимок. Без боевых систем.": "Dialogue rewards, a live relationship binding and a one-time snapshot. No combat systems.",
+  "Что открыть → Reward.award. Что изменить → формулу награды. Результат → поддержка иначе меняет отношение и доступные ответы.": "Open Reward.award and change the reward formula. Support changes the relationship and available replies differently.",
+  "Counter «Отношение» читает переменную постоянно; второй Counter запоминает значение разовым аргументом.": "The relationship Counter reads its story variable continuously; a second Counter captures a one-time argument.",
+  "Общие Counter и Reward, улучшение и принадлежащий компоненту таймер.": "Shared Counter and Reward, upgrades and a component-owned timer.",
+  "Что открыть → Reward.award. Что изменить → прибавить 5 к формуле. Результат → кнопка и таймер дают больше монет.": "Open Reward.award and add 5 to its formula. The button and timer award more coins.",
+  "Добавьте метод bonus и выберите его у кнопки. PeriodicReward.stop останавливает собственный таймер.": "Add a bonus method and select it for the button. PeriodicReward.stop stops only its own timer.",
+  "История, музыка и открываемые компоненты доверия, осмотра предметов и двери.": "A story with music and editable components for trust, objects and doors.",
+  "Что открыть → «Алиса» → Reward, «Письмо» → StoryFlag. Что изменить → формулу награды или действие осмотра. Результат → меняются доверие и доступность ответа.": "Open Alice → Reward or Letter → StoryFlag. Change the reward formula or inspection action to change trust and available replies."
 }

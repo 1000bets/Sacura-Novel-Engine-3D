@@ -1,3 +1,5 @@
+import {actionSummary} from './authoringPresentation.js';
+import {isComponentCall} from './componentCatalog.js';
 import {t as tr, useLocale} from './i18n.jsx';
 import React from 'react';
 import ActionFields from './ActionFields.jsx';
@@ -16,7 +18,7 @@ export default function EventInspector({event,project,sceneId,binding,onEdit,onA
  {event.groups.map((g,index)=><section key={g.id} className="inline-event-group">
  <label>{tr("Группа ")}{index+1}<input value={g.name} onChange={e=>onEdit(ev=>ev.groups.find(x=>x.id===g.id).name=e.target.value)}/></label>
  <div><Button icon="ArrowUp" title={tr("Переместить группу выше")} disabled={!index} onClick={()=>onEdit(e=>{[e.groups[index-1],e.groups[index]]=[e.groups[index],e.groups[index-1]];})}/><Button icon="ArrowDown" title={tr("Переместить группу ниже")} disabled={index===event.groups.length-1} onClick={()=>onEdit(e=>{[e.groups[index+1],e.groups[index]]=[e.groups[index],e.groups[index+1]];})}/><Button icon="Trash2" title={tr("Удалить группу")} onClick={()=>onEdit(e=>e.groups=e.groups.filter(x=>x.id!==g.id))}/></div>
- {g.actions.map(source=>{const a={...source,...(source.id===event.groups[0]?.actions[0]?.id?binding?.overrides:{}),...binding?.actionOverrides?.[source.id]};return <details key={a.id} open className="inline-event-action"><summary>{tr(TYPES[a.type]?.label)}</summary>
+ {g.actions.map(source=>{const a={...source,...(source.id===event.groups[0]?.actions[0]?.id?binding?.overrides:{}),...binding?.actionOverrides?.[source.id]};return <details key={a.id} open className="inline-event-action"><summary>{isComponentCall(a.command)?actionSummary(a,project):tr(TYPES[a.type]?.label)}</summary>
  <label>{tr("Тип действия")}<select value={a.type} onChange={e=>onAction(a.id,{...makeAction(e.target.value),id:a.id})}>{Object.entries(TYPES).map(([id,t])=><option key={id} value={id}>{tr(t.label)}</option>)}</select></label>
  <ActionFields action={a} project={project} sceneId={sceneId} onChange={v=>onAction(a.id,v)} onPickPosition={onPickPosition}/>
  <details><summary>{tr("Дополнительные параметры действия")}</summary>
@@ -27,6 +29,7 @@ export default function EventInspector({event,project,sceneId,binding,onEdit,onA
  {['onFailure','finalState','fallback'].map((key,i)=><label key={key}>{tr(['При ошибке','Итоговое состояние','Резервное состояние'][i])}<input value={a[key]||''} onChange={e=>onAction(a.id,{[key]:e.target.value})}/></label>)}
  </details>
  <Button icon="Trash2" onClick={()=>onEdit(e=>e.groups.find(x=>x.id===g.id).actions=e.groups.find(x=>x.id===g.id).actions.filter(x=>x.id!==a.id))}>{tr("Удалить действие")}</Button></details>;})}
+ <Button icon="Puzzle" onClick={()=>onEdit(e=>e.groups.find(x=>x.id===g.id).actions.push({...makeAction('gameplay'),command:'sacura.component.call',operationVersion:1,value:{}}))}>Добавить вызов метода</Button>
  <Button icon="Plus" onClick={()=>onEdit(e=>e.groups.find(x=>x.id===g.id).actions.push(makeAction('wait')))}>{tr("Добавить действие")}</Button>
  </section>)}
  <Button icon="Plus" onClick={()=>onEdit(e=>e.groups.push({id:uid('group'),name:'Следующий шаг',actions:[makeAction('wait')]}))}>{tr("Добавить группу")}</Button>

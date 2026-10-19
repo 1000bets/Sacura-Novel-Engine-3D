@@ -1,3 +1,5 @@
+import ComponentCallFields from './ComponentCallFields.jsx';
+import {isComponentCall} from './componentCatalog.js';
 import SchemaFields,{useOperationLibrary} from './SchemaFields.jsx';
 import {operationDefinition,validateOperationCall} from './operationRegistry.js';
 import {schemaDefaults} from './valueSchemas.js';
@@ -18,7 +20,7 @@ export default function GameplayCommandFields({project,command='runEvent',value=
  useLocale();const operations=useOperationLibrary().filter(d=>d.contexts.includes(kind)),definition=operationDefinition(command,operationVersion);const v=value&&typeof value==='object'?value:{},patch=x=>onChange({command,value:{...v,...x}}),ids=(array)=>[['','Выберите…'],...array.map(x=>[x.id,x.name])];
  return <><GameSelect label="Команда" value={command} options={[...Object.entries(GAME_COMMANDS),...new Map(operations.map(d=>[d.id,[d.id,d.editor.label]])).values(),...(command.includes('.')&&!definition?[[command,'Недоступная операция']]:[])]} onChange={command=>{const d=operations.find(d=>d.id===command);onChange(d?{command,operationVersion:d.version,value:schemaDefaults(d.parameters)}:{command,value:command==='startTimer'?{seconds:2,timerId:'timer'}:command==='impulse'?{velocity:[0,5,0]}:{}});}}/>
  {operations.filter(d=>d.id===command).length>1&&<GameSelect label="Версия операции" value={operationVersion} options={operations.filter(d=>d.id===command).map(d=>[d.version,String(d.version)])} onChange={version=>onChange({command,operationVersion:Number(version),value:v})}/>}
- {definition&&<SchemaFields project={project} schema={definition.parameters} value={v} issues={validateOperationCall({id:command,version:operationVersion,parameters:v},{project,kind,allowDeferred:true,allowExpressions:true})} expressionOptions={expressionOptions} onChange={value=>onChange({command,operationVersion,value})}/>}
+ {definition&&(isComponentCall(command)?<ComponentCallFields project={project} call={{id:command,version:operationVersion,parameters:v}} onChange={call=>onChange({command:call.id,operationVersion:call.version,value:call.parameters})} expressionOptions={expressionOptions}/>:<SchemaFields project={project} schema={definition.parameters} value={v} issues={validateOperationCall({id:command,version:operationVersion,parameters:v},{project,kind,allowDeferred:true,allowExpressions:true})} expressionOptions={expressionOptions} onChange={value=>onChange({command,operationVersion,value})}/>)}
  {command.includes('.')&&!definition&&<p role="alert">Операция или версия недоступна. Настройки сохранены.</p>}
  {['damage','heal','impulse'].includes(command)&&<GameSelect label="Объект" value={v.target||''} options={[["","Управляемый объект"],...project.objects.map(o=>[o.id,o.name])]} onChange={target=>patch({target})}/>}
  {['damage','heal'].includes(command)&&<GameNumber label="Количество" value={v.amount??25} onChange={amount=>patch({amount})}/>}

@@ -12,4 +12,7 @@ import './capabilities/resources.js';
 import './capabilities/legacyViews.js';
 
 import './capabilities/turns.js';
+import './capabilities/components.js';
 import './extensions/reward.js';
+
+import './capabilities/spatial.js';

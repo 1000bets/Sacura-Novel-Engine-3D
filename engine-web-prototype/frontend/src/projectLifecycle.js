@@ -1,3 +1,4 @@
+import {installStandardProjectComponents} from './standardProjectComponents.js';
 import {parseAuthoringProjectFile} from './authoringTemplates.js';
 import {makeAction} from './model.js';
 import {upgradeProject, uid} from './studioModel.js';
@@ -73,6 +74,11 @@ export async function writeProjectFile(value,{handle=null,chooseFile,download,fi
 // Keep the teaching/demo fixture unchanged; the standard starter is ready to play.
 export function createStandardProject(name='Письма после дождя') {
   const project=copyProjectAs(upgradeProject(),name);
+  // Explicit choice destinations bypass the fixture's fallback merges. Keep
+  // those connecting scenes on an actual playable route in the new starter.
+  const beats=project.chapters.flatMap(c=>c.beats);
+  beats.find(b=>b.id==='lh3').next='merge1';
+  beats.find(b=>b.id==='ch2').next='merge4';
   const letter=project.chapters.flatMap(c=>c.beats).find(b=>b.id==='l3');
   letter.mode='SEQUENTIAL';
   for(const batches of Object.values(letter.batches))for(const batch of batches)batch.mode='SEQUENTIAL';
@@ -93,7 +99,7 @@ export function createStandardProject(name='Письма после дождя')
   project.variables.keepsakeFound=false;project.events.push(event,examined);
   chapter.beats.splice(chapter.beats.indexOf(before)+1,0,{id:'rain-explore',kind:'gate',speaker:'Рассказчик',text:'Осмотрите письмо и шкатулку в любом порядке. Алиса может ходить по гостиной.',signal:'letter',signals:['letter',clue.id],controls:{characterId:'alice',mode:'both',speed:2.4,radius:1.5},interactionEvents:{[clue.id]:examined.id},timeout:30,next:before.next,mode:'SEQUENTIAL',bindings:[{id:'rain-explore-view-binding',eventId:event.id,hook:'ON_START',join:'EVENT_END',overrides:{}}]});
   before.next='rain-explore';
-  return upgradeProject(project);
+  return upgradeProject(installStandardProjectComponents(project));
 }
 
 export const LOCAL_PROJECTS_KEY='sacura-recent-projects-v1';

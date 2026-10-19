@@ -1,6 +1,6 @@
 // Serializable schemas and native project references. No editor or executor dependencies.
 const unsafe=new Set(['__proto__','prototype','constructor']);
-const kinds=new Set(['number','integer','boolean','string','vector','collection','object','union','reference','void','variableValue','signalPayload']);
+const kinds=new Set(['number','integer','boolean','string','vector','collection','object','union','reference','void','variableValue','signalPayload','componentArguments','componentResult']);
 export const referenceTypes=['object','scene','project','variable','event','function','widget','inputAction','signal','beat','item','weapon','recipe','resource','mechanic'];
 export const reference=(type,id,mode='direct')=>({kind:'reference',type,mode,id});
 export function assertSerializable(value,depth=0){
@@ -15,7 +15,8 @@ export function assertSchema(schema,depth=0){
  if(schema.type==='vector'&&![2,3,4].includes(schema.size??3))throw Error('Вектор должен иметь 2, 3 или 4 компонента.');
  if(schema.type==='object'){if(!schema.properties||Array.isArray(schema.properties)||typeof schema.properties!=='object')throw Error('Опишите поля структуры.');Object.values(schema.properties).forEach(s=>assertSchema(s,depth+1));}
  if(schema.type==='union'){if(!Array.isArray(schema.variants)||!schema.variants.length)throw Error('Опишите варианты значения.');schema.variants.forEach(s=>assertSchema(s,depth+1));}
- if(['variableValue','signalPayload'].includes(schema.type)&&typeof schema.parameter!=='string')throw Error('Выберите параметр зависимого значения.');
+ if(['variableValue','signalPayload','componentArguments','componentResult'].includes(schema.type)&&typeof schema.parameter!=='string')throw Error('Выберите параметр зависимого значения.');
+ if(['componentArguments','componentResult'].includes(schema.type)&&typeof schema.methodParameter!=='string')throw Error('Выберите параметр метода компонента.');
  if(schema.enum&&(!Array.isArray(schema.enum)||!schema.enum.length))throw Error('Пустой список значений.');
  if(schema.min!==undefined&&!Number.isFinite(schema.min)||schema.max!==undefined&&!Number.isFinite(schema.max)||schema.min>schema.max)throw Error('Некорректные границы значения.');
 }
@@ -50,6 +51,13 @@ export function dependentSchema(schema,context){
  // Parameter expressions are resolved by the existing evaluator at execution.
  // Import/project validation must not treat an expression object as a native ID.
  if(context.allowExpressions&&context.parameters?.[schema.parameter]?.op)return null;
+ if(['componentArguments','componentResult'].includes(schema.type)){
+  const raw=context.parameters?.[schema.parameter],id=raw?.kind==='reference'?resolveReference(raw,'mechanic',context):raw,methodId=context.parameters?.[schema.methodParameter];
+  if(!id||!methodId)return null;
+  const m=context.project?.gameplay?.mechanics?.find(m=>m.id===id),d=context.project?.gameplay?.mechanicDefinitions?.find(d=>d.id===m?.definitionId&&d.version===m?.definitionVersion);
+  if(!d?.componentVersion||!Object.hasOwn(d.methods||{},methodId)){if(context.checkReferences===false||context.allowDeferred)return null;throw Error('Выберите существующий экземпляр и метод компонента.');}
+  return d.methods[methodId][schema.type==='componentArguments'?'parameters':'result'];
+ }
  if(schema.type==='variableValue'){const raw=context.parameters?.[schema.parameter];let id;if(raw?.kind==='reference')id=resolveReference(raw,'variable',context);else id=raw;if(!id)return null;if(context.checkReferences===false&&!context.project?.gameplay?.variableBindings?.some(x=>x.id===id))return null;const key=variableKey(context.project,id);return schemaFromValue(context.project.variables[key],context.project.variableTypes?.[key]);}
  if(schema.type==='signalPayload'){const raw=context.parameters?.[schema.parameter],id=raw?.kind==='reference'?resolveReference(raw,'signal',context):raw;if(!id)return null;return context.project.gameplay?.signals?.find(x=>x.id===id)?.payloadSchema||null;}
  return schema;
@@ -61,6 +69,7 @@ export function schemaDefaults(schema){
 }
 export function validateValue(schema,value,context={},path=''){
  const errors=[],bad=message=>errors.push({path,message}),label=schema.label||path||'Значение';
+ if(['componentArguments','componentResult'].includes(schema.type)){try{const s=dependentSchema(schema,context);if(!s){if(!context.allowDeferred)bad(label+': сначала выберите компонент и метод.');return errors;}return validateValue(s,value,context,path);}catch(e){bad(e.message);return errors;}}
  if(value===undefined){if(!schema.optional&&!Object.hasOwn(schema,'default')&&schema.type!=='void')bad(label+': значение обязательно.');return errors;}
  if(context.allowExpressions&&value?.op){try{context.validateExpression?.(value);}catch(e){bad(e.message);}return errors;}
  try{
@@ -80,7 +89,7 @@ export function validateValue(schema,value,context={},path=''){
 export function materializeValue(schema,value,context){
  if(value===undefined)value=schemaDefaults(schema);
  if(value?.op){value=context.evaluate(value);}
- if(['variableValue','signalPayload'].includes(schema.type)){const s=dependentSchema(schema,context);if(!s)throw Error('Не назначена связь значения.');return materializeValue(s,value,context);}
+ if(['variableValue','signalPayload','componentArguments','componentResult'].includes(schema.type)){const s=dependentSchema(schema,context);if(!s)throw Error('Не назначена связь значения.');return materializeValue(s,value,context);}
  if(schema.type==='union'){const variant=schema.variants.find(s=>!validateValue(s,value,context).length);if(!variant)throw Error('Неверный тип значения.');return materializeValue(variant,value,context);}
  if(schema.type==='reference')return resolveReference(value,schema.referenceType,context);
  if(schema.type==='collection'&&value?.mode==='tag')return resolveReference(value,'object',context);
