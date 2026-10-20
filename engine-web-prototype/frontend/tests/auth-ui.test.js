@@ -67,7 +67,7 @@ test('main menu creates invite, copies URL, traps focus and restores trigger on 
  const field=await screen.findByLabelText('Ссылка приглашения');assert.equal(field.value,url);assert.equal(field.readOnly,true);assert.ok(screen.getByText(/Действует до/));
  assert.equal(calls.filter(c=>c.path==='/api/invites'&&c.options.method==='POST').length,1);
  fireEvent.click(screen.getByRole('button',{name:'Копировать ссылку'}));await screen.findByRole('status');assert.deepEqual(copied,[url]);
- 
+
  const last=screen.getByRole('button',{name:'Копировать ссылку'});last.focus();fireEvent.keyDown(last,{key:'Tab'});assert.ok(document.activeElement===screen.getAllByRole('button',{name:'Закрыть',exact:true})[0],document.activeElement.outerHTML);
  fireEvent.keyDown(screen.getByRole('dialog'),{key:'Escape'});await waitFor(()=>assert.equal(screen.queryByRole('dialog'),null));assert.ok(document.activeElement===trigger,document.activeElement.outerHTML);
 });

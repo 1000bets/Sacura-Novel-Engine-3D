@@ -1,0 +1,136 @@
+/* Component authoring: one file bar, an uninterrupted editor, optional settings. */
+.component-workspace{--component-surface:var(--bg-panel,var(--panel));--component-line:var(--border-subtle,var(--border));--component-muted:var(--text-secondary,var(--text-muted));display:flex;flex:1;min-width:0;min-height:0;height:100%;color:var(--text-primary,var(--text));background:var(--component-surface);container:components / inline-size}
+.component-workspace-body{display:flex;flex:1;min-width:0;min-height:0;overflow:hidden}
+.component-workspace *{box-sizing:border-box}
+.mechanics-workbench .mechanics-component-mode .mechanics-catalog{display:none}
+.mechanics-workbench .mechanics-component-mode .mechanics-layout{display:flex;height:100%;min-height:0;overflow:hidden}
+.mechanics-workbench .mechanics-component-mode .mechanics-inspector{display:flex;flex:1;flex-direction:column;min-width:0;min-height:0;padding:0;overflow:hidden}
+.mechanics-workbench .mechanics-component-mode .mechanics-inspector>h2{display:none}
+.component-workspace .component-resource-list{flex:0 0 190px;display:flex;flex-direction:column;flex-wrap:nowrap;gap:0;margin:0;min-width:0;min-height:0;border-right:1px solid var(--component-line);background:color-mix(in srgb,var(--bg-app,var(--component-surface)) 35%,var(--component-surface))}
+.component-list-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:36px;padding:4px 8px 4px 12px}
+.component-list-heading>span{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;color:var(--component-muted)}
+.component-list-heading small{display:inline;font-size:10px;font-variant-numeric:tabular-nums;opacity:.7}
+.component-resource-items{display:flex;flex-direction:column;gap:3px;min-height:0;padding:0 8px 12px;overflow:auto}
+.component-workspace button.component-resource-item{display:flex;align-items:center;justify-content:flex-start;gap:9px;width:100%;padding:9px 10px;min-height:37px;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--component-muted);text-align:left}
+.component-resource-item>svg{flex-shrink:0;opacity:.75}
+.component-resource-item>span{flex:1;min-width:0;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.component-resource-item>small{font-family:monospace;font-size:9px;font-weight:500;opacity:.7;flex-shrink:0}
+.component-workspace button.component-resource-item:hover{background:var(--bg-hover,var(--panel-hover))}
+.component-workspace button.component-resource-item[aria-pressed=true]{background:var(--accent-muted,var(--panel-hover));border-color:color-mix(in srgb,var(--accent) 20%,transparent);color:var(--text-primary,var(--text));box-shadow:none}
+.component-resource-item[aria-pressed=true]>svg{color:var(--accent);opacity:1}
+.component-resource-content{display:flex;flex:1;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
+.component-editor-layout{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);flex:1;min-width:0;min-height:0;overflow:hidden}
+.component-editor-layout.has-properties{grid-template-columns:minmax(0,1fr) 280px}
+.component-code-editor{display:flex;flex:1;flex-direction:column;min-width:0;min-height:240px;height:100%;overflow:auto;color:var(--text-primary,var(--text));background:var(--bg-panel,var(--panel))}
+.component-editor-layout>.component-code-editor{min-height:0;height:auto}
+.component-code-editor[hidden]{display:none}
+.component-code-toolbar{display:flex;align-items:center;gap:4px 6px;flex-wrap:wrap;flex-shrink:0;min-height:36px;padding:4px 8px;border-bottom:1px solid var(--border-subtle,var(--border));background:var(--bg-panel,var(--panel))}
+.component-code-heading{display:flex;align-items:center;gap:6px;flex:1 1 max-content;min-width:min(100%,180px)}
+.component-file-title{display:flex;align-items:center;gap:6px;flex:1;min-width:0}
+.component-file-title>svg{color:var(--accent);flex-shrink:0}
+.component-file-title strong{font-size:12px;font-weight:600;line-height:1.5;overflow-wrap:anywhere;min-width:0}
+.component-method-title{font-weight:400;color:var(--text-secondary,var(--text-muted))}
+.component-language{font-family:"SFMono-Regular",Consolas,monospace;font-size:10px;font-weight:400;color:var(--text-muted);flex-shrink:0}
+.component-code-actions{display:flex;align-items:center;gap:4px;flex-wrap:wrap;max-width:100%;margin-left:auto}
+.component-code-actions>button{flex-shrink:0;white-space:nowrap}
+.component-code-actions svg{flex-shrink:0}
+.component-workspace button,.component-code-editor button{font:inherit;font-size:12px;cursor:pointer;transition:background-color 140ms,border-color 140ms,color 140ms}
+.component-workspace button.component-icon-button,.component-code-editor button.component-icon-button{display:inline-flex;align-items:center;justify-content:center;flex:0 0 26px;width:26px;height:26px;min-height:26px;padding:0;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--text-secondary,var(--text-muted))}
+.component-workspace button.component-quiet,.component-code-editor button.component-quiet{background:transparent;border-color:transparent}
+.component-workspace button.component-icon-button:hover:not(:disabled),.component-code-editor button.component-icon-button:hover:not(:disabled),.component-workspace button.component-quiet:hover:not(:disabled){background:var(--bg-hover,var(--panel-hover));color:var(--text-primary,var(--text));border-color:var(--border-subtle,var(--border))}
+.component-workspace button.component-connections-toggle{display:inline-flex;align-items:center;gap:5px;padding:3px 6px;min-height:26px;border-radius:5px;font-size:11px;color:var(--component-muted)}
+.component-workspace button.component-connections-toggle[aria-expanded=true]{background:var(--accent-muted,var(--panel-hover));color:var(--accent)}
+.component-count{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 4px;border-radius:4px;background:var(--bg-panel-elevated,var(--panel-hover));font-size:10px;line-height:1;font-weight:500;color:var(--text-secondary,var(--text-muted));font-variant-numeric:tabular-nums}
+.component-workspace button.component-primary,.component-code-editor button.component-primary{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:30px;padding:6px 11px;border:1px solid var(--accent);border-radius:5px;background:var(--accent);color:var(--bg-app,#202126);font-size:11px;font-weight:600}
+.component-workspace button.component-primary:hover:not(:disabled),.component-code-editor button.component-primary:hover:not(:disabled){background:var(--accent-hover,var(--accent));border-color:var(--accent-hover,var(--accent));color:var(--bg-app,#202126)}
+.component-code-editor .component-code-actions>button.component-primary{min-height:26px;padding:4px 8px;gap:5px;line-height:1.2}
+.component-workspace button:disabled,.component-code-editor button:disabled{opacity:.45;cursor:default}
+.component-workspace :is(button,input,select,summary):focus-visible,.component-code-editor :is(button,summary):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.component-code-editor .mechanic-script-codemirror{display:flex;flex:1;min-width:0;min-height:120px;height:auto;overflow:hidden}
+.component-code-editor .mechanic-script-codemirror>.cm-editor{flex:1;min-width:0;min-height:0;height:100%;max-height:100%}
+.component-code-editor .cm-scroller{overscroll-behavior:contain}
+.component-code-status{display:flex;align-items:center;flex-wrap:wrap;gap:4px 12px;flex-shrink:0;min-height:24px;padding:3px 8px;border-top:1px solid var(--border-subtle,var(--border));font-size:10px;line-height:1.5;color:var(--text-secondary,var(--text-muted));background:var(--bg-panel,var(--panel))}
+.component-save-status,.component-code-scope{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.component-save-status{overflow-wrap:anywhere}
+.component-save-status>svg,.component-code-scope>svg{flex-shrink:0;opacity:.75}
+.component-code-status [role=alert]{color:var(--error,#efa6b4);flex-basis:100%}
+.component-source-path{margin-left:auto;min-width:0;overflow-wrap:anywhere;color:var(--text-muted)}
+.component-code-scope{white-space:nowrap}
+.component-sdk-help{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:12px 24px;flex-shrink:0;max-height:40%;overflow:auto;padding:16px 20px;border-bottom:1px solid var(--border-subtle,var(--border));background:var(--bg-panel-elevated,var(--panel-hover));font-size:11px;line-height:1.65}
+.component-sdk-help strong{font-size:11px;font-weight:600}
+.component-sdk-help p{margin:5px 0 0;font-size:11px;line-height:1.65}
+.component-sdk-help code{font-size:11px;overflow-wrap:anywhere}
+.component-sdk-help .component-sdk-note{grid-column:1/-1;margin:0}
+.component-code-editor details.component-code-calls{flex-shrink:0;max-height:35%;overflow:auto;margin:0;padding:1px 8px;border:0;border-bottom:1px solid var(--border-subtle,var(--border));border-radius:0}
+.component-code-editor .component-code-calls>summary{display:flex;align-items:center;gap:6px;cursor:pointer;min-height:24px;margin:0;font-size:11px}
+.component-code-calls button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;margin:4px 0;text-align:left}
+.component-code-calls button{flex-wrap:wrap;overflow-wrap:anywhere}
+.component-code-calls small{font-size:10px;white-space:nowrap}
+.component-properties{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;border-left:1px solid var(--component-line);background:var(--component-surface)}
+.component-properties>header{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:36px;padding:4px 10px;border-bottom:1px solid var(--component-line)}
+.component-properties>header h3{display:flex;align-items:center;gap:8px;margin:0;font-size:12px;font-weight:600}
+.component-properties:focus{outline:none}
+.component-properties-body{flex:1;min-height:0;overflow:auto;padding:16px}
+.component-properties label{display:flex;flex-direction:column;gap:7px;min-width:0;margin:0;font-size:11px;color:var(--component-muted)}
+.component-properties input,.component-properties select,.component-create input{box-sizing:border-box;width:100%;min-height:34px;min-width:0;max-width:100%;padding:7px 9px;border:1px solid var(--component-line);border-radius:5px;background:var(--bg-input,var(--input-bg));color:var(--text-primary,var(--text));font:inherit;font-size:12px}
+.component-properties fieldset{border:0;padding:0;margin:0;min-width:0}
+.component-properties .component-attach{display:grid;gap:10px;padding-bottom:18px}
+.component-attach>button{justify-self:start;display:inline-flex;align-items:center;gap:7px}
+.component-instance-settings{padding:18px 0;border-top:1px solid var(--component-line)}
+.component-properties .component-instance-fields{display:grid;gap:12px;margin-top:18px}
+.component-instance-fields .game-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+.component-instance-fields .game-field{margin:0}
+.component-properties p.component-empty-parameters{margin:0;font-size:11px}
+.component-properties details.component-resource-settings{margin:0;padding:14px 0 0;border:0;border-top:1px solid var(--component-line)}
+.component-properties details.component-resource-settings summary{display:flex;align-items:center;gap:6px;min-height:26px;margin:0;font-size:11px;cursor:pointer}
+.component-properties details.component-resource-settings summary::before{content:none}
+.component-resource-settings summary>svg{transition:transform 140ms}
+.component-resource-settings[open] summary>svg{transform:rotate(90deg)}
+.component-resource-settings>label{margin-top:12px}
+.component-resource-settings>p{margin:12px 0 0;font-size:11px;line-height:1.5}
+.component-start{display:flex;flex:1;min-height:0;padding:32px 24px;overflow:auto}
+.component-create{display:flex;flex-direction:column;align-items:flex-start;gap:16px;width:100%;max-width:320px;margin:auto;padding:20px 0 32px}
+.component-create .component-start-icon{box-sizing:content-box;padding:12px;border:1px solid var(--component-line);border-radius:10px;color:var(--accent);margin-bottom:4px}
+.component-workspace .component-create h2{margin:0;font-size:20px;line-height:1.3;letter-spacing:-.35px;font-weight:600}
+.component-workspace .component-create p{margin:0;line-height:1.6;font-size:12px;max-width:40ch}
+.component-create>.component-language{margin-top:-10px}
+.component-create label{display:flex;flex-direction:column;gap:8px;width:100%;margin-top:8px;font-size:11px;color:var(--component-muted)}
+.component-create input{min-height:38px}
+.component-form-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:4px}
+.component-workspace .component-form-actions button{min-height:34px;padding:7px 14px}
+.component-workspace-error{flex-shrink:0;padding:10px 14px;margin:0;border-top:1px solid var(--error);font-size:12px;color:var(--error);overflow-wrap:anywhere}
+@container components (max-width:900px){
+ .component-editor-layout.has-properties{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(280px,1fr) minmax(180px,45%);overflow:auto}
+ .component-editor-layout.has-properties>.component-properties{grid-row:2;border-left:0;border-top:1px solid var(--component-line)}
+ .component-editor-layout.has-properties>.component-code-editor{grid-row:1}
+ .component-properties-body{padding:12px 16px;display:flex;flex-wrap:wrap;align-content:start;gap:16px}
+ .component-properties .component-attach{flex:1 1 200px;padding:0}
+ .component-instance-settings{flex:1 1 200px;padding:0;border:0}
+ .component-properties details.component-resource-settings{flex:1 1 200px;padding:0;border:0}
+ .component-source-path{display:none}
+}
+@container components (max-width:620px){
+ .component-workspace .component-resource-list{flex-basis:150px}
+ .component-list-heading{padding-left:10px}
+ .component-workspace .component-resource-item>small{display:none}
+ .component-workspace button.component-connections-toggle>span:not(.component-count){display:none}
+ .component-code-status{font-size:10px;gap:4px 6px}
+ .component-code-scope{margin-left:auto}
+ .component-sdk-help{grid-template-columns:minmax(0,1fr);padding:12px}
+}
+@container components (max-width:480px){
+ .component-workspace-body{flex-direction:column}
+ .component-workspace .component-resource-list{flex:0 0 auto;max-height:116px;border-right:0;border-bottom:1px solid var(--component-line)}
+ .component-list-heading{min-height:34px;padding:3px 8px}
+ .component-resource-items{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(145px,100%),1fr));gap:4px;padding:0 8px 8px}
+ .component-resource-content{flex:1}
+ .component-workspace button.component-connections-toggle>span:not(.component-count){display:inline}
+ .component-code-status{align-items:flex-start}
+ .component-code-scope{white-space:normal}
+ .component-start{padding:16px}
+}
+@media(prefers-reduced-motion:reduce){.component-workspace button,.component-code-editor button,.component-resource-settings summary>svg{transition:none}}
+
+.component-instances{border-block:1px solid var(--border);padding:12px 0;margin:12px 0}.component-instances h3{font-size:14px}.component-instance-list{display:flex;flex-direction:column;gap:6px;margin:8px 0}.component-instance-list>button{display:flex;flex-direction:column;align-items:flex-start;min-height:40px}.component-instance-list>button[aria-pressed=true]{border-color:var(--accent)}.component-instances label,.component-call-fields label{display:flex;flex-direction:column;gap:5px;margin-block:8px;font-size:12px}.component-instances label:has(input[type=checkbox]){flex-direction:row}.component-instances input,.component-instances select,.component-call-fields input,.component-call-fields select{max-width:100%;min-height:30px}.component-instances small,.component-call-fields small{display:block;line-height:1.5;color:var(--text-muted,#aaa4b5)}.component-instances button{margin:4px 4px 4px 0}.component-instance-properties{border-top:1px solid var(--border);margin-top:12px;padding-top:10px}.component-instance-properties output{font-weight:600}.component-call-fields{min-width:0}.component-argument{margin-block:8px;border:1px solid var(--border);padding:8px}.component-call-fields strong{display:block;overflow-wrap:anywhere}
+
+.component-runtime-issue{padding:12px;border-block:1px solid var(--border);color:var(--text);font-size:13px;line-height:1.5}.component-runtime-issue p{margin:6px 0;max-height:8em;overflow:auto;overflow-wrap:anywhere}.component-runtime-issue button{min-height:36px}

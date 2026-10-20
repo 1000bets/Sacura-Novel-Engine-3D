@@ -1,0 +1,3858 @@
+{
+  "format": "sacura-authoring-package",
+  "formatVersion": 3,
+  "sourceContract": {
+    "version": 1,
+    "language": "javascript",
+    "runtime": "sacura-sdk",
+    "execution": "gameplay-only"
+  },
+  "metadata": {
+    "id": "sacura.template.horror",
+    "version": "3.0.0",
+    "name": "Последний обход · Point & click хоррор",
+    "description": "Что открыть → «Корпус № 6» → HauntedRoom, любой предмет → HauntedProp, выход → LockedDoor. Что изменить → условие выхода в escape, реакцию mirror или правило interact. Результат → загадка и события действительно меняются.\nМаршрут: журнал и предохранитель на столе → красный щит → магнитофон → зелёная дверь. Зеркало, шкаф и звонок содержат необязательные страхи. WASD, щелчок рядом с предметом, ПКМ + мышь для осмотра. Сохранение хранит прогресс обхода и положение героя; стартовая подготовка при загрузке не повторяется. Все ссылки выбираются в инспекторе, исходники не содержат ID сцены или предметов.",
+    "author": "Sacura contributors",
+    "license": "MIT",
+    "sources": []
+  },
+  "compatibility": {
+    "projectSchemaVersion": 2,
+    "requiredCapabilities": [
+      {
+        "id": "component.resources",
+        "version": 1
+      },
+      {
+        "id": "mechanic.javascript",
+        "version": 1
+      },
+      {
+        "id": "operation.sacura.object.visible",
+        "version": 1
+      },
+      {
+        "id": "operation.sacura.camera.look",
+        "version": 1
+      },
+      {
+        "id": "operation.sacura.game.message",
+        "version": 1
+      },
+      {
+        "id": "operation.sacura.story.enter",
+        "version": 1
+      },
+      {
+        "id": "operation.sacura.spatial.observe",
+        "version": 1
+      },
+      {
+        "id": "operation.sacura.inventory.count",
+        "version": 1
+      },
+      {
+        "id": "operation.sacura.inventory.remove",
+        "version": 1
+      },
+      {
+        "id": "operation.sacura.door.animate",
+        "version": 1
+      },
+      {
+        "id": "mechanic.components",
+        "version": 1
+      },
+      {
+        "id": "function.graph",
+        "version": 1
+      },
+      {
+        "id": "function.typed-graph",
+        "version": 1
+      }
+    ],
+    "requiredEngineModules": []
+  },
+  "roots": {
+    "kind": "template",
+    "entries": [
+      "/content/chapters/0"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  "inputs": [],
+  "content": {
+    "gameplay": {
+      "version": 2,
+      "behaviorSchemaVersion": 1,
+      "capabilitySchemaVersion": 1,
+      "resources": [],
+      "inventories": [],
+      "movements": [],
+      "stateBindings": [],
+      "mechanicSchemaVersion": 1,
+      "mechanicDefinitions": [
+        {
+          "id": "sample.component.hauntedroom",
+          "version": 1,
+          "scopes": [
+            "object",
+            "scene",
+            "project"
+          ],
+          "when": "start",
+          "stateSchema": {
+            "type": "object",
+            "properties": {
+              "fuse": {
+                "type": "boolean",
+                "default": false,
+                "label": "Предохранитель найден"
+              },
+              "power": {
+                "type": "boolean",
+                "default": false,
+                "label": "Питание включено"
+              },
+              "record": {
+                "type": "boolean",
+                "default": false,
+                "label": "Запись прослушана"
+              },
+              "mirrorSeen": {
+                "type": "boolean",
+                "default": false,
+                "label": "Отражение замечено"
+              },
+              "escaped": {
+                "type": "boolean",
+                "default": false,
+                "label": "Обход завершён"
+              },
+              "objective": {
+                "type": "string",
+                "default": "Найдите предохранитель на столе у входа.",
+                "label": "Текущая задача"
+              }
+            }
+          },
+          "initialState": {},
+          "requirements": [],
+          "name": "HauntedRoom",
+          "componentVersion": 1,
+          "stateVersion": 1,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "requireRecord": {
+                "type": "boolean",
+                "default": true,
+                "label": "Для выхода нужна запись смены"
+              }
+            }
+          },
+          "references": {
+            "type": "object",
+            "properties": {
+              "shadow": {
+                "type": "reference",
+                "referenceType": "object",
+                "label": "Чужой силуэт"
+              },
+              "lamp": {
+                "type": "reference",
+                "referenceType": "object",
+                "label": "Аварийный свет"
+              },
+              "exit": {
+                "type": "reference",
+                "referenceType": "mechanic",
+                "label": "Замок выхода · LockedDoor"
+              },
+              "ending": {
+                "type": "reference",
+                "referenceType": "beat",
+                "label": "Финал истории"
+              }
+            }
+          },
+          "methods": {
+            "prepare": {
+              "name": "Подготовить новый обход",
+              "parameters": {
+                "type": "object",
+                "properties": {}
+              },
+              "result": {
+                "type": "void"
+              },
+              "logic": {
+                "functionId": "sample-method-HauntedRoom-prepare"
+              }
+            },
+            "takeFuse": {
+              "name": "Взять предохранитель",
+              "parameters": {
+                "type": "object",
+                "properties": {}
+              },
+              "result": {
+                "type": "boolean"
+              },
+              "logic": {
+                "functionId": "sample-method-HauntedRoom-takeFuse"
+              }
+            },
+            "power": {
+              "name": "Восстановить питание",
+              "parameters": {
+                "type": "object",
+                "properties": {}
+              },
+              "result": {
+                "type": "boolean"
+              },
+              "logic": {
+                "functionId": "sample-method-HauntedRoom-power"
+              }
+            },
+            "listen": {
+              "name": "Прослушать запись",
+              "parameters": {
+                "type": "object",
+                "properties": {}
+              },
+              "result": {
+                "type": "boolean"
+              },
+              "logic": {
+                "functionId": "sample-method-HauntedRoom-listen"
+              }
+            },
+            "mirror": {
+              "name": "Посмотреть в зеркало",
+              "parameters": {
+                "type": "object",
+                "properties": {}
+              },
+              "result": {
+                "type": "void"
+              },
+              "logic": {
+                "functionId": "sample-method-HauntedRoom-mirror"
+              }
+            },
+            "escape": {
+              "name": "Завершить обход",
+              "parameters": {
+                "type": "object",
+                "properties": {}
+              },
+              "result": {
+                "type": "boolean"
+              },
+              "logic": {
+                "functionId": "sample-method-HauntedRoom-escape"
+              }
+            }
+          },
+          "events": {
+            "changed": {
+              "name": "Обход изменился",
+              "signalId": "user.component-signal.sample-source--aunted-oom.changed",
+              "payloadSchema": {
+                "type": "object",
+                "properties": {
+                  "stage": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "logicResourceId": "sample-source-HauntedRoom",
+          "stateFromParameters": {},
+          "lifecycle": {
+            "initialize": "prepare"
+          },
+          "subscriptions": []
+        },
+        {
+          "id": "sample.component.hauntedprop",
+          "version": 1,
+          "scopes": [
+            "object",
+            "scene",
+            "project"
+          ],
+          "when": "start",
+          "stateSchema": {
+            "type": "object",
+            "properties": {
+              "visits": {
+                "type": "integer",
+                "default": 0,
+                "label": "Осмотров"
+              },
+              "taken": {
+                "type": "boolean",
+                "default": false,
+                "label": "Подобран"
+              }
+            }
+          },
+          "initialState": {},
+          "requirements": [],
+          "name": "HauntedProp",
+          "componentVersion": 1,
+          "stateVersion": 1,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "examine",
+                  "fuse",
+                  "power",
+                  "tape",
+                  "mirror",
+                  "exit"
+                ],
+                "options": {
+                  "examine": "Осмотреть",
+                  "fuse": "Взять предохранитель",
+                  "power": "Включить питание",
+                  "tape": "Прослушать запись",
+                  "mirror": "Заглянуть в зеркало",
+                  "exit": "Выйти"
+                },
+                "default": "examine",
+                "label": "Действие предмета"
+              },
+              "text": {
+                "type": "string",
+                "default": "Здесь кто-то был.",
+                "label": "Текст осмотра"
+              },
+              "distance": {
+                "type": "number",
+                "min": 1,
+                "default": 3.2,
+                "label": "Расстояние взаимодействия"
+              }
+            }
+          },
+          "references": {
+            "type": "object",
+            "properties": {
+              "room": {
+                "type": "reference",
+                "referenceType": "mechanic",
+                "label": "Правила обхода · HauntedRoom"
+              },
+              "viewer": {
+                "type": "reference",
+                "referenceType": "object",
+                "label": "Кто осматривает"
+              }
+            }
+          },
+          "methods": {
+            "interact": {
+              "name": "Осмотреть / использовать",
+              "parameters": {
+                "type": "object",
+                "properties": {}
+              },
+              "result": {
+                "type": "boolean"
+              },
+              "logic": {
+                "functionId": "sample-method-HauntedProp-interact"
+              }
+            }
+          },
+          "events": {},
+          "logicResourceId": "sample-source-HauntedProp",
+          "stateFromParameters": {},
+          "lifecycle": {},
+          "subscriptions": []
+        },
+        {
+          "id": "sample.component.lockeddoor",
+          "version": 1,
+          "scopes": [
+            "object",
+            "scene",
+            "project"
+          ],
+          "when": "start",
+          "stateSchema": {
+            "type": "object",
+            "properties": {
+              "IsLocked": {
+                "type": "boolean",
+                "default": true,
+                "label": "Заперта · IsLocked"
+              }
+            }
+          },
+          "initialState": {},
+          "requirements": [],
+          "name": "LockedDoor",
+          "componentVersion": 1,
+          "stateVersion": 1,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "InitiallyLocked": {
+                "type": "boolean",
+                "default": true,
+                "label": "Изначально заперта · IsLocked"
+              },
+              "requiresKey": {
+                "type": "boolean",
+                "default": false,
+                "label": "Разрешать открытие ключом"
+              },
+              "consumeKey": {
+                "type": "boolean",
+                "default": false,
+                "label": "Расходовать ключ"
+              },
+              "OpenSeconds": {
+                "type": "number",
+                "min": 0,
+                "default": 0.5,
+                "label": "Время открытия, сек"
+              }
+            }
+          },
+          "references": {
+            "type": "object",
+            "properties": {
+              "inventory": {
+                "type": "union",
+                "optional": true,
+                "label": "Инвентарь",
+                "variants": [
+                  {
+                    "type": "reference",
+                    "referenceType": "object",
+                    "label": "Инвентарь объекта"
+                  },
+                  {
+                    "type": "reference",
+                    "referenceType": "project",
+                    "label": "Инвентарь проекта"
+                  }
+                ]
+              },
+              "key": {
+                "type": "reference",
+                "referenceType": "item",
+                "optional": true,
+                "label": "Нужный ключ"
+              }
+            }
+          },
+          "methods": {
+            "setLocked": {
+              "name": "Задать замок",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "boolean",
+                    "default": false,
+                    "label": "Заперта"
+                  }
+                }
+              },
+              "result": {
+                "type": "boolean"
+              },
+              "logic": {
+                "functionId": "sample-method-LockedDoor-setLocked"
+              }
+            },
+            "canUnlock": {
+              "name": "Проверить ключ",
+              "parameters": {
+                "type": "object",
+                "properties": {}
+              },
+              "result": {
+                "type": "boolean"
+              },
+              "logic": {
+                "functionId": "sample-method-LockedDoor-canUnlock"
+              }
+            },
+            "interact": {
+              "name": "Взаимодействовать",
+              "parameters": {
+                "type": "object",
+                "properties": {}
+              },
+              "result": {
+                "type": "boolean"
+              },
+              "logic": {
+                "functionId": "sample-method-LockedDoor-interact"
+              }
+            },
+            "open": {
+              "name": "Открыть",
+              "parameters": {
+                "type": "object",
+                "properties": {}
+              },
+              "result": {
+                "type": "boolean"
+              },
+              "logic": {
+                "functionId": "sample-method-LockedDoor-open"
+              }
+            }
+          },
+          "events": {
+            "opened": {
+              "name": "Дверь открыта",
+              "signalId": "user.component-signal.sample-source--ocked-oor.opened",
+              "payloadSchema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          },
+          "logicResourceId": "sample-source-LockedDoor",
+          "stateFromParameters": {
+            "IsLocked": "InitiallyLocked"
+          },
+          "lifecycle": {},
+          "subscriptions": []
+        }
+      ],
+      "signals": [
+        {
+          "id": "user.component-signal.sample-source--aunted-oom.changed",
+          "version": 1,
+          "name": "HauntedRoom · Обход изменился",
+          "payloadSchema": {
+            "type": "object",
+            "properties": {
+              "stage": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "id": "user.component-signal.sample-source--ocked-oor.opened",
+          "version": 1,
+          "name": "LockedDoor · Дверь открыта",
+          "payloadSchema": {
+            "type": "object",
+            "properties": {}
+          }
+        }
+      ],
+      "variableBindings": [],
+      "enabled": true,
+      "activation": "continuous",
+      "camera": {
+        "mode": "thirdPerson",
+        "targetId": "horror-player",
+        "pointerLock": false,
+        "crosshair": false
+      },
+      "mechanics": [
+        {
+          "id": "horror-lock",
+          "type": "definition",
+          "definitionId": "sample.component.lockeddoor",
+          "definitionVersion": 1,
+          "scope": {
+            "kind": "object",
+            "id": "horror-exit"
+          },
+          "values": {
+            "InitiallyLocked": true,
+            "requiresKey": false,
+            "consumeKey": false,
+            "OpenSeconds": 1
+          },
+          "enabled": true,
+          "references": {},
+          "name": "Замок выхода"
+        },
+        {
+          "id": "horror-room",
+          "type": "definition",
+          "definitionId": "sample.component.hauntedroom",
+          "definitionVersion": 1,
+          "scope": {
+            "kind": "scene",
+            "id": "sample-scene"
+          },
+          "values": {
+            "requireRecord": true
+          },
+          "enabled": true,
+          "references": {
+            "shadow": {
+              "kind": "reference",
+              "type": "object",
+              "mode": "direct",
+              "id": "horror-shadow"
+            },
+            "lamp": {
+              "kind": "reference",
+              "type": "object",
+              "mode": "direct",
+              "id": "horror-alarm-light"
+            },
+            "exit": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "horror-lock"
+            },
+            "ending": {
+              "kind": "reference",
+              "type": "beat",
+              "mode": "direct",
+              "id": "horror-ending"
+            }
+          },
+          "name": "Правила ночного обхода",
+          "inputContexts": [
+            "game-mechanics"
+          ]
+        },
+        {
+          "id": "horror-prop-horror-fuse",
+          "type": "definition",
+          "definitionId": "sample.component.hauntedprop",
+          "definitionVersion": 1,
+          "scope": {
+            "kind": "object",
+            "id": "horror-fuse"
+          },
+          "values": {
+            "kind": "fuse",
+            "text": "",
+            "distance": 3.2
+          },
+          "enabled": true,
+          "references": {
+            "room": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "horror-room"
+            },
+            "viewer": {
+              "kind": "reference",
+              "type": "object",
+              "mode": "direct",
+              "id": "horror-player"
+            }
+          },
+          "name": "Керамический предохранитель · осмотр"
+        },
+        {
+          "id": "horror-prop-horror-journal",
+          "type": "definition",
+          "definitionId": "sample.component.hauntedprop",
+          "definitionVersion": 1,
+          "scope": {
+            "kind": "object",
+            "id": "horror-journal"
+          },
+          "values": {
+            "kind": "examine",
+            "text": "Журнал: «Питание — щит в конце коридора. После включения прослушать запись на магнитофоне. Зелёная дверь — единственный выход». Последняя подпись — ваша. Дата: 1996.",
+            "distance": 3.2
+          },
+          "enabled": true,
+          "references": {
+            "room": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "horror-room"
+            },
+            "viewer": {
+              "kind": "reference",
+              "type": "object",
+              "mode": "direct",
+              "id": "horror-player"
+            }
+          },
+          "name": "Журнал смен · осмотр"
+        },
+        {
+          "id": "horror-prop-horror-desk",
+          "type": "definition",
+          "definitionId": "sample.component.hauntedprop",
+          "definitionVersion": 1,
+          "scope": {
+            "kind": "object",
+            "id": "horror-desk"
+          },
+          "values": {
+            "kind": "examine",
+            "text": "На столе лежит предохранитель. Под ним свежий след ладони, хотя пыль здесь не трогали годами.",
+            "distance": 3.2
+          },
+          "enabled": true,
+          "references": {
+            "room": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "horror-room"
+            },
+            "viewer": {
+              "kind": "reference",
+              "type": "object",
+              "mode": "direct",
+              "id": "horror-player"
+            }
+          },
+          "name": "Стол смотрителя · осмотр"
+        },
+        {
+          "id": "horror-prop-horror-cabinet",
+          "type": "definition",
+          "definitionId": "sample.component.hauntedprop",
+          "definitionVersion": 1,
+          "scope": {
+            "kind": "object",
+            "id": "horror-cabinet"
+          },
+          "values": {
+            "kind": "examine",
+            "text": "Внутри пять одинаковых пальто. В кармане каждого — ваше удостоверение. Из закрытой секции доносится один короткий стук.",
+            "distance": 3.2
+          },
+          "enabled": true,
+          "references": {
+            "room": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "horror-room"
+            },
+            "viewer": {
+              "kind": "reference",
+              "type": "object",
+              "mode": "direct",
+              "id": "horror-player"
+            }
+          },
+          "name": "Шкаф пропавшей смены · осмотр"
+        },
+        {
+          "id": "horror-prop-horror-mirror",
+          "type": "definition",
+          "definitionId": "sample.component.hauntedprop",
+          "definitionVersion": 1,
+          "scope": {
+            "kind": "object",
+            "id": "horror-mirror"
+          },
+          "values": {
+            "kind": "mirror",
+            "text": "",
+            "distance": 3.2
+          },
+          "enabled": true,
+          "references": {
+            "room": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "horror-room"
+            },
+            "viewer": {
+              "kind": "reference",
+              "type": "object",
+              "mode": "direct",
+              "id": "horror-player"
+            }
+          },
+          "name": "Тусклое зеркало · осмотр"
+        },
+        {
+          "id": "horror-prop-horror-tape",
+          "type": "definition",
+          "definitionId": "sample.component.hauntedprop",
+          "definitionVersion": 1,
+          "scope": {
+            "kind": "object",
+            "id": "horror-tape"
+          },
+          "values": {
+            "kind": "tape",
+            "text": "",
+            "distance": 3.2
+          },
+          "enabled": true,
+          "references": {
+            "room": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "horror-room"
+            },
+            "viewer": {
+              "kind": "reference",
+              "type": "object",
+              "mode": "direct",
+              "id": "horror-player"
+            }
+          },
+          "name": "Магнитофон последней смены · осмотр"
+        },
+        {
+          "id": "horror-prop-horror-power",
+          "type": "definition",
+          "definitionId": "sample.component.hauntedprop",
+          "definitionVersion": 1,
+          "scope": {
+            "kind": "object",
+            "id": "horror-power"
+          },
+          "values": {
+            "kind": "power",
+            "text": "",
+            "distance": 3.2
+          },
+          "enabled": true,
+          "references": {
+            "room": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "horror-room"
+            },
+            "viewer": {
+              "kind": "reference",
+              "type": "object",
+              "mode": "direct",
+              "id": "horror-player"
+            }
+          },
+          "name": "Красный электрощит · осмотр"
+        },
+        {
+          "id": "horror-prop-horror-exit",
+          "type": "definition",
+          "definitionId": "sample.component.hauntedprop",
+          "definitionVersion": 1,
+          "scope": {
+            "kind": "object",
+            "id": "horror-exit"
+          },
+          "values": {
+            "kind": "exit",
+            "text": "",
+            "distance": 3.2
+          },
+          "enabled": true,
+          "references": {
+            "room": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "horror-room"
+            },
+            "viewer": {
+              "kind": "reference",
+              "type": "object",
+              "mode": "direct",
+              "id": "horror-player"
+            }
+          },
+          "name": "Зелёная дверь выхода · осмотр"
+        },
+        {
+          "id": "horror-prop-horror-shadow",
+          "type": "definition",
+          "definitionId": "sample.component.hauntedprop",
+          "definitionVersion": 1,
+          "scope": {
+            "kind": "object",
+            "id": "horror-shadow"
+          },
+          "values": {
+            "kind": "examine",
+            "text": "Силуэт беззвучно произносит ваше имя. На его груди номер следующей смены.",
+            "distance": 3.2
+          },
+          "enabled": true,
+          "references": {
+            "room": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "horror-room"
+            },
+            "viewer": {
+              "kind": "reference",
+              "type": "object",
+              "mode": "direct",
+              "id": "horror-player"
+            }
+          },
+          "name": "Чужой силуэт · осмотр"
+        },
+        {
+          "id": "horror-prop-horror-bell",
+          "type": "definition",
+          "definitionId": "sample.component.hauntedprop",
+          "definitionVersion": 1,
+          "scope": {
+            "kind": "object",
+            "id": "horror-bell"
+          },
+          "values": {
+            "kind": "examine",
+            "text": "Звонок не издал звука. Но в дальнем конце коридора кто-то ответил: «Смена принята».",
+            "distance": 3.2
+          },
+          "enabled": true,
+          "references": {
+            "room": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "horror-room"
+            },
+            "viewer": {
+              "kind": "reference",
+              "type": "object",
+              "mode": "direct",
+              "id": "horror-player"
+            }
+          },
+          "name": "Звонок охраны · осмотр"
+        }
+      ],
+      "playerId": "",
+      "controller": {
+        "ownerId": "horror-player",
+        "mode": "wasd",
+        "speed": 2.8,
+        "jumpSpeed": 0,
+        "gravity": 16,
+        "eyeHeight": 1.6,
+        "sensitivity": 0.003,
+        "distance": 3,
+        "fov": 70
+      },
+      "actors": {},
+      "weapons": [],
+      "items": [],
+      "recipes": [],
+      "rules": [],
+      "inventory": {
+        "owner": {
+          "kind": "project",
+          "id": null
+        },
+        "enabled": false,
+        "slots": 12,
+        "starting": [],
+        "equipment": {}
+      },
+      "hudWidgetId": "horror-hud",
+      "cameraSettings": {
+        "eyeHeight": 1.6,
+        "sensitivity": 0.004,
+        "distance": 4.5,
+        "fov": 64
+      },
+      "storyPolicy": {
+        "mode": "story",
+        "mechanics": "continuous",
+        "dialogueControl": "suspend",
+        "ending": "stop"
+      }
+    },
+    "logicResources": [
+      {
+        "id": "sample-source-HauntedRoom",
+        "version": 1,
+        "kind": "component.code",
+        "name": "HauntedRoom",
+        "path": "Компоненты/HauntedRoom.js",
+        "definitionId": "sample.component.hauntedroom",
+        "status": "ready",
+        "approved": true,
+        "source": "// Последний обход. Здесь находятся правила загадки, а не скрытый жанровый preset.\n// Упражнение: в escape разрешите выход без записи или измените реакцию mirror.\nconst component = {\n  name: \"HauntedRoom\",\n  parameters: { type: \"object\", properties: {\n    requireRecord: { type: \"boolean\", default: true, label: \"Для выхода нужна запись смены\" },\n  } },\n  state: { type: \"object\", properties: {\n    fuse: { type: \"boolean\", default: false, label: \"Предохранитель найден\" },\n    power: { type: \"boolean\", default: false, label: \"Питание включено\" },\n    record: { type: \"boolean\", default: false, label: \"Запись прослушана\" },\n    mirrorSeen: { type: \"boolean\", default: false, label: \"Отражение замечено\" },\n    escaped: { type: \"boolean\", default: false, label: \"Обход завершён\" },\n    objective: { type: \"string\", default: \"Найдите предохранитель на столе у входа.\", label: \"Текущая задача\" },\n  } },\n  references: { type: \"object\", properties: {\n    shadow: { type: \"reference\", referenceType: \"object\", label: \"Чужой силуэт\" },\n    lamp: { type: \"reference\", referenceType: \"object\", label: \"Аварийный свет\" },\n    exit: { type: \"reference\", referenceType: \"mechanic\", label: \"Замок выхода · LockedDoor\" },\n    ending: { type: \"reference\", referenceType: \"beat\", label: \"Финал истории\" },\n  } },\n  signals: { changed: { name: \"Обход изменился\", payloadSchema: { type: \"object\", properties: { stage: { type: \"string\" } } } } },\n  lifecycle: { initialize: \"prepare\" },\n  methods: {\n    prepare: { name: \"Подготовить новый обход\", async run({ refs, engine }) {\n      await engine.operation(\"sacura.object.visible\", { object: refs.shadow, visible: false });\n      await engine.operation(\"sacura.object.visible\", { object: refs.lamp, visible: false });\n      await engine.operation(\"sacura.camera.look\", { delta: [0, 40], device: \"pointer\" });\n    } },\n    takeFuse: { name: \"Взять предохранитель\", result: { type: \"boolean\" }, async run({ state, engine }) {\n      if (state.fuse) return false;\n      state.fuse = true;\n      state.objective = \"Установите предохранитель в красный щит у дальней стены.\";\n      await engine.operation(\"sacura.game.message\", { message: \"Керамика ещё тёплая. Кто-то вынул предохранитель перед вашим приходом.\" });\n      await engine.emit(\"changed\", { stage: \"fuse\" });\n      return true;\n    } },\n    power: { name: \"Восстановить питание\", result: { type: \"boolean\" }, async run({ state, refs, engine }) {\n      if (!state.fuse) { await engine.operation(\"sacura.game.message\", { message: \"Пустое гнездо. Нужен предохранитель со стола смотрителя.\" }); return false; }\n      if (state.power) { await engine.operation(\"sacura.game.message\", { message: \"Щит гудит. Теперь работает магнитофон.\" }); return true; }\n      state.power = true;\n      state.objective = \"Прослушайте магнитофон на синем столе. Не оборачивайтесь на стук.\";\n      await engine.operation(\"sacura.object.visible\", { object: refs.lamp, visible: true });\n      await engine.operation(\"sacura.object.visible\", { object: refs.shadow, visible: true });\n      await engine.operation(\"sacura.game.message\", { message: \"Свет вспыхнул. В конце коридора стоит человек в вашей форме. У него нет лица.\" });\n      await engine.emit(\"changed\", { stage: \"power\" });\n      return true;\n    } },\n    listen: { name: \"Прослушать запись\", result: { type: \"boolean\" }, async run({ state, refs, engine }) {\n      if (!state.power) { await engine.operation(\"sacura.game.message\", { message: \"Катушки неподвижны. Сначала восстановите питание щита.\" }); return false; }\n      state.record = true;\n      state.objective = \"Выход разблокирован. Вернитесь к зелёной двери и завершите обход.\";\n      await engine.invoke(refs.exit, \"setLocked\", { value: false });\n      await engine.operation(\"sacura.object.visible\", { object: refs.shadow, visible: false });\n      await engine.operation(\"sacura.game.message\", { message: \"Ваш голос на ленте: «Смена закончилась тридцать лет назад. Не отвечай, если назовут по имени». Замок выхода щёлкнул.\" });\n      await engine.emit(\"changed\", { stage: \"record\" });\n      return true;\n    } },\n    mirror: { name: \"Посмотреть в зеркало\", async run({ state, refs, engine }) {\n      state.mirrorSeen = !state.mirrorSeen;\n      await engine.operation(\"sacura.object.visible\", { object: refs.shadow, visible: state.mirrorSeen });\n      await engine.operation(\"sacura.game.message\", { message: state.mirrorSeen ? \"В зеркале вы всё ещё стоите у входа. Отражение поднимает руку, хотя вы не двигались.\" : \"Отражение исчезло. На стекле изнутри проступило: «Не оставайся на вторую смену».\" });\n    } },\n    escape: { name: \"Завершить обход\", result: { type: \"boolean\" }, async run({ params, state, refs, engine }) {\n      if (state.escaped) return true;\n      if (!state.power || (params.requireRecord && !state.record)) {\n        await engine.operation(\"sacura.game.message\", { message: \"Заперто. В журнале сказано: восстановить питание и прослушать последнюю запись.\" }); return false;\n      }\n      await engine.invoke(refs.exit, \"setLocked\", { value: false });\n      await engine.invoke(refs.exit, \"open\", {});\n      state.escaped = true;\n      state.objective = \"Вы выбрались. Сегодня в журнале впервые появилась новая дата.\";\n      await engine.emit(\"changed\", { stage: \"escaped\" });\n      await engine.operation(\"sacura.story.enter\", { beat: refs.ending });\n      return true;\n    } },\n  },\n};\n",
+        "fingerprint": "5396:fd47b619",
+        "dependencies": {
+          "functions": {},
+          "events": {},
+          "references": {},
+          "globals": {},
+          "signals": {},
+          "operations": {
+            "sacura.object.visible": {
+              "operationId": "sacura.object.visible",
+              "operationVersion": 1
+            },
+            "sacura.camera.look": {
+              "operationId": "sacura.camera.look",
+              "operationVersion": 1
+            },
+            "sacura.game.message": {
+              "operationId": "sacura.game.message",
+              "operationVersion": 1
+            },
+            "sacura.story.enter": {
+              "operationId": "sacura.story.enter",
+              "operationVersion": 1
+            }
+          }
+        },
+        "signalBindings": {
+          "changed": {
+            "signalId": "user.component-signal.sample-source--aunted-oom.changed"
+          }
+        },
+        "lesson": "Что открыть → HauntedRoom.escape / mirror. Измените условие requireRecord или реакцию зеркала. Результат → другое условие финала / появление силуэта.",
+        "locations": {
+          "prepare": {
+            "line": 25,
+            "column": 49
+          },
+          "takeFuse": {
+            "line": 30,
+            "column": 76
+          },
+          "power": {
+            "line": 38,
+            "column": 73
+          },
+          "listen": {
+            "line": 49,
+            "column": 71
+          },
+          "mirror": {
+            "line": 59,
+            "column": 45
+          },
+          "escape": {
+            "line": 64,
+            "column": 69
+          }
+        }
+      },
+      {
+        "id": "sample-source-HauntedProp",
+        "version": 1,
+        "kind": "component.code",
+        "name": "HauntedProp",
+        "path": "Компоненты/HauntedProp.js",
+        "definitionId": "sample.component.hauntedprop",
+        "status": "ready",
+        "approved": true,
+        "source": "// Один исходник для всех осматриваемых предметов. Владелец, текст и ссылки — у экземпляра.\n// Измените порог distance или добавьте реакцию в ветку kind — это реальное поведение.\nconst component = {\n  name: \"HauntedProp\",\n  parameters: { type: \"object\", properties: {\n    kind: { type: \"string\", enum: [\"examine\", \"fuse\", \"power\", \"tape\", \"mirror\", \"exit\"], options: { examine: \"Осмотреть\", fuse: \"Взять предохранитель\", power: \"Включить питание\", tape: \"Прослушать запись\", mirror: \"Заглянуть в зеркало\", exit: \"Выйти\" }, default: \"examine\", label: \"Действие предмета\" },\n    text: { type: \"string\", default: \"Здесь кто-то был.\", label: \"Текст осмотра\" },\n    distance: { type: \"number\", min: 1, default: 3.2, label: \"Расстояние взаимодействия\" },\n  } },\n  state: { type: \"object\", properties: { visits: { type: \"integer\", default: 0, label: \"Осмотров\" }, taken: { type: \"boolean\", default: false, label: \"Подобран\" } } },\n  references: { type: \"object\", properties: {\n    room: { type: \"reference\", referenceType: \"mechanic\", label: \"Правила обхода · HauntedRoom\" },\n    viewer: { type: \"reference\", referenceType: \"object\", label: \"Кто осматривает\" },\n  } },\n  methods: { interact: { name: \"Осмотреть / использовать\", result: { type: \"boolean\" }, async run({ params, state, refs, owner, engine }) {\n    const seen = await engine.operation(\"sacura.spatial.observe\", { owner, target: refs.viewer });\n    if (!seen.available || seen.distance > params.distance) {\n      await engine.operation(\"sacura.game.message\", { message: \"Подойдите ближе: WASD. Зажмите правую кнопку мыши, чтобы осмотреться.\" }); return false;\n    }\n    state.visits += 1;\n    if (params.kind === \"fuse\") {\n      if (state.taken) return false;\n      if (await engine.invoke(refs.room, \"takeFuse\", {})) {\n        state.taken = true;\n        await engine.operation(\"sacura.object.visible\", { object: owner, visible: false });\n      }\n    } else if (params.kind === \"power\") return await engine.invoke(refs.room, \"power\", {});\n    else if (params.kind === \"tape\") return await engine.invoke(refs.room, \"listen\", {});\n    else if (params.kind === \"mirror\") await engine.invoke(refs.room, \"mirror\", {});\n    else if (params.kind === \"exit\") return await engine.invoke(refs.room, \"escape\", {});\n    else await engine.operation(\"sacura.game.message\", { message: params.text });\n    return true;\n  } } },\n};\n",
+        "fingerprint": "2372:a9b98b60",
+        "dependencies": {
+          "functions": {},
+          "events": {},
+          "references": {},
+          "globals": {},
+          "signals": {},
+          "operations": {
+            "sacura.spatial.observe": {
+              "operationId": "sacura.spatial.observe",
+              "operationVersion": 1
+            },
+            "sacura.game.message": {
+              "operationId": "sacura.game.message",
+              "operationVersion": 1
+            },
+            "sacura.object.visible": {
+              "operationId": "sacura.object.visible",
+              "operationVersion": 1
+            }
+          }
+        },
+        "signalBindings": {},
+        "lesson": "Что открыть → HauntedProp.interact. Измените расстояние или добавьте действие перед вызовом HauntedRoom. Один исходник обслуживает все предметы; текст и ссылки задаются в инспекторе.",
+        "locations": {
+          "interact": {
+            "line": 15,
+            "column": 89
+          }
+        }
+      },
+      {
+        "id": "sample-source-LockedDoor",
+        "version": 1,
+        "kind": "component.code",
+        "name": "LockedDoor",
+        "path": "Компоненты/LockedDoor.js",
+        "definitionId": "sample.component.lockeddoor",
+        "status": "ready",
+        "approved": true,
+        "source": "// Два подключения используют один исходник. Условия меняются здесь.\n// Упражнение: вместо count > 0 потребуйте count >= 2 или добавьте вызов Reward.award.\n// SetLocked(false) меняет только замок. Open — отдельная ожидаемая анимация.\nconst component = {\n  name: \"LockedDoor\",\n  parameters: {\n    type: \"object\",\n    properties: {\n      InitiallyLocked: { type: \"boolean\", default: true, label: \"Изначально заперта · IsLocked\" },\n      requiresKey: { type: \"boolean\", default: false, label: \"Разрешать открытие ключом\" },\n      consumeKey: { type: \"boolean\", default: false, label: \"Расходовать ключ\" },\n      OpenSeconds: { type: \"number\", min: 0, default: 0.5, label: \"Время открытия, сек\" },\n    },\n  },\n  state: {\n    type: \"object\",\n    properties: { IsLocked: { type: \"boolean\", default: true, label: \"Заперта · IsLocked\" } },\n  },\n  stateFromParameters: { IsLocked: \"InitiallyLocked\" },\n  references: {\n    type: \"object\",\n    properties: {\n      inventory: {\n        type: \"union\",\n        optional: true,\n        label: \"Инвентарь\",\n        variants: [\n          { type: \"reference\", referenceType: \"object\", label: \"Инвентарь объекта\" },\n          { type: \"reference\", referenceType: \"project\", label: \"Инвентарь проекта\" },\n        ],\n      },\n      key: { type: \"reference\", referenceType: \"item\", optional: true, label: \"Нужный ключ\" },\n    },\n  },\n  signals: { opened: { name: \"Дверь открыта\", payloadSchema: { type: \"object\", properties: {} } } },\n  methods: {\n    setLocked: {\n      name: \"Задать замок\",\n      parameters: {\n        type: \"object\",\n        properties: { value: { type: \"boolean\", default: false, label: \"Заперта\" } },\n      },\n      result: { type: \"boolean\" },\n      run({ args, state }) {\n        state.IsLocked = args.value;\n        return state.IsLocked;\n      },\n    },\n    canUnlock: {\n      name: \"Проверить ключ\",\n      result: { type: \"boolean\" },\n      async run({ params, refs, engine }) {\n        if (!params.requiresKey || !refs.inventory || !refs.key) return false;\n        const count = await engine.operation(\"sacura.inventory.count\", {\n          owner: refs.inventory,\n          item: refs.key,\n        });\n        return count > 0;\n      },\n    },\n    interact: {\n      name: \"Взаимодействовать\",\n      result: { type: \"boolean\" },\n      async run({ state, params, refs, engine, self }) {\n        if (state.IsLocked) {\n          if (!(await engine.invoke(self, \"canUnlock\", {}))) {\n            await engine.operation(\"sacura.game.message\", { message: \"Заперто\" });\n            return false;\n          }\n          if (params.consumeKey)\n            await engine.operation(\"sacura.inventory.remove\", {\n              owner: refs.inventory,\n              item: refs.key,\n              count: 1,\n            });\n          await engine.invoke(self, \"setLocked\", { value: false });\n        }\n        return await engine.invoke(self, \"open\", {});\n      },\n    },\n    open: {\n      name: \"Открыть\",\n      result: { type: \"boolean\" },\n      async run({ engine, owner, params }) {\n        await engine.operation(\"sacura.door.animate\", {\n          object: owner,\n          open: true,\n          seconds: params.OpenSeconds,\n        });\n        await engine.emit(\"opened\", {});\n        return true;\n      },\n    },\n  },\n};\n",
+        "fingerprint": "3260:eeed6646",
+        "dependencies": {
+          "functions": {},
+          "events": {},
+          "references": {},
+          "globals": {},
+          "signals": {},
+          "operations": {
+            "sacura.inventory.count": {
+              "operationId": "sacura.inventory.count",
+              "operationVersion": 1
+            },
+            "sacura.game.message": {
+              "operationId": "sacura.game.message",
+              "operationVersion": 1
+            },
+            "sacura.inventory.remove": {
+              "operationId": "sacura.inventory.remove",
+              "operationVersion": 1
+            },
+            "sacura.door.animate": {
+              "operationId": "sacura.door.animate",
+              "operationVersion": 1
+            }
+          }
+        },
+        "signalBindings": {
+          "opened": {
+            "signalId": "user.component-signal.sample-source--ocked-oor.opened"
+          }
+        },
+        "lesson": "Выход использует общий LockedDoor. HauntedRoom отдельно снимает замок и ожидает Open.",
+        "locations": {
+          "setLocked": {
+            "line": 44,
+            "column": 7
+          },
+          "canUnlock": {
+            "line": 52,
+            "column": 7
+          },
+          "interact": {
+            "line": 64,
+            "column": 7
+          },
+          "open": {
+            "line": 84,
+            "column": 7
+          }
+        }
+      }
+    ],
+    "version": 2,
+    "authoringGraphVersion": 1,
+    "handlerGraphVersion": 1,
+    "visualExamplesVersion": 1,
+    "sceneEditingVersion": 2,
+    "standardEventsVersion": 1,
+    "events": [],
+    "functions": [
+      {
+        "id": "sample-method-HauntedRoom-prepare",
+        "name": "HauntedRoom · Подготовить новый обход",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-HauntedRoom",
+        "componentMethodId": "prepare",
+        "parameters": [],
+        "resultSchema": {
+          "type": "void"
+        },
+        "locals": {},
+        "entry": "",
+        "nodes": []
+      },
+      {
+        "id": "sample-method-HauntedRoom-takeFuse",
+        "name": "HauntedRoom · Взять предохранитель",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-HauntedRoom",
+        "componentMethodId": "takeFuse",
+        "parameters": [],
+        "resultSchema": {
+          "type": "boolean"
+        },
+        "locals": {},
+        "entry": "",
+        "nodes": []
+      },
+      {
+        "id": "sample-method-HauntedRoom-power",
+        "name": "HauntedRoom · Восстановить питание",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-HauntedRoom",
+        "componentMethodId": "power",
+        "parameters": [],
+        "resultSchema": {
+          "type": "boolean"
+        },
+        "locals": {},
+        "entry": "",
+        "nodes": []
+      },
+      {
+        "id": "sample-method-HauntedRoom-listen",
+        "name": "HauntedRoom · Прослушать запись",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-HauntedRoom",
+        "componentMethodId": "listen",
+        "parameters": [],
+        "resultSchema": {
+          "type": "boolean"
+        },
+        "locals": {},
+        "entry": "",
+        "nodes": []
+      },
+      {
+        "id": "sample-method-HauntedRoom-mirror",
+        "name": "HauntedRoom · Посмотреть в зеркало",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-HauntedRoom",
+        "componentMethodId": "mirror",
+        "parameters": [],
+        "resultSchema": {
+          "type": "void"
+        },
+        "locals": {},
+        "entry": "",
+        "nodes": []
+      },
+      {
+        "id": "sample-method-HauntedRoom-escape",
+        "name": "HauntedRoom · Завершить обход",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-HauntedRoom",
+        "componentMethodId": "escape",
+        "parameters": [],
+        "resultSchema": {
+          "type": "boolean"
+        },
+        "locals": {},
+        "entry": "",
+        "nodes": []
+      },
+      {
+        "id": "sample-method-HauntedProp-interact",
+        "name": "HauntedProp · Осмотреть / использовать",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-HauntedProp",
+        "componentMethodId": "interact",
+        "parameters": [],
+        "resultSchema": {
+          "type": "boolean"
+        },
+        "locals": {},
+        "entry": "",
+        "nodes": []
+      },
+      {
+        "id": "sample-method-LockedDoor-setLocked",
+        "name": "LockedDoor · Задать замок",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-LockedDoor",
+        "componentMethodId": "setLocked",
+        "parameters": [
+          {
+            "name": "value",
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "label": "Заперта"
+            }
+          }
+        ],
+        "resultSchema": {
+          "type": "boolean"
+        },
+        "locals": {},
+        "entry": "",
+        "nodes": []
+      },
+      {
+        "id": "sample-method-LockedDoor-canUnlock",
+        "name": "LockedDoor · Проверить ключ",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-LockedDoor",
+        "componentMethodId": "canUnlock",
+        "parameters": [],
+        "resultSchema": {
+          "type": "boolean"
+        },
+        "locals": {},
+        "entry": "",
+        "nodes": []
+      },
+      {
+        "id": "sample-method-LockedDoor-interact",
+        "name": "LockedDoor · Взаимодействовать",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-LockedDoor",
+        "componentMethodId": "interact",
+        "parameters": [],
+        "resultSchema": {
+          "type": "boolean"
+        },
+        "locals": {},
+        "entry": "",
+        "nodes": []
+      },
+      {
+        "id": "sample-method-LockedDoor-open",
+        "name": "LockedDoor · Открыть",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-LockedDoor",
+        "componentMethodId": "open",
+        "parameters": [],
+        "resultSchema": {
+          "type": "boolean"
+        },
+        "locals": {},
+        "entry": "",
+        "nodes": []
+      }
+    ],
+    "actionTemplates": [],
+    "groupTemplates": [],
+    "widgets": [
+      {
+        "id": "widget-default-dialogue",
+        "name": "Диалог",
+        "kind": "dialogue",
+        "builtinDefault": true,
+        "referenceSize": [
+          1280,
+          720
+        ],
+        "elements": [
+          {
+            "id": "widget-default-dialogue-panel",
+            "name": "Диалоговое окно",
+            "type": "panel",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                0.5,
+                1
+              ],
+              "x": 0,
+              "y": -34,
+              "width": -100,
+              "height": 205
+            },
+            "style": {
+              "background": "#211c29",
+              "color": "#fff4f8",
+              "opacity": 0.96,
+              "borderRadius": 16,
+              "borderWidth": 1,
+              "borderColor": "#ad849d",
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-dialogue-speaker",
+            "name": "Имя персонажа",
+            "type": "text",
+            "parentId": "widget-default-dialogue-panel",
+            "role": "speaker",
+            "text": "Новый текст",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 28,
+              "y": 18,
+              "width": -56,
+              "height": 32
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#e2b8d1",
+              "fontSize": 23,
+              "fontWeight": 600,
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-dialogue-text",
+            "name": "Текст реплики",
+            "type": "text",
+            "parentId": "widget-default-dialogue-panel",
+            "role": "dialogueText",
+            "text": "Новый текст",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 28,
+              "y": 60,
+              "width": -88,
+              "height": -105
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-dialogue-status",
+            "name": "Подсказка",
+            "type": "text",
+            "parentId": "widget-default-dialogue-panel",
+            "role": "status",
+            "text": "Новый текст",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                0,
+                1
+              ],
+              "x": 28,
+              "y": -16,
+              "width": -90,
+              "height": 25
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#d1bfd0",
+              "fontSize": 15,
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-dialogue-next",
+            "name": "Продолжить",
+            "type": "button",
+            "parentId": "widget-default-dialogue-panel",
+            "role": "none",
+            "text": "›",
+            "action": "advance",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                1,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                1,
+                1
+              ],
+              "x": -20,
+              "y": -14,
+              "width": 44,
+              "height": 44
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 28,
+              "borderRadius": 10,
+              "textAlign": "center",
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-dialogue-choices",
+            "name": "Ответы игрока",
+            "type": "choices",
+            "parentId": null,
+            "role": "choices",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                1
+              ],
+              "anchorMax": [
+                0.5,
+                1
+              ],
+              "pivot": [
+                0.5,
+                1
+              ],
+              "x": 0,
+              "y": -255,
+              "width": 620,
+              "height": 190
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 22,
+              "borderRadius": 10,
+              "padding": 4,
+              "gap": 8
+            }
+          }
+        ],
+        "css": ""
+      },
+      {
+        "id": "widget-default-mainMenu",
+        "name": "Главное меню",
+        "kind": "mainMenu",
+        "builtinDefault": true,
+        "referenceSize": [
+          1280,
+          720
+        ],
+        "elements": [
+          {
+            "id": "widget-default-mainMenu-panel",
+            "name": "Панель меню",
+            "type": "panel",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0.5
+              ],
+              "anchorMax": [
+                0.5,
+                0.5
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 0,
+              "width": 510,
+              "height": 440
+            },
+            "style": {
+              "background": "#211c29",
+              "color": "#fff4f8",
+              "opacity": 0.98,
+              "borderRadius": 20,
+              "borderWidth": 1,
+              "borderColor": "#ad849d",
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-mainMenu-title",
+            "name": "Заголовок",
+            "type": "text",
+            "parentId": "widget-default-mainMenu-panel",
+            "role": "title",
+            "text": "Пауза",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 30,
+              "y": 35,
+              "width": -60,
+              "height": 90
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 36,
+              "fontWeight": 600,
+              "textAlign": "center",
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-mainMenu-start",
+            "name": "Начать игру",
+            "type": "button",
+            "parentId": "widget-default-mainMenu-panel",
+            "role": "none",
+            "text": "Начать игру",
+            "action": "start",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0
+              ],
+              "anchorMax": [
+                0.5,
+                0
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 160,
+              "width": 380,
+              "height": 60
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "textAlign": "center",
+              "borderRadius": 10,
+              "padding": 8
+            }
+          },
+          {
+            "id": "widget-default-mainMenu-restart",
+            "name": "Начать заново",
+            "type": "button",
+            "parentId": "widget-default-mainMenu-panel",
+            "role": "none",
+            "text": "Начать заново",
+            "action": "restart",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0
+              ],
+              "anchorMax": [
+                0.5,
+                0
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 240,
+              "width": 380,
+              "height": 60
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "textAlign": "center",
+              "borderRadius": 10,
+              "padding": 8
+            }
+          }
+        ],
+        "css": ""
+      },
+      {
+        "id": "widget-default-pauseMenu",
+        "name": "Меню паузы",
+        "kind": "pauseMenu",
+        "builtinDefault": true,
+        "referenceSize": [
+          1280,
+          720
+        ],
+        "elements": [
+          {
+            "id": "widget-default-pauseMenu-panel",
+            "name": "Панель меню",
+            "type": "panel",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0.5
+              ],
+              "anchorMax": [
+                0.5,
+                0.5
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 0,
+              "width": 510,
+              "height": 440
+            },
+            "style": {
+              "background": "#211c29",
+              "color": "#fff4f8",
+              "opacity": 0.98,
+              "borderRadius": 20,
+              "borderWidth": 1,
+              "borderColor": "#ad849d",
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-pauseMenu-title",
+            "name": "Заголовок",
+            "type": "text",
+            "parentId": "widget-default-pauseMenu-panel",
+            "role": "none",
+            "text": "Пауза",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 30,
+              "y": 35,
+              "width": -60,
+              "height": 90
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 36,
+              "fontWeight": 600,
+              "textAlign": "center",
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-pauseMenu-resume",
+            "name": "Продолжить",
+            "type": "button",
+            "parentId": "widget-default-pauseMenu-panel",
+            "role": "none",
+            "text": "Продолжить",
+            "action": "resume",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0
+              ],
+              "anchorMax": [
+                0.5,
+                0
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 160,
+              "width": 380,
+              "height": 60
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "textAlign": "center",
+              "borderRadius": 10,
+              "padding": 8
+            }
+          },
+          {
+            "id": "widget-default-pauseMenu-restart",
+            "name": "Начать заново",
+            "type": "button",
+            "parentId": "widget-default-pauseMenu-panel",
+            "role": "none",
+            "text": "Начать заново",
+            "action": "restart",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0
+              ],
+              "anchorMax": [
+                0.5,
+                0
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 240,
+              "width": 380,
+              "height": 60
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "textAlign": "center",
+              "borderRadius": 10,
+              "padding": 8
+            }
+          },
+          {
+            "id": "widget-default-pauseMenu-mainMenu",
+            "name": "Главное меню",
+            "type": "button",
+            "parentId": "widget-default-pauseMenu-panel",
+            "role": "none",
+            "text": "Главное меню",
+            "action": "mainMenu",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0
+              ],
+              "anchorMax": [
+                0.5,
+                0
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 320,
+              "width": 380,
+              "height": 60
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "textAlign": "center",
+              "borderRadius": 10,
+              "padding": 8
+            }
+          }
+        ],
+        "css": ""
+      },
+      {
+        "id": "horror-hud",
+        "name": "Интерфейс примера",
+        "kind": "hud",
+        "referenceSize": [
+          1280,
+          720
+        ],
+        "elements": [
+          {
+            "id": "horror-title",
+            "name": "ПОСЛЕДНИЙ ОБХОД",
+            "type": "text",
+            "parentId": null,
+            "role": "none",
+            "text": "ПОСЛЕДНИЙ ОБХОД",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 24,
+              "y": 20,
+              "width": 380,
+              "height": 42
+            },
+            "style": {
+              "color": "#e5c38f",
+              "fontSize": 24,
+              "fontWeight": 600,
+              "padding": 0
+            }
+          },
+          {
+            "id": "horror-objective",
+            "name": "Задача",
+            "type": "text",
+            "parentId": null,
+            "role": "none",
+            "text": "Задача",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 24,
+              "y": 55,
+              "width": 650,
+              "height": 70
+            },
+            "style": {
+              "color": "#f5eee0",
+              "fontSize": 21,
+              "padding": 0
+            },
+            "binding": {
+              "source": "component",
+              "instance": {
+                "kind": "reference",
+                "type": "mechanic",
+                "mode": "direct",
+                "id": "horror-room"
+              },
+              "field": "objective",
+              "valueType": "string"
+            }
+          },
+          {
+            "id": "horror-controls",
+            "name": "WASD — идти · ЛКМ — предмет · ПКМ + мышь — осмотр",
+            "type": "text",
+            "parentId": null,
+            "role": "none",
+            "text": "WASD — идти · ЛКМ — предмет · ПКМ + мышь — осмотр",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 24,
+              "y": 135,
+              "width": 740,
+              "height": 34
+            },
+            "style": {
+              "color": "#d1c6b5",
+              "fontSize": 18,
+              "padding": 0
+            }
+          }
+        ],
+        "css": ""
+      }
+    ],
+    "audioAssets": [],
+    "variables": {},
+    "variableTypes": {},
+    "objects": [
+      {
+        "id": "horror-floor-0",
+        "name": "Плитка проходной 1",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#384146",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              0,
+              -0.16,
+              5
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              18,
+              0.6,
+              20
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        }
+      },
+      {
+        "id": "horror-west-0",
+        "name": "Западная стена 1",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#303b40",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              -4.45,
+              1.4,
+              5
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.6,
+              5.6,
+              20
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        }
+      },
+      {
+        "id": "horror-east-0",
+        "name": "Восточная стена 1",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#303b40",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              4.45,
+              1.4,
+              5
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.6,
+              5.6,
+              20
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        }
+      },
+      {
+        "id": "horror-floor-1",
+        "name": "Плитка проходной 2",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#384146",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              0,
+              -0.16,
+              -5
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              18,
+              0.6,
+              20
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        }
+      },
+      {
+        "id": "horror-west-1",
+        "name": "Западная стена 2",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#303b40",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              -4.45,
+              1.4,
+              -5
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.6,
+              5.6,
+              20
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        }
+      },
+      {
+        "id": "horror-east-1",
+        "name": "Восточная стена 2",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#303b40",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              4.45,
+              1.4,
+              -5
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.6,
+              5.6,
+              20
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        }
+      },
+      {
+        "id": "horror-end",
+        "name": "Стена дальней смены",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#272f35",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              0,
+              1.4,
+              -9.8
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              18,
+              5.6,
+              0.6
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        }
+      },
+      {
+        "id": "floor-seam-0",
+        "name": "Шов плитки 1",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#77807c",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              0,
+              0.002,
+              8
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              17.2,
+              0.024,
+              0.05
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "floor-seam-1",
+        "name": "Шов плитки 2",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#77807c",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              0,
+              0.002,
+              5.7
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              17.2,
+              0.024,
+              0.05
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "floor-seam-2",
+        "name": "Шов плитки 3",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#77807c",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              0,
+              0.002,
+              3.4000000000000004
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              17.2,
+              0.024,
+              0.05
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "floor-seam-3",
+        "name": "Шов плитки 4",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#77807c",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              0,
+              0.002,
+              1.1000000000000005
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              17.2,
+              0.024,
+              0.05
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "floor-seam-4",
+        "name": "Шов плитки 5",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#77807c",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              0,
+              0.002,
+              -1.1999999999999993
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              17.2,
+              0.024,
+              0.05
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "floor-seam-5",
+        "name": "Шов плитки 6",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#77807c",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              0,
+              0.002,
+              -3.5
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              17.2,
+              0.024,
+              0.05
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "floor-seam-6",
+        "name": "Шов плитки 7",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#77807c",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              0,
+              0.002,
+              -5.799999999999999
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              17.2,
+              0.024,
+              0.05
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "floor-seam-7",
+        "name": "Шов плитки 8",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#77807c",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              0,
+              0.002,
+              -8.099999999999998
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              17.2,
+              0.024,
+              0.05
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "horror-player",
+        "name": "Смотритель · игрок",
+        "type": "Персонаж",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#b89b62",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              0,
+              0,
+              6.5
+            ],
+            "rotation": [
+              0,
+              180,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        "walkAnimation": "ходит",
+        "idleAnimation": "стоит",
+        "collision": {
+          "enabled": true,
+          "custom": true,
+          "size": [
+            0.48,
+            1.6,
+            0.48
+          ],
+          "offset": [
+            0,
+            0.8,
+            0
+          ]
+        },
+        "dialogueWidgetId": null
+      },
+      {
+        "id": "horror-wall-light-0",
+        "name": "Дежурный свет 1",
+        "type": "Источник света",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#d0b58c",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              -3.8,
+              2.25,
+              5
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        "light": {
+          "intensity": 16,
+          "distance": 9,
+          "decay": 2
+        }
+      },
+      {
+        "id": "horror-light-cover-0",
+        "name": "Плафон 1",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#c5ae7b",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              -4.1,
+              2.25,
+              5
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.36,
+              0.4,
+              1.6
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "horror-wall-light-1",
+        "name": "Дежурный свет 2",
+        "type": "Источник света",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#d0b58c",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              3.8,
+              2.25,
+              -2
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        "light": {
+          "intensity": 16,
+          "distance": 9,
+          "decay": 2
+        }
+      },
+      {
+        "id": "horror-light-cover-1",
+        "name": "Плафон 2",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#c5ae7b",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              4.1,
+              2.25,
+              -2
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.36,
+              0.4,
+              1.6
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "horror-wall-light-2",
+        "name": "Дежурный свет 3",
+        "type": "Источник света",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#d0b58c",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              -3.8,
+              2.25,
+              -7
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        "light": {
+          "intensity": 16,
+          "distance": 9,
+          "decay": 2
+        }
+      },
+      {
+        "id": "horror-light-cover-2",
+        "name": "Плафон 3",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#c5ae7b",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              -4.1,
+              2.25,
+              -7
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.36,
+              0.4,
+              1.6
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "horror-desk",
+        "name": "Стол смотрителя",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#635a49",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              -2.8,
+              0.55,
+              4.4
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              3.2,
+              2.2,
+              3.6
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        },
+        "interactionCall": {
+          "id": "sacura.component.call",
+          "version": 1,
+          "parameters": {
+            "instance": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "horror-prop-horror-desk"
+            },
+            "methodId": "interact",
+            "args": {}
+          }
+        }
+      },
+      {
+        "id": "horror-fuse",
+        "name": "Керамический предохранитель",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#e5cc85",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              -2.7,
+              1.22,
+              4.1
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.8,
+              0.56,
+              1.3
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        },
+        "interactionCall": {
+          "id": "sacura.component.call",
+          "version": 1,
+          "parameters": {
+            "instance": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "horror-prop-horror-fuse"
+            },
+            "methodId": "interact",
+            "args": {}
+          }
+        }
+      },
+      {
+        "id": "horror-journal",
+        "name": "Журнал смен",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#b29473",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              -2.9,
+              1.14,
+              4.9
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1.4,
+              0.16,
+              1.1
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        },
+        "interactionCall": {
+          "id": "sacura.component.call",
+          "version": 1,
+          "parameters": {
+            "instance": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "horror-prop-horror-journal"
+            },
+            "methodId": "interact",
+            "args": {}
+          }
+        }
+      },
+      {
+        "id": "horror-cabinet",
+        "name": "Шкаф пропавшей смены",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#4f625d",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              3,
+              0.9,
+              1.6
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              2.2,
+              3.6,
+              3
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        },
+        "interactionCall": {
+          "id": "sacura.component.call",
+          "version": 1,
+          "parameters": {
+            "instance": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "horror-prop-horror-cabinet"
+            },
+            "methodId": "interact",
+            "args": {}
+          }
+        }
+      },
+      {
+        "id": "horror-mirror",
+        "name": "Тусклое зеркало",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#829b9f",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              -4.15,
+              1.4,
+              -0.7
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.2,
+              3.4,
+              3
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        },
+        "interactionCall": {
+          "id": "sacura.component.call",
+          "version": 1,
+          "parameters": {
+            "instance": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "horror-prop-horror-mirror"
+            },
+            "methodId": "interact",
+            "args": {}
+          }
+        }
+      },
+      {
+        "id": "horror-tape-table",
+        "name": "Тумба магнитофона",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#3e5963",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              2.7,
+              0.45,
+              -2.8
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              3.2,
+              1.8,
+              2.8
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        }
+      },
+      {
+        "id": "horror-tape",
+        "name": "Магнитофон последней смены",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#d3a367",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              2.7,
+              1.08,
+              -2.8
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              2.4,
+              0.7,
+              1.5
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        },
+        "interactionCall": {
+          "id": "sacura.component.call",
+          "version": 1,
+          "parameters": {
+            "instance": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "horror-prop-horror-tape"
+            },
+            "methodId": "interact",
+            "args": {}
+          }
+        }
+      },
+      {
+        "id": "tape-reel-0",
+        "name": "Катушка 1",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "cylinder",
+        "color": "#252932",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              2.35,
+              1.31,
+              -2.8
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.56,
+              0.2,
+              0.56
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        },
+        "interactionCall": {
+          "id": "sacura.component.call",
+          "version": 1,
+          "parameters": {
+            "instance": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "horror-prop-horror-tape"
+            },
+            "methodId": "interact",
+            "args": {}
+          }
+        }
+      },
+      {
+        "id": "tape-reel-1",
+        "name": "Катушка 2",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "cylinder",
+        "color": "#252932",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              3.05,
+              1.31,
+              -2.8
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.56,
+              0.2,
+              0.56
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        },
+        "interactionCall": {
+          "id": "sacura.component.call",
+          "version": 1,
+          "parameters": {
+            "instance": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "horror-prop-horror-tape"
+            },
+            "methodId": "interact",
+            "args": {}
+          }
+        }
+      },
+      {
+        "id": "horror-power",
+        "name": "Красный электрощит",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#92514d",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              -4.05,
+              1.1,
+              -5.2
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              2.6,
+              2.4
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        },
+        "interactionCall": {
+          "id": "sacura.component.call",
+          "version": 1,
+          "parameters": {
+            "instance": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "horror-prop-horror-power"
+            },
+            "methodId": "interact",
+            "args": {}
+          }
+        }
+      },
+      {
+        "id": "horror-exit",
+        "name": "Зелёная дверь выхода",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#4e8877",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              0,
+              1,
+              -9.55
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              3,
+              4,
+              0.36
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        },
+        "interactionCall": {
+          "id": "sacura.component.call",
+          "version": 1,
+          "parameters": {
+            "instance": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "horror-prop-horror-exit"
+            },
+            "methodId": "interact",
+            "args": {}
+          }
+        }
+      },
+      {
+        "id": "horror-shadow",
+        "name": "Чужой силуэт",
+        "type": "Персонаж",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#14151c",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              0,
+              0,
+              -7
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        "description": "Силуэт появляется по правилам HauntedRoom. Его можно осмотреть.",
+        "dialogueWidgetId": null,
+        "interactionCall": {
+          "id": "sacura.component.call",
+          "version": 1,
+          "parameters": {
+            "instance": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "horror-prop-horror-shadow"
+            },
+            "methodId": "interact",
+            "args": {}
+          }
+        }
+      },
+      {
+        "id": "horror-alarm-light",
+        "name": "Аварийный свет",
+        "type": "Источник света",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "box",
+        "color": "#e27059",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              0,
+              2.5,
+              -5
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        "light": {
+          "intensity": 24,
+          "distance": 12,
+          "decay": 2
+        }
+      },
+      {
+        "id": "horror-bell",
+        "name": "Звонок охраны",
+        "type": "Активный меш",
+        "active": true,
+        "subsceneId": "sample-scene",
+        "primitive": "sphere",
+        "color": "#b9a36a",
+        "transforms": {
+          "sample-scene": {
+            "position": [
+              3,
+              1.1,
+              6
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              0.6,
+              1
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        },
+        "interactionCall": {
+          "id": "sacura.component.call",
+          "version": 1,
+          "parameters": {
+            "instance": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "horror-prop-horror-bell"
+            },
+            "methodId": "interact",
+            "args": {}
+          }
+        }
+      }
+    ],
+    "subscenes": [
+      {
+        "id": "sample-scene",
+        "name": "Корпус № 6 · ночная смена",
+        "location": "Пустая сцена",
+        "kind": "empty",
+        "entry": "horror-intro",
+        "sceneId": "sample-chapter",
+        "weather": "Ясно",
+        "time": "Ночь",
+        "color": "#bd94a9",
+        "stagingPoints": [],
+        "cameras": [
+          {
+            "id": "horror-overview",
+            "name": "Обзор проходной",
+            "mode": "fixed",
+            "position": [
+              8,
+              7,
+              12
+            ],
+            "target": [
+              0,
+              0,
+              -1
+            ],
+            "fov": 60,
+            "smoothing": 0
+          }
+        ],
+        "defaultCameraId": "horror-overview",
+        "description": "Открытый сверху игровой макет заброшенной проходной. Все цветные предметы осматриваются щелчком с близкого расстояния. Камера следует за смотрителем."
+      }
+    ],
+    "chapters": [
+      {
+        "id": "sample-chapter",
+        "name": "Последний обход · Point & click хоррор",
+        "subsceneId": "sample-scene",
+        "beats": [
+          {
+            "id": "horror-intro",
+            "kind": "dialogue",
+            "text": "Корпус № 6 закрыли тридцать лет назад. Сегодня вам пришло сообщение с собственного номера: «Не оставляй меня на вторую смену». Вы пришли на последний обход.",
+            "speaker": "Рассказчик",
+            "next": "horror-walk",
+            "bindings": [],
+            "mode": "SEQUENTIAL",
+            "batches": {
+              "BEFORE": [],
+              "ON_START": [],
+              "AFTER": []
+            }
+          },
+          {
+            "id": "horror-walk",
+            "kind": "gameplay",
+            "text": "",
+            "speaker": "Рассказчик",
+            "next": null,
+            "bindings": [],
+            "mode": "SEQUENTIAL",
+            "batches": {
+              "BEFORE": [],
+              "ON_START": [],
+              "AFTER": []
+            }
+          },
+          {
+            "id": "horror-ending",
+            "kind": "end",
+            "text": "Вы вышли в рассвет. В телефоне одно новое сообщение: «Спасибо. Теперь моя очередь уйти». В журнале за вашей подписью больше нет пустой строки.",
+            "speaker": "Рассказчик",
+            "next": null,
+            "bindings": [],
+            "mode": "SEQUENTIAL",
+            "batches": {
+              "BEFORE": [],
+              "ON_START": [],
+              "AFTER": []
+            },
+            "ending": "Рассвет"
+          }
+        ]
+      }
+    ],
+    "input": {
+      "version": 1,
+      "touchMode": "auto",
+      "actions": [
+        {
+          "id": "move",
+          "name": "Двигаться",
+          "valueType": "axis2d",
+          "behavior": "move",
+          "trigger": "continuous",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "interact",
+          "name": "Осмотреть",
+          "valueType": "boolean",
+          "behavior": "interact",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "point",
+          "name": "Идти по указателю",
+          "valueType": "boolean",
+          "behavior": "point",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "advance",
+          "name": "Дальше",
+          "valueType": "boolean",
+          "behavior": "advance",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "pause",
+          "name": "Пауза",
+          "valueType": "boolean",
+          "behavior": "pause",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "choiceNext",
+          "name": "Следующий ответ",
+          "valueType": "boolean",
+          "behavior": "choiceNext",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "choicePrevious",
+          "name": "Предыдущий ответ",
+          "valueType": "boolean",
+          "behavior": "choicePrevious",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "horror-look",
+          "name": "Осмотреться правой кнопкой",
+          "valueType": "axis2d",
+          "behavior": "operation",
+          "trigger": "continuous",
+          "holdSeconds": 0.4,
+          "consume": true,
+          "operation": {
+            "id": "sacura.camera.look",
+            "version": 1,
+            "parameters": {
+              "delta": {
+                "op": "get",
+                "path": "args.payload.delta"
+              },
+              "device": {
+                "op": "get",
+                "path": "args.device"
+              }
+            }
+          }
+        }
+      ],
+      "contexts": [
+        {
+          "id": "system",
+          "name": "Система",
+          "priority": 100,
+          "bindings": [
+            {
+              "actionId": "pause",
+              "device": "keyboard",
+              "control": "Escape",
+              "scale": 1,
+              "id": "system-0"
+            },
+            {
+              "actionId": "pause",
+              "device": "gamepad-button",
+              "control": "9",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "system-1"
+            },
+            {
+              "actionId": "pause",
+              "device": "touch",
+              "control": "pause",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "system-2"
+            }
+          ]
+        },
+        {
+          "id": "dialogue",
+          "name": "Диалог",
+          "priority": 10,
+          "bindings": [
+            {
+              "actionId": "advance",
+              "device": "keyboard",
+              "control": "Enter",
+              "scale": 1,
+              "id": "dialogue-0"
+            },
+            {
+              "actionId": "advance",
+              "device": "keyboard",
+              "control": "Space",
+              "scale": 1,
+              "id": "dialogue-1"
+            },
+            {
+              "actionId": "advance",
+              "device": "gamepad-button",
+              "control": "0",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "dialogue-2"
+            },
+            {
+              "actionId": "advance",
+              "device": "touch",
+              "control": "advance",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "dialogue-3"
+            },
+            {
+              "actionId": "choiceNext",
+              "device": "keyboard",
+              "control": "ArrowDown",
+              "scale": 1,
+              "id": "dialogue-4"
+            },
+            {
+              "actionId": "choicePrevious",
+              "device": "keyboard",
+              "control": "ArrowUp",
+              "scale": 1,
+              "id": "dialogue-5"
+            },
+            {
+              "actionId": "choiceNext",
+              "device": "gamepad-button",
+              "control": "13",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "dialogue-6"
+            },
+            {
+              "actionId": "choicePrevious",
+              "device": "gamepad-button",
+              "control": "12",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "dialogue-7"
+            }
+          ]
+        },
+        {
+          "id": "gameplay",
+          "name": "Ходьба и взаимодействие",
+          "priority": 20,
+          "bindings": [
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "KeyW",
+              "scale": [
+                0,
+                1
+              ],
+              "id": "gameplay-0"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "ArrowUp",
+              "scale": [
+                0,
+                1
+              ],
+              "id": "gameplay-1"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "KeyS",
+              "scale": [
+                0,
+                -1
+              ],
+              "id": "gameplay-2"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "ArrowDown",
+              "scale": [
+                0,
+                -1
+              ],
+              "id": "gameplay-3"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "KeyA",
+              "scale": [
+                -1,
+                0
+              ],
+              "id": "gameplay-4"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "ArrowLeft",
+              "scale": [
+                -1,
+                0
+              ],
+              "id": "gameplay-5"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "KeyD",
+              "scale": [
+                1,
+                0
+              ],
+              "id": "gameplay-6"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "ArrowRight",
+              "scale": [
+                1,
+                0
+              ],
+              "id": "gameplay-7"
+            },
+            {
+              "actionId": "interact",
+              "device": "keyboard",
+              "control": "KeyE",
+              "scale": 1,
+              "id": "gameplay-8"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-axis",
+              "control": "0",
+              "scale": [
+                1,
+                0
+              ],
+              "deadZone": 0.18,
+              "id": "gameplay-9"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-axis",
+              "control": "1",
+              "scale": [
+                0,
+                -1
+              ],
+              "deadZone": 0.18,
+              "id": "gameplay-10"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-button",
+              "control": "12",
+              "scale": [
+                0,
+                1
+              ],
+              "deadZone": 0,
+              "id": "gameplay-11"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-button",
+              "control": "13",
+              "scale": [
+                0,
+                -1
+              ],
+              "deadZone": 0,
+              "id": "gameplay-12"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-button",
+              "control": "14",
+              "scale": [
+                -1,
+                0
+              ],
+              "deadZone": 0,
+              "id": "gameplay-13"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-button",
+              "control": "15",
+              "scale": [
+                1,
+                0
+              ],
+              "deadZone": 0,
+              "id": "gameplay-14"
+            },
+            {
+              "actionId": "interact",
+              "device": "gamepad-button",
+              "control": "0",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "gameplay-15"
+            },
+            {
+              "actionId": "point",
+              "device": "pointer",
+              "control": "primary",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "gameplay-16"
+            },
+            {
+              "actionId": "move",
+              "device": "touch",
+              "control": "move",
+              "scale": [
+                1,
+                1
+              ],
+              "deadZone": 0,
+              "id": "gameplay-17"
+            },
+            {
+              "actionId": "interact",
+              "device": "touch",
+              "control": "interact",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "gameplay-18"
+            }
+          ]
+        },
+        {
+          "id": "game-mechanics",
+          "name": "Методы компонентов",
+          "priority": 40,
+          "bindings": [
+            {
+              "id": "sample-key-horror-look",
+              "actionId": "horror-look",
+              "device": "pointer",
+              "control": "delta",
+              "scale": [
+                1,
+                1
+              ],
+              "deadZone": 0
+            }
+          ]
+        }
+      ]
+    },
+    "ui": {
+      "dialogue": "widget-default-dialogue",
+      "mainMenu": "widget-default-mainMenu",
+      "pauseMenu": "widget-default-pauseMenu",
+      "hud": "horror-hud"
+    },
+    "audioSettings": {
+      "sidechain": {
+        "reductionDb": 4,
+        "attack": 0.6,
+        "release": 0.9
+      }
+    },
+    "description": "Что открыть → «Корпус № 6» → HauntedRoom, любой предмет → HauntedProp, выход → LockedDoor. Что изменить → условие выхода в escape, реакцию mirror или правило interact. Результат → загадка и события действительно меняются.\nМаршрут: журнал и предохранитель на столе → красный щит → магнитофон → зелёная дверь. Зеркало, шкаф и звонок содержат необязательные страхи. WASD, щелчок рядом с предметом, ПКМ + мышь для осмотра. Сохранение хранит прогресс обхода и положение героя; стартовая подготовка при загрузке не повторяется. Все ссылки выбираются в инспекторе, исходники не содержат ID сцены или предметов."
+  },
+  "references": [],
+  "assets": []
+}

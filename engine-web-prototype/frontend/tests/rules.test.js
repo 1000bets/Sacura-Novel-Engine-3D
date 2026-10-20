@@ -33,7 +33,7 @@ test('a project with no chapters/beat/dialogue runs registered rules and round-t
 });
 
 test('button, received item and timer completion use the same rule model with committed payload/state',async()=>{
- const p=project(),widget=p.widgets[0];widget.elements.push(createWidgetElement('button','button')); 
+ const p=project(),widget=p.widgets[0];widget.elements.push(createWidgetElement('button','button'));
  for(const [signal,label]of [['button','button'],['pickup','item'],['timer','timer']])rule(p,{signal,actions:[log(label)]});
  p.gameplay.items.push({id:'key',name:'Ключ',stackLimit:10,heal:0,slot:'',weaponId:'',consumable:false,worldObjectId:'',useEventId:''});const rt=await start(p);try{await rt.uiAction('none',widget.elements.at(-1));rt.game.addItem('key');await settle(rt);rt.game.command('startTimer',{timerId:'clock',seconds:.05});await drive(rt,.05);await settle(rt);assert.deepEqual(rt.snapshot.variables.log,['button','item','timer']);assert.equal(rt.game.count('key'),1);assert.equal(rt.game.state.timers.clock,undefined);}finally{rt.stop();}
 });

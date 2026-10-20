@@ -1,0 +1,28 @@
+.story-inspector.camera-inspector{padding-top:0}
+.story-inspector.camera-inspector .story-inspector-heading>small{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.story-inspector.camera-inspector .camera-shot-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:0 16px 14px;margin:0;border-bottom:1px solid var(--divider)}
+.story-inspector.camera-inspector .camera-shot-actions>button{justify-content:center;white-space:normal;text-align:center;background:var(--surface-input);border:1px solid transparent}
+.story-inspector.camera-inspector .camera-shot-actions>button:nth-child(3){grid-column:1/-1}
+.story-inspector.camera-inspector .camera-shot-actions>button:hover{background:var(--surface-hover)}
+.story-inspector.camera-inspector .camera-shot-actions>button.active{background:var(--surface-active);border-color:var(--accent)}
+.story-inspector.camera-inspector .camera-pilot-hint{grid-column:1/-1;margin:2px 0 0;color:var(--text-secondary);font-size:11px;line-height:1.5}
+.story-inspector.camera-inspector .camera-play-notice{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 16px;background:var(--surface-2);font-size:11px;color:var(--text-secondary)}
+.story-inspector.camera-inspector .camera-vector{margin:0;font-size:12px;color:var(--text-secondary)}
+.story-inspector.camera-inspector .camera-vector>div{gap:6px;margin-top:7px}
+.story-inspector.camera-inspector .camera-vector label{display:flex;align-items:center;gap:4px}
+.story-inspector.camera-inspector .camera-vector b{margin:0;font-size:10px;font-weight:500}
+.story-inspector.camera-inspector .camera-vector input{padding:5px 4px;font-variant-numeric:tabular-nums}
+.story-inspector.camera-inspector .camera-error{margin:0;color:var(--danger,var(--text-primary));font-size:11px;line-height:1.5}
+.player-control-fields,.player-control-details>div{display:flex;flex-direction:column;gap:8px;min-width:0}
+.player-control-fields .game-field,.component-instances .player-control-fields .game-field{display:grid;grid-template-columns:minmax(106px,.9fr) minmax(0,1.3fr);align-items:center;gap:8px;margin:0}
+.player-control-fields .game-field>span{line-height:1.45;overflow-wrap:anywhere}
+.player-control-fields .game-check{display:flex;align-items:center;gap:7px;min-height:28px;margin:0;color:var(--text-secondary)}
+.player-control-fields .game-check input{flex-shrink:0}
+.player-control-fields .player-control-details{margin:0;padding:0;border:0;border-top:1px solid var(--divider);background:transparent}
+.player-control-fields .player-control-details>summary{display:flex;align-items:center;gap:6px;min-height:32px;padding:4px 0;list-style:none;font-size:11px;font-weight:500;color:var(--text-secondary);cursor:pointer}
+.player-control-details>summary::-webkit-details-marker{display:none}
+.player-control-details>summary::before{content:'›';font-size:16px;width:9px;line-height:1}
+.player-control-details[open]>summary::before{transform:rotate(90deg)}
+.player-control-fields .player-control-details>div{padding:4px 0 8px}
+.player-control-fields .player-control-details button{width:100%;min-height:30px;padding:5px 8px;white-space:normal;text-align:center;background:var(--surface-input);border-radius:var(--radius-control,4px)}
+.player-control-fields .player-control-details .game-field>span{font-size:11px}

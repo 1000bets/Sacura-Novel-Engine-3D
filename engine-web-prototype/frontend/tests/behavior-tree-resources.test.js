@@ -1,0 +1,53 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createMechanicsProject} from '../src/projectLifecycle.js';
+import {createComponentResource,editComponentSource,publishComponentSource,addGraphComponentMethod} from '../src/componentResources.js';
+import {addMechanicInstance} from '../src/mechanicDescriptions.js';
+import {reference} from '../src/valueSchemas.js';
+import {PreviewRuntime} from '../src/runtime.js';
+import {SoundDesk} from '../src/audio.js';
+import {exportAuthoringPackage,planPackageImport} from '../src/mechanicPackages.js';
+import {duplicateInstance,planAuthoringChange} from '../src/authoredMechanics.js';
+const object=properties=>({type:'object',properties});
+const yieldTurn=()=>new Promise(r=>setTimeout(r,3));
+async function until(predicate){for(let i=0;i<300;i++){if(predicate())return;await yieldTurn();}throw Error('Tree did not settle');}
+async function startTrees(rt){for(const m of rt.game.config.mechanics){const d=rt.game.config.mechanicDefinitions.find(d=>d.id===m.definitionId);if(d?.behaviorTree){rt.game.startComponentTask(m.id,'start');await until(()=>rt.game.componentHandles.get(m.id)?.behaviorRun);}}}
+function fixture(){
+ const p=createMechanicsProject('Реактивное дерево'),worker=createComponentResource(p,{name:'Worker'});
+ editComponentSource(p,worker.id,`const component={name:'Worker',state:{type:'object',properties:{value:{type:'number',default:0}}},methods:{attack:{name:'Attack',result:{type:'string'},async run({engine,state}){await engine.waitSignal('victory');state.value+=100;return 'Success';}},idle:{name:'Idle',result:{type:'string'},run({state}){state.value+=1;return 'Running';}}}};`);publishComponentSource(p,worker.id);
+ const wa=addMechanicInstance(p,worker.definitionId,{kind:'project',id:p.id}),wb=addMechanicInstance(p,worker.definitionId,{kind:'project',id:p.id});
+ const tree=createComponentResource(p,{name:'Выбор действия',kind:'behavior.tree'}),definition=p.gameplay.mechanicDefinitions.find(d=>d.id===tree.definitionId);definition.parameters=object({aggressive:{type:'boolean',default:true}});definition.stateSchema=object({attack:{type:'boolean',default:true}});definition.stateFromParameters={attack:'aggressive'};definition.references=object({worker:{type:'reference',referenceType:'mechanic'}});
+ const method=addGraphComponentMethod(p,definition.id,{name:'SetAttack',parameters:object({value:{type:'boolean'}}),result:{type:'boolean'}}),f=p.functions.find(f=>f.id===definition.methods[method].logic.functionId);f.entry='set-attack';f.nodes=[{id:'set-attack',kind:'set',path:'state.attack',value:{op:'get',path:'args.value'},next:'return'},{id:'return',kind:'return',value:true}];
+ tree.root='root';tree.nodes=[{id:'root',kind:'selector',children:['attack-sequence','idle']},{id:'attack-sequence',kind:'sequence',children:['guard','attack']},{id:'guard',kind:'condition',condition:{op:'get',path:'state.attack'}},...['attack','idle'].map(id=>({id,kind:'task',componentMethod:{definitionId:worker.definitionId,definitionVersion:1,methodId:id},call:{instance:{op:'get',path:'refs.worker'},methodId:id,args:{}}}))];
+ const a=addMechanicInstance(p,definition.id,{kind:'project',id:p.id},{aggressive:true}),b=addMechanicInstance(p,definition.id,{kind:'project',id:p.id},{aggressive:false});a.references.worker=reference('mechanic',wa.id);b.references.worker=reference('mechanic',wb.id);
+ return {p,tree,a,b,wa,wb,method};
+}
+test('editable Behavior Tree runs component tasks per instance and switches/cancels a waiting branch without late effects or Rules snapshots',async()=>{
+ const {p,a,b,wa,wb,method}=fixture(),rt=new PreviewRuntime(new SoundDesk(()=>{}));let copies=0;const clone=globalThis.structuredClone;
+ try{await rt.start(p);assert.equal(rt.snapshot.error,null);await startTrees(rt);await yieldTurn();globalThis.structuredClone=value=>{if(value?.id===p.id&&value.gameplay&&value.functions)copies++;return clone(value);};
+  rt.game.tick(.05);await until(()=>rt.game.ruleRuntime.signalWaiters.has('victory'));assert.equal(rt.game.ruleRuntime.signalWaiters.get('victory').size,1);assert.equal(rt.game.state.componentBehaviors[a.id].nodeId,'attack');assert.equal(rt.game.state.componentBehaviors[b.id].nodeId,'idle');assert.equal(rt.game.state.mechanicStates[wb.id].value,1);
+  await rt.game.callComponent(a.id,method,{value:false});rt.game.tick(.05);rt.game.tick(.05);await yieldTurn();assert.equal(rt.game.ruleRuntime.signalWaiters.has('victory'),false);assert.equal(rt.game.state.componentBehaviors[a.id].nodeId,'idle');assert.equal(rt.game.state.mechanicStates[wa.id].value,1);assert.ok(rt.game.state.mechanicStates[wb.id].value>1);assert.equal(copies,0);
+  globalThis.structuredClone=clone;await rt.game.trigger('victory');await yieldTurn();assert.equal(rt.game.state.mechanicStates[wa.id].value,1);
+  await rt.game.setComponentEnabled(a.id,false);const stopped=rt.game.state.mechanicStates[wa.id].value;for(let i=0;i<4;i++)rt.game.tick(.05);await yieldTurn();assert.equal(rt.game.state.mechanicStates[wa.id].value,stopped);assert.ok(rt.game.componentHandles.get(b.id).active);assert.equal(rt.game.state.componentBehaviors[a.id].status,'Stopped');
+ }finally{globalThis.structuredClone=clone;rt.stop();}assert.equal(rt.game.ruleRuntime.signalWaiters.size,0);
+});
+test('Behavior Tree resource, graph methods, task source and named component references survive local package import',async()=>{
+ const {p,tree,a}=fixture(),pkg=await exportAuthoringPackage(p,a,{name:'Behavior',author:'A',license:'CC0'});assert.ok(pkg.content.logicResources.some(r=>r.kind==='behavior.tree'));assert.ok(pkg.content.logicResources.some(r=>r.kind==='component.code'));
+ const b=createMechanicsProject('B'),next=(await planPackageImport(b,pkg,{})).apply(b),imported=next.logicResources.find(r=>r.kind==='behavior.tree');assert.notEqual(imported.id,tree.id);assert.ok(imported.nodes.some(n=>n.id===imported.root));
+ for(const r of next.logicResources.filter(r=>r.kind==='component.code'))publishComponentSource(next,r.id);const rt=new PreviewRuntime(new SoundDesk(()=>{}));try{await rt.start(next);assert.equal(rt.snapshot.error,null);await startTrees(rt);rt.game.tick(.05);await until(()=>rt.game.ruleRuntime.signalWaiters.has('victory'));assert.equal(rt.game.ruleRuntime.signalWaiters.get('victory').size,1);}finally{rt.stop();}assert.equal(rt.game.ruleRuntime.signalWaiters.size,0);
+});
+test('an invalid Behavior Tree task result reports its resource/node once and releases the running task',async()=>{
+ const {p,tree,wa}=fixture();tree.root='bad-task';tree.nodes=[{id:'bad-task',kind:'task',call:{instance:reference('mechanic',wa.id),methodId:'bad',args:{}}}];
+ const worker=p.logicResources.find(r=>r.kind==='component.code');editComponentSource(p,worker.id,worker.source.replace("methods:{attack:","methods:{bad:{name:'Bad',result:{type:'number'},run(){return 17;}},attack:"));publishComponentSource(p,worker.id);
+ const rt=new PreviewRuntime(new SoundDesk(()=>{}));try{await rt.start(p);assert.equal(rt.snapshot.error,null);await startTrees(rt);rt.game.tick(.1);await until(()=>rt.game.state.message?.includes('bad-task'));assert.match(rt.game.state.message,/\.bt.*bad-task.*bool/);await yieldTurn();assert.equal(rt.game.componentTasks.size,0);assert.ok(Object.values(rt.game.state.componentBehaviors).every(s=>s.status==='Failure'));}finally{rt.stop();}
+});
+test('an independent Behavior Tree copy remaps tree nodes and graph methods and keeps its own state',async()=>{
+ const {p,tree,a,method}=fixture(),plan=planAuthoringChange(p,next=>duplicateInstance(next,next.gameplay.mechanics.find(m=>m.id===a.id),{independent:true}));plan.apply(p);const copy=p.gameplay.mechanics.find(m=>m.id===plan.record.id),definition=p.gameplay.mechanicDefinitions.find(d=>d.id===copy.definitionId),resource=p.logicResources.find(r=>r.id===definition.logicResourceId);assert.notEqual(resource.id,tree.id);assert.notEqual(resource.root,tree.root);assert.ok(resource.nodes.some(n=>n.id===resource.root));assert.notEqual(definition.methods[method].logic.functionId,p.gameplay.mechanicDefinitions.find(d=>d.id===a.definitionId).methods[method].logic.functionId);
+ const rt=new PreviewRuntime(new SoundDesk(()=>{}));try{await rt.start(p);assert.equal(rt.snapshot.error,null);await startTrees(rt);await rt.game.callComponent(copy.id,method,{value:false});assert.equal(rt.game.state.mechanicStates[a.id].attack,true);assert.equal(rt.game.state.mechanicStates[copy.id].attack,false);rt.game.tick(.1);await until(()=>rt.game.ruleRuntime.signalWaiters.has('victory'));assert.notEqual(rt.game.state.componentBehaviors[a.id].nodeId,rt.game.state.componentBehaviors[copy.id].nodeId);}finally{rt.stop();}assert.equal(rt.game.ruleRuntime.signalWaiters.size,0);
+});
+test('a prepared tree stays idle until Start, then ticks across dialogue with native gameplay paused and stops with its explicit owner',async()=>{
+ const {p,a,b,wa}=fixture();p.chapters=[{id:'chapter',name:'Story',beats:[{id:'first',kind:'dialogue',speaker:'Narrator',text:'Ready',next:'next',bindings:[]},{id:'next',kind:'dialogue',speaker:'Narrator',text:'Continue',next:null,bindings:[]}]}];p.subscenes[0].entry='first';p.gameplay.storyPolicy={mode:'story',mechanics:'gameplay-node',dialogueControl:'allow',ending:'continue'};
+ const rt=new PreviewRuntime(new SoundDesk(()=>{}));try{await rt.start(p,'first');assert.equal(rt.snapshot.error,null);assert.equal(rt.game.state.active,false);for(let i=0;i<4;i++)rt.game.tick(.05);assert.equal(rt.game.ruleRuntime.signalWaiters.has('victory'),false);assert.equal(rt.game.state.componentBehaviors?.[a.id],undefined);
+  const work=await rt.game.execute({id:'sacura.component.start',version:1,parameters:{instance:reference('mechanic',a.id),methodId:'start',args:{},lifetime:'component',lifetimeOwner:reference('mechanic',b.id)}});await until(()=>rt.game.componentHandles.get(a.id)?.behaviorRun);rt.game.tick(.1);await until(()=>rt.game.ruleRuntime.signalWaiters.has('victory'));const ticks=rt.game.state.componentBehaviors[a.id].ticks;await rt.advance();assert.equal(rt.snapshot.beatId,'next');rt.game.tick(.1);rt.game.tick(.1);assert.ok(rt.game.state.componentBehaviors[a.id].ticks>ticks);assert.equal(rt.game.state.active,false);await rt.game.setComponentEnabled(b.id,false);rt.game.cleanupOwners();await until(()=>!rt.game.ruleRuntime.signalWaiters.has('victory'));assert.equal(rt.game.componentHandles.get(a.id).active,true);assert.equal(rt.game.state.componentBehaviors[a.id].enabled,false);assert.equal(work.kind,'work');await rt.game.trigger('victory');await yieldTurn();assert.equal(rt.game.state.mechanicStates[wa.id].value,0);
+ }finally{rt.stop();}
+});
