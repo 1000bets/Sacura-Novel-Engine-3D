@@ -94,9 +94,9 @@ void EditorMainWindow::OnPlayToggled(bool bChecked)
     if (bChecked)
     {
         Scene* World = GetEditScene();
-        if (World != nullptr && !BoundEngine.PrepareSceneMaterials(*World))
+        if (World != nullptr && (!BoundEngine.PrepareSceneMaterials(*World) || !BoundEngine.PrepareSceneSimulation(*World)))
         {
-            statusBar()->showMessage(tr("Preparing material variants…"));
+            statusBar()->showMessage(tr("Preparing scene resources and navigation…"));
             return;
         }
         bPlayRequested = false;

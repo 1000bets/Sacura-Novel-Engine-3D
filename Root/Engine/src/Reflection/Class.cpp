@@ -55,6 +55,10 @@ PropertyDescriptor* Class::FindProperty(const PropertyId& Property)
             return &Entry;
         }
     }
+    if (BaseClass != nullptr)
+    {
+        return BaseClass->FindProperty(Property);
+    }
     return nullptr;
 }
 
@@ -67,5 +71,30 @@ const PropertyDescriptor* Class::FindProperty(const PropertyId& Property) const
             return &Entry;
         }
     }
+    if (BaseClass != nullptr)
+    {
+        return BaseClass->FindProperty(Property);
+    }
     return nullptr;
+}
+
+std::vector<const PropertyDescriptor*> Class::GetAllProperties() const
+{
+    std::vector<const PropertyDescriptor*> Result;
+    for (const Class* Current = this; Current != nullptr; Current = Current->GetBaseClass())
+    {
+        for (const PropertyDescriptor& Descriptor : Current->GetProperties())
+        {
+            bool bExists = false;
+            for (const PropertyDescriptor* Added : Result)
+            {
+                bExists = bExists || Added->Id == Descriptor.Id;
+            }
+            if (!bExists)
+            {
+                Result.push_back(&Descriptor);
+            }
+        }
+    }
+    return Result;
 }

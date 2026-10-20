@@ -34,6 +34,7 @@ set(EDITOR_SRC
 set(EDITOR_HDR
     inc/Editor.h
     inc/Actions/BuiltinEditorActions.h
+    inc/Actions/PhysicsNavigationEditorActions.h
     inc/Panels/AssetImportDialog.h
     inc/Panels/HierarchyTreeWidget.h
     inc/Panels/ContentBrowserWidget.h

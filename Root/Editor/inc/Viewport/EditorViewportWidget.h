@@ -48,6 +48,10 @@ public:
     float GetCameraMoveSpeed() const;
     void SetGizmoOperation(GizmoOperation Operation);
     GizmoOperation GetGizmoOperation() const;
+    void SetNavigationVisible(bool bVisible);
+    void SetCollisionVisible(bool bVisible);
+    bool IsNavigationVisible() const { return bNavigationVisible; }
+    bool IsCollisionVisible() const { return bCollisionVisible; }
 
 signals:
     void AssetDropped(QString AssetId, QString SubAssetId, QString AssetTypeIdentifier, QString VirtualPath, QPoint Position);
@@ -55,6 +59,7 @@ signals:
     void CameraChanged();
     void CameraMoveSpeedChanged(float Speed);
     void GizmoOperationChanged(EditorViewportWidget::GizmoOperation Operation);
+    void NavigationVisibilityChanged(bool bVisible);
 
 protected:
     void dragEnterEvent(QDragEnterEvent* Event) override;
@@ -114,4 +119,6 @@ private:
     float MoveSpeed = 8.0f;
     bool bEditorToolsEnabled = false;
     bool bKeyboardCaptured = false;
+    bool bNavigationVisible = false;
+    bool bCollisionVisible = false;
 };

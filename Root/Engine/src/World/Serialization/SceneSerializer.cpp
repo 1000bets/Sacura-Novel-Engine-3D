@@ -10,6 +10,8 @@
 #include "World/GameObject.h"
 #include "Reflection/Json/ReflectionJson.h"
 #include "Reflection/ReflectionSubsystem.h"
+#include "Navigation/NavigationWorld.h"
+#include "Physics/PhysicsWorld.h"
 
 #include <fstream>
 #include <nlohmann/json.hpp>
@@ -241,6 +243,19 @@ SceneSerializeResult SceneSerializer::SerializeToJson(const Scene& InScene, std:
         Root["objects"].push_back(std::move(ObjectJson));
     }
 
+    if (const NavigationWorld* Navigation = InScene.GetNavigationIfCreated())
+    {
+        nlohmann::json BakedNavigation;
+        Navigation->Serialize(BakedNavigation);
+        if (!BakedNavigation.empty())
+        {
+            Root["navigation"] = std::move(BakedNavigation);
+        }
+    }
+    if (const PhysicsWorld* Physics = InScene.GetPhysicsIfCreated())
+    {
+        Root["physics"] = {{"gravity", Vector3ToJson(Physics->GetGravity())}};
+    }
     OutJsonText = Root.dump(2);
     Result.bOk = true;
     return Result;
@@ -542,6 +557,24 @@ SceneSerializeResult SceneSerializer::DeserializeFromJson(const std::string& Jso
         ComponentInstance->OnCreate();
     }
 
+    if (Root.contains("navigation") && !CreatedScene->GetNavigation().Deserialize(Root.at("navigation"), Result.Error))
+    {
+        DestroyPartialScene(CreatedScene, Memory);
+        return Result;
+    }
+    if (Root.contains("physics"))
+    {
+        Vector3 Gravity;
+        const nlohmann::json& Physics = Root.at("physics");
+        if (!Physics.is_object() || !Physics.contains("gravity")
+            || !TryReadVector3(Physics.at("gravity"), Gravity, Result.Error)
+            || !CreatedScene->GetPhysics().SetGravity(Gravity))
+        {
+            Result.Error = "Scene physics gravity is invalid";
+            DestroyPartialScene(CreatedScene, Memory);
+            return Result;
+        }
+    }
     CreatedScene->SetLoaded(true);
     OutScene = CreatedScene;
     Result.bOk = true;

@@ -73,6 +73,7 @@ public:
     Scene* GetEditScene() const { return OwnedScene.get(); }
     bool StartGame();
     bool PrepareSceneMaterials(Scene& World);
+    bool PrepareSceneSimulation(Scene& World);
     void RegisterMaterialWidgetBinding(const std::shared_ptr<MaterialWidgetBinding>& Binding);
     float GetMaterialTime() const { return MaterialTime; }
     void StopGame();
@@ -99,7 +100,7 @@ public:
 private:
     friend class PlaySession;
     void BeginStory(Scene* World);
-    void TickWorld(Scene& World, float DeltaTime);
+    void TickWorld(Scene& World, float DeltaTime, bool bSinglePhysicsStep = false);
     void BeginFrame();
     void EndFrame();
     void InitializeCommon(bool bCreateWindowAndRender);

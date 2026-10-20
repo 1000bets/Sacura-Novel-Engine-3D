@@ -1,4 +1,5 @@
 #include "Panels/ReflectionInspector.h"
+#include <limits>
 #include "Panels/ReflectionValueEditor.h"
 
 #include "Core/Object/Object.h"
@@ -9,6 +10,7 @@
 #include "Reflection/ReflectedValue.h"
 
 #include <QCheckBox>
+#include <QAbstractSpinBox>
 #include <QColorDialog>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
@@ -28,11 +30,15 @@ ReflectionInspector::ReflectionInspector(QWidget* Parent)
 {
     setObjectName("ReflectionInspector");
     RootLayout = new QVBoxLayout(this);
+    RootLayout->setSizeConstraint(QLayout::SetMinimumSize);
     TypeLabel = new QLabel(this);
     TypeLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    TypeLabel->setWordWrap(true);
+    TypeLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     ResetAllButton = new QPushButton(tr("Reset All"), this);
     PropertiesLayout = new QFormLayout();
     PropertiesLayout->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
+    PropertiesLayout->setRowWrapPolicy(QFormLayout::WrapAllRows);
 
     RootLayout->addWidget(TypeLabel);
     RootLayout->addWidget(ResetAllButton);
@@ -154,8 +160,9 @@ std::vector<const PropertyDescriptor*> ReflectionInspector::ListEditableProperti
         return Result;
     }
 
-    for (const PropertyDescriptor& Descriptor : Instance->GetClass()->GetProperties())
+    for (const PropertyDescriptor* Property : Instance->GetClass()->GetAllProperties())
     {
+        const PropertyDescriptor& Descriptor = *Property;
         if (Descriptor.Attributes.bEditorHidden)
         {
             continue;
@@ -425,6 +432,8 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
         }
 
         QPushButton* Picker = new QPushButton(Display, FieldWidget);
+        Picker->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
+        Picker->setMinimumWidth(70);
         Picker->setEnabled(bEditable && Registry != nullptr);
         Picker->setToolTip(Display);
         QMenu* Menu = new QMenu(Picker);
@@ -488,6 +497,16 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
     else if (Descriptor.ValueTypeId.Value == "engine.bool")
     {
         QCheckBox* CheckBox = new QCheckBox(Label, FieldWidget);
+        if (CheckBox->fontMetrics().horizontalAdvance(Label) > 160)
+        {
+            const qsizetype BreakPosition = Label.lastIndexOf(' ', Label.size() / 2);
+            if (BreakPosition > 0)
+            {
+                QString WrappedLabel = Label;
+                WrappedLabel[BreakPosition] = '\n';
+                CheckBox->setText(WrappedLabel);
+            }
+        }
         CheckBox->setChecked(CurrentValue.BoolValue);
         CheckBox->setEnabled(bEditable);
         FieldLayout->addWidget(CheckBox, 1);
@@ -501,33 +520,62 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
     }
     else if (Descriptor.ValueTypeId.Value == "engine.int64")
     {
-        QSpinBox* SpinBox = new QSpinBox(FieldWidget);
-        if (Descriptor.Attributes.bHasRange)
+        const bool bNeedsWideInteger = CurrentValue.Int64Value < std::numeric_limits<int>::min()
+            || CurrentValue.Int64Value > std::numeric_limits<int>::max()
+            || (Descriptor.Attributes.bHasRange && (Descriptor.Attributes.RangeMinimum < std::numeric_limits<int>::min()
+                || Descriptor.Attributes.RangeMaximum > std::numeric_limits<int>::max()));
+        if (bNeedsWideInteger)
         {
-            SpinBox->setRange(
-                static_cast<int>(Descriptor.Attributes.RangeMinimum),
-                static_cast<int>(Descriptor.Attributes.RangeMaximum));
+            QLineEdit* IntegerEdit = new QLineEdit(QString::number(CurrentValue.Int64Value), FieldWidget);
+            IntegerEdit->setEnabled(bEditable);
+            FieldLayout->addWidget(IntegerEdit, 1);
+            if (bEditable)
+            {
+                connect(IntegerEdit, &QLineEdit::editingFinished, this, [this, Property, IntegerEdit]()
+                {
+                    bool bValid = false;
+                    const qlonglong Value = IntegerEdit->text().toLongLong(&bValid);
+                    if (bValid && CommitProperty(Property, ReflectedValue::MakeInt64(Value)))
+                    {
+                        emit PropertyChanged();
+                    }
+                    else
+                    {
+                        Rebuild();
+                    }
+                });
+            }
         }
         else
         {
-            SpinBox->setRange(-1000000, 1000000);
-        }
-        SpinBox->setValue(static_cast<int>(CurrentValue.Int64Value));
-        SpinBox->setEnabled(bEditable);
-        FieldLayout->addWidget(SpinBox, 1);
-        if (bEditable)
-        {
-            connect(SpinBox, qOverload<int>(&QSpinBox::valueChanged), this, [this, Property](int Value)
+            QSpinBox* SpinBox = new QSpinBox(FieldWidget);
+            if (Descriptor.Attributes.bHasRange)
             {
-                if (CommitProperty(Property, ReflectedValue::MakeInt64(Value)))
+                SpinBox->setRange(
+                    static_cast<int>(Descriptor.Attributes.RangeMinimum),
+                    static_cast<int>(Descriptor.Attributes.RangeMaximum));
+            }
+            else
+            {
+                SpinBox->setRange(-1000000, 1000000);
+            }
+            SpinBox->setValue(static_cast<int>(CurrentValue.Int64Value));
+            SpinBox->setEnabled(bEditable);
+            FieldLayout->addWidget(SpinBox, 1);
+            if (bEditable)
+            {
+                connect(SpinBox, qOverload<int>(&QSpinBox::valueChanged), this, [this, Property](int Value)
                 {
-                    emit PropertyChanged();
-                }
-                else
-                {
-                    Rebuild();
-                }
-            });
+                    if (CommitProperty(Property, ReflectedValue::MakeInt64(Value)))
+                    {
+                        emit PropertyChanged();
+                    }
+                    else
+                    {
+                        Rebuild();
+                    }
+                });
+            }
         }
     }
     else if (Descriptor.ValueTypeId.Value == "engine.float" || Descriptor.ValueTypeId.Value == "engine.double")
@@ -650,7 +698,10 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
 
     if (bEditable)
     {
-        QPushButton* ResetButton = new QPushButton(tr("Reset"), FieldWidget);
+        QPushButton* ResetButton = new QPushButton(QString(QChar(0x21ba)), FieldWidget);
+        ResetButton->setToolTip(tr("Reset property to default"));
+        ResetButton->setAccessibleName(tr("Reset property to default"));
+        ResetButton->setFixedWidth(24);
         FieldLayout->addWidget(ResetButton);
         connect(ResetButton, &QPushButton::clicked, this, [this, Property]()
         {
@@ -658,12 +709,19 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
         });
     }
 
+    for (QAbstractSpinBox* NumericEditor : FieldWidget->findChildren<QAbstractSpinBox*>())
+    {
+        NumericEditor->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
+        NumericEditor->setMinimumWidth(55);
+    }
     if (Descriptor.ValueTypeId.Value == "engine.bool")
     {
-        PropertiesLayout->addRow(QString(), FieldWidget);
+        PropertiesLayout->addRow(FieldWidget);
     }
     else
     {
-        PropertiesLayout->addRow(Label, FieldWidget);
+        QLabel* PropertyLabel = new QLabel(Label, this);
+        PropertyLabel->setWordWrap(true);
+        PropertiesLayout->addRow(PropertyLabel, FieldWidget);
     }
 }

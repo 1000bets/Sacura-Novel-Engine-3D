@@ -4,10 +4,21 @@
 #include "World/Components/LightSettings.h"
 #include "World/Components/MeshRendererComponent.h"
 #include "World/Components/ScriptComponent.h"
+#include "World/Components/PhysicsBodyComponent.h"
+#include "World/Components/NavMeshBoundsComponent.h"
+#include "World/Components/NavigationModifierComponent.h"
+#include "World/Components/NavigationLinkComponent.h"
+#include "World/Components/NavigationAgentComponent.h"
 #include "Reflection/ReflectionSubsystem.h"
 
 void ForceTouchRegistrars()
 {
+    (void)&PhysicsBodyComponent::s_ReflectionClassRegistrar;
+    (void)&CharacterControllerComponent::s_ReflectionClassRegistrar;
+    (void)&NavMeshBoundsComponent::s_ReflectionClassRegistrar;
+    (void)&NavigationModifierComponent::s_ReflectionClassRegistrar;
+    (void)&NavigationLinkComponent::s_ReflectionClassRegistrar;
+    (void)&NavigationAgentComponent::s_ReflectionClassRegistrar;
     (void)CameraComponent::StaticReflectionTypeId();
     (void)ArrowComponent::StaticReflectionTypeId();
     (void)&ArrowComponent::s_ReflectionClassRegistrar;

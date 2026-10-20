@@ -24,6 +24,7 @@ public:
 
     const Transform& GetTransform() const { return m_Transform; }
     void SetTransform(const Transform& InTransform);
+    bool SetWorldTransform(const Transform& WorldTransform);
     bool IsStoryControllingTransform() const { return bStoryControllingTransform; }
 
     Matrix GetWorldMatrix() const;

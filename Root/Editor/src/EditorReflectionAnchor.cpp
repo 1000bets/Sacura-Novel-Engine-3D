@@ -1,8 +1,20 @@
 #include "Actions/BuiltinEditorActions.h"
+#include "Actions/PhysicsNavigationEditorActions.h"
 #include "Actions/EditorAction.h"
 
 void ForceTouchEditorRegistrars()
 {
+    (void)&CreatePhysicsBodyObjectAction::s_ReflectionClassRegistrar;
+    (void)&CreateCharacterObjectAction::s_ReflectionClassRegistrar;
+    (void)&CreateNavMeshBoundsObjectAction::s_ReflectionClassRegistrar;
+    (void)&CreateNavigationModifierObjectAction::s_ReflectionClassRegistrar;
+    (void)&CreateNavigationLinkObjectAction::s_ReflectionClassRegistrar;
+    (void)&AddPhysicsBodyComponentAction::s_ReflectionClassRegistrar;
+    (void)&AddCharacterControllerComponentAction::s_ReflectionClassRegistrar;
+    (void)&AddNavMeshBoundsComponentAction::s_ReflectionClassRegistrar;
+    (void)&AddNavigationModifierComponentAction::s_ReflectionClassRegistrar;
+    (void)&AddNavigationLinkComponentAction::s_ReflectionClassRegistrar;
+    (void)&AddNavigationAgentComponentAction::s_ReflectionClassRegistrar;
     (void)EditorAction::StaticReflectionTypeId();
     (void)CreateEmptyObjectAction::StaticReflectionTypeId();
     (void)CreateCameraObjectAction::StaticReflectionTypeId();

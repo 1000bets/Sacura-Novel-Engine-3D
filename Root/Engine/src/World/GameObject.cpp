@@ -2,6 +2,7 @@
 #include "World/Scene.h"
 
 #include <algorithm>
+#include <cmath>
 
 GameObject::GameObject() = default;
 
@@ -16,6 +17,31 @@ void GameObject::SetTransform(const Transform& InTransform)
 GameObject::GameObject(const std::string& InName)
     : Object(InName)
 {
+}
+
+bool GameObject::SetWorldTransform(const Transform& WorldTransform)
+{
+    if (bStoryControllingTransform)
+    {
+        return false;
+    }
+    Matrix LocalMatrix = WorldTransform.GetMatrix();
+    if (m_Parent != nullptr)
+    {
+        const Matrix ParentMatrix = m_Parent->GetWorldMatrix();
+        if (std::abs(ParentMatrix.Determinant()) < 0.000001f)
+        {
+            return false;
+        }
+        LocalMatrix *= ParentMatrix.Invert();
+    }
+    Transform LocalTransform;
+    if (!LocalMatrix.Decompose(LocalTransform.Scale, LocalTransform.Rotation, LocalTransform.Position))
+    {
+        return false;
+    }
+    SetTransform(LocalTransform);
+    return true;
 }
 
 GameObject::~GameObject()

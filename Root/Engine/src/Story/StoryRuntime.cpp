@@ -1,4 +1,5 @@
 #include "Story/StoryRuntime.h"
+#include "World/Components/NavigationAgentComponent.h"
 
 #include "Core/Threading/ThreadContext.h"
 #include "Core/Object/MemorySubsystem.h"
@@ -354,6 +355,22 @@ void StoryRuntime::PrepareActiveAction()
     {
         Action.TargetObject = Target->GetObjectHandle();
     }
+    if (Action.Definition.Kind == StoryActionKind::NavigateTo)
+    {
+        NavigationAgentComponent* Agent = nullptr;
+        if (Target != nullptr)
+        {
+            Agent = Target->GetComponent<NavigationAgentComponent>();
+        }
+        if (Agent == nullptr || !Agent->IsEnabled())
+        {
+            FailAction("NavigateTo requires an enabled navigation agent on its target");
+            return;
+        }
+        Action.NavigationAgent = Agent->GetObjectHandle();
+        Action.NavigationRequest = Agent->MoveTo(Action.Definition.TargetPosition);
+        return;
+    }
     if (Action.Definition.Kind == StoryActionKind::MoveTo)
     {
         if (Target == nullptr)
@@ -407,6 +424,38 @@ void StoryRuntime::TickActiveAction(float DeltaTime)
 
     Action.ElapsedSeconds += DeltaTime;
     const float Duration = std::max(Action.Definition.DurationSeconds, 0.0f);
+    if (Action.Definition.Kind == StoryActionKind::NavigateTo)
+    {
+        NavigationAgentComponent* Agent = MemorySubsystem::Get()->ResolveHandle<NavigationAgentComponent>(Action.NavigationAgent);
+        if (Agent == nullptr || Agent->IsPendingRemoval() || !Agent->IsEnabled()
+            || Agent->GetGameObject()->IsPendingDestroy() || !Agent->GetGameObject()->IsActiveInHierarchy())
+        {
+            FailAction("NavigateTo target is no longer available");
+            return;
+        }
+        if (Agent->GetRequestId() != Action.NavigationRequest)
+        {
+            FailAction("NavigateTo request was replaced");
+            return;
+        }
+        if (Duration > 0.f && Action.ElapsedSeconds > Duration)
+        {
+            Agent->Stop();
+            FailAction("NavigateTo timed out");
+            return;
+        }
+        const NavigationAgentState State = Agent->GetMovementState();
+        if (State == NavigationAgentState::Reached)
+        {
+            CompleteActiveAction();
+        }
+        else if (State == NavigationAgentState::Failed || State == NavigationAgentState::Blocked
+            || State == NavigationAgentState::Cancelled || State == NavigationAgentState::PartialReached)
+        {
+            FailAction("NavigateTo failed: " + Agent->GetDiagnostic());
+        }
+        return;
+    }
 
     if (Action.Definition.Kind == StoryActionKind::Wait)
     {
@@ -520,6 +569,20 @@ void StoryRuntime::CancelAllActions()
 
 void StoryRuntime::ReleaseActionTransform(ActiveAction& Action)
 {
+    if (Action.Definition.Kind == StoryActionKind::NavigateTo)
+    {
+        NavigationAgentComponent* Agent = MemorySubsystem::Get()->ResolveHandle<NavigationAgentComponent>(Action.NavigationAgent);
+        if (Agent != nullptr && Agent->GetRequestId() == Action.NavigationRequest && Action.State == StoryActionState::Running)
+        {
+            const NavigationAgentState Movement = Agent->GetMovementState();
+            if (Movement == NavigationAgentState::Moving || Movement == NavigationAgentState::WaitingForNavigation
+                || Movement == NavigationAgentState::WaitingForLink)
+            {
+                Agent->Stop();
+            }
+        }
+        return;
+    }
     Scene* World = GetScene();
     if (World == nullptr)
     {

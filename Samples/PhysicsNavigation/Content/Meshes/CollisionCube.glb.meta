@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "guid": "136f7bd8-d59b-505e-abdb-2e535a4f832a",
+  "assetType": "Model",
+  "sourceFingerprint": "15328aafe74070b5",
+  "loadSettings": {},
+  "importInfo": {},
+  "subAssets": [
+    {
+      "id": "b88298b2-000e-52c7-847f-ffb720f119f6",
+      "type": "StaticMesh",
+      "name": "CollisionCube",
+      "selector": {
+        "kind": "mesh",
+        "index": 0
+      }
+    }
+  ]
+}

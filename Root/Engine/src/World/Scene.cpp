@@ -3,10 +3,45 @@
 #include "World/Components/Component.h"
 #include "World/GameObject.h"
 #include "Core/Object/MemorySubsystem.h"
+#include "Physics/PhysicsWorld.h"
+#include "Navigation/NavigationWorld.h"
 
 #include <algorithm>
 
 Scene::Scene() = default;
+
+PhysicsWorld& Scene::GetPhysics()
+{
+    if (!Physics)
+    {
+        Physics = std::make_unique<PhysicsWorld>(*this);
+    }
+    return *Physics;
+}
+
+void Scene::SetAssetManager(AssetManager* InAssets)
+{
+    Assets = InAssets;
+}
+
+NavigationWorld& Scene::GetNavigation()
+{
+    if (!Navigation)
+    {
+        Navigation = std::make_unique<NavigationWorld>(*this);
+        Navigation->SetJobSystem(Jobs);
+    }
+    return *Navigation;
+}
+
+void Scene::SetJobSystem(JobSystem* System)
+{
+    Jobs = System;
+    if (Navigation)
+    {
+        Navigation->SetJobSystem(Jobs);
+    }
+}
 
 Scene::Scene(const std::string& InName)
     : Object(InName)
@@ -16,6 +51,8 @@ Scene::Scene(const std::string& InName)
 Scene::~Scene()
 {
     EndPlay();
+    Navigation.reset();
+    Physics.reset();
     m_PendingDestroy.clear();
     PendingComponentRemoval.clear();
 
@@ -275,11 +312,15 @@ void Scene::BuildComponentSnapshot()
     }
 }
 
-void Scene::BeginPlay()
+bool Scene::BeginPlay()
 {
     if (bPlaying)
     {
-        return;
+        return true;
+    }
+    if (!GetPhysics().Prepare(Assets) || !GetPhysics().Initialize())
+    {
+        return false;
     }
     bPlaying = true;
     bUpdatingComponents = true;
@@ -295,6 +336,7 @@ void Scene::BeginPlay()
     }
     bUpdatingComponents = false;
     FlushPendingDestroys();
+    return true;
 }
 
 void Scene::EndPlay()
@@ -316,13 +358,29 @@ void Scene::EndPlay()
     }
     bUpdatingComponents = false;
     FlushPendingDestroys();
+    if (Physics)
+    {
+        Physics->Shutdown();
+    }
+    if (Navigation)
+    {
+        Navigation->ResetCrowds();
+    }
 }
 
-void Scene::Tick(float DeltaTime)
+void Scene::Tick(float DeltaTime, bool bSinglePhysicsStep)
 {
     if (bUpdatingComponents)
     {
         return;
+    }
+    if (Navigation)
+    {
+        Navigation->Update();
+        if (bPlaying)
+        {
+            Navigation->UpdateCrowds(DeltaTime);
+        }
     }
     bUpdatingComponents = true;
     BuildComponentSnapshot();
@@ -349,6 +407,17 @@ void Scene::Tick(float DeltaTime)
     }
     bUpdatingComponents = false;
     FlushPendingDestroys();
+    if (bPlaying && Physics)
+    {
+        if (bSinglePhysicsStep)
+        {
+            Physics->StepOnce();
+        }
+        else
+        {
+            Physics->Tick(DeltaTime);
+        }
+    }
 }
 
 GameObject* Scene::FindByPersistentId(const std::string& PersistentId) const

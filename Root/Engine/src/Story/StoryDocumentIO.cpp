@@ -96,6 +96,11 @@ bool TryParseActionKind(const std::string& KindText, StoryActionKind& OutKind, s
         OutKind = StoryActionKind::MoveTo;
         return true;
     }
+    if (KindText == "NavigateTo")
+    {
+        OutKind = StoryActionKind::NavigateTo;
+        return true;
+    }
     if (KindText == "CameraCut")
     {
         OutKind = StoryActionKind::CameraCut;
@@ -261,6 +266,9 @@ nlohmann::json ActionToJson(const StoryActionDefinition& Action)
     case StoryActionKind::MoveTo:
         Document["kind"] = "MoveTo";
         break;
+    case StoryActionKind::NavigateTo:
+        Document["kind"] = "NavigateTo";
+        break;
     case StoryActionKind::CameraCut:
         Document["kind"] = "CameraCut";
         break;
@@ -274,7 +282,8 @@ nlohmann::json ActionToJson(const StoryActionDefinition& Action)
     {
         Document["targetObjectName"] = Action.TargetObjectName;
     }
-    if (Action.Kind == StoryActionKind::MoveTo || Action.Kind == StoryActionKind::CameraCut)
+    if (Action.Kind == StoryActionKind::MoveTo || Action.Kind == StoryActionKind::CameraCut
+        || Action.Kind == StoryActionKind::NavigateTo)
     {
         Document["position"] = Vector3ToJson(Action.TargetPosition);
     }

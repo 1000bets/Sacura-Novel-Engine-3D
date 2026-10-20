@@ -5,6 +5,13 @@
 #include "World/Scene.h"
 #include "World/GameObject.h"
 #include "World/Components/ArrowComponent.h"
+#include "World/Components/NavMeshBoundsComponent.h"
+#include "World/Components/NavigationModifierComponent.h"
+#include "World/Components/NavigationLinkComponent.h"
+#include "World/Components/NavigationAgentComponent.h"
+#include "World/Components/CameraComponent.h"
+#include "Navigation/NavigationWorld.h"
+#include "Physics/PhysicsWorld.h"
 #include "Rendering/ImGuiOverlaySnapshot.h"
 
 #include <imgui.h>
@@ -159,6 +166,7 @@ public:
         ImGuiContextInstance = ImGui::CreateContext();
         ImGui::SetCurrentContext(ImGuiContextInstance);
         ImGui::GetIO().IniFilename = nullptr;
+        ImGui::GetIO().BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;
         unsigned char* FontPixels = nullptr;
         int FontWidth = 0;
         int FontHeight = 0;
@@ -217,10 +225,11 @@ public:
             && (QApplication::keyboardModifiers() & Qt::AltModifier) == Qt::NoModifier;
         InputOutput.MouseDown[0] = bAllowGizmoMouse;
         ImGui::NewFrame();
+        DrawSimulationDebugGeometry(DisplayWidth, DisplayHeight);
         ImGuizmo::BeginFrame();
         ImGuizmo::SetRect(0.0f, 0.0f, DisplayWidth, DisplayHeight);
 
-        if (bHasSelection && !Owner->IsCameraNavigationActive() && DisplayWidth > 0.0f && DisplayHeight > 0.0f)
+        if (Owner->bEditorToolsEnabled && bHasSelection && !Owner->IsCameraNavigationActive() && DisplayWidth > 0.0f && DisplayHeight > 0.0f)
         {
             Matrix ViewMatrix = Matrix::CreateLookAt(
                 Owner->GetViewCamera().Position,
@@ -258,7 +267,15 @@ public:
             }
         }
 
-        RebuildComponentIcons();
+        if (Owner->bEditorToolsEnabled)
+        {
+            RebuildComponentIcons();
+        }
+        else
+        {
+            ComponentIcons.clear();
+            Arrows.clear();
+        }
         update();
         ImGui::Render();
         if (Owner->BoundEngine != nullptr)
@@ -409,6 +426,173 @@ protected:
     }
 
 private:
+    void DrawSimulationDebugGeometry(float DisplayWidth, float DisplayHeight)
+    {
+        if ((!Owner->bNavigationVisible && !Owner->bCollisionVisible) || Owner->BoundEngine == nullptr
+            || DisplayWidth <= 0.f || DisplayHeight <= 0.f)
+        {
+            return;
+        }
+        Scene* World = Owner->BoundEngine->GetActiveScene();
+        if (World == nullptr)
+        {
+            return;
+        }
+        RenderViewCamera Camera = Owner->GetViewCamera();
+        if (World->IsPlaying())
+        {
+            if (const CameraComponent* GameCamera = World->FindPrimaryCamera())
+            {
+                const GameObject* CameraOwner = GameCamera->GetGameObject();
+                Camera.Position = CameraOwner->GetWorldPosition();
+                Camera.Target = Camera.Position + CameraOwner->GetWorldForward();
+                Camera.Up = CameraOwner->GetWorldUp();
+                Camera.FieldOfViewDegrees = GameCamera->FieldOfViewDegrees;
+                Camera.NearPlane = GameCamera->NearPlane;
+                Camera.FarPlane = GameCamera->FarPlane;
+            }
+        }
+        const Matrix ViewProjection = Matrix::CreateLookAt(Camera.Position, Camera.Target, Camera.Up)
+            * Matrix::CreatePerspectiveFieldOfView(Camera.FieldOfViewDegrees * DegreesToRadians,
+                DisplayWidth / DisplayHeight, Camera.NearPlane, Camera.FarPlane);
+        ImDrawList* Drawing = ImGui::GetBackgroundDrawList();
+        auto Project = [&](const Vector3& Position, ImVec2& Screen)
+        {
+            const Vector4 Clip = Vector4::Transform(Vector4(Position.x, Position.y, Position.z, 1.f), ViewProjection);
+            if (Clip.w <= 0.001f || Clip.z < 0.f || Clip.z > Clip.w)
+            {
+                return false;
+            }
+            Screen = ImVec2((Clip.x / Clip.w * 0.5f + 0.5f) * DisplayWidth,
+                (0.5f - Clip.y / Clip.w * 0.5f) * DisplayHeight);
+            return true;
+        };
+        auto DrawLine = [&](const Vector3& Start, const Vector3& End, ImU32 LineColor, float Thickness)
+        {
+            ImVec2 ScreenStart;
+            ImVec2 ScreenEnd;
+            if (Project(Start, ScreenStart) && Project(End, ScreenEnd))
+            {
+                Drawing->AddLine(ScreenStart, ScreenEnd, LineColor, Thickness);
+            }
+        };
+        auto DrawBox = [&](const Vector3& HalfExtents, const Matrix& Placement, ImU32 LineColor)
+        {
+            Vector3 Corners[8];
+            for (int CornerIndex = 0; CornerIndex < 8; ++CornerIndex)
+            {
+                Vector3 Corner = HalfExtents;
+                if ((CornerIndex & 1) == 0)
+                {
+                    Corner.x = -Corner.x;
+                }
+                if ((CornerIndex & 2) == 0)
+                {
+                    Corner.y = -Corner.y;
+                }
+                if ((CornerIndex & 4) == 0)
+                {
+                    Corner.z = -Corner.z;
+                }
+                Corners[CornerIndex] = Vector3::Transform(Corner, Placement);
+            }
+            for (int CornerIndex = 0; CornerIndex < 8; ++CornerIndex)
+            {
+                for (int AxisBit : {1, 2, 4})
+                {
+                    if ((CornerIndex & AxisBit) == 0)
+                    {
+                        DrawLine(Corners[CornerIndex], Corners[CornerIndex | AxisBit], LineColor, 1.5f);
+                    }
+                }
+            }
+        };
+        if (Owner->bNavigationVisible)
+        {
+            if (const NavigationWorld* Navigation = World->GetNavigationIfCreated())
+            {
+                for (const NavigationDebugTriangle& Triangle : Navigation->GetDebugTriangles())
+                {
+                    ImVec2 First;
+                    ImVec2 Second;
+                    ImVec2 Third;
+                    if (Project(Triangle.First, First) && Project(Triangle.Second, Second) && Project(Triangle.Third, Third))
+                    {
+                        if (std::max({First.x, Second.x, Third.x}) < 0.f || std::min({First.x, Second.x, Third.x}) > DisplayWidth
+                            || std::max({First.y, Second.y, Third.y}) < 0.f || std::min({First.y, Second.y, Third.y}) > DisplayHeight)
+                        {
+                            continue;
+                        }
+                        ImU32 Fill = IM_COL32(55, 190, 100, 85);
+                        if (Triangle.Area != 1)
+                        {
+                            Fill = IM_COL32(215, 155, 55, 95);
+                        }
+                        Drawing->AddTriangleFilled(First, Second, Third, Fill);
+                        Drawing->AddTriangle(First, Second, Third, IM_COL32(70, 215, 115, 150), 1.f);
+                    }
+                }
+            }
+            for (GameObject* ObjectInstance : World->GetAllObjects())
+            {
+                if (!ObjectInstance->IsActiveInHierarchy())
+                {
+                    continue;
+                }
+                for (Component* ComponentInstance : ObjectInstance->GetAllComponents())
+                {
+                    if (!ComponentInstance->IsEnabled() || ComponentInstance->IsPendingRemoval())
+                    {
+                        continue;
+                    }
+                    if (const auto* Bounds = dynamic_cast<const NavMeshBoundsComponent*>(ComponentInstance))
+                    {
+                        const AxisAlignedBounds WorldBounds = Bounds->GetWorldBounds();
+                        const Vector3 Center = (WorldBounds.Minimum + WorldBounds.Maximum) * 0.5f;
+                        DrawBox((WorldBounds.Maximum - WorldBounds.Minimum) * 0.5f, Matrix::CreateTranslation(Center),
+                            IM_COL32(80, 200, 120, 200));
+                    }
+                    if (const auto* Modifier = dynamic_cast<const NavigationModifierComponent*>(ComponentInstance))
+                    {
+                        DrawBox(Modifier->HalfExtents, ObjectInstance->GetWorldMatrix(), IM_COL32(215, 155, 55, 220));
+                    }
+                    if (const auto* Link = dynamic_cast<const NavigationLinkComponent*>(ComponentInstance))
+                    {
+                        const Vector3 Start = Vector3::Transform(Link->Start, ObjectInstance->GetWorldMatrix());
+                        const Vector3 End = Vector3::Transform(Link->End, ObjectInstance->GetWorldMatrix());
+                        DrawLine(Start, End, IM_COL32(80, 190, 240, 255), 3.f);
+                        ImVec2 Endpoint;
+                        if (Project(Start, Endpoint))
+                        {
+                            Drawing->AddCircle(Endpoint, 5.f, IM_COL32(80, 190, 240, 255), 12, 2.f);
+                        }
+                        if (Project(End, Endpoint))
+                        {
+                            Drawing->AddCircleFilled(Endpoint, 5.f, IM_COL32(80, 190, 240, 255));
+                        }
+                    }
+                    if (const auto* Agent = dynamic_cast<const NavigationAgentComponent*>(ComponentInstance))
+                    {
+                        const auto& Points = Agent->GetPath().Points;
+                        for (size_t PointIndex = 1; PointIndex < Points.size(); ++PointIndex)
+                        {
+                            DrawLine(Points[PointIndex - 1].Position, Points[PointIndex].Position,
+                                IM_COL32(245, 220, 75, 255), 3.f);
+                        }
+                    }
+                }
+            }
+        }
+        if (Owner->bCollisionVisible)
+        {
+            for (const PhysicsDebugLine& Line : World->GetPhysics().GetDebugLines())
+            {
+                DrawLine(Line.Start, Line.End, ImGui::ColorConvertFloat4ToU32(
+                    ImVec4(Line.LineColor.x, Line.LineColor.y, Line.LineColor.z, Line.LineColor.w)), 1.f);
+            }
+        }
+    }
+
     struct EditorArrow
     {
         QColor Color;
@@ -630,13 +814,30 @@ void EditorViewportWidget::SetEditorToolsEnabled(bool bEnabled)
 
 void EditorViewportWidget::SyncGizmoOverlay()
 {
-    if (!bEditorToolsEnabled)
+    if (!bEditorToolsEnabled && !bNavigationVisible && !bCollisionVisible)
     {
         Gizmo->hide();
         return;
     }
     Gizmo->SyncGeometry();
     Gizmo->BuildAndSubmit();
+}
+
+void EditorViewportWidget::SetNavigationVisible(bool bVisible)
+{
+    if (bNavigationVisible == bVisible)
+    {
+        return;
+    }
+    bNavigationVisible = bVisible;
+    emit NavigationVisibilityChanged(bVisible);
+    SyncGizmoOverlay();
+}
+
+void EditorViewportWidget::SetCollisionVisible(bool bVisible)
+{
+    bCollisionVisible = bVisible;
+    SyncGizmoOverlay();
 }
 
 bool EditorViewportWidget::IsCameraNavigationActive() const
@@ -901,6 +1102,12 @@ void EditorViewportWidget::HandleCameraKeyPress(QKeyEvent* Event)
     }
 
     const quint32 ScanCode = Event->nativeScanCode();
+    if (ScanCode == 0x19 && Event->modifiers() == Qt::NoModifier)
+    {
+        SetNavigationVisible(!bNavigationVisible);
+        Event->accept();
+        return;
+    }
     if (ActiveCameraMode != CameraMode::FlyLook)
     {
         if (ScanCode == ForwardKeyScanCode)

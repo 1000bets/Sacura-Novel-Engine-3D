@@ -1,0 +1,6 @@
+{
+  "name": "PhysicsNavigation",
+  "engineVersion": "0.1",
+  "startupScene": "Content/Scenes/Navigation.scene",
+  "startupStory": "Content/Stories/NavigationDemo.story"
+}

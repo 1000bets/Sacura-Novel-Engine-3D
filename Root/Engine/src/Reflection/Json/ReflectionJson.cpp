@@ -477,8 +477,9 @@ ReflectionDiagnostic ReflectionJson::SerializeObject(const Object* Instance, Ref
     OutDocument.TypeVersion = ObjectClass->GetSchemaVersion();
     OutDocument.Properties = nlohmann::json::object();
 
-    for (const PropertyDescriptor& Descriptor : ObjectClass->GetProperties())
+    for (const PropertyDescriptor* Property : ObjectClass->GetAllProperties())
     {
+        const PropertyDescriptor& Descriptor = *Property;
         if (!HasPropertyFlag(Descriptor.Attributes.Flags, PropertyFlags::Serializable))
         {
             continue;

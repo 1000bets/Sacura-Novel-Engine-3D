@@ -21,6 +21,7 @@ public:
     const TypeId& GetNativeBackingTypeId() const { return NativeBackingTypeId; }
     Object* GetClassDefaultObject() const { return ClassDefaultObject; }
     const std::vector<PropertyDescriptor>& GetProperties() const { return Properties; }
+    std::vector<const PropertyDescriptor*> GetAllProperties() const;
 
     bool IsA(const TypeId& OtherTypeId) const;
     bool IsA(const Class* OtherClass) const;

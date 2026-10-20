@@ -11,6 +11,8 @@
 #include "Platform/WindowSubsystem.h"
 #include "Project/ProjectPaths.h"
 #include "Reflection/ReflectionSubsystem.h"
+#include "Physics/PhysicsWorld.h"
+#include "Navigation/NavigationWorld.h"
 
 #include <chrono>
 #include <filesystem>
@@ -365,6 +367,11 @@ void Engine::AdoptScene(std::unique_ptr<Scene> NewScene)
     StopGame();
     Play.StopPlay();
     OwnedScene = std::move(NewScene);
+    if (OwnedScene)
+    {
+        OwnedScene->SetAssetManager(&Assets);
+        OwnedScene->SetJobSystem(&Jobs);
+    }
 }
 
 Scene* Engine::GetActiveScene() const
@@ -392,15 +399,31 @@ bool Engine::StartGame()
     {
         return false;
     }
-    if (!PrepareSceneMaterials(*OwnedScene))
+    if (!PrepareSceneMaterials(*OwnedScene) || !PrepareSceneSimulation(*OwnedScene))
     {
         return false;
     }
     MaterialTime = 0.f;
+    if (!OwnedScene->BeginPlay())
+    {
+        return false;
+    }
     bGameRunning = true;
-    OwnedScene->BeginPlay();
     BeginStory(OwnedScene.get());
     return true;
+}
+
+bool Engine::PrepareSceneSimulation(Scene& World)
+{
+    AssertGameThread();
+    World.SetAssetManager(&Assets);
+    World.SetJobSystem(&Jobs);
+    if (!World.GetPhysics().Prepare(&Assets))
+    {
+        return false;
+    }
+    NavigationWorld& Navigation = World.GetNavigation();
+    return Navigation.PrepareForSimulation();
 }
 
 std::shared_ptr<DynamicMaterialInstance> Engine::CreateDynamicMaterialInstance(const AssetKey& Material)
@@ -424,11 +447,11 @@ void Engine::StopGame()
     bGameRunning = false;
 }
 
-void Engine::TickWorld(Scene& World, float DeltaTime)
+void Engine::TickWorld(Scene& World, float DeltaTime, bool bSinglePhysicsStep)
 {
     AssertGameThread();
     MaterialTime += std::max(0.f, DeltaTime);
-    World.Tick(DeltaTime);
+    World.Tick(DeltaTime, bSinglePhysicsStep);
     Story.Tick(DeltaTime);
 }
 
@@ -513,12 +536,16 @@ void Engine::Tick(float DeltaTime)
 
     AssetResolver.PollMaterialChanges();
     Assets.PumpCompletions();
+    if (OwnedScene != nullptr && !OwnedScene->IsPlaying())
+    {
+        OwnedScene->GetNavigation().Update();
+    }
     Scene* ActiveScene = GetActiveScene();
-    if (ActiveScene != nullptr)
+    if (ActiveScene != nullptr && Render.IsReady())
     {
         AssetResolver.ResolveScene(*ActiveScene);
     }
-    if (OwnedScene != nullptr && OwnedScene.get() != ActiveScene)
+    if (OwnedScene != nullptr && OwnedScene.get() != ActiveScene && Render.IsReady())
     {
         AssetResolver.ResolveScene(*OwnedScene);
     }

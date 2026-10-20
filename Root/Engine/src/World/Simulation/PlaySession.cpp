@@ -7,6 +7,8 @@
 #include "Engine.h"
 #include "World/Scene.h"
 #include "World/Serialization/SceneSerializer.h"
+#include "Physics/PhysicsWorld.h"
+#include "Navigation/NavigationWorld.h"
 
 PlaySession::PlaySession() = default;
 PlaySession::~PlaySession() = default;
@@ -35,7 +37,8 @@ bool PlaySession::StartPlay()
         return false;
     }
 
-    if (!BoundEngine->PrepareSceneMaterials(*SourceEditWorld))
+    if (!BoundEngine->PrepareSceneMaterials(*SourceEditWorld)
+        || !BoundEngine->PrepareSceneSimulation(*SourceEditWorld))
     {
         return false;
     }
@@ -61,8 +64,19 @@ bool PlaySession::StartPlay()
     }
 
     PlayWorld.reset(LoadedPlayWorld);
+    PlayWorld->SetAssetManager(&BoundEngine->GetAssetManager());
+    PlayWorld->SetJobSystem(&BoundEngine->GetJobSystem());
+    PlayWorld->GetNavigation().CopyMeshesFrom(SourceEditWorld->GetNavigation());
     State = PlaySessionState::Playing;
-    PlayWorld->BeginPlay();
+    if (!PlayWorld->BeginPlay())
+    {
+        PrintString("PlaySession: physics initialization failed: " + PlayWorld->GetPhysics().GetDiagnostic());
+        DestroyPlayWorld();
+        EditWorld = nullptr;
+        EditSceneJson.clear();
+        State = PlaySessionState::Stopped;
+        return false;
+    }
     BoundEngine->BeginStory(PlayWorld.get());
     PrintString("PlaySession: started");
     return true;
@@ -116,7 +130,7 @@ void PlaySession::StepFrame(float Delta)
     {
         return;
     }
-    BoundEngine->TickWorld(*PlayWorld, Delta);
+    BoundEngine->TickWorld(*PlayWorld, Delta, true);
 }
 
 void PlaySession::Tick(float Delta)

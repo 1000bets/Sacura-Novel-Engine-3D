@@ -4,6 +4,8 @@
 
 Сейчас в репозитории — C++-каркас движка в `Root/` (сцена, GameObject/Component, подсистемы) и сборка через CMake. Графический стек: Qt6 (окна Editor и Player, runtime UI) + Diligent Engine (RHI над D3D12 / Vulkan / OpenGL). SDL3 сохранён для низкоуровневого host и тестов.
 
+Физика и навигация реализованы через независимый интерфейс `IPhysicsWorld`, адаптер PhysX и Recast/Detour. Инструкция по компонентам, настройке сетки, Python API и демонстрационному проекту находится в [Samples/PhysicsNavigation/README.md](Samples/PhysicsNavigation/README.md).
+
 ## Сборка
 
 На Windows нужны CMake 3.25+, Visual Studio 2022 с компонентами Desktop development with C++ и C++ CMake tools for Windows (включая Ninja), Windows SDK, Python 3 x64 и Git. Отдельно устанавливать Qt не нужно. Из корня:

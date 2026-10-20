@@ -19,7 +19,8 @@ enum class StoryActionKind
 {
     Wait = 0,
     MoveTo,
-    CameraCut
+    CameraCut,
+    NavigateTo
 };
 
 enum class StoryActionState

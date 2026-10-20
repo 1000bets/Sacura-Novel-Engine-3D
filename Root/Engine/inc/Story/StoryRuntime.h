@@ -62,6 +62,8 @@ private:
         Quaternion StartRotation = Quaternion::Identity;
         ObjectHandle TargetObject;
         ObjectHandle PrimaryCameraObject;
+        ObjectHandle NavigationAgent;
+        uint64_t NavigationRequest = 0;
     };
 
     const StoryNode* FindNode(const StoryNodeId& NodeId) const;

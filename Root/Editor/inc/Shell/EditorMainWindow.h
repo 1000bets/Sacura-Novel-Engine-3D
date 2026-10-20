@@ -163,6 +163,7 @@ private:
     QPushButton* RotateGizmoButton = nullptr;
     QPushButton* ScaleGizmoButton = nullptr;
     QLabel* RenderStatisticsLabel = nullptr;
+    QLabel* NavigationStatisticsLabel = nullptr;
     RenderSettings RenderConfiguration;
     QTabWidget* DockTabs = nullptr;
     QWidget* StoryDockPage = nullptr;

@@ -25,6 +25,7 @@
 #include "Project/ProjectPaths.h"
 #include "Rendering/SceneExtractor.h"
 #include "Story/StoryRuntime.h"
+#include "Navigation/NavigationWorld.h"
 #include "UI/StoryWidget.h"
 
 #include <QAbstractItemView>
@@ -110,6 +111,38 @@ void EditorMainWindow::BuildMenus()
     QMenu* CreateObjectsMenu = CreateMenu->addMenu(QString::fromUtf8("\xD0\x9E\xD0\xB1\xD1\x8A\xD0\xB5\xD0\xBA\xD1\x82\xD1\x8B"));
     QMenu* CreateComponentsMenu = CreateMenu->addMenu(QString::fromUtf8("\xD0\x9A\xD0\xBE\xD0\xBC\xD0\xBF\xD0\xBE\xD0\xBD\xD0\xB5\xD0\xBD\xD1\x82\xD1\x8B"));
     PopulateCreateMenus(CreateObjectsMenu, CreateComponentsMenu);
+    QMenu* NavigationMenu = menuBar()->addMenu(QString::fromUtf8("Навигация"));
+    QAction* BuildNavigation = NavigationMenu->addAction(QString::fromUtf8("Перестроить навигацию"), this, [this]()
+    {
+        Scene* World = GetEditScene();
+        if (World != nullptr && !BoundEngine.GetPlaySession().IsSimulating())
+        {
+            World->GetNavigation().RequestBuild();
+            Document.MarkDirty();
+            statusBar()->showMessage(QString::fromUtf8("Запущено построение навигации"), 3000);
+        }
+    });
+    BuildNavigation->setObjectName("BuildNavigationAction");
+    QAction* ShowNavigation = NavigationMenu->addAction(QString::fromUtf8("Показать NavMesh (P)"));
+    ShowNavigation->setObjectName("ShowNavigationAction");
+    ShowNavigation->setCheckable(true);
+    connect(ShowNavigation, &QAction::toggled, this, [this](bool bVisible)
+    {
+        if (PrimaryViewport != nullptr)
+        {
+            PrimaryViewport->SetNavigationVisible(bVisible);
+        }
+    });
+    QAction* ShowCollision = NavigationMenu->addAction(QString::fromUtf8("Показать коллизии"));
+    ShowCollision->setObjectName("ShowCollisionAction");
+    ShowCollision->setCheckable(true);
+    connect(ShowCollision, &QAction::toggled, this, [this](bool bVisible)
+    {
+        if (PrimaryViewport != nullptr)
+        {
+            PrimaryViewport->SetCollisionVisible(bVisible);
+        }
+    });
     CreateMenu->addSeparator();
     CreateMenu->addAction(QString::fromUtf8("\xD0\x94\xD0\xB5\xD0\xB9\xD1\x81\xD1\x82\xD0\xB2\xD0\xB8\xD1\x8F \xD0\xB8 \xD1\x81\xD0\xBE\xD0\xB1\xD1\x8B\xD1\x82\xD0\xB8\xD1\x8F"), this, &EditorMainWindow::OnFocusActionsAndEvents);
 
@@ -246,6 +279,13 @@ void EditorMainWindow::BuildUi()
     ViewportLayout->setSpacing(0);
 
     PrimaryViewport = new EditorViewportWidget(ViewportPanel);
+    connect(PrimaryViewport, &EditorViewportWidget::NavigationVisibilityChanged, this, [this](bool bVisible)
+    {
+        if (QAction* Action = findChild<QAction*>("ShowNavigationAction"))
+        {
+            Action->setChecked(bVisible);
+        }
+    });
     PrimaryViewport->SetViewId(RenderViewId{1});
     PrimaryViewport->SetEngine(&BoundEngine);
     PrimaryViewport->SetEditorToolsEnabled(true);
@@ -505,6 +545,10 @@ void EditorMainWindow::BuildRenderStatisticsDockPage()
     RenderStatisticsLabel->setStyleSheet("color: #95909e;");
     RenderStatisticsLabel->setText(tr("Waiting for render statisticsвЂ¦"));
     Layout->addWidget(RenderStatisticsLabel);
+    NavigationStatisticsLabel = new QLabel(Page);
+    NavigationStatisticsLabel->setObjectName("NavigationStatisticsLabel");
+    NavigationStatisticsLabel->setWordWrap(true);
+    Layout->addWidget(NavigationStatisticsLabel);
     Layout->addStretch(1);
     DockTabs->addTab(Page, QString::fromUtf8("\xD0\x9D\xD0\xB0\xD1\x81\xD1\x82\xD1\x80\xD0\xBE\xD0\xB9\xD0\xBA\xD0\xB8 \xD1\x81\xD1\x82\xD0\xB0\xD1\x82\xD0\xB8\xD1\x81\xD1\x82\xD0\xB8\xD0\xBA\xD0\xB8"));
 }

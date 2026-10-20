@@ -7,6 +7,14 @@ add_subdirectory(ThirdParty)
 # Engine library (explicit sources РІР‚вЂќ do not use file(GLOB) for compilation units)
 # ---------------------------------------------------------------
 set(ENGINE_SRC
+    src/Physics/PhysicsTypes.cpp
+    src/Physics/PhysicsWorld.cpp
+    src/Physics/Backends/PhysXWorld.cpp
+    src/Navigation/Recast/NavigationMesh.cpp
+    src/Navigation/Recast/NavigationCrowd.cpp
+    src/Navigation/NavigationWorld.cpp
+    src/World/Components/NavigationAgentComponent.cpp
+    src/World/Components/PhysicsBodyComponent.cpp
     src/Rendering/Assets/AssetGpuUploader.cpp
     src/Assets/AssetManager.cpp
     src/Assets/AssetMetadata.cpp
@@ -70,6 +78,7 @@ set(ENGINE_SRC
     src/Rendering/RHI/RenderResourceManager.cpp
     src/Rendering/SceneExtractor.cpp
     src/Scripting/PythonBindings.cpp
+    src/Scripting/PhysicsNavigationBindings.cpp
     src/Scripting/ScriptLifecycle.cpp
     src/Scripting/ScriptingSubsystem.cpp
     src/Story/StoryDocumentIO.cpp
@@ -77,6 +86,18 @@ set(ENGINE_SRC
 )
 
 set(ENGINE_HDR
+    inc/Physics/IPhysicsWorld.h
+    inc/Physics/PhysicsTypes.h
+    inc/Physics/PhysicsWorld.h
+    inc/Navigation/NavigationTypes.h
+    inc/Navigation/NavigationMesh.h
+    inc/Navigation/NavigationCrowd.h
+    inc/Navigation/NavigationWorld.h
+    inc/World/Components/PhysicsBodyComponent.h
+    inc/World/Components/NavMeshBoundsComponent.h
+    inc/World/Components/NavigationModifierComponent.h
+    inc/World/Components/NavigationLinkComponent.h
+    inc/World/Components/NavigationAgentComponent.h
     inc/Rendering/Assets/AssetGpuUploader.h
     inc/Assets/AssetHandle.h
     inc/Assets/AssetManager.h

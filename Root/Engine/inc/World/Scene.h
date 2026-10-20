@@ -4,10 +4,15 @@
 
 #include <string>
 #include <vector>
+#include <memory>
 
 class GameObject;
 class Component;
 class CameraComponent;
+class PhysicsWorld;
+class AssetManager;
+class NavigationWorld;
+class JobSystem;
 
 class Scene : public Object
 {
@@ -22,9 +27,16 @@ public:
     void FlushPendingDestroys();
     void QueueRemoveComponent(Component* ComponentInstance);
     bool IsUpdatingComponents() const { return bUpdatingComponents; }
-    void BeginPlay();
+    bool BeginPlay();
     void EndPlay();
     bool IsPlaying() const { return bPlaying; }
+    PhysicsWorld& GetPhysics();
+    const PhysicsWorld* GetPhysicsIfCreated() const { return Physics.get(); }
+    void SetAssetManager(AssetManager* Assets);
+    AssetManager* GetAssetManager() const { return Assets; }
+    NavigationWorld& GetNavigation();
+    const NavigationWorld* GetNavigationIfCreated() const { return Navigation.get(); }
+    void SetJobSystem(JobSystem* System);
 
     GameObject* FindByPersistentId(const std::string& PersistentId) const;
     GameObject* FindByName(const std::string& Name) const;
@@ -36,7 +48,7 @@ public:
 
     size_t GetObjectCount() const { return m_Objects.size(); }
 
-    void Tick(float DeltaTime);
+    void Tick(float DeltaTime, bool bSinglePhysicsStep = false);
 
     bool IsLoaded() const { return m_bLoaded; }
     void SetLoaded(bool bLoaded) { m_bLoaded = bLoaded; }
@@ -53,6 +65,10 @@ private:
     void BuildComponentSnapshot();
 
     std::vector<GameObject*> m_Objects;
+    std::unique_ptr<PhysicsWorld> Physics;
+    std::unique_ptr<NavigationWorld> Navigation;
+    JobSystem* Jobs = nullptr;
+    AssetManager* Assets = nullptr;
     std::vector<ObjectHandle> m_PendingDestroy;
     std::vector<ObjectHandle> PendingComponentRemoval;
     std::vector<ObjectHandle> ComponentSnapshot;

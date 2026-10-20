@@ -143,6 +143,7 @@ endif()
 
 add_library(SakuraPhysX INTERFACE)
 add_library(Sakura::PhysX ALIAS SakuraPhysX)
+target_compile_definitions(SakuraPhysX INTERFACE PX_PHYSX_STATIC_LIB)
 
 set(SAKURA_PHYSX_TARGETS
     PhysX
@@ -168,6 +169,7 @@ target_include_directories(SakuraPhysX INTERFACE
 )
 
 # ---- Asset pipeline (fastgltf, ozz, stb_image, nlohmann/json) ----
+include(${CMAKE_CURRENT_SOURCE_DIR}/Navigation.cmake)
 add_subdirectory(asset)
 
 # ---- Python scripting (pybind11 embed) ----
@@ -220,6 +222,7 @@ target_link_libraries(SakuraEngineThirdParty INTERFACE
     SDL3::SDL3
     Diligent-BuildSettings
     Sakura::PhysX
+    Sakura::Navigation
     Sakura::AssetThirdParty
 )
 

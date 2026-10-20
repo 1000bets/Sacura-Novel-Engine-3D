@@ -32,7 +32,7 @@ public:
     void SetTransform(const Transform& InTransform);
 
     bool IsEnabled() const { return m_bEnabled; }
-    void SetEnabled(bool bEnabled) { m_bEnabled = bEnabled; }
+    virtual void SetEnabled(bool bEnabled) { m_bEnabled = bEnabled; }
 
 protected:
     friend class GameObject;

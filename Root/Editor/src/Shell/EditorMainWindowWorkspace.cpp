@@ -25,6 +25,8 @@
 #include "Project/ProjectPaths.h"
 #include "Rendering/SceneExtractor.h"
 #include "Story/StoryRuntime.h"
+#include "Navigation/NavigationWorld.h"
+#include "Physics/PhysicsWorld.h"
 #include "UI/StoryWidget.h"
 
 #include <QAbstractItemView>
@@ -52,6 +54,7 @@
 #include <QKeySequence>
 #include <QLabel>
 #include <QLineEdit>
+#include <QScreen>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
@@ -106,6 +109,15 @@ bool EditorMainWindow::CaptureScreenshot(const QString& OutputFile)
     raise();
     activateWindow();
     QApplication::processEvents();
+    if (screen() != nullptr)
+    {
+        const QPoint Origin = mapToGlobal(QPoint(0, 0));
+        const QPixmap Screenshot = screen()->grabWindow(0, Origin.x(), Origin.y(), width(), height());
+        if (!Screenshot.isNull())
+        {
+            return Screenshot.save(OutputFile, "PNG");
+        }
+    }
     return grab().save(OutputFile, "PNG");
 }
 
@@ -290,9 +302,28 @@ void EditorMainWindow::OnMaintenanceTick()
 
     ConfigureRenderView();
     BoundEngine.Tick(DeltaTime);
-    if (bPlayRequested && GetEditScene() != nullptr && BoundEngine.PrepareSceneMaterials(*GetEditScene()))
+    if (bPlayRequested && GetEditScene() != nullptr && BoundEngine.PrepareSceneMaterials(*GetEditScene())
+        && BoundEngine.PrepareSceneSimulation(*GetEditScene()))
     {
         OnPlayToggled(true);
+    }
+    else if (bPlayRequested && GetEditScene() != nullptr)
+    {
+        Scene& World = *GetEditScene();
+        bool bFailed = World.GetPhysics().HasPreparationFailed();
+        std::string Diagnostic = World.GetPhysics().GetDiagnostic();
+        if (World.GetNavigation().HasPreparationFailed())
+        {
+            bFailed = true;
+            Diagnostic = World.GetNavigation().GetDiagnostic();
+        }
+        if (bFailed)
+        {
+            bPlayRequested = false;
+            const QSignalBlocker Blocker(PlayButton);
+            PlayButton->setChecked(false);
+            statusBar()->showMessage(QString::fromStdString(Diagnostic), 10000);
+        }
     }
     RefreshStoryPlaybackUi();
     UpdateStatus();

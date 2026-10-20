@@ -741,6 +741,7 @@ def register_class(type_id, schema_version=1):
     return decorator
 )PY",
         Module.attr("__dict__"));
+    RegisterPhysicsNavigationBindings(Module);
 }
 #endif
 

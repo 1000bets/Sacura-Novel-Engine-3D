@@ -25,6 +25,7 @@
 #include "Project/ProjectPaths.h"
 #include "Rendering/SceneExtractor.h"
 #include "Story/StoryRuntime.h"
+#include "Navigation/NavigationWorld.h"
 #include "UI/StoryWidget.h"
 
 #include <QAbstractItemView>
@@ -230,6 +231,43 @@ void EditorMainWindow::ConfigureRenderView()
             .arg(bPlaying ? tr("Game") : tr("Scene"))
             .arg(Statistics.VisibleObjects).arg(Statistics.CulledObjects).arg(Statistics.DrawCalls)
             .arg(Statistics.CpuMilliseconds, 0, 'f', 2).arg(Timings));
+    }
+    if (NavigationStatisticsLabel != nullptr)
+    {
+        QStringList Lines;
+        if (const Scene* World = BoundEngine.GetActiveScene())
+        {
+            if (const NavigationWorld* Navigation = World->GetNavigationIfCreated())
+            {
+                for (const std::string& Profile : Navigation->GetProfiles())
+                {
+                    QString State = tr("Empty");
+                    switch (Navigation->GetBuildState(Profile))
+                    {
+                    case NavigationBuildState::Building: State = tr("Building"); break;
+                    case NavigationBuildState::Ready: State = tr("Ready"); break;
+                    case NavigationBuildState::Stale: State = tr("Stale"); break;
+                    case NavigationBuildState::Failed: State = tr("Failed"); break;
+                    case NavigationBuildState::Empty: break;
+                    }
+                    QString Detail = QString::fromStdString(Profile) + ": " + State;
+                    if (const NavigationMesh* Mesh = Navigation->GetMesh(Profile))
+                    {
+                        const NavigationStatistics& NavigationMetrics = Mesh->GetStatistics();
+                        Detail += tr(", %1 tiles, %2 polygons, %3 KiB, build %4 ms")
+                            .arg(NavigationMetrics.TileCount).arg(NavigationMetrics.PolygonCount)
+                            .arg(NavigationMetrics.DataBytes / 1024).arg(NavigationMetrics.BuildMilliseconds, 0, 'f', 2);
+                    }
+                    Lines.append(Detail);
+                }
+                if (!Navigation->GetDiagnostic().empty())
+                {
+                    Lines.append(QString::fromStdString(Navigation->GetDiagnostic()));
+                }
+            }
+        }
+        NavigationStatisticsLabel->setText(Lines.join('\n'));
+        NavigationStatisticsLabel->setVisible(!Lines.isEmpty());
     }
 }
 
