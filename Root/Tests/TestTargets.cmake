@@ -1,0 +1,12 @@
+if(APPLE AND CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
+    add_executable(SakuraPhysXMacSmoke "${CMAKE_CURRENT_LIST_DIR}/PhysXMacSmoke.cpp")
+    target_link_libraries(SakuraPhysXMacSmoke PRIVATE Sakura::PhysX)
+    add_test(NAME Engine.PhysX.MacCPU COMMAND SakuraPhysXMacSmoke)
+    add_executable(SakuraMacRenderSmoke "${CMAKE_CURRENT_LIST_DIR}/MacRenderSmoke.cpp")
+    target_link_libraries(SakuraMacRenderSmoke PRIVATE Engine)
+    sakura_stage_engine_runtime(SakuraMacRenderSmoke)
+    file(COPY "${CMAKE_SOURCE_DIR}/Samples/SampleProject" DESTINATION "${CMAKE_BINARY_DIR}/SmokeProjects")
+    add_test(NAME Engine.Render.MacVulkan COMMAND SakuraMacRenderSmoke
+        "${CMAKE_BINARY_DIR}/SmokeProjects/SampleProject/SampleProject.project")
+    set_tests_properties(Engine.Render.MacVulkan PROPERTIES TIMEOUT 45)
+endif()
