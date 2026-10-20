@@ -1,3 +1,8 @@
+import GameplayCommandFields from './GameplayCommandFields.jsx';
+import {animationOptions} from './characterPresentation.js';
+import {t as tr, useLocale, optionLabel, literalLabel, message} from './i18n.jsx';
+import AudioActionControls from './AudioActionControls.jsx';
+import AudioEnvelopeEditor from './AudioEnvelopeEditor.jsx';
 import {PhysicsNumber} from './NavigationInspector.jsx';
 import {projectAudioAssets} from './audioAssets.js';
 import {typedValue,variableName} from './choiceModel.js';
@@ -12,12 +17,14 @@ export default function ActionFields({
   project,
   onChange,
   compact = false,
+  inspector = false,
   sceneId,
   onPickPosition,
 }) {
+ useLocale();
   const field = (label, control) => (
     <label className="action-field">
-      <span>{label}</span>
+      <span>{tr(label)}</span>
       {control}
     </label>
   );
@@ -30,7 +37,7 @@ export default function ActionFields({
         const [v, l] = Array.isArray(x) ? x : [x, x];
         return (
           <option value={v} key={v}>
-            {l}
+            {optionLabel(l)}
           </option>
         );
       })}
@@ -47,13 +54,14 @@ export default function ActionFields({
   );
   const type = a.type,
     duration =
-      ["move", "wait", "duck", "stop"].includes(type) ||
+      ["move", "wait", "duck"].includes(type) ||
       (type === "sound" && !a.assetId);
   const target=project.objects.find(o=>o.id===a.target),activeScene=project.subscenes.find(scene=>scene.id===(sceneId||target?.subsceneId));
   const pointOptions=activeScene?stagingPointOptions(activeScene,project.objects,a.value):project.subscenes.flatMap(scene=>sceneStagingPoints(scene,project.objects).map(point=>[point.id,`${scene.name} · ${point.label}`]));
   if(type==='move'&&!activeScene&&!pointOptions.some(([id])=>id===a.value)){
     pointOptions.unshift([Array.isArray(a.value)?a.value.join(', '):a.value,Array.isArray(a.value)?`Координаты: ${a.value.join(', ')}`:`Сохранённая точка: ${a.value||'выберите точку'}`]);
   }
+  if(type==='gameplay')return <div className="typed-action-fields"><GameplayCommandFields compact={inspector} project={project} command={a.command} value={a.value} operationVersion={a.operationVersion} onChange={onChange}/></div>;
   return (
     <div className={"typed-action-fields " + (compact ? "compact" : "")}>
       {["move", "pose", "visibility", "highlight", "door"].includes(type) &&
@@ -64,22 +72,22 @@ export default function ActionFields({
             ([{id:"",name:"Выберите объект"},...project.objects])
               .filter((o) => !o.id || type !== "pose" || o.type === "Персонаж")
               .filter((o) => !o.id||!sceneId||!activeScene||isObjectInScene(o,activeScene)||o.id===a.target)
-              .map((o) => [o.id, o.name]),
+              .map((o) => [o.id,o.id?literalLabel(o.name):o.name]),
           ),
         )}
       {type === "move" &&
         <>
-        {field("К точке", select("value", [["", "Выберите точку"],...pointOptions]))}
-        <div className="action-coordinates">{['X','Y','Z'].map((axis,i)=><PhysicsNumber key={axis} label={axis} value={Array.isArray(a.value)?a.value[i]:0} onChange={n=>{const value=Array.isArray(a.value)?[...a.value]:[0,0,0];value[i]=n;onChange({value});}}/>)}</div>
-        {onPickPosition&&<button type="button" onClick={()=>onPickPosition(a.id)}>Выбрать вручную на сцене</button>}
-        {field('Звук шагов',select('footstepAssetId',[["","Не выбран · без звука"],...projectAudioAssets(project).filter(asset=>asset.kind==='sound').map(asset=>[asset.id,asset.name])]))}
+        {field("К точке", select("value", [["", "Выберите точку"],...pointOptions.map(([id,label])=>[id,literalLabel(message(label))])]))}
+        <details className="action-extra" open={inspector?Array.isArray(a.value):true}><summary>{tr("Координаты и движение")}</summary><div className="action-coordinates">{['X','Y','Z'].map((axis,i)=><PhysicsNumber key={axis} label={axis} value={Array.isArray(a.value)?a.value[i]:0} onChange={n=>{const value=Array.isArray(a.value)?[...a.value]:[0,0,0];value[i]=n;onChange({value});}}/>)}</div>
+        {onPickPosition&&<button type="button" onClick={()=>onPickPosition(a.id)}>{tr("Выбрать вручную на сцене")}</button>}
+        {field('Звук шагов',select('footstepAssetId',[["","Не выбран · без звука"],...projectAudioAssets(project).filter(asset=>asset.kind==='sound').map(asset=>[asset.id,literalLabel(asset.name)])]))}
         {a.footstepAssetId&&field('Громкость шагов',<input type="number" min="0" max="1" step="0.1" value={a.footstepVolume??1} onChange={e=>onChange({footstepVolume:Math.max(0,Math.min(1,Number(e.target.value)))})}/>)}
-        {target?.type==='Персонаж'&&field('Анимация движения',select('animationId',[["","По настройкам персонажа"],...characterAnimationOptions(target,a.animationId)]))}
+        {target?.type==='Персонаж'&&field('Анимация движения',select('animationId',[["","По настройкам персонажа"],...animationOptions(target,a.animationId)]))}</details>
         </>}
       {type === "pose" &&
         field(
           "Анимация персонажа",
-          select("value", [["","Выберите анимацию"],...characterAnimationOptions(target,a.value)]),
+          select("value", [["","Выберите анимацию"],...animationOptions(target,a.value)]),
         )}
       {type === "camera" && <>
         {field("Камера",select("cameraId",[["","План по умолчанию"],...(a.cameraId&&!project.subscenes.some(s=>s.cameras?.some(c=>c.id===a.cameraId))?[[a.cameraId,"Камера удалена · выберите другую"]]:[]),...project.subscenes.flatMap(s=>(s.cameras||[]).map(c=>[c.id,`${s.location} · ${c.name}${c.mode==='follow'?' · слежение':''}`]))]))}
@@ -106,7 +114,7 @@ export default function ActionFields({
               ["", "Без файла"],
               ...projectAudioAssets(project).filter(
                 (s) => type !== "music" || s.kind === "music",
-              ).map((s) => [s.id, s.name]),
+              ).map((s) => [s.id,literalLabel(s.name)]),
             ]),
           )}
           {field(
@@ -122,6 +130,7 @@ export default function ActionFields({
               onChange={(e) => onChange({ volume: Number(e.target.value) })}
             />,
           )}
+          {a.assetId&&projectAudioAssets(project).find(s=>s.id===a.assetId)&&<details className="action-extra" open={!inspector}><summary>{tr("Огибающая звука")}</summary><AudioEnvelopeEditor asset={projectAudioAssets(project).find(s=>s.id===a.assetId)} action={a} onChange={onChange}/></details>}
           {!compact && (
             <>
               {type === "music" ? (
@@ -132,9 +141,8 @@ export default function ActionFields({
                       checked={a.loop !== false}
                       onChange={(e) => onChange({ loop: e.target.checked })}
                     />
-                    Повторять по кругу
-                  </label>
-                  {field("Плавный вход, сек", number("fade"))}
+                    {tr("Повторять по кругу")}</label>
+
                 </>
               ) : (
                 <label className="check">
@@ -143,21 +151,21 @@ export default function ActionFields({
                     checked={a.duck !== false}
                     onChange={(e) => onChange({ duck: e.target.checked })}
                   />
-                  Приглушать музыку под голос
-                </label>
+                  {tr("Приглушать музыку под голос")}</label>
               )}
             </>
           )}
         </>
       )}
       {["pause", "resume", "stop", "duck"].includes(type) && (
-        <div className="action-target-note">Музыка · основной фон</div>
+        <div className="action-target-note">{tr("Музыка · основной фон")}</div>
       )}
+      {["music","sound","pause","resume","stop"].includes(type)&&<details className="action-extra" open={!inspector}><summary>{tr('Переходы звука')}</summary><AudioActionControls compact={inspector} action={a} onChange={onChange}/></details>}
       {type==='variable'&&(()=>{const valueType=a.valueType||typeof project.variables[a.target],operation=a.operation||(String(a.value).startsWith('+')?'add':'set');return <>
        {field('Переменная',<select value={a.target} onChange={e=>{const target=e.target.value,valueType=typeof project.variables[target];onChange({target,valueType,operation:'set',value:typedValue('',valueType)});}}>{Object.keys(project.variables).map(id=><option key={id} value={id}>{variableName(id)}</option>)}</select>)}
-       {valueType==='number'&&field('Операция',<select aria-label="Операция с переменной" value={operation} onChange={e=>onChange({operation:e.target.value,valueType,value:typedValue(a.value,valueType)})}><option value="set">Задать значение</option><option value="add">Прибавить</option></select>)}
-       {field(operation==='add'&&valueType==='number'?'Прибавить число':'Значение',<ValueField label="Значение переменной" type={valueType} value={typedValue(a.value,valueType)} onChange={value=>onChange({value,valueType,operation:valueType==='number'?operation:'set'})}/>)}
-       <small className="resource-note">Используйте эту переменную в проверках и условиях ответов.</small>
+       {valueType==='number'&&field('Операция',<select aria-label={tr("Операция с переменной")} value={operation} onChange={e=>onChange({operation:e.target.value,valueType,value:typedValue(a.value,valueType)})}><option value="set">{tr("Задать значение")}</option><option value="add">{tr("Прибавить")}</option></select>)}
+       {field(operation==='add'&&valueType==='number'?'Прибавить число':'Значение',<ValueField label={tr("Значение переменной")} type={valueType} value={typedValue(a.value,valueType)} onChange={value=>onChange({value,valueType,operation:valueType==='number'?operation:'set'})}/>)}
+       {!inspector&&<small className="resource-note">{tr("Используйте эту переменную в проверках и условиях ответов.")}</small>}
       </>;})()}
       {type === "wait" && (
         <>
@@ -174,10 +182,9 @@ export default function ActionFields({
                 })
               }
             >
-              <option value="delay">Пауза на время</option>
+              <option value="delay">{tr("Пауза на время")}</option>
               <option value="dependency">
-                Результат события · диагностика
-              </option>
+                {tr("Результат события · диагностика")}</option>
             </select>,
           )}
           {a.waitFor &&
@@ -185,27 +192,27 @@ export default function ActionFields({
               "Событие",
               select(
                 "waitFor",
-                project.events.map((e) => [e.id, e.name]),
+                project.events.map((e) => [e.id,literalLabel(e.name)]),
               ),
             )}
         </>
       )}
       {duration &&
         field(
-          type === "stop" ? "Затухание, сек" : "Длительность, сек",
+          "Длительность, сек",
           number("duration", 0.1),
         )}
-      {!compact && (
+      {!compact && !inspector && (
         <div className="action-completion">
-          <span>Продолжение группы</span>
+          <span>{tr("Продолжение группы")}</span>
           <strong>
             {TYPES[type]?.completion === "CONTINUOUS"
-              ? "После запуска · фон остаётся"
+              ? tr("После запуска · фон остаётся")
               : type === "sound" && a.assetId
-                ? "Когда закончится файл"
+                ? a.endMode==='event'?tr("Звук продолжается до конца события"):tr("Когда закончится файл")
                 : duration
-                  ? "После завершения"
-                  : "После применения"}
+                  ? tr("После завершения")
+                  : tr("После применения")}
           </strong>
         </div>
       )}

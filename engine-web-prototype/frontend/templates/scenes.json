@@ -1,0 +1,1586 @@
+{
+  "shooter": {
+    "objects": [
+      {
+        "id": "shooter-arena-floor",
+        "name": "Бетонный пол",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#53616a",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              0,
+              -0.15,
+              0
+            ],
+            "scale": [
+              32,
+              0.6,
+              40
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "wall-north",
+        "name": "Северная стена",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#253841",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              0,
+              2,
+              -10
+            ],
+            "scale": [
+              32,
+              8,
+              0.8
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        }
+      },
+      {
+        "id": "wall-west",
+        "name": "Западная стена",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#2f424b",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              -8,
+              2,
+              0
+            ],
+            "scale": [
+              0.8,
+              8,
+              40
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        }
+      },
+      {
+        "id": "wall-east",
+        "name": "Восточная стена",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#2f424b",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              8,
+              2,
+              0
+            ],
+            "scale": [
+              0.8,
+              8,
+              40
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        }
+      },
+      {
+        "id": "wall-south",
+        "name": "Южная стена",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#253841",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              0,
+              2,
+              10
+            ],
+            "scale": [
+              32,
+              8,
+              0.8
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        }
+      },
+      {
+        "id": "shooter-hero",
+        "name": "Боец",
+        "type": "Персонаж",
+        "dialogueWidgetId": null,
+        "color": "#729fb5",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "description": "Игрок: 100 HP. WASD, обзор мышью, прыжок. Коллайдер соответствует фигуре.",
+        "idleAnimation": "стоит",
+        "enabledAnimations": [
+          "стоит",
+          "ходит",
+          "сидит",
+          "машет",
+          "улыбка",
+          "задумчивость",
+          "танец",
+          "грусть"
+        ],
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              0,
+              0,
+              6
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "walkAnimation": "ходит",
+        "collision": {
+          "enabled": true,
+          "custom": true,
+          "size": [
+            0.45,
+            1.6,
+            0.45
+          ],
+          "offset": [
+            0,
+            0.8,
+            0
+          ]
+        }
+      },
+      {
+        "id": "enemy-1",
+        "name": "Штурмовик · центр",
+        "type": "Персонаж",
+        "dialogueWidgetId": null,
+        "color": "#bd665e",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "description": "50 HP · скорость 0.8 · урон 10. Преследует героя и атакует вблизи.",
+        "idleAnimation": "ходит",
+        "enabledAnimations": [
+          "стоит",
+          "ходит",
+          "сидит",
+          "машет",
+          "улыбка",
+          "задумчивость",
+          "танец",
+          "грусть"
+        ],
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              0,
+              0,
+              -2
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "walkAnimation": "ходит",
+        "collision": {
+          "enabled": true,
+          "custom": true,
+          "size": [
+            0.45,
+            1.6,
+            0.45
+          ],
+          "offset": [
+            0,
+            0.8,
+            0
+          ]
+        }
+      },
+      {
+        "id": "enemy-2",
+        "name": "Штурмовик · слева",
+        "type": "Персонаж",
+        "dialogueWidgetId": null,
+        "color": "#bd665e",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "description": "50 HP · скорость 0.9 · урон 10. Преследует героя и атакует вблизи.",
+        "idleAnimation": "ходит",
+        "enabledAnimations": [
+          "стоит",
+          "ходит",
+          "сидит",
+          "машет",
+          "улыбка",
+          "задумчивость",
+          "танец",
+          "грусть"
+        ],
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              -4.5,
+              0,
+              -4
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "walkAnimation": "ходит",
+        "collision": {
+          "enabled": true,
+          "custom": true,
+          "size": [
+            0.45,
+            1.6,
+            0.45
+          ],
+          "offset": [
+            0,
+            0.8,
+            0
+          ]
+        }
+      },
+      {
+        "id": "enemy-3",
+        "name": "Штурмовик · справа",
+        "type": "Персонаж",
+        "dialogueWidgetId": null,
+        "color": "#bd665e",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "description": "50 HP · скорость 0.9 · урон 10. Преследует героя и атакует вблизи.",
+        "idleAnimation": "ходит",
+        "enabledAnimations": [
+          "стоит",
+          "ходит",
+          "сидит",
+          "машет",
+          "улыбка",
+          "задумчивость",
+          "танец",
+          "грусть"
+        ],
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              4.5,
+              0,
+              -4
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "walkAnimation": "ходит",
+        "collision": {
+          "enabled": true,
+          "custom": true,
+          "size": [
+            0.45,
+            1.6,
+            0.45
+          ],
+          "offset": [
+            0,
+            0.8,
+            0
+          ]
+        }
+      },
+      {
+        "id": "enemy-4",
+        "name": "Разведчик · быстрый",
+        "type": "Персонаж",
+        "dialogueWidgetId": null,
+        "color": "#e1a459",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "description": "50 HP · скорость 1.35 · урон 8. Преследует героя и атакует вблизи.",
+        "idleAnimation": "ходит",
+        "enabledAnimations": [
+          "стоит",
+          "ходит",
+          "сидит",
+          "машет",
+          "улыбка",
+          "задумчивость",
+          "танец",
+          "грусть"
+        ],
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              -2,
+              0,
+              -8
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "walkAnimation": "ходит",
+        "collision": {
+          "enabled": true,
+          "custom": true,
+          "size": [
+            0.45,
+            1.6,
+            0.45
+          ],
+          "offset": [
+            0,
+            0.8,
+            0
+          ]
+        }
+      },
+      {
+        "id": "enemy-5",
+        "name": "Тяжёлый боец",
+        "type": "Персонаж",
+        "dialogueWidgetId": null,
+        "color": "#843f48",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "description": "100 HP · скорость 0.65 · урон 16. Преследует героя и атакует вблизи.",
+        "idleAnimation": "ходит",
+        "enabledAnimations": [
+          "стоит",
+          "ходит",
+          "сидит",
+          "машет",
+          "улыбка",
+          "задумчивость",
+          "танец",
+          "грусть"
+        ],
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              2,
+              0,
+              -8
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "walkAnimation": "ходит",
+        "collision": {
+          "enabled": true,
+          "custom": true,
+          "size": [
+            0.45,
+            1.6,
+            0.45
+          ],
+          "offset": [
+            0,
+            0.8,
+            0
+          ]
+        }
+      },
+      {
+        "id": "cover-west",
+        "name": "Укрытие слева",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#6c827a",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              -5,
+              0.7,
+              1
+            ],
+            "scale": [
+              4,
+              2.8,
+              2.6
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        }
+      },
+      {
+        "id": "cover-east",
+        "name": "Укрытие справа",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#6c827a",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              5,
+              0.7,
+              1
+            ],
+            "scale": [
+              4,
+              2.8,
+              2.6
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        }
+      },
+      {
+        "id": "cover-back-west",
+        "name": "Грузовой ящик слева",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#58656a",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              -6,
+              1.2,
+              -7
+            ],
+            "scale": [
+              4.4,
+              4.8,
+              4
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        }
+      },
+      {
+        "id": "cover-back-east",
+        "name": "Грузовой ящик справа",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#58656a",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              6,
+              1.2,
+              -7
+            ],
+            "scale": [
+              4.4,
+              4.8,
+              4
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": true
+        }
+      },
+      {
+        "id": "gate",
+        "name": "Ворота рубежа",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#18252c",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              0,
+              1.65,
+              -9.74
+            ],
+            "scale": [
+              7.6,
+              6.6,
+              0.3
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "gate-stripe",
+        "name": "Сигнал ворот",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#d5a55c",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              0,
+              3.45,
+              -9.6
+            ],
+            "scale": [
+              7.6,
+              0.24,
+              0.24
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "arena-medkit",
+        "name": "Аптечка · E — подобрать",
+        "type": "Активный меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#68c6a0",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              -5,
+              0.25,
+              3
+            ],
+            "scale": [
+              1.1,
+              1,
+              1.1
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        },
+        "interaction": "Подобрать аптечку"
+      },
+      {
+        "id": "medkit-cross-horizontal",
+        "name": "Метка аптечки",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#e5f5ee",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              -5,
+              0.515,
+              3
+            ],
+            "scale": [
+              0.72,
+              0.024,
+              0.2
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "medkit-cross-vertical",
+        "name": "Метка аптечки",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#e5f5ee",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              -5,
+              0.52,
+              3
+            ],
+            "scale": [
+              0.2,
+              0.024,
+              0.72
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "lane-0",
+        "name": "Разметка прохода 1",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#c6aa66",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              0,
+              0.006,
+              -5
+            ],
+            "scale": [
+              0.24,
+              0.024,
+              2.8
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "lane-1",
+        "name": "Разметка прохода 2",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#c6aa66",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              0,
+              0.006,
+              -1
+            ],
+            "scale": [
+              0.24,
+              0.024,
+              2.8
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "lane-2",
+        "name": "Разметка прохода 3",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#c6aa66",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              0,
+              0.006,
+              3
+            ],
+            "scale": [
+              0.24,
+              0.024,
+              2.8
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "lane-3",
+        "name": "Разметка прохода 4",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#c6aa66",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              0,
+              0.006,
+              7
+            ],
+            "scale": [
+              0.24,
+              0.024,
+              2.8
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "wall-band-0-0",
+        "name": "Сигнальная полоса 0/0",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#b69b64",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              -7.72,
+              2.8,
+              -6
+            ],
+            "scale": [
+              0.1,
+              0.4,
+              4
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "wall-band-0-1",
+        "name": "Сигнальная полоса 0/1",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#b69b64",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              -7.72,
+              2.8,
+              0
+            ],
+            "scale": [
+              0.1,
+              0.4,
+              4
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "wall-band-0-2",
+        "name": "Сигнальная полоса 0/2",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#b69b64",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              -7.72,
+              2.8,
+              6
+            ],
+            "scale": [
+              0.1,
+              0.4,
+              4
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "wall-band-1-0",
+        "name": "Сигнальная полоса 1/0",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#b69b64",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              7.72,
+              2.8,
+              -6
+            ],
+            "scale": [
+              0.1,
+              0.4,
+              4
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "wall-band-1-1",
+        "name": "Сигнальная полоса 1/1",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#b69b64",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              7.72,
+              2.8,
+              0
+            ],
+            "scale": [
+              0.1,
+              0.4,
+              4
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      },
+      {
+        "id": "wall-band-1-2",
+        "name": "Сигнальная полоса 1/2",
+        "type": "Меш",
+        "primitive": "box",
+        "active": true,
+        "subsceneId": "shooter-arena",
+        "color": "#b69b64",
+        "transforms": {
+          "shooter-arena": {
+            "position": [
+              7.72,
+              2.8,
+              6
+            ],
+            "scale": [
+              0.1,
+              0.4,
+              4
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "collision": {
+          "enabled": false
+        }
+      }
+    ],
+    "subscenes": [
+      {
+        "id": "shooter-arena",
+        "name": "Арена · Последний рубеж",
+        "description": "Пять противников в открытом проходе; укрытия и аптечка на флангах. Победа — уничтожить всех.",
+        "location": "Шутер — Последний рубеж",
+        "kind": "empty",
+        "entry": "shooter-intro",
+        "sceneId": "chapter1",
+        "weather": "Ясно",
+        "time": "День",
+        "color": "#96b9ba",
+        "stagingPoints": [],
+        "navMesh": {
+          "enabled": true,
+          "show": false,
+          "center": [
+            0,
+            0,
+            0
+          ],
+          "size": [
+            15,
+            19
+          ],
+          "cellSize": 0.25
+        },
+        "cameras": [
+          {
+            "id": "shooter-arena-camera",
+            "name": "Обзор арены · вступление и финал",
+            "mode": "fixed",
+            "position": [
+              0,
+              5.5,
+              9
+            ],
+            "target": [
+              0,
+              0,
+              -3
+            ],
+            "fov": 64,
+            "smoothing": 0.15
+          }
+        ],
+        "defaultCameraId": "shooter-arena-camera"
+      }
+    ]
+  },
+  "point-and-click": {
+    "objects": [
+      {
+        "id": "quest-room-floor",
+        "name": "Пол локации",
+        "type": "Меш",
+        "primitive": "box",
+        "color": "#726659",
+        "active": true,
+        "subsceneId": "quest-room",
+        "transforms": {
+          "quest-room": {
+            "position": [
+              0,
+              -0.08,
+              0
+            ],
+            "scale": [
+              16,
+              0.3,
+              12
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "id": "quest-room-wall",
+        "name": "Задняя стена",
+        "type": "Меш",
+        "primitive": "box",
+        "color": "#485965",
+        "active": true,
+        "subsceneId": "quest-room",
+        "transforms": {
+          "quest-room": {
+            "position": [
+              0,
+              1.1,
+              -3
+            ],
+            "scale": [
+              16,
+              4.4,
+              0.35
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "id": "quest-yard-floor",
+        "name": "Пол локации",
+        "type": "Меш",
+        "primitive": "box",
+        "color": "#536b61",
+        "active": true,
+        "subsceneId": "quest-yard",
+        "transforms": {
+          "quest-yard": {
+            "position": [
+              0,
+              -0.08,
+              0
+            ],
+            "scale": [
+              16,
+              0.3,
+              12
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "id": "quest-yard-wall",
+        "name": "Задняя стена",
+        "type": "Меш",
+        "primitive": "box",
+        "color": "#485965",
+        "active": true,
+        "subsceneId": "quest-yard",
+        "transforms": {
+          "quest-yard": {
+            "position": [
+              0,
+              1.1,
+              -3
+            ],
+            "scale": [
+              16,
+              4.4,
+              0.35
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "id": "quest-hero",
+        "name": "Исследователь",
+        "type": "Персонаж",
+        "dialogueWidgetId": null,
+        "color": "#d7b47d",
+        "active": true,
+        "subsceneId": "",
+        "description": "",
+        "idleAnimation": "стоит",
+        "enabledAnimations": [
+          "стоит",
+          "ходит",
+          "сидит",
+          "машет",
+          "улыбка",
+          "задумчивость",
+          "танец",
+          "грусть"
+        ],
+        "transforms": {
+          "quest-room": {
+            "position": [
+              -0.4,
+              0,
+              1.4
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "quest-yard": {
+            "position": [
+              -0.4,
+              0,
+              1.4
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        "walkAnimation": "ходит",
+        "collision": {
+          "enabled": true,
+          "custom": true,
+          "size": [
+            0.45,
+            1.6,
+            0.45
+          ],
+          "offset": [
+            0,
+            0.8,
+            0
+          ]
+        }
+      },
+      {
+        "id": "quest-desk",
+        "name": "Стол смотрителя",
+        "type": "Меш",
+        "primitive": "box",
+        "color": "#796047",
+        "active": true,
+        "subsceneId": "quest-room",
+        "transforms": {
+          "quest-room": {
+            "position": [
+              -1.8,
+              0.55,
+              -0.6
+            ],
+            "scale": [
+              3,
+              2.2,
+              1.8
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "id": "quest-key",
+        "name": "Латунный ключ",
+        "type": "Активный меш",
+        "primitive": "box",
+        "color": "#e5c15c",
+        "active": true,
+        "subsceneId": "quest-room",
+        "transforms": {
+          "quest-room": {
+            "position": [
+              -1.8,
+              1.15,
+              -0.6
+            ],
+            "scale": [
+              0.75,
+              0.18,
+              0.42
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "interaction": "Латунный ключ"
+      },
+      {
+        "id": "quest-note",
+        "name": "Записка смотрителя",
+        "type": "Активный меш",
+        "primitive": "box",
+        "color": "#e8dec0",
+        "active": true,
+        "subsceneId": "quest-room",
+        "transforms": {
+          "quest-room": {
+            "position": [
+              1.3,
+              0.08,
+              0.2
+            ],
+            "scale": [
+              1.35,
+              0.12,
+              0.9
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "interaction": "Записка смотрителя"
+      },
+      {
+        "id": "quest-door",
+        "name": "Запертая дверь во двор",
+        "type": "Активный меш",
+        "primitive": "box",
+        "color": "#6b9da0",
+        "active": true,
+        "subsceneId": "quest-room",
+        "transforms": {
+          "quest-room": {
+            "position": [
+              2.7,
+              1,
+              -2.2
+            ],
+            "scale": [
+              2.2,
+              4,
+              0.35
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "interaction": "Запертая дверь во двор"
+      },
+      {
+        "id": "quest-pedestal",
+        "name": "Постамент",
+        "type": "Меш",
+        "primitive": "box",
+        "color": "#a4adb0",
+        "active": true,
+        "subsceneId": "quest-yard",
+        "transforms": {
+          "quest-yard": {
+            "position": [
+              0.5,
+              0.45,
+              -0.8
+            ],
+            "scale": [
+              2,
+              1.8,
+              2
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "id": "quest-relic",
+        "name": "Звёздная линза",
+        "type": "Активный меш",
+        "primitive": "sphere",
+        "color": "#9ebcea",
+        "active": true,
+        "subsceneId": "quest-yard",
+        "transforms": {
+          "quest-yard": {
+            "position": [
+              0.5,
+              1.05,
+              -0.8
+            ],
+            "scale": [
+              0.9,
+              0.9,
+              0.9
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "interaction": "Звёздная линза"
+      }
+    ],
+    "subscenes": [
+      {
+        "id": "quest-room",
+        "name": "Кабинет смотрителя",
+        "description": "Все объекты, события, виджеты и связи редактируются стандартными инструментами Sacura.",
+        "location": "Point & Click — Ключ от обсерватории",
+        "kind": "empty",
+        "entry": "quest-intro",
+        "sceneId": "chapter1",
+        "weather": "Ясно",
+        "time": "День",
+        "color": "#96b9ba",
+        "stagingPoints": [],
+        "navMesh": {
+          "enabled": true,
+          "show": true,
+          "center": [
+            0,
+            0,
+            0
+          ],
+          "size": [
+            8,
+            6
+          ],
+          "cellSize": 0.25
+        },
+        "cameras": [
+          {
+            "id": "quest-room-camera",
+            "name": "Игровой ракурс",
+            "mode": "fixed",
+            "position": [
+              0,
+              5,
+              6.8
+            ],
+            "target": [
+              0,
+              0.3,
+              -0.5
+            ],
+            "fov": 58,
+            "smoothing": 0.15
+          }
+        ],
+        "defaultCameraId": "quest-room-camera"
+      },
+      {
+        "id": "quest-yard",
+        "name": "Двор обсерватории",
+        "description": "Все объекты, события, виджеты и связи редактируются стандартными инструментами Sacura.",
+        "location": "Двор обсерватории",
+        "kind": "empty",
+        "entry": "quest-yard-intro",
+        "sceneId": "chapter1",
+        "weather": "Ясно",
+        "time": "День",
+        "color": "#96b9ba",
+        "stagingPoints": [],
+        "navMesh": {
+          "enabled": true,
+          "show": true,
+          "center": [
+            0,
+            0,
+            0
+          ],
+          "size": [
+            8,
+            6
+          ],
+          "cellSize": 0.25
+        },
+        "cameras": [
+          {
+            "id": "quest-yard-camera",
+            "name": "Игровой ракурс",
+            "mode": "fixed",
+            "position": [
+              0,
+              5,
+              6.8
+            ],
+            "target": [
+              0,
+              0.3,
+              -0.5
+            ],
+            "fov": 58,
+            "smoothing": 0.15
+          }
+        ],
+        "defaultCameraId": "quest-yard-camera"
+      }
+    ]
+  }
+}

@@ -1,3 +1,4 @@
+import {subscribeLanguage} from './i18n.js';
 import * as THREE from 'three';
 
 import {resolvedPosition} from './sceneEditing.js';
@@ -23,8 +24,10 @@ export function gameCamera(kind,state,objects=[]){
 }
 export function labelSprite(text){
  const canvas=document.createElement('canvas');canvas.width=512;canvas.height=96;const c=canvas.getContext('2d');
- c.fillStyle='#22252deb';c.beginPath();c.roundRect(2,2,508,92,15);c.fill();c.strokeStyle='#d8b584';c.lineWidth=3;c.stroke();c.fillStyle='#f4e1bd';c.font='500 27px Segoe UI';c.textAlign='center';c.textBaseline='middle';c.fillText(text,256,48);
- const texture=new THREE.CanvasTexture(canvas),sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,depthTest:false}));sprite.scale.set(1.3,.245,1);sprite.renderOrder=10;return sprite;
+ const draw=()=>{c.clearRect(0,0,512,96);c.fillStyle='#22252deb';c.beginPath();c.roundRect(2,2,508,92,15);c.fill();c.strokeStyle='#d8b584';c.lineWidth=3;c.stroke();c.fillStyle='#f4e1bd';c.font='500 27px Segoe UI';c.textAlign='center';c.textBaseline='middle';c.fillText(typeof text==='function'?text():text,256,48);};draw();
+ const texture=new THREE.CanvasTexture(canvas),sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,depthTest:false}));sprite.scale.set(1.3,.245,1);sprite.renderOrder=10;
+ if(typeof text==='function'){const unsubscribe=subscribeLanguage(()=>{draw();texture.needsUpdate=true;});sprite.material.addEventListener('dispose',unsubscribe);}
+ return sprite;
 }
 export function decoratePaper(mesh,label){
  mesh.geometry.dispose();mesh.geometry=new THREE.BoxGeometry(.64,.025,.43);
@@ -101,4 +104,18 @@ export function atmosphere(scene,{kind,renderer,sun,hemi}){
   if(!state.paused&&!state.particlesPaused){const p=motesGeo.attributes.position.array;for(let i=0;i<160;i++){p[i*3]=motes[i*3]+Math.sin(particleClock*.6+i)*.24;p[i*3+1]=state.particles==='Лепестки'?3-((particleClock*.35+i*.13)%3):motes[i*3+1]+Math.sin(particleClock+i)*.12;}motesGeo.attributes.position.needsUpdate=true;}
   return elapsed;
  };
+}
+
+// The door action uses the same native object ID in every scene and renderer.
+// Called after the authored transform is applied, so rotation never accumulates.
+export function updateDoorEffect(mesh,world,id,dt,playing=true) {
+  const motion=playing&&world.doorMotions?.[id];if(motion){const progress=motion.cancelled?motion.progress:motion.seconds?Math.max(0,Math.min(1,((world.game?.clock||0)-motion.start)/motion.seconds)):1;mesh.userData.openAngle=motion.from+(motion.to-motion.from)*progress;mesh.rotation.y+=mesh.userData.openAngle;return;}
+  // No command/motion in a restored world means the authored closed pose,
+  // not a cached angle left over from the abandoned playthrough.
+  if(!playing||!world.doors?.[id]){mesh.userData.openAngle=0;return;}
+  const target=playing&&world.doors?.[id]==='Открыть'?-1.25:0;
+  const seconds=world.paused||world.pausedDoors?.[id]?0:Math.max(0,Math.min(.1,dt||0));
+  const current=mesh.userData.openAngle||0;
+  mesh.userData.openAngle=playing?current+(target-current)*(1-Math.exp(-3*seconds)):0;
+  mesh.rotation.y+=mesh.userData.openAngle;
 }

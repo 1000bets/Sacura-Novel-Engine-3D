@@ -1,3 +1,6 @@
+import {actionSummary} from './authoringPresentation.js';
+import {flowAriaLabels} from './flowLocalization.js';
+import {t as tr, useLocale, message} from './i18n.jsx';
 import {blueprintEdgeTypes} from './BlueprintEdge.jsx';
 import {storyPorts} from './choiceModel.js';
 import {clipboardCommand} from './editorClipboard.js';
@@ -208,7 +211,7 @@ export function stagingGraph(project, beatId, phaseFilter = "ALL") {
           "fork-" + batch.id,
           "fork",
           "Запустить вместе",
-          batch.bindings.length + " события",
+          tr("{0} события",[batch.bindings.length]),
           { batchId: batch.id, batch, phase: phase.id },
           172,
           160,
@@ -228,7 +231,7 @@ export function stagingGraph(project, beatId, phaseFilter = "ALL") {
                 .slice(0, 3)
                 .map(
                   (a) =>
-                    `${project.objects.find((o) => o.id === a.target)?.name || TYPES[a.type]?.label} → ${a.type==='camera'&&a.cameraId?project.subscenes.flatMap(s=>s.cameras||[]).find(c=>c.id===a.cameraId)?.name||'Камера удалена':a.value}`,
+                    actionSummary(a,project),
                 )
                 .join("\n"),
               {
@@ -277,7 +280,7 @@ export function stagingGraph(project, beatId, phaseFilter = "ALL") {
               .slice(0, 3)
               .map(
                 (a) =>
-                  `${project.objects.find((o) => o.id === a.target)?.name || TYPES[a.type]?.label} → ${a.type==='camera'&&a.cameraId?project.subscenes.flatMap(s=>s.cameras||[]).find(c=>c.id===a.cameraId)?.name||'Камера удалена':a.value}`,
+                  actionSummary(a,project),
               )
               .join("\n"),
             {
@@ -405,6 +408,7 @@ export function eventGraph(project, eventId, binding) {
 }
 
 const EditorNode = memo(function EditorNode({ id, data, selected }) {
+ useLocale();
   const {
     kind,
     beat,
@@ -445,11 +449,11 @@ const EditorNode = memo(function EditorNode({ id, data, selected }) {
       <Handle type="target" position={Position.Left} id="in" />
       <header className="node-grab">
         {kind !== "dialogue" && <Icon name={icon} size={15} />}
-        <strong>{title}</strong>
+        <strong>{beat||(kind==='event'&&data.event)?title:tr(title)}</strong>
         {data.active ? (
           <Icon name="Play" size={12} />
         ) : (
-          <span>{data.subtitle || ""}</span>
+          <span>{message(data.subtitle) || ""}</span>
         )}
       </header>
       {action ? (
@@ -465,18 +469,18 @@ const EditorNode = memo(function EditorNode({ id, data, selected }) {
             <span>
               <Icon name="Timer" size={12} />
               {TYPES[action.type]?.completion === "CONTINUOUS"
-                ? "В фоне"
+                ? tr("В фоне")
                 : TYPES[action.type]?.completion === "INSTANT"
-                  ? "Сразу"
-                  : "До завершения"}
+                  ? tr("Сразу")
+                  : tr("До завершения")}
             </span>
             <button className="nodrag" onClick={() => onEdit?.(data)}>
-              Все параметры <Icon name="ArrowUpRight" size={12} />
+              {tr("Все параметры ")}<Icon name="ArrowUpRight" size={12} />
             </button>
           </div>
         </div>
       ) : (
-        <div className="node-copy">{text}</div>
+        <div className="node-copy">{beat?text:message(text)}</div>
       )}
       {data.phases && (
         <div className="node-phase-slots nodrag">
@@ -484,15 +488,15 @@ const EditorNode = memo(function EditorNode({ id, data, selected }) {
             <button
               key={p.id}
               className={p.count ? "filled" : ""}
-              title={`Открыть события: ${p.label}`}
+              title={tr("Открыть события: {0}", [tr(p.label)])}
               onClick={() => onPhase?.(beat.id, p.id)}
             >
               <span>
                 {p.id === "BEFORE"
-                  ? "До"
+                  ? tr("До")
                   : p.id === "ON_START"
-                    ? "Во время"
-                    : "После"}
+                    ? tr("Во время")
+                    : tr("После")}
               </span>
               <b>{p.count || "—"}</b>
             </button>
@@ -511,19 +515,19 @@ const EditorNode = memo(function EditorNode({ id, data, selected }) {
               size={12}
             />
             {data.binding?.join === "EVENT_END"
-              ? "Ждать завершения"
+              ? tr("Ждать завершения")
               : data.binding?.join === "FLOW_END"
-                ? "Дождаться шагов · фон остаётся"
-                : "Запустить и идти дальше"}
+                ? tr("Дождаться шагов · фон остаётся")
+                : tr("Запустить и идти дальше")}
           </div>
           <button className="node-open nodrag" onClick={() => onOpen?.(data)}>
-            Открыть действия <Icon name="ChevronRight" size={13} />
+            {tr("Открыть действия ")}<Icon name="ChevronRight" size={13} />
           </button>
         </>
       )}
       {kind === "portal" && (
         <button className="node-open nodrag" onClick={() => onOpen?.(data)}>
-          Открыть продолжение <Icon name="ArrowUpRight" size={13} />
+          {tr("Открыть продолжение ")}<Icon name="ArrowUpRight" size={13} />
         </button>
       )}
       {kind === "choice" ? (
@@ -531,7 +535,7 @@ const EditorNode = memo(function EditorNode({ id, data, selected }) {
           {ports.map((p, i) => (
             <div key={p.id}>
               <span>
-                {i + 1}. {p.label}
+                {i + 1}. {p.id.startsWith('choice:')?p.label:tr(p.label)}
               </span>
               {p.condition !== "always" && (
                 <Icon name="LockKeyhole" size={11} />
@@ -553,21 +557,21 @@ const EditorNode = memo(function EditorNode({ id, data, selected }) {
       {data.batch && kind !== "join" && (
         <div className="node-batch-controls nodrag">
           <select
-            aria-label="Порядок группы"
+            aria-label={tr("Порядок группы")}
             value={data.batch.mode}
             onChange={(e) => data.onBatch(data.batchId, "mode", e.target.value)}
           >
-            <option value="SEQUENTIAL">По очереди →</option>
-            <option value="PARALLEL">Вместе ⇉</option>
+            <option value="SEQUENTIAL">{tr("По очереди →")}</option>
+            <option value="PARALLEL">{tr("Вместе ⇉")}</option>
           </select>
           <button
-            title="Добавить событие в эту группу"
+            title={tr("Добавить событие в эту группу")}
             onClick={() => data.onBatch(data.batchId, "add")}
           >
             <Icon name="Plus" size={14} />
           </button>
           <button
-            title="Настроить группу событий"
+            title={tr("Настроить группу событий")}
             onClick={() => data.onBatch(data.batchId, "select")}
           >
             <Icon name="Settings2" size={14} />
@@ -591,19 +595,19 @@ const EditorNode = memo(function EditorNode({ id, data, selected }) {
             size={12}
           />
           {{
-            running: "Выполняется",
-            paused: "На паузе",
-            held: "Работает в фоне",
-            done: "Готово",
-            stopped: "Остановлено",
-            skipped: "Пропущено",
-            error: "Ошибка",
+            running: tr("Выполняется"),
+            paused: tr("На паузе"),
+            held: tr("Работает в фоне"),
+            done: tr("Готово"),
+            stopped: tr("Остановлено"),
+            skipped: tr("Пропущено"),
+            error: tr("Ошибка"),
           }[data.status] || data.status}
         </div>
       )}
       {data.error && (
         <div className="node-error">
-          <Icon name="TriangleAlert" size={12} /> {data.error}
+          <Icon name="TriangleAlert" size={12} /> {message(data.error)}
         </div>
       )}
     </article>
@@ -634,6 +638,7 @@ function GraphCanvas({
   onContext, onClipboard,
   onReady,
 }) {
+ useLocale();
   const api = useReactFlow(),
     [nodes, setNodes] = useState([]),
     [zoom, setZoom] = useState(1),
@@ -642,6 +647,7 @@ function GraphCanvas({
     initKey = useRef(null),
     container = useRef(),
     panGesture = useRef(null);
+  const language=useLocale();
   const graph = useMemo(
     () =>
       mode === "story"
@@ -649,7 +655,7 @@ function GraphCanvas({
         : mode === "staging"
           ? stagingGraph(project, selectedId, phase)
           : eventGraph(project, eventId, binding),
-    [project, mode, selectedId, scope, phase, eventId, binding],
+    [project, mode, selectedId, scope, phase, eventId, binding, language],
   );
   const graphKey =
     mode === "story"
@@ -804,7 +810,7 @@ function GraphCanvas({
       onPointerDownCapture={e => {panGesture.current = {x:e.clientX,y:e.clientY,moved:false};}}
       onPointerMoveCapture={e => {const pan=panGesture.current;if(pan && e.buttons && Math.hypot(e.clientX-pan.x,e.clientY-pan.y)>5)pan.moved=true;}}
     >
-      <ReactFlow
+      <ReactFlow ariaLabelConfig={flowAriaLabels()}
         nodes={nodes}
         edges={edges}
         edgeTypes={blueprintEdgeTypes}
@@ -865,7 +871,7 @@ function GraphCanvas({
           <div className="graph-navigation">
             <Button
               icon="Minus"
-              title="Уменьшить масштаб"
+              title={tr("Уменьшить масштаб")}
               onClick={() => api.zoomOut()}
             />
             <button onClick={() => api.zoomTo(1)}>
@@ -873,19 +879,19 @@ function GraphCanvas({
             </button>
             <Button
               icon="Plus"
-              title="Увеличить масштаб"
+              title={tr("Увеличить масштаб")}
               onClick={() => api.zoomIn()}
             />
-            <Button icon="Map" title="Миникарта графа" aria-pressed={showMinimap} onClick={() => setShowMinimap(v => !v)} />
+            <Button icon="Map" title={tr("Миникарта графа")} aria-pressed={showMinimap} onClick={() => setShowMinimap(v => !v)} />
             <span />
             <Button
               icon="Focus"
-              title="Показать выделенный блок"
+              title={tr("Показать выделенный блок")}
               onClick={() => focus()}
             />
             <Button
               icon="Scan"
-              title="Показать граф целиком"
+              title={tr("Показать граф целиком")}
               onClick={() => api.fitView({ padding: 0.15, maxZoom: 1 })}
             />
           </div>
@@ -904,8 +910,7 @@ function GraphCanvas({
                 setSelectedEdge(null);
               }}
             >
-              Удалить выбранную связь
-            </Button>
+              {tr("Удалить выбранную связь")}</Button>
           </Panel>
         )}
       </ReactFlow>
@@ -913,6 +918,7 @@ function GraphCanvas({
   );
 }
 export default function EditorGraph(props) {
+ useLocale();
   return (
     <ReactFlowProvider>
       <GraphCanvas {...props} />

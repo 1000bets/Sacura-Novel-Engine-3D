@@ -1,0 +1,2293 @@
+{
+  "format": "sacura-authoring-package",
+  "formatVersion": 3,
+  "sourceContract": {
+    "version": 1,
+    "language": "javascript",
+    "runtime": "sacura-sdk",
+    "execution": "gameplay-only"
+  },
+  "metadata": {
+    "id": "sacura.template.point-and-click",
+    "version": "3.0.0",
+    "name": "Point & click · Две двери",
+    "description": "Что открыть → «Дверь с ключом» или «Дверь склада» → LockedDoor → canUnlock / interact. Что изменить → условие проверки ключа или добавить вызов действия. Результат → обе двери используют новый исходник, но замки независимы.\nСклад: следующая реплика вызывает SetLocked(false), дверь остаётся закрытой. Взаимодействие или отдельный Open открывает её; ожидание относится только к анимации. Инвентарь и ключ назначаются в ссылках экземпляра.",
+    "author": "Sacura contributors",
+    "license": "MIT",
+    "sources": []
+  },
+  "compatibility": {
+    "projectSchemaVersion": 2,
+    "requiredCapabilities": [
+      {
+        "id": "component.resources",
+        "version": 1
+      },
+      {
+        "id": "mechanic.javascript",
+        "version": 1
+      },
+      {
+        "id": "operation.sacura.inventory.count",
+        "version": 1
+      },
+      {
+        "id": "operation.sacura.game.message",
+        "version": 1
+      },
+      {
+        "id": "operation.sacura.inventory.remove",
+        "version": 1
+      },
+      {
+        "id": "operation.sacura.door.animate",
+        "version": 1
+      },
+      {
+        "id": "operation.sacura.inventory.add",
+        "version": 1
+      },
+      {
+        "id": "operation.sacura.object.visible",
+        "version": 1
+      },
+      {
+        "id": "mechanic.components",
+        "version": 1
+      },
+      {
+        "id": "capability.sacura.inventory",
+        "version": 1
+      },
+      {
+        "id": "action.gameplay",
+        "version": 1
+      },
+      {
+        "id": "operation.sacura.component.call",
+        "version": 1
+      },
+      {
+        "id": "function.graph",
+        "version": 1
+      },
+      {
+        "id": "function.typed-graph",
+        "version": 1
+      }
+    ],
+    "requiredEngineModules": []
+  },
+  "roots": {
+    "kind": "template",
+    "entries": [
+      "/content/chapters/0"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  "inputs": [],
+  "content": {
+    "gameplay": {
+      "version": 2,
+      "behaviorSchemaVersion": 1,
+      "capabilitySchemaVersion": 1,
+      "resources": [],
+      "inventories": [],
+      "movements": [],
+      "stateBindings": [],
+      "mechanicSchemaVersion": 1,
+      "mechanicDefinitions": [
+        {
+          "id": "sample.component.lockeddoor",
+          "version": 1,
+          "scopes": [
+            "object",
+            "scene",
+            "project"
+          ],
+          "when": "start",
+          "stateSchema": {
+            "type": "object",
+            "properties": {
+              "IsLocked": {
+                "type": "boolean",
+                "default": true,
+                "label": "Заперта · IsLocked"
+              }
+            }
+          },
+          "initialState": {},
+          "requirements": [],
+          "name": "LockedDoor",
+          "componentVersion": 1,
+          "stateVersion": 1,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "InitiallyLocked": {
+                "type": "boolean",
+                "default": true,
+                "label": "Изначально заперта · IsLocked"
+              },
+              "requiresKey": {
+                "type": "boolean",
+                "default": false,
+                "label": "Разрешать открытие ключом"
+              },
+              "consumeKey": {
+                "type": "boolean",
+                "default": false,
+                "label": "Расходовать ключ"
+              },
+              "OpenSeconds": {
+                "type": "number",
+                "min": 0,
+                "default": 0.5,
+                "label": "Время открытия, сек"
+              }
+            }
+          },
+          "references": {
+            "type": "object",
+            "properties": {
+              "inventory": {
+                "type": "union",
+                "optional": true,
+                "label": "Инвентарь",
+                "variants": [
+                  {
+                    "type": "reference",
+                    "referenceType": "object",
+                    "label": "Инвентарь объекта"
+                  },
+                  {
+                    "type": "reference",
+                    "referenceType": "project",
+                    "label": "Инвентарь проекта"
+                  }
+                ]
+              },
+              "key": {
+                "type": "reference",
+                "referenceType": "item",
+                "optional": true,
+                "label": "Нужный ключ"
+              }
+            }
+          },
+          "methods": {
+            "setLocked": {
+              "name": "Задать замок",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "boolean",
+                    "default": false,
+                    "label": "Заперта"
+                  }
+                }
+              },
+              "result": {
+                "type": "boolean"
+              },
+              "logic": {
+                "functionId": "sample-method-LockedDoor-setLocked"
+              }
+            },
+            "canUnlock": {
+              "name": "Проверить ключ",
+              "parameters": {
+                "type": "object",
+                "properties": {}
+              },
+              "result": {
+                "type": "boolean"
+              },
+              "logic": {
+                "functionId": "sample-method-LockedDoor-canUnlock"
+              }
+            },
+            "interact": {
+              "name": "Взаимодействовать",
+              "parameters": {
+                "type": "object",
+                "properties": {}
+              },
+              "result": {
+                "type": "boolean"
+              },
+              "logic": {
+                "functionId": "sample-method-LockedDoor-interact"
+              }
+            },
+            "open": {
+              "name": "Открыть",
+              "parameters": {
+                "type": "object",
+                "properties": {}
+              },
+              "result": {
+                "type": "boolean"
+              },
+              "logic": {
+                "functionId": "sample-method-LockedDoor-open"
+              }
+            }
+          },
+          "events": {
+            "opened": {
+              "name": "Дверь открыта",
+              "signalId": "user.component-signal.sample-source--ocked-oor.opened",
+              "payloadSchema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          },
+          "logicResourceId": "sample-source-LockedDoor",
+          "stateFromParameters": {
+            "IsLocked": "InitiallyLocked"
+          },
+          "lifecycle": {},
+          "subscriptions": []
+        },
+        {
+          "id": "sample.component.pickup",
+          "version": 1,
+          "scopes": [
+            "object",
+            "scene",
+            "project"
+          ],
+          "when": "start",
+          "stateSchema": {
+            "type": "object",
+            "properties": {
+              "collected": {
+                "type": "boolean",
+                "default": false,
+                "label": "Получен"
+              }
+            }
+          },
+          "initialState": {},
+          "requirements": [],
+          "name": "Pickup",
+          "componentVersion": 1,
+          "stateVersion": 1,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "type": "integer",
+                "min": 1,
+                "default": 1,
+                "label": "Количество"
+              }
+            }
+          },
+          "references": {
+            "type": "object",
+            "properties": {
+              "inventory": {
+                "type": "union",
+                "variants": [
+                  {
+                    "type": "reference",
+                    "referenceType": "object",
+                    "label": "Объект"
+                  },
+                  {
+                    "type": "reference",
+                    "referenceType": "project",
+                    "label": "Проект"
+                  }
+                ]
+              },
+              "item": {
+                "type": "reference",
+                "referenceType": "item",
+                "label": "Предмет"
+              }
+            }
+          },
+          "methods": {
+            "pickup": {
+              "name": "Подобрать",
+              "parameters": {
+                "type": "object",
+                "properties": {}
+              },
+              "result": {
+                "type": "boolean"
+              },
+              "logic": {
+                "functionId": "sample-method-Pickup-pickup"
+              }
+            }
+          },
+          "events": {},
+          "logicResourceId": "sample-source-Pickup",
+          "stateFromParameters": {},
+          "lifecycle": {},
+          "subscriptions": []
+        }
+      ],
+      "signals": [
+        {
+          "id": "user.component-signal.sample-source--ocked-oor.opened",
+          "version": 1,
+          "name": "LockedDoor · Дверь открыта",
+          "payloadSchema": {
+            "type": "object",
+            "properties": {}
+          }
+        }
+      ],
+      "variableBindings": [],
+      "enabled": true,
+      "activation": "continuous",
+      "camera": {
+        "mode": "authored",
+        "targetId": "",
+        "pointerLock": false,
+        "crosshair": false
+      },
+      "mechanics": [
+        {
+          "id": "key-pickup",
+          "type": "definition",
+          "definitionId": "sample.component.pickup",
+          "definitionVersion": 1,
+          "scope": {
+            "kind": "object",
+            "id": "quest-key"
+          },
+          "values": {
+            "count": 1
+          },
+          "enabled": true,
+          "references": {
+            "inventory": {
+              "kind": "reference",
+              "type": "project",
+              "mode": "direct",
+              "id": "package-project"
+            },
+            "item": {
+              "kind": "reference",
+              "type": "item",
+              "mode": "direct",
+              "id": "brass-key"
+            }
+          },
+          "name": "Подобрать ключ"
+        },
+        {
+          "id": "key-door",
+          "type": "definition",
+          "definitionId": "sample.component.lockeddoor",
+          "definitionVersion": 1,
+          "scope": {
+            "kind": "object",
+            "id": "quest-door"
+          },
+          "values": {
+            "InitiallyLocked": true,
+            "requiresKey": true,
+            "consumeKey": false,
+            "OpenSeconds": 0.5
+          },
+          "enabled": true,
+          "references": {
+            "inventory": {
+              "kind": "reference",
+              "type": "project",
+              "mode": "direct",
+              "id": "package-project"
+            },
+            "key": {
+              "kind": "reference",
+              "type": "item",
+              "mode": "direct",
+              "id": "brass-key"
+            }
+          },
+          "name": "Замок · ключ"
+        },
+        {
+          "id": "story-door-lock",
+          "type": "definition",
+          "definitionId": "sample.component.lockeddoor",
+          "definitionVersion": 1,
+          "scope": {
+            "kind": "object",
+            "id": "story-door"
+          },
+          "values": {
+            "InitiallyLocked": true,
+            "requiresKey": false,
+            "consumeKey": false,
+            "OpenSeconds": 0.5
+          },
+          "enabled": true,
+          "references": {},
+          "name": "Замок · история"
+        }
+      ],
+      "playerId": "",
+      "controller": {
+        "ownerId": "",
+        "mode": "none",
+        "speed": 3.5,
+        "jumpSpeed": 5,
+        "gravity": 16,
+        "eyeHeight": 1.25,
+        "sensitivity": 0.003,
+        "distance": 3,
+        "fov": 70
+      },
+      "actors": {},
+      "weapons": [],
+      "items": [
+        {
+          "id": "brass-key",
+          "name": "Латунный ключ",
+          "stackLimit": 10,
+          "slot": "",
+          "weaponId": "",
+          "heal": 0,
+          "consumable": false,
+          "worldObjectId": "quest-key",
+          "inventoryOwner": {
+            "kind": "project",
+            "id": null
+          },
+          "componentPickup": {
+            "instance": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "key-pickup"
+            },
+            "methods": {
+              "pickup": "pickup"
+            }
+          },
+          "componentUse": {
+            "instance": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "key-door"
+            },
+            "methods": {
+              "use": "interact"
+            }
+          }
+        }
+      ],
+      "recipes": [],
+      "rules": [],
+      "inventory": {
+        "enabled": true,
+        "owner": {
+          "kind": "project",
+          "id": null
+        },
+        "slots": 12,
+        "starting": [],
+        "equipment": {}
+      },
+      "hudWidgetId": "doors-hud",
+      "cameraSettings": {
+        "eyeHeight": 1.25,
+        "sensitivity": 0.003,
+        "distance": 3,
+        "fov": 70
+      },
+      "storyPolicy": {
+        "mode": "story",
+        "mechanics": "continuous",
+        "dialogueControl": "allow",
+        "ending": "continue"
+      }
+    },
+    "logicResources": [
+      {
+        "id": "sample-source-LockedDoor",
+        "version": 1,
+        "kind": "component.code",
+        "name": "LockedDoor",
+        "path": "Компоненты/LockedDoor.js",
+        "definitionId": "sample.component.lockeddoor",
+        "status": "ready",
+        "approved": true,
+        "source": "// Два подключения используют один исходник. Условия меняются здесь.\n// Упражнение: вместо count > 0 потребуйте count >= 2 или добавьте вызов Reward.award.\n// SetLocked(false) меняет только замок. Open — отдельная ожидаемая анимация.\nconst component = {\n  name: \"LockedDoor\",\n  parameters: {\n    type: \"object\",\n    properties: {\n      InitiallyLocked: { type: \"boolean\", default: true, label: \"Изначально заперта · IsLocked\" },\n      requiresKey: { type: \"boolean\", default: false, label: \"Разрешать открытие ключом\" },\n      consumeKey: { type: \"boolean\", default: false, label: \"Расходовать ключ\" },\n      OpenSeconds: { type: \"number\", min: 0, default: 0.5, label: \"Время открытия, сек\" },\n    },\n  },\n  state: {\n    type: \"object\",\n    properties: { IsLocked: { type: \"boolean\", default: true, label: \"Заперта · IsLocked\" } },\n  },\n  stateFromParameters: { IsLocked: \"InitiallyLocked\" },\n  references: {\n    type: \"object\",\n    properties: {\n      inventory: {\n        type: \"union\",\n        optional: true,\n        label: \"Инвентарь\",\n        variants: [\n          { type: \"reference\", referenceType: \"object\", label: \"Инвентарь объекта\" },\n          { type: \"reference\", referenceType: \"project\", label: \"Инвентарь проекта\" },\n        ],\n      },\n      key: { type: \"reference\", referenceType: \"item\", optional: true, label: \"Нужный ключ\" },\n    },\n  },\n  signals: { opened: { name: \"Дверь открыта\", payloadSchema: { type: \"object\", properties: {} } } },\n  methods: {\n    setLocked: {\n      name: \"Задать замок\",\n      parameters: {\n        type: \"object\",\n        properties: { value: { type: \"boolean\", default: false, label: \"Заперта\" } },\n      },\n      result: { type: \"boolean\" },\n      run({ args, state }) {\n        state.IsLocked = args.value;\n        return state.IsLocked;\n      },\n    },\n    canUnlock: {\n      name: \"Проверить ключ\",\n      result: { type: \"boolean\" },\n      async run({ params, refs, engine }) {\n        if (!params.requiresKey || !refs.inventory || !refs.key) return false;\n        const count = await engine.operation(\"sacura.inventory.count\", {\n          owner: refs.inventory,\n          item: refs.key,\n        });\n        return count > 0;\n      },\n    },\n    interact: {\n      name: \"Взаимодействовать\",\n      result: { type: \"boolean\" },\n      async run({ state, params, refs, engine, self }) {\n        if (state.IsLocked) {\n          if (!(await engine.invoke(self, \"canUnlock\", {}))) {\n            await engine.operation(\"sacura.game.message\", { message: \"Заперто\" });\n            return false;\n          }\n          if (params.consumeKey)\n            await engine.operation(\"sacura.inventory.remove\", {\n              owner: refs.inventory,\n              item: refs.key,\n              count: 1,\n            });\n          await engine.invoke(self, \"setLocked\", { value: false });\n        }\n        return await engine.invoke(self, \"open\", {});\n      },\n    },\n    open: {\n      name: \"Открыть\",\n      result: { type: \"boolean\" },\n      async run({ engine, owner, params }) {\n        await engine.operation(\"sacura.door.animate\", {\n          object: owner,\n          open: true,\n          seconds: params.OpenSeconds,\n        });\n        await engine.emit(\"opened\", {});\n        return true;\n      },\n    },\n  },\n};\n",
+        "fingerprint": "3260:eeed6646",
+        "dependencies": {
+          "functions": {},
+          "events": {},
+          "references": {},
+          "globals": {},
+          "signals": {},
+          "operations": {
+            "sacura.inventory.count": {
+              "operationId": "sacura.inventory.count",
+              "operationVersion": 1
+            },
+            "sacura.game.message": {
+              "operationId": "sacura.game.message",
+              "operationVersion": 1
+            },
+            "sacura.inventory.remove": {
+              "operationId": "sacura.inventory.remove",
+              "operationVersion": 1
+            },
+            "sacura.door.animate": {
+              "operationId": "sacura.door.animate",
+              "operationVersion": 1
+            }
+          }
+        },
+        "signalBindings": {
+          "opened": {
+            "signalId": "user.component-signal.sample-source--ocked-oor.opened"
+          }
+        },
+        "lesson": "Что открыть → LockedDoor.canUnlock. Измените count > 0 на count >= 2. Результат → одного ключа недостаточно. interact и open — настоящие отдельные методы.",
+        "locations": {
+          "setLocked": {
+            "line": 44,
+            "column": 7
+          },
+          "canUnlock": {
+            "line": 52,
+            "column": 7
+          },
+          "interact": {
+            "line": 64,
+            "column": 7
+          },
+          "open": {
+            "line": 84,
+            "column": 7
+          }
+        }
+      },
+      {
+        "id": "sample-source-Pickup",
+        "version": 1,
+        "kind": "component.code",
+        "name": "Pickup",
+        "path": "Компоненты/Pickup.js",
+        "definitionId": "sample.component.pickup",
+        "status": "ready",
+        "approved": true,
+        "source": "// Предмет/получатель назначаются ссылками в инспекторе. Без имён объектов в коде.\nconst component = {\n  name: \"Pickup\",\n  parameters: {\n    type: \"object\",\n    properties: { count: { type: \"integer\", min: 1, default: 1, label: \"Количество\" } },\n  },\n  state: {\n    type: \"object\",\n    properties: { collected: { type: \"boolean\", default: false, label: \"Получен\" } },\n  },\n  references: {\n    type: \"object\",\n    properties: {\n      inventory: {\n        type: \"union\",\n        variants: [\n          { type: \"reference\", referenceType: \"object\", label: \"Объект\" },\n          { type: \"reference\", referenceType: \"project\", label: \"Проект\" },\n        ],\n      },\n      item: { type: \"reference\", referenceType: \"item\", label: \"Предмет\" },\n    },\n  },\n  methods: {\n    pickup: {\n      name: \"Подобрать\",\n      result: { type: \"boolean\" },\n      async run({ params, state, refs, engine, owner }) {\n        if (state.collected) return false;\n        state.collected = true;\n        try {\n          await engine.operation(\"sacura.inventory.add\", {\n            owner: refs.inventory,\n            item: refs.item,\n            count: params.count,\n          });\n        } catch (error) {\n          state.collected = false;\n          throw error;\n        }\n        await engine.operation(\"sacura.object.visible\", { object: owner, visible: false });\n        await engine.operation(\"sacura.game.message\", { message: \"Предмет в инвентаре\" });\n        return true;\n      },\n    },\n  },\n};\n",
+        "fingerprint": "1474:58926330",
+        "dependencies": {
+          "functions": {},
+          "events": {},
+          "references": {},
+          "globals": {},
+          "signals": {},
+          "operations": {
+            "sacura.inventory.add": {
+              "operationId": "sacura.inventory.add",
+              "operationVersion": 1
+            },
+            "sacura.object.visible": {
+              "operationId": "sacura.object.visible",
+              "operationVersion": 1
+            },
+            "sacura.game.message": {
+              "operationId": "sacura.game.message",
+              "operationVersion": 1
+            }
+          }
+        },
+        "signalBindings": {},
+        "lesson": "Откройте pickup: здесь выдаётся предмет и скрывается объект; инвентарь назначается ссылкой.",
+        "locations": {
+          "pickup": {
+            "line": 29,
+            "column": 7
+          }
+        }
+      }
+    ],
+    "version": 2,
+    "authoringGraphVersion": 1,
+    "handlerGraphVersion": 1,
+    "visualExamplesVersion": 1,
+    "sceneEditingVersion": 2,
+    "standardEventsVersion": 1,
+    "events": [
+      {
+        "id": "event-bc427f43-bfc9-47b9-90e9-e7e652eb1e73",
+        "name": "Дверь склада → Задать замок",
+        "description": "",
+        "retention": "AUTO_CLOSE_ON_FLOW_END",
+        "owner": "SubScene",
+        "groups": [
+          {
+            "id": "group-1656f2d7-3938-4f2a-a772-51b3e80255b1",
+            "name": "Основное действие",
+            "actions": [
+              {
+                "id": "action-562dca47-7591-48a9-a165-213f38fbe465",
+                "type": "gameplay",
+                "target": "world",
+                "value": {
+                  "instance": {
+                    "kind": "reference",
+                    "type": "mechanic",
+                    "mode": "direct",
+                    "id": "story-door-lock"
+                  },
+                  "methodId": "setLocked",
+                  "args": {
+                    "value": false
+                  }
+                },
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "command": "sacura.component.call",
+                "duration": 2,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние",
+                "operationVersion": 1
+              }
+            ]
+          }
+        ],
+        "componentAction": true
+      },
+      {
+        "id": "event-52f23eb8-9996-4b57-9a89-7de84aef5b2c",
+        "name": "Дверь склада → Открыть",
+        "description": "",
+        "retention": "AUTO_CLOSE_ON_FLOW_END",
+        "owner": "SubScene",
+        "groups": [
+          {
+            "id": "group-e70966a2-4a8e-4097-b9d5-7be6619ecb61",
+            "name": "Основное действие",
+            "actions": [
+              {
+                "id": "action-9de54aec-db92-46f5-a24c-9311f7f46b62",
+                "type": "gameplay",
+                "target": "world",
+                "value": {
+                  "instance": {
+                    "kind": "reference",
+                    "type": "mechanic",
+                    "mode": "direct",
+                    "id": "story-door-lock"
+                  },
+                  "methodId": "open",
+                  "args": {}
+                },
+                "wait": "COMPLETED",
+                "scope": "SELF",
+                "conflict": "FAIL_NEW",
+                "command": "sacura.component.call",
+                "duration": 2,
+                "queueTimeout": 10,
+                "startTimeout": 5,
+                "executionTimeout": 30,
+                "stopTimeout": 3,
+                "onFailure": "Остановить событие",
+                "finalState": "Сохранить результат",
+                "fallback": "Безопасное исходное состояние",
+                "operationVersion": 1
+              }
+            ]
+          }
+        ],
+        "componentAction": true
+      }
+    ],
+    "functions": [
+      {
+        "id": "sample-method-LockedDoor-setLocked",
+        "name": "LockedDoor · Задать замок",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-LockedDoor",
+        "componentMethodId": "setLocked",
+        "parameters": [
+          {
+            "name": "value",
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "label": "Заперта"
+            }
+          }
+        ],
+        "resultSchema": {
+          "type": "boolean"
+        },
+        "locals": {},
+        "entry": "",
+        "nodes": []
+      },
+      {
+        "id": "sample-method-LockedDoor-canUnlock",
+        "name": "LockedDoor · Проверить ключ",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-LockedDoor",
+        "componentMethodId": "canUnlock",
+        "parameters": [],
+        "resultSchema": {
+          "type": "boolean"
+        },
+        "locals": {},
+        "entry": "",
+        "nodes": []
+      },
+      {
+        "id": "sample-method-LockedDoor-interact",
+        "name": "LockedDoor · Взаимодействовать",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-LockedDoor",
+        "componentMethodId": "interact",
+        "parameters": [],
+        "resultSchema": {
+          "type": "boolean"
+        },
+        "locals": {},
+        "entry": "",
+        "nodes": []
+      },
+      {
+        "id": "sample-method-LockedDoor-open",
+        "name": "LockedDoor · Открыть",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-LockedDoor",
+        "componentMethodId": "open",
+        "parameters": [],
+        "resultSchema": {
+          "type": "boolean"
+        },
+        "locals": {},
+        "entry": "",
+        "nodes": []
+      },
+      {
+        "id": "sample-method-Pickup-pickup",
+        "name": "Pickup · Подобрать",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-Pickup",
+        "componentMethodId": "pickup",
+        "parameters": [],
+        "resultSchema": {
+          "type": "boolean"
+        },
+        "locals": {},
+        "entry": "",
+        "nodes": []
+      }
+    ],
+    "actionTemplates": [],
+    "groupTemplates": [],
+    "widgets": [
+      {
+        "id": "widget-default-dialogue",
+        "name": "Диалог",
+        "kind": "dialogue",
+        "builtinDefault": true,
+        "referenceSize": [
+          1280,
+          720
+        ],
+        "elements": [
+          {
+            "id": "widget-default-dialogue-panel",
+            "name": "Диалоговое окно",
+            "type": "panel",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                0.5,
+                1
+              ],
+              "x": 0,
+              "y": -34,
+              "width": -100,
+              "height": 205
+            },
+            "style": {
+              "background": "#211c29",
+              "color": "#fff4f8",
+              "opacity": 0.96,
+              "borderRadius": 16,
+              "borderWidth": 1,
+              "borderColor": "#ad849d",
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-dialogue-speaker",
+            "name": "Имя персонажа",
+            "type": "text",
+            "parentId": "widget-default-dialogue-panel",
+            "role": "speaker",
+            "text": "Новый текст",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 28,
+              "y": 18,
+              "width": -56,
+              "height": 32
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#e2b8d1",
+              "fontSize": 23,
+              "fontWeight": 600,
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-dialogue-text",
+            "name": "Текст реплики",
+            "type": "text",
+            "parentId": "widget-default-dialogue-panel",
+            "role": "dialogueText",
+            "text": "Новый текст",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 28,
+              "y": 60,
+              "width": -88,
+              "height": -105
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-dialogue-status",
+            "name": "Подсказка",
+            "type": "text",
+            "parentId": "widget-default-dialogue-panel",
+            "role": "status",
+            "text": "Новый текст",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                0,
+                1
+              ],
+              "x": 28,
+              "y": -16,
+              "width": -90,
+              "height": 25
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#d1bfd0",
+              "fontSize": 15,
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-dialogue-next",
+            "name": "Продолжить",
+            "type": "button",
+            "parentId": "widget-default-dialogue-panel",
+            "role": "none",
+            "text": "›",
+            "action": "advance",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                1,
+                1
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                1,
+                1
+              ],
+              "x": -20,
+              "y": -14,
+              "width": 44,
+              "height": 44
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 28,
+              "borderRadius": 10,
+              "textAlign": "center",
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-dialogue-choices",
+            "name": "Ответы игрока",
+            "type": "choices",
+            "parentId": null,
+            "role": "choices",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                1
+              ],
+              "anchorMax": [
+                0.5,
+                1
+              ],
+              "pivot": [
+                0.5,
+                1
+              ],
+              "x": 0,
+              "y": -255,
+              "width": 620,
+              "height": 190
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 22,
+              "borderRadius": 10,
+              "padding": 4,
+              "gap": 8
+            }
+          }
+        ],
+        "css": ""
+      },
+      {
+        "id": "widget-default-mainMenu",
+        "name": "Главное меню",
+        "kind": "mainMenu",
+        "builtinDefault": true,
+        "referenceSize": [
+          1280,
+          720
+        ],
+        "elements": [
+          {
+            "id": "widget-default-mainMenu-panel",
+            "name": "Панель меню",
+            "type": "panel",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0.5
+              ],
+              "anchorMax": [
+                0.5,
+                0.5
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 0,
+              "width": 510,
+              "height": 440
+            },
+            "style": {
+              "background": "#211c29",
+              "color": "#fff4f8",
+              "opacity": 0.98,
+              "borderRadius": 20,
+              "borderWidth": 1,
+              "borderColor": "#ad849d",
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-mainMenu-title",
+            "name": "Заголовок",
+            "type": "text",
+            "parentId": "widget-default-mainMenu-panel",
+            "role": "title",
+            "text": "Пауза",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 30,
+              "y": 35,
+              "width": -60,
+              "height": 90
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 36,
+              "fontWeight": 600,
+              "textAlign": "center",
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-mainMenu-start",
+            "name": "Начать игру",
+            "type": "button",
+            "parentId": "widget-default-mainMenu-panel",
+            "role": "none",
+            "text": "Начать игру",
+            "action": "start",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0
+              ],
+              "anchorMax": [
+                0.5,
+                0
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 160,
+              "width": 380,
+              "height": 60
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "textAlign": "center",
+              "borderRadius": 10,
+              "padding": 8
+            }
+          },
+          {
+            "id": "widget-default-mainMenu-restart",
+            "name": "Начать заново",
+            "type": "button",
+            "parentId": "widget-default-mainMenu-panel",
+            "role": "none",
+            "text": "Начать заново",
+            "action": "restart",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0
+              ],
+              "anchorMax": [
+                0.5,
+                0
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 240,
+              "width": 380,
+              "height": 60
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "textAlign": "center",
+              "borderRadius": 10,
+              "padding": 8
+            }
+          }
+        ],
+        "css": ""
+      },
+      {
+        "id": "widget-default-pauseMenu",
+        "name": "Меню паузы",
+        "kind": "pauseMenu",
+        "builtinDefault": true,
+        "referenceSize": [
+          1280,
+          720
+        ],
+        "elements": [
+          {
+            "id": "widget-default-pauseMenu-panel",
+            "name": "Панель меню",
+            "type": "panel",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0.5
+              ],
+              "anchorMax": [
+                0.5,
+                0.5
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 0,
+              "width": 510,
+              "height": 440
+            },
+            "style": {
+              "background": "#211c29",
+              "color": "#fff4f8",
+              "opacity": 0.98,
+              "borderRadius": 20,
+              "borderWidth": 1,
+              "borderColor": "#ad849d",
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-pauseMenu-title",
+            "name": "Заголовок",
+            "type": "text",
+            "parentId": "widget-default-pauseMenu-panel",
+            "role": "none",
+            "text": "Пауза",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 30,
+              "y": 35,
+              "width": -60,
+              "height": 90
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#fff4f8",
+              "fontSize": 36,
+              "fontWeight": 600,
+              "textAlign": "center",
+              "padding": 0
+            }
+          },
+          {
+            "id": "widget-default-pauseMenu-resume",
+            "name": "Продолжить",
+            "type": "button",
+            "parentId": "widget-default-pauseMenu-panel",
+            "role": "none",
+            "text": "Продолжить",
+            "action": "resume",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0
+              ],
+              "anchorMax": [
+                0.5,
+                0
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 160,
+              "width": 380,
+              "height": 60
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "textAlign": "center",
+              "borderRadius": 10,
+              "padding": 8
+            }
+          },
+          {
+            "id": "widget-default-pauseMenu-restart",
+            "name": "Начать заново",
+            "type": "button",
+            "parentId": "widget-default-pauseMenu-panel",
+            "role": "none",
+            "text": "Начать заново",
+            "action": "restart",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0
+              ],
+              "anchorMax": [
+                0.5,
+                0
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 240,
+              "width": 380,
+              "height": 60
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "textAlign": "center",
+              "borderRadius": 10,
+              "padding": 8
+            }
+          },
+          {
+            "id": "widget-default-pauseMenu-mainMenu",
+            "name": "Главное меню",
+            "type": "button",
+            "parentId": "widget-default-pauseMenu-panel",
+            "role": "none",
+            "text": "Главное меню",
+            "action": "mainMenu",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0
+              ],
+              "anchorMax": [
+                0.5,
+                0
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 320,
+              "width": 380,
+              "height": 60
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "textAlign": "center",
+              "borderRadius": 10,
+              "padding": 8
+            }
+          }
+        ],
+        "css": ""
+      },
+      {
+        "id": "doors-hud",
+        "name": "Интерфейс примера",
+        "kind": "hud",
+        "referenceSize": [
+          1280,
+          720
+        ],
+        "elements": [
+          {
+            "id": "take-key",
+            "name": "Подобрать ключ",
+            "type": "button",
+            "parentId": null,
+            "role": "none",
+            "text": "Подобрать ключ",
+            "action": "gameplay",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 24,
+              "y": 24,
+              "width": 380,
+              "height": 50
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "fontFamily": "system-ui",
+              "fontWeight": 400,
+              "borderColor": "#ad849d",
+              "borderWidth": 0,
+              "borderRadius": 12,
+              "padding": 12,
+              "opacity": 1,
+              "textAlign": "left",
+              "gap": 8
+            },
+            "command": "sacura.component.call",
+            "value": {
+              "instance": {
+                "kind": "reference",
+                "type": "mechanic",
+                "mode": "direct",
+                "id": "key-pickup"
+              },
+              "methodId": "pickup",
+              "args": {}
+            },
+            "operationVersion": 1
+          },
+          {
+            "id": "key-door-button",
+            "name": "Дверь с ключом",
+            "type": "button",
+            "parentId": null,
+            "role": "none",
+            "text": "Дверь с ключом",
+            "action": "gameplay",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 24,
+              "y": 85,
+              "width": 380,
+              "height": 50
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "fontFamily": "system-ui",
+              "fontWeight": 400,
+              "borderColor": "#ad849d",
+              "borderWidth": 0,
+              "borderRadius": 12,
+              "padding": 12,
+              "opacity": 1,
+              "textAlign": "left",
+              "gap": 8
+            },
+            "command": "sacura.component.call",
+            "value": {
+              "instance": {
+                "kind": "reference",
+                "type": "mechanic",
+                "mode": "direct",
+                "id": "key-door"
+              },
+              "methodId": "interact",
+              "args": {}
+            },
+            "operationVersion": 1
+          },
+          {
+            "id": "story-door-button",
+            "name": "Дверь склада",
+            "type": "button",
+            "parentId": null,
+            "role": "none",
+            "text": "Дверь склада",
+            "action": "gameplay",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 24,
+              "y": 146,
+              "width": 380,
+              "height": 50
+            },
+            "style": {
+              "background": "#704e7c",
+              "color": "#fff4f8",
+              "fontSize": 24,
+              "fontFamily": "system-ui",
+              "fontWeight": 400,
+              "borderColor": "#ad849d",
+              "borderWidth": 0,
+              "borderRadius": 12,
+              "padding": 12,
+              "opacity": 1,
+              "textAlign": "left",
+              "gap": 8
+            },
+            "command": "sacura.component.call",
+            "value": {
+              "instance": {
+                "kind": "reference",
+                "type": "mechanic",
+                "mode": "direct",
+                "id": "story-door-lock"
+              },
+              "methodId": "interact",
+              "args": {}
+            },
+            "operationVersion": 1
+          }
+        ],
+        "css": ""
+      }
+    ],
+    "audioAssets": [],
+    "variables": {},
+    "variableTypes": {},
+    "objects": [
+      {
+        "id": "quest-room-floor",
+        "name": "Пол локации",
+        "type": "Меш",
+        "primitive": "box",
+        "color": "#726659",
+        "active": true,
+        "subsceneId": "quest-room",
+        "transforms": {
+          "quest-room": {
+            "position": [
+              0,
+              -0.08,
+              0
+            ],
+            "scale": [
+              16,
+              0.3,
+              12
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "id": "quest-room-wall",
+        "name": "Задняя стена",
+        "type": "Меш",
+        "primitive": "box",
+        "color": "#485965",
+        "active": true,
+        "subsceneId": "quest-room",
+        "transforms": {
+          "quest-room": {
+            "position": [
+              0,
+              1.1,
+              -3
+            ],
+            "scale": [
+              16,
+              4.4,
+              0.35
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "id": "quest-key",
+        "name": "Латунный ключ",
+        "type": "Активный меш",
+        "primitive": "box",
+        "color": "#e5c15c",
+        "active": true,
+        "subsceneId": "quest-room",
+        "transforms": {
+          "quest-room": {
+            "position": [
+              0,
+              0.4,
+              -0.5
+            ],
+            "scale": [
+              0.75,
+              0.18,
+              0.42
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "interaction": "Латунный ключ",
+        "interactionCall": {
+          "id": "sacura.component.call",
+          "version": 1,
+          "parameters": {
+            "instance": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "key-pickup"
+            },
+            "methodId": "pickup",
+            "args": {}
+          }
+        }
+      },
+      {
+        "id": "quest-door",
+        "name": "Дверь с ключом",
+        "type": "Активный меш",
+        "primitive": "box",
+        "color": "#6b9da0",
+        "active": true,
+        "subsceneId": "quest-room",
+        "transforms": {
+          "quest-room": {
+            "position": [
+              -2,
+              1,
+              -2.2
+            ],
+            "scale": [
+              1.2,
+              2,
+              0.25
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "interaction": "Запертая дверь во двор",
+        "interactionCall": {
+          "id": "sacura.component.call",
+          "version": 1,
+          "parameters": {
+            "instance": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "key-door"
+            },
+            "methodId": "interact",
+            "args": {}
+          }
+        }
+      },
+      {
+        "id": "story-door",
+        "name": "Дверь склада",
+        "type": "Активный меш",
+        "primitive": "box",
+        "color": "#ac7966",
+        "active": true,
+        "subsceneId": "quest-room",
+        "transforms": {
+          "quest-room": {
+            "position": [
+              2,
+              1,
+              -2.2
+            ],
+            "scale": [
+              1.2,
+              2,
+              0.25
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "interaction": "Запертая дверь во двор",
+        "interactionCall": {
+          "id": "sacura.component.call",
+          "version": 1,
+          "parameters": {
+            "instance": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "story-door-lock"
+            },
+            "methodId": "interact",
+            "args": {}
+          }
+        }
+      }
+    ],
+    "subscenes": [
+      {
+        "id": "quest-room",
+        "name": "Кабинет смотрителя",
+        "description": "Все объекты, события, виджеты и связи редактируются стандартными инструментами Sacura.",
+        "location": "Point & Click — Ключ от обсерватории",
+        "kind": "empty",
+        "entry": "quest-intro",
+        "sceneId": "sample-chapter",
+        "weather": "Ясно",
+        "time": "День",
+        "color": "#96b9ba",
+        "stagingPoints": [],
+        "navMesh": {
+          "enabled": true,
+          "show": false,
+          "center": [
+            0,
+            0,
+            0
+          ],
+          "size": [
+            8,
+            6
+          ],
+          "cellSize": 0.25
+        },
+        "cameras": [
+          {
+            "id": "quest-room-camera",
+            "name": "Игровой ракурс",
+            "mode": "fixed",
+            "position": [
+              0,
+              5,
+              6.8
+            ],
+            "target": [
+              0,
+              0.3,
+              -0.5
+            ],
+            "fov": 58,
+            "smoothing": 0.15
+          }
+        ],
+        "defaultCameraId": "quest-room-camera"
+      }
+    ],
+    "chapters": [
+      {
+        "id": "sample-chapter",
+        "name": "Point & click · Две двери",
+        "subsceneId": "quest-room",
+        "beats": [
+          {
+            "id": "quest-intro",
+            "kind": "dialogue",
+            "text": "Левая дверь открывается ключом. Правая пока заперта.",
+            "speaker": "Рассказчик",
+            "next": "quest-unlock",
+            "bindings": [],
+            "mode": "SEQUENTIAL",
+            "batches": {
+              "BEFORE": [],
+              "ON_START": [],
+              "AFTER": []
+            }
+          },
+          {
+            "id": "quest-unlock",
+            "kind": "dialogue",
+            "text": "Смотритель разблокировал склад. Теперь можно открыть правую дверь.",
+            "speaker": "Рассказчик",
+            "next": "quest-next",
+            "bindings": [
+              {
+                "id": "bind-d73af0de-2504-4eb5-ba1a-eb99306827cb",
+                "eventId": "event-bc427f43-bfc9-47b9-90e9-e7e652eb1e73",
+                "hook": "BEFORE",
+                "join": "EVENT_END",
+                "overrides": {},
+                "actionOverrides": {},
+                "localEventId": "event-bc427f43-bfc9-47b9-90e9-e7e652eb1e73"
+              }
+            ],
+            "mode": "SEQUENTIAL",
+            "batches": {
+              "BEFORE": [
+                {
+                  "id": "batch-fb91217b-868b-41aa-a8a4-23e1aa66041f",
+                  "mode": "SEQUENTIAL",
+                  "bindingIds": [
+                    "bind-d73af0de-2504-4eb5-ba1a-eb99306827cb"
+                  ]
+                }
+              ],
+              "ON_START": [],
+              "AFTER": []
+            }
+          },
+          {
+            "id": "quest-next",
+            "kind": "dialogue",
+            "text": "Замок не сбросился. Следующая реплика отдельно открывает склад.",
+            "speaker": "Рассказчик",
+            "next": "quest-auto-open",
+            "bindings": [],
+            "mode": "SEQUENTIAL",
+            "batches": {
+              "BEFORE": [],
+              "ON_START": [],
+              "AFTER": []
+            }
+          },
+          {
+            "id": "quest-auto-open",
+            "kind": "dialogue",
+            "text": "Дверь открыта после завершения анимации.",
+            "speaker": "Рассказчик",
+            "next": "quest-end",
+            "bindings": [
+              {
+                "id": "bind-a92ec031-7228-40c2-9218-6367291090b5",
+                "eventId": "event-52f23eb8-9996-4b57-9a89-7de84aef5b2c",
+                "hook": "BEFORE",
+                "join": "EVENT_END",
+                "overrides": {},
+                "actionOverrides": {},
+                "localEventId": "event-52f23eb8-9996-4b57-9a89-7de84aef5b2c"
+              }
+            ],
+            "mode": "SEQUENTIAL",
+            "batches": {
+              "BEFORE": [
+                {
+                  "id": "batch-70cc2a24-123a-4d58-805a-809cbf69e19e",
+                  "mode": "SEQUENTIAL",
+                  "bindingIds": [
+                    "bind-a92ec031-7228-40c2-9218-6367291090b5"
+                  ]
+                }
+              ],
+              "ON_START": [],
+              "AFTER": []
+            }
+          },
+          {
+            "id": "quest-end",
+            "kind": "end",
+            "text": "Обе двери доступны.",
+            "speaker": "Рассказчик",
+            "next": null,
+            "bindings": [],
+            "mode": "SEQUENTIAL",
+            "batches": {
+              "BEFORE": [],
+              "ON_START": [],
+              "AFTER": []
+            },
+            "ending": "Конец"
+          }
+        ]
+      }
+    ],
+    "input": {
+      "version": 1,
+      "touchMode": "auto",
+      "actions": [
+        {
+          "id": "move",
+          "name": "Двигаться",
+          "valueType": "axis2d",
+          "behavior": "move",
+          "trigger": "continuous",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "interact",
+          "name": "Осмотреть",
+          "valueType": "boolean",
+          "behavior": "interact",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "point",
+          "name": "Идти по указателю",
+          "valueType": "boolean",
+          "behavior": "point",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "advance",
+          "name": "Дальше",
+          "valueType": "boolean",
+          "behavior": "advance",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "pause",
+          "name": "Пауза",
+          "valueType": "boolean",
+          "behavior": "pause",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "choiceNext",
+          "name": "Следующий ответ",
+          "valueType": "boolean",
+          "behavior": "choiceNext",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        },
+        {
+          "id": "choicePrevious",
+          "name": "Предыдущий ответ",
+          "valueType": "boolean",
+          "behavior": "choicePrevious",
+          "trigger": "pressed",
+          "holdSeconds": 0.4,
+          "consume": true
+        }
+      ],
+      "contexts": [
+        {
+          "id": "system",
+          "name": "Система",
+          "priority": 100,
+          "bindings": [
+            {
+              "actionId": "pause",
+              "device": "keyboard",
+              "control": "Escape",
+              "scale": 1,
+              "id": "system-0"
+            },
+            {
+              "actionId": "pause",
+              "device": "gamepad-button",
+              "control": "9",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "system-1"
+            },
+            {
+              "actionId": "pause",
+              "device": "touch",
+              "control": "pause",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "system-2"
+            }
+          ]
+        },
+        {
+          "id": "dialogue",
+          "name": "Диалог",
+          "priority": 10,
+          "bindings": [
+            {
+              "actionId": "advance",
+              "device": "keyboard",
+              "control": "Enter",
+              "scale": 1,
+              "id": "dialogue-0"
+            },
+            {
+              "actionId": "advance",
+              "device": "keyboard",
+              "control": "Space",
+              "scale": 1,
+              "id": "dialogue-1"
+            },
+            {
+              "actionId": "advance",
+              "device": "gamepad-button",
+              "control": "0",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "dialogue-2"
+            },
+            {
+              "actionId": "advance",
+              "device": "touch",
+              "control": "advance",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "dialogue-3"
+            },
+            {
+              "actionId": "choiceNext",
+              "device": "keyboard",
+              "control": "ArrowDown",
+              "scale": 1,
+              "id": "dialogue-4"
+            },
+            {
+              "actionId": "choicePrevious",
+              "device": "keyboard",
+              "control": "ArrowUp",
+              "scale": 1,
+              "id": "dialogue-5"
+            },
+            {
+              "actionId": "choiceNext",
+              "device": "gamepad-button",
+              "control": "13",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "dialogue-6"
+            },
+            {
+              "actionId": "choicePrevious",
+              "device": "gamepad-button",
+              "control": "12",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "dialogue-7"
+            }
+          ]
+        },
+        {
+          "id": "gameplay",
+          "name": "Ходьба и взаимодействие",
+          "priority": 20,
+          "bindings": [
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "KeyW",
+              "scale": [
+                0,
+                1
+              ],
+              "id": "gameplay-0"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "ArrowUp",
+              "scale": [
+                0,
+                1
+              ],
+              "id": "gameplay-1"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "KeyS",
+              "scale": [
+                0,
+                -1
+              ],
+              "id": "gameplay-2"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "ArrowDown",
+              "scale": [
+                0,
+                -1
+              ],
+              "id": "gameplay-3"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "KeyA",
+              "scale": [
+                -1,
+                0
+              ],
+              "id": "gameplay-4"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "ArrowLeft",
+              "scale": [
+                -1,
+                0
+              ],
+              "id": "gameplay-5"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "KeyD",
+              "scale": [
+                1,
+                0
+              ],
+              "id": "gameplay-6"
+            },
+            {
+              "actionId": "move",
+              "device": "keyboard",
+              "control": "ArrowRight",
+              "scale": [
+                1,
+                0
+              ],
+              "id": "gameplay-7"
+            },
+            {
+              "actionId": "interact",
+              "device": "keyboard",
+              "control": "KeyE",
+              "scale": 1,
+              "id": "gameplay-8"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-axis",
+              "control": "0",
+              "scale": [
+                1,
+                0
+              ],
+              "deadZone": 0.18,
+              "id": "gameplay-9"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-axis",
+              "control": "1",
+              "scale": [
+                0,
+                -1
+              ],
+              "deadZone": 0.18,
+              "id": "gameplay-10"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-button",
+              "control": "12",
+              "scale": [
+                0,
+                1
+              ],
+              "deadZone": 0,
+              "id": "gameplay-11"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-button",
+              "control": "13",
+              "scale": [
+                0,
+                -1
+              ],
+              "deadZone": 0,
+              "id": "gameplay-12"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-button",
+              "control": "14",
+              "scale": [
+                -1,
+                0
+              ],
+              "deadZone": 0,
+              "id": "gameplay-13"
+            },
+            {
+              "actionId": "move",
+              "device": "gamepad-button",
+              "control": "15",
+              "scale": [
+                1,
+                0
+              ],
+              "deadZone": 0,
+              "id": "gameplay-14"
+            },
+            {
+              "actionId": "interact",
+              "device": "gamepad-button",
+              "control": "0",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "gameplay-15"
+            },
+            {
+              "actionId": "point",
+              "device": "pointer",
+              "control": "primary",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "gameplay-16"
+            },
+            {
+              "actionId": "move",
+              "device": "touch",
+              "control": "move",
+              "scale": [
+                1,
+                1
+              ],
+              "deadZone": 0,
+              "id": "gameplay-17"
+            },
+            {
+              "actionId": "interact",
+              "device": "touch",
+              "control": "interact",
+              "scale": 1,
+              "deadZone": 0,
+              "id": "gameplay-18"
+            }
+          ]
+        }
+      ]
+    },
+    "ui": {
+      "dialogue": "widget-default-dialogue",
+      "mainMenu": "widget-default-mainMenu",
+      "pauseMenu": "widget-default-pauseMenu",
+      "hud": "doors-hud"
+    },
+    "audioSettings": {
+      "sidechain": {
+        "reductionDb": 4,
+        "attack": 0.6,
+        "release": 0.9
+      }
+    },
+    "description": "Что открыть → «Дверь с ключом» или «Дверь склада» → LockedDoor → canUnlock / interact. Что изменить → условие проверки ключа или добавить вызов действия. Результат → обе двери используют новый исходник, но замки независимы.\nСклад: следующая реплика вызывает SetLocked(false), дверь остаётся закрытой. Взаимодействие или отдельный Open открывает её; ожидание относится только к анимации. Инвентарь и ключ назначаются в ссылках экземпляра."
+  },
+  "references": [],
+  "assets": []
+}

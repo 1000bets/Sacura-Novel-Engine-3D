@@ -1,0 +1,4 @@
+import React from 'react';
+import WidgetRenderer from './WidgetRenderer.jsx';
+import {resolveWidget} from './widgetModel.js';
+export default function GameHUD({project,preview,onAction,text}){const game=preview.world.game,task=(game?.messageAt===undefined||game.clock-game.messageAt<3?game?.message:'')||preview.hint||text;const widget=project.widgets.find(w=>w.id===project.gameplay?.hudWidgetId&&w.kind==='hud')||resolveWidget(project,'hud');return <>{(project.gameplay.hudWidgetId||project.gameplay.legacyCompatibility==='gameplay-v1')&&<div className="gameplay-hud"><WidgetRenderer widget={widget} context={{project,variables:preview.variables,game:preview.world.game,ready:preview.ready,paused:preview.paused}} onAction={onAction}/></div>}{project.gameplay.crosshair?.enabled&&<span className="game-crosshair" aria-hidden="true">+</span>}{task&&<div className="gameplay-task" role="status">{task}</div>}</>;}

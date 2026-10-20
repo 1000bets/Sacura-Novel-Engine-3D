@@ -1,0 +1,5 @@
+.anchored-popover { position: fixed; z-index: 1000; max-width: calc(100vw - 16px); overflow: auto; overscroll-behavior: contain; background: var(--bg-panel-elevated); color: var(--text-primary); border: 1px solid var(--border-subtle); border-radius: 6px; box-shadow: var(--shadow-popup); }
+.scene-object-menu { padding: 5px; }
+.scene-object-menu>button { display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; min-height: 32px; padding: 7px 9px; border: 0; background: transparent; text-align: left; font-size: 13px; color: var(--text-primary); }
+.scene-object-menu>button:hover, .scene-object-menu>button:focus-visible { background: var(--bg-hover); }
+.scene-object-menu>button>svg { flex-shrink: 0; color: var(--text-muted); }

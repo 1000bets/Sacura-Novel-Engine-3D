@@ -1,0 +1,3787 @@
+{
+  "mechanics": [
+    {
+      "id": "rule",
+      "name": "Своя реакция",
+      "scopes": [
+        "object",
+        "scene",
+        "project"
+      ]
+    },
+    {
+      "id": "timer",
+      "name": "Таймер",
+      "scopes": [
+        "object",
+        "scene",
+        "project"
+      ]
+    },
+    {
+      "id": "interaction",
+      "name": "Осмотр предмета",
+      "scopes": [
+        "object"
+      ]
+    },
+    {
+      "id": "door",
+      "name": "Дверь с ключом",
+      "scopes": [
+        "object"
+      ]
+    },
+    {
+      "id": "pickup",
+      "name": "Предмет для подбора",
+      "scopes": [
+        "object"
+      ]
+    },
+    {
+      "id": "movement",
+      "name": "Управление объектом",
+      "scopes": [
+        "object"
+      ]
+    },
+    {
+      "id": "camera",
+      "name": "Камера",
+      "scopes": [
+        "object",
+        "scene",
+        "project"
+      ]
+    },
+    {
+      "id": "health",
+      "name": "Здоровье",
+      "scopes": [
+        "object"
+      ]
+    },
+    {
+      "id": "weapon",
+      "name": "Оружие",
+      "scopes": [
+        "object"
+      ]
+    },
+    {
+      "id": "pursuit",
+      "name": "Преследование",
+      "scopes": [
+        "object"
+      ]
+    },
+    {
+      "id": "physics",
+      "name": "Динамическое тело",
+      "scopes": [
+        "object"
+      ]
+    },
+    {
+      "id": "inventory",
+      "name": "Инвентарь",
+      "scopes": [
+        "object",
+        "scene",
+        "project"
+      ]
+    },
+    {
+      "id": "resource",
+      "name": "Счётчик",
+      "scopes": [
+        "object",
+        "scene",
+        "project"
+      ]
+    },
+    {
+      "id": "crosshair",
+      "name": "Прицел",
+      "scopes": [
+        "project"
+      ]
+    },
+    {
+      "id": "sacura.turn",
+      "name": "Очередность ходов",
+      "scopes": [
+        "scene",
+        "project"
+      ]
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "sacura.health",
+      "version": 1,
+      "bindings": {
+        "hp": {
+          "type": "number"
+        },
+        "maxHP": {
+          "type": "number"
+        },
+        "dead": {
+          "type": "boolean"
+        }
+      }
+    },
+    {
+      "id": "sacura.behavior",
+      "version": 1,
+      "bindings": {}
+    },
+    {
+      "id": "sacura.movement",
+      "version": 1,
+      "bindings": {}
+    },
+    {
+      "id": "sacura.weapon",
+      "version": 1,
+      "bindings": {
+        "ammo": {
+          "type": "integer"
+        },
+        "reserve": {
+          "type": "integer"
+        }
+      }
+    },
+    {
+      "id": "sacura.inventory",
+      "version": 1,
+      "bindings": {
+        "count": {
+          "type": "integer",
+          "min": 0,
+          "label": "Количество предмета"
+        },
+        "items": {
+          "type": "collection",
+          "items": {
+            "type": "object",
+            "properties": {
+              "itemId": {
+                "type": "string"
+              },
+              "count": {
+                "type": "integer",
+                "min": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "sacura.interaction",
+      "version": 1,
+      "bindings": {}
+    },
+    {
+      "id": "sacura.timer",
+      "version": 1,
+      "bindings": {}
+    },
+    {
+      "id": "sacura.camera",
+      "version": 1,
+      "bindings": {}
+    },
+    {
+      "id": "sacura.crosshair",
+      "version": 1,
+      "bindings": {}
+    },
+    {
+      "id": "sacura.resource",
+      "version": 1,
+      "bindings": {
+        "value": {
+          "type": "integer"
+        }
+      }
+    },
+    {
+      "id": "sacura.compatibility",
+      "version": 1,
+      "bindings": {}
+    },
+    {
+      "id": "sacura.turn",
+      "version": 1,
+      "bindings": {
+        "round": {
+          "type": "integer",
+          "label": "Номер круга"
+        }
+      }
+    },
+    {
+      "id": "sacura.reward-extension",
+      "version": 1,
+      "bindings": {}
+    }
+  ],
+  "signals": [
+    {
+      "id": "start",
+      "version": 1,
+      "payloadSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "id": "victory",
+      "version": 1,
+      "payloadSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "id": "interact",
+      "version": 1,
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "optional": true
+          }
+        }
+      }
+    },
+    {
+      "id": "death",
+      "version": 1,
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "optional": true
+          }
+        }
+      }
+    },
+    {
+      "id": "enter",
+      "version": 1,
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "optional": true
+          }
+        }
+      }
+    },
+    {
+      "id": "exit",
+      "version": 1,
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "optional": true
+          }
+        }
+      }
+    },
+    {
+      "id": "tick",
+      "version": 1,
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "optional": true
+          }
+        }
+      }
+    },
+    {
+      "id": "hit",
+      "version": 1,
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    {
+      "id": "pickup",
+      "version": 1,
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          },
+          "itemId": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "id": "collision",
+      "version": 1,
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          },
+          "actorId": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "id": "timer",
+      "version": 1,
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "optional": true
+          },
+          "timerId": {
+            "type": "string",
+            "optional": true
+          }
+        }
+      }
+    },
+    {
+      "id": "button",
+      "version": 1,
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "elementId": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "id": "input",
+      "version": 1,
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "actionId": {
+            "type": "string"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "value": {
+            "type": "union",
+            "variants": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "vector",
+                "size": 2
+              }
+            ]
+          },
+          "device": {
+            "type": "string",
+            "optional": true
+          }
+        }
+      }
+    },
+    {
+      "id": "sacura.variable.changed",
+      "version": 1,
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "variableId": {
+            "type": "string"
+          },
+          "oldValue": {
+            "type": "variableValue",
+            "parameter": "variableId"
+          },
+          "newValue": {
+            "type": "variableValue",
+            "parameter": "variableId"
+          }
+        }
+      }
+    },
+    {
+      "id": "sacura.turn.started",
+      "name": "Начались ходы",
+      "version": 1,
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "mechanicId": {
+            "type": "string"
+          },
+          "participant": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Участник"
+          },
+          "round": {
+            "type": "integer",
+            "min": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "sacura.turn.changed",
+      "name": "Ход передан",
+      "version": 1,
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "mechanicId": {
+            "type": "string"
+          },
+          "participant": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Участник"
+          },
+          "round": {
+            "type": "integer",
+            "min": 1
+          }
+        }
+      }
+    }
+  ],
+  "operations": [
+    {
+      "id": "sacura.variable.set",
+      "version": 1,
+      "source": {
+        "path": "src/coreOperations.js",
+        "line": 1
+      },
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "variable": {
+            "type": "reference",
+            "referenceType": "variable",
+            "label": "Переменная"
+          },
+          "value": {
+            "type": "variableValue",
+            "parameter": "variable",
+            "label": "Новое значение"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "editor": {
+        "label": "Изменить переменную",
+        "category": "Общая логика"
+      },
+      "schemaVersion": 1
+    },
+    {
+      "id": "sacura.signal.emit",
+      "version": 1,
+      "source": {
+        "path": "src/coreOperations.js",
+        "line": 1
+      },
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "signal": {
+            "type": "reference",
+            "referenceType": "signal",
+            "label": "Пользовательский сигнал"
+          },
+          "payload": {
+            "type": "signalPayload",
+            "parameter": "signal",
+            "label": "Данные сигнала",
+            "default": {}
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "editor": {
+        "label": "Отправить сигнал",
+        "category": "Общая логика"
+      },
+      "schemaVersion": 1
+    },
+    {
+      "id": "sacura.condition.compare",
+      "version": 1,
+      "source": {
+        "path": "src/coreOperations.js",
+        "line": 1
+      },
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "left": {
+            "type": "union",
+            "variants": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "label": "Первое значение",
+            "default": 0
+          },
+          "operator": {
+            "type": "string",
+            "enum": [
+              "eq",
+              "ne",
+              "lt",
+              "lte",
+              "gt",
+              "gte"
+            ],
+            "default": "eq",
+            "label": "Сравнение",
+            "options": {
+              "eq": "Равно",
+              "ne": "Не равно",
+              "lt": "Меньше",
+              "lte": "Не больше",
+              "gt": "Больше",
+              "gte": "Не меньше"
+            }
+          },
+          "right": {
+            "type": "union",
+            "variants": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "label": "Второе значение",
+            "default": 0
+          }
+        }
+      },
+      "result": {
+        "type": "boolean"
+      },
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "editor": {
+        "label": "Сравнить значения",
+        "category": "Общая логика"
+      },
+      "pure": true,
+      "schemaVersion": 1
+    },
+    {
+      "id": "sacura.event.run",
+      "version": 1,
+      "source": {
+        "path": "src/coreOperations.js",
+        "line": 1
+      },
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "event": {
+            "type": "reference",
+            "referenceType": "event",
+            "label": "Событие"
+          },
+          "join": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "STARTED",
+              "FLOW_END",
+              "EVENT_END"
+            ],
+            "default": "FLOW_END",
+            "label": "Ожидание",
+            "options": {
+              "NONE": "Не задерживает поток",
+              "STARTED": "Ждём запуска",
+              "FLOW_END": "Ждём готовности",
+              "EVENT_END": "Ждём завершения"
+            }
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "editor": {
+        "label": "Запустить Event",
+        "category": "Общая логика"
+      },
+      "schemaVersion": 1
+    },
+    {
+      "id": "sacura.story.enter",
+      "version": 1,
+      "source": {
+        "path": "src/coreOperations.js",
+        "line": 1
+      },
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "beat": {
+            "type": "reference",
+            "referenceType": "beat",
+            "label": "Нода истории"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "editor": {
+        "label": "Продолжить историю",
+        "category": "Общая логика"
+      },
+      "schemaVersion": 1
+    },
+    {
+      "id": "sacura.scene.enter",
+      "version": 1,
+      "source": {
+        "path": "src/coreOperations.js",
+        "line": 1
+      },
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "scene": {
+            "type": "reference",
+            "referenceType": "scene",
+            "label": "Сцена"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "editor": {
+        "label": "Перейти в сцену",
+        "category": "Общая логика"
+      },
+      "schemaVersion": 1
+    },
+    {
+      "id": "sacura.mechanic.call",
+      "version": 1,
+      "source": {
+        "path": "src/coreOperations.js",
+        "line": 1
+      },
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "mechanic": {
+            "type": "reference",
+            "referenceType": "mechanic",
+            "label": "Механика"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "editor": {
+        "label": "Вызвать механику",
+        "category": "Общая логика"
+      },
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/health.js",
+        "line": 1
+      },
+      "id": "sacura.health.damage",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Владелец здоровья"
+          },
+          "amount": {
+            "type": "number",
+            "min": 0,
+            "default": 25,
+            "label": "Количество"
+          }
+        }
+      },
+      "result": {
+        "type": "boolean"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Нанести урон"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/health.js",
+        "line": 1
+      },
+      "id": "sacura.health.heal",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Владелец здоровья"
+          },
+          "amount": {
+            "type": "number",
+            "min": 0,
+            "default": 25,
+            "label": "Количество"
+          }
+        }
+      },
+      "result": {
+        "type": "boolean"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Восстановить здоровье"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/health.js",
+        "line": 1
+      },
+      "id": "sacura.health.all-dead",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "objects": {
+            "type": "collection",
+            "label": "Объекты",
+            "items": {
+              "type": "reference",
+              "referenceType": "object",
+              "label": "Объект"
+            },
+            "minItems": 0
+          }
+        }
+      },
+      "result": {
+        "type": "boolean"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Все выбранные объекты погибли"
+      },
+      "pure": true,
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/health.js",
+        "line": 1
+      },
+      "id": "sacura.signal.victory",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Отправить сигнал победы"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/health.js",
+        "line": 1
+      },
+      "id": "sacura.health.read",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "union",
+            "label": "Владелец",
+            "variants": [
+              {
+                "type": "reference",
+                "referenceType": "object",
+                "label": "Объект"
+              },
+              {
+                "type": "reference",
+                "referenceType": "scene",
+                "label": "Сцена"
+              },
+              {
+                "type": "reference",
+                "referenceType": "project",
+                "label": "Проект"
+              }
+            ]
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "label": "Компонент здоровья доступен"
+          },
+          "hp": {
+            "type": "number",
+            "label": "Текущее здоровье"
+          },
+          "maxHP": {
+            "type": "number",
+            "label": "Максимальное здоровье"
+          },
+          "dead": {
+            "type": "boolean",
+            "label": "Объект погиб"
+          }
+        }
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Прочитать здоровье"
+      },
+      "pure": true,
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/health.js",
+        "line": 1
+      },
+      "id": "sacura.health.write",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Владелец"
+          },
+          "hp": {
+            "type": "number",
+            "min": 0
+          },
+          "dead": {
+            "type": "boolean",
+            "default": false,
+            "label": "Объект погиб"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Сохранить здоровье"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/health.js",
+        "line": 1
+      },
+      "id": "sacura.health.publish",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Владелец"
+          },
+          "signal": {
+            "type": "string",
+            "enum": [
+              "hit",
+              "death"
+            ],
+            "default": "hit",
+            "label": "Сигнал"
+          },
+          "amount": {
+            "type": "number",
+            "min": 0,
+            "default": 0
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Опубликовать изменение здоровья"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/health.js",
+        "line": 1
+      },
+      "id": "sacura.game.fail",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "label": "Причина",
+            "default": "Действие недоступно."
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Прервать с объяснением"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/health.js",
+        "line": 1
+      },
+      "id": "sacura.game.commit",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Обновить состояние и интерфейс"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/health.js",
+        "line": 1
+      },
+      "id": "sacura.game.message",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "label": "Текст",
+            "default": ""
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Показать сообщение"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/behavior.js",
+        "line": 1
+      },
+      "id": "sacura.behavior.enabled",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Объект"
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": false,
+            "label": "Разрешить"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Разрешить поведение объекта"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/behavior.js",
+        "line": 1
+      },
+      "id": "sacura.behavior.observe",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Объект"
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "label": "Поведение разрешено"
+          },
+          "hasTarget": {
+            "type": "boolean",
+            "label": "Цель доступна"
+          },
+          "targetAlive": {
+            "type": "boolean",
+            "label": "Цель жива"
+          },
+          "target": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Цель",
+            "optional": true
+          },
+          "distance": {
+            "type": "number",
+            "label": "Расстояние до цели"
+          },
+          "detection": {
+            "type": "number",
+            "label": "Дальность обнаружения"
+          },
+          "range": {
+            "type": "number",
+            "label": "Дальность атаки"
+          },
+          "damage": {
+            "type": "number",
+            "label": "Урон атаки"
+          },
+          "interval": {
+            "type": "number",
+            "label": "Пауза между атаками"
+          },
+          "clock": {
+            "type": "number",
+            "label": "Время игры"
+          },
+          "nextAttack": {
+            "type": "number",
+            "label": "Время следующей атаки"
+          },
+          "direction": {
+            "type": "vector",
+            "size": 3,
+            "label": "Направление к цели"
+          },
+          "lineOfSight": {
+            "type": "boolean",
+            "label": "Цель видна"
+          }
+        }
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Наблюдать за целью"
+      },
+      "pure": true,
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/behavior.js",
+        "line": 1
+      },
+      "id": "sacura.behavior.direction",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Объект"
+          },
+          "direction": {
+            "type": "vector",
+            "size": 3,
+            "default": [
+              0,
+              0,
+              0
+            ],
+            "label": "Направление"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Задать намерение движения"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/behavior.js",
+        "line": 1
+      },
+      "id": "sacura.behavior.next-attack",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Объект"
+          },
+          "time": {
+            "type": "number",
+            "min": 0,
+            "label": "Игровое время"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Назначить время следующей атаки"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/behavior.js",
+        "line": 1
+      },
+      "id": "sacura.behavior.target",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Объект"
+          },
+          "target": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Цель"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Выбрать цель поведения"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/behavior.js",
+        "line": 1
+      },
+      "id": "sacura.behavior.nearest",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Искатель"
+          },
+          "targets": {
+            "type": "collection",
+            "items": {
+              "type": "reference",
+              "referenceType": "object",
+              "label": "Возможная цель"
+            },
+            "default": []
+          }
+        }
+      },
+      "result": {
+        "type": "reference",
+        "referenceType": "object",
+        "optional": true
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Найти ближайший объект"
+      },
+      "pure": true,
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/movement.js",
+        "line": 1
+      },
+      "id": "sacura.movement.jump",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Управляемый объект"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Прыгнуть"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/movement.js",
+        "line": 1
+      },
+      "id": "sacura.movement.impulse",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Объект"
+          },
+          "velocity": {
+            "type": "vector",
+            "size": 3,
+            "label": "Импульс"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Толкнуть объект"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/movement.js",
+        "line": 1
+      },
+      "id": "sacura.movement.enabled",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Объект"
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": false,
+            "label": "Разрешить"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Разрешить управление объектом"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/movement.js",
+        "line": 1
+      },
+      "id": "sacura.movement.direction",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Объект"
+          },
+          "direction": {
+            "type": "vector",
+            "size": 3,
+            "label": "Направление",
+            "default": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Задать направление движения"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/movement.js",
+        "line": 1
+      },
+      "id": "sacura.movement.destination",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Управляемый объект"
+          },
+          "point": {
+            "type": "vector",
+            "size": 3,
+            "label": "Точка"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Идти к точке"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/weapons.js",
+        "line": 1
+      },
+      "id": "sacura.weapon.shoot",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Владелец оружия"
+          },
+          "weapon": {
+            "type": "reference",
+            "referenceType": "weapon",
+            "label": "Оружие",
+            "optional": true
+          },
+          "origin": {
+            "type": "vector",
+            "size": 3,
+            "label": "Точка выстрела",
+            "optional": true
+          },
+          "direction": {
+            "type": "vector",
+            "size": 3,
+            "label": "Направление",
+            "optional": true
+          }
+        }
+      },
+      "result": {
+        "type": "boolean"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Выстрелить"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/weapons.js",
+        "line": 1
+      },
+      "id": "sacura.weapon.reload",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Владелец оружия"
+          },
+          "weapon": {
+            "type": "reference",
+            "referenceType": "weapon",
+            "label": "Оружие",
+            "optional": true
+          }
+        }
+      },
+      "result": {
+        "type": "boolean"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Перезарядить"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/weapons.js",
+        "line": 1
+      },
+      "id": "sacura.weapon.enabled",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Владелец оружия"
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": false,
+            "label": "Разрешить"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Разрешить использование оружия"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/weapons.js",
+        "line": 1
+      },
+      "id": "sacura.weapon.read",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Владелец оружия"
+          },
+          "weapon": {
+            "type": "reference",
+            "referenceType": "weapon",
+            "label": "Оружие",
+            "optional": true
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "label": "Оружие доступно"
+          },
+          "enabled": {
+            "type": "boolean",
+            "label": "Оружие включено"
+          },
+          "ammo": {
+            "type": "number",
+            "label": "Патроны в магазине"
+          },
+          "reserve": {
+            "type": "number",
+            "label": "Запас патронов"
+          },
+          "nextShot": {
+            "type": "number",
+            "label": "Время следующего выстрела"
+          },
+          "reloadUntil": {
+            "type": "number",
+            "label": "Время завершения перезарядки"
+          },
+          "clock": {
+            "type": "number",
+            "label": "Время игры"
+          },
+          "magazine": {
+            "type": "number",
+            "label": "Ёмкость магазина"
+          },
+          "cooldown": {
+            "type": "number",
+            "label": "Пауза между выстрелами"
+          },
+          "reloadTime": {
+            "type": "number",
+            "label": "Длительность перезарядки"
+          },
+          "damage": {
+            "type": "number",
+            "label": "Базовый урон"
+          },
+          "recoil": {
+            "type": "number",
+            "label": "Отдача"
+          },
+          "range": {
+            "type": "number",
+            "label": "Дальность выстрела"
+          },
+          "projectileSpeed": {
+            "type": "number",
+            "label": "Скорость снаряда"
+          },
+          "mode": {
+            "type": "string",
+            "label": "Способ выстрела"
+          }
+        }
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Параметры и состояние оружия"
+      },
+      "pure": true,
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/weapons.js",
+        "line": 1
+      },
+      "id": "sacura.weapon.write",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Владелец оружия"
+          },
+          "weapon": {
+            "type": "reference",
+            "referenceType": "weapon",
+            "label": "Оружие",
+            "optional": true
+          },
+          "field": {
+            "type": "string",
+            "enum": [
+              "ammo",
+              "reserve",
+              "nextShot",
+              "reloadUntil"
+            ],
+            "options": {
+              "ammo": "Патроны в магазине",
+              "reserve": "Запас патронов",
+              "nextShot": "Время следующего выстрела",
+              "reloadUntil": "Время завершения перезарядки"
+            },
+            "default": "ammo",
+            "label": "Поле"
+          },
+          "value": {
+            "type": "number",
+            "min": 0,
+            "label": "Значение"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Изменить состояние оружия"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/weapons.js",
+        "line": 1
+      },
+      "id": "sacura.weapon.aim",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Владелец оружия"
+          },
+          "weapon": {
+            "type": "reference",
+            "referenceType": "weapon",
+            "label": "Оружие",
+            "optional": true
+          },
+          "origin": {
+            "type": "vector",
+            "size": 3,
+            "optional": true
+          },
+          "direction": {
+            "type": "vector",
+            "size": 3,
+            "optional": true
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "label": "Направление доступно"
+          },
+          "origin": {
+            "type": "vector",
+            "size": 3,
+            "label": "Начало выстрела"
+          },
+          "direction": {
+            "type": "vector",
+            "size": 3,
+            "label": "Направление выстрела"
+          }
+        }
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Построить направление выстрела"
+      },
+      "pure": true,
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/weapons.js",
+        "line": 1
+      },
+      "id": "sacura.weapon.raycast",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Стрелок"
+          },
+          "origin": {
+            "type": "vector",
+            "size": 3
+          },
+          "direction": {
+            "type": "vector",
+            "size": 3
+          },
+          "range": {
+            "type": "number",
+            "min": 0
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "hit": {
+            "type": "boolean",
+            "label": "Есть попадание"
+          },
+          "target": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Попавший объект",
+            "optional": true
+          },
+          "point": {
+            "type": "vector",
+            "size": 3,
+            "label": "Точка попадания"
+          }
+        }
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Трассировать луч"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/weapons.js",
+        "line": 1
+      },
+      "id": "sacura.weapon.projectile",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Стрелок"
+          },
+          "origin": {
+            "type": "vector",
+            "size": 3
+          },
+          "direction": {
+            "type": "vector",
+            "size": 3
+          },
+          "range": {
+            "type": "number",
+            "min": 0
+          },
+          "speed": {
+            "type": "number",
+            "min": 0
+          },
+          "damage": {
+            "type": "number",
+            "min": 0
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Создать физический снаряд"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/weapons.js",
+        "line": 1
+      },
+      "id": "sacura.weapon.tracer",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "vector",
+            "size": 3
+          },
+          "to": {
+            "type": "vector",
+            "size": 3
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Показать след выстрела"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/weapons.js",
+        "line": 1
+      },
+      "id": "sacura.weapon.recoil",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Стрелок"
+          },
+          "amount": {
+            "type": "number",
+            "min": 0
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Сместить прицел отдачей"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/weapons.js",
+        "line": 1
+      },
+      "id": "sacura.weapon.select",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Владелец"
+          },
+          "weapon": {
+            "type": "reference",
+            "referenceType": "weapon",
+            "label": "Оружие"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Выбрать оружие"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/inventory.js",
+        "line": 1
+      },
+      "id": "sacura.inventory.add",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "union",
+            "label": "Владелец",
+            "variants": [
+              {
+                "type": "reference",
+                "referenceType": "object",
+                "label": "Объект"
+              },
+              {
+                "type": "reference",
+                "referenceType": "scene",
+                "label": "Сцена"
+              },
+              {
+                "type": "reference",
+                "referenceType": "project",
+                "label": "Проект"
+              }
+            ]
+          },
+          "item": {
+            "type": "reference",
+            "referenceType": "item",
+            "label": "Предмет"
+          },
+          "count": {
+            "type": "integer",
+            "min": 1,
+            "default": 1,
+            "label": "Количество"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Добавить предмет"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/inventory.js",
+        "line": 1
+      },
+      "id": "sacura.inventory.remove",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "union",
+            "label": "Владелец",
+            "variants": [
+              {
+                "type": "reference",
+                "referenceType": "object",
+                "label": "Объект"
+              },
+              {
+                "type": "reference",
+                "referenceType": "scene",
+                "label": "Сцена"
+              },
+              {
+                "type": "reference",
+                "referenceType": "project",
+                "label": "Проект"
+              }
+            ]
+          },
+          "item": {
+            "type": "reference",
+            "referenceType": "item",
+            "label": "Предмет"
+          },
+          "count": {
+            "type": "integer",
+            "min": 1,
+            "default": 1,
+            "label": "Количество"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Убрать предмет"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/inventory.js",
+        "line": 1
+      },
+      "id": "sacura.inventory.equip",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "union",
+            "label": "Владелец",
+            "variants": [
+              {
+                "type": "reference",
+                "referenceType": "object",
+                "label": "Объект"
+              },
+              {
+                "type": "reference",
+                "referenceType": "scene",
+                "label": "Сцена"
+              },
+              {
+                "type": "reference",
+                "referenceType": "project",
+                "label": "Проект"
+              }
+            ]
+          },
+          "item": {
+            "type": "reference",
+            "referenceType": "item",
+            "label": "Предмет"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Экипировать предмет"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/inventory.js",
+        "line": 1
+      },
+      "id": "sacura.inventory.use",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "union",
+            "label": "Владелец",
+            "variants": [
+              {
+                "type": "reference",
+                "referenceType": "object",
+                "label": "Объект"
+              },
+              {
+                "type": "reference",
+                "referenceType": "scene",
+                "label": "Сцена"
+              },
+              {
+                "type": "reference",
+                "referenceType": "project",
+                "label": "Проект"
+              }
+            ]
+          },
+          "item": {
+            "type": "reference",
+            "referenceType": "item",
+            "label": "Предмет"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Использовать предмет"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/inventory.js",
+        "line": 1
+      },
+      "id": "sacura.inventory.recipe-read",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "recipe": {
+            "type": "reference",
+            "referenceType": "recipe",
+            "label": "Сочетание"
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "ingredients": {
+            "type": "collection",
+            "label": "Ингредиенты",
+            "items": {
+              "type": "object",
+              "properties": {
+                "item": {
+                  "type": "reference",
+                  "referenceType": "item",
+                  "label": "Ингредиент"
+                },
+                "count": {
+                  "type": "integer",
+                  "min": 1,
+                  "label": "Требуемое количество"
+                }
+              }
+            }
+          },
+          "result": {
+            "type": "reference",
+            "referenceType": "item",
+            "label": "Результат"
+          },
+          "count": {
+            "type": "integer",
+            "min": 1,
+            "label": "Количество результата"
+          }
+        }
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Прочитать состав сочетания"
+      },
+      "pure": true,
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/inventory.js",
+        "line": 1
+      },
+      "id": "sacura.inventory.item-read",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "union",
+            "label": "Владелец",
+            "variants": [
+              {
+                "type": "reference",
+                "referenceType": "object",
+                "label": "Объект"
+              },
+              {
+                "type": "reference",
+                "referenceType": "scene",
+                "label": "Сцена"
+              },
+              {
+                "type": "reference",
+                "referenceType": "project",
+                "label": "Проект"
+              }
+            ]
+          },
+          "item": {
+            "type": "reference",
+            "referenceType": "item",
+            "label": "Предмет"
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "label": "Количество у владельца"
+          },
+          "consumable": {
+            "type": "boolean",
+            "label": "Расходуется при использовании"
+          },
+          "heal": {
+            "type": "number",
+            "label": "Восстановление здоровья"
+          },
+          "slot": {
+            "type": "string",
+            "label": "Слот экипировки"
+          },
+          "hasWeapon": {
+            "type": "boolean",
+            "label": "У предмета есть оружие"
+          },
+          "weaponOwnerMatches": {
+            "type": "boolean",
+            "label": "Оружие принадлежит владельцу"
+          },
+          "weapon": {
+            "type": "reference",
+            "referenceType": "weapon",
+            "label": "Оружие",
+            "optional": true
+          },
+          "hasUseEvent": {
+            "type": "boolean",
+            "label": "Есть Event использования"
+          },
+          "useEvent": {
+            "type": "reference",
+            "referenceType": "event",
+            "label": "Действие предмета",
+            "optional": true
+          }
+        }
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Прочитать свойства предмета"
+      },
+      "pure": true,
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/inventory.js",
+        "line": 1
+      },
+      "id": "sacura.inventory.equipment-write",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "union",
+            "label": "Владелец",
+            "variants": [
+              {
+                "type": "reference",
+                "referenceType": "object",
+                "label": "Объект"
+              },
+              {
+                "type": "reference",
+                "referenceType": "scene",
+                "label": "Сцена"
+              },
+              {
+                "type": "reference",
+                "referenceType": "project",
+                "label": "Проект"
+              }
+            ]
+          },
+          "item": {
+            "type": "reference",
+            "referenceType": "item",
+            "label": "Предмет"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Поместить предмет в слот"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/inventory.js",
+        "line": 1
+      },
+      "id": "sacura.inventory.store",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "union",
+            "label": "Владелец",
+            "variants": [
+              {
+                "type": "reference",
+                "referenceType": "object",
+                "label": "Объект"
+              },
+              {
+                "type": "reference",
+                "referenceType": "scene",
+                "label": "Сцена"
+              },
+              {
+                "type": "reference",
+                "referenceType": "project",
+                "label": "Проект"
+              }
+            ]
+          },
+          "item": {
+            "type": "reference",
+            "referenceType": "item",
+            "label": "Предмет"
+          },
+          "count": {
+            "type": "integer",
+            "min": 1,
+            "default": 1,
+            "label": "Количество"
+          },
+          "publish": {
+            "type": "boolean",
+            "default": true,
+            "label": "Сообщить о получении"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Добавить предмет в хранилище"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/inventory.js",
+        "line": 1
+      },
+      "id": "sacura.inventory.count",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "union",
+            "label": "Владелец",
+            "variants": [
+              {
+                "type": "reference",
+                "referenceType": "object",
+                "label": "Объект"
+              },
+              {
+                "type": "reference",
+                "referenceType": "scene",
+                "label": "Сцена"
+              },
+              {
+                "type": "reference",
+                "referenceType": "project",
+                "label": "Проект"
+              }
+            ]
+          },
+          "item": {
+            "type": "reference",
+            "referenceType": "item",
+            "label": "Предмет"
+          }
+        }
+      },
+      "result": {
+        "type": "integer"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Количество предметов"
+      },
+      "pure": true,
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/inventory.js",
+        "line": 1
+      },
+      "id": "sacura.inventory.combine",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "union",
+            "label": "Владелец",
+            "variants": [
+              {
+                "type": "reference",
+                "referenceType": "object",
+                "label": "Объект"
+              },
+              {
+                "type": "reference",
+                "referenceType": "scene",
+                "label": "Сцена"
+              },
+              {
+                "type": "reference",
+                "referenceType": "project",
+                "label": "Проект"
+              }
+            ]
+          },
+          "recipe": {
+            "type": "reference",
+            "referenceType": "recipe",
+            "label": "Сочетание"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Соединить предметы"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/interaction.js",
+        "line": 1
+      },
+      "id": "sacura.interaction.pickup",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "union",
+            "label": "Владелец",
+            "variants": [
+              {
+                "type": "reference",
+                "referenceType": "object",
+                "label": "Объект"
+              },
+              {
+                "type": "reference",
+                "referenceType": "scene",
+                "label": "Сцена"
+              },
+              {
+                "type": "reference",
+                "referenceType": "project",
+                "label": "Проект"
+              }
+            ]
+          },
+          "object": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Предмет на сцене"
+          }
+        }
+      },
+      "result": {
+        "type": "boolean"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Подобрать предмет"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/interaction.js",
+        "line": 1
+      },
+      "id": "sacura.object.visible",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "object": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Объект"
+          },
+          "visible": {
+            "type": "boolean",
+            "default": false,
+            "label": "Показать"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Показать объект"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/interaction.js",
+        "line": 1
+      },
+      "id": "sacura.interaction.read",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "union",
+            "label": "Владелец",
+            "variants": [
+              {
+                "type": "reference",
+                "referenceType": "object",
+                "label": "Объект"
+              },
+              {
+                "type": "reference",
+                "referenceType": "scene",
+                "label": "Сцена"
+              },
+              {
+                "type": "reference",
+                "referenceType": "project",
+                "label": "Проект"
+              }
+            ]
+          },
+          "object": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Предмет на сцене"
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "label": "Предмет доступен"
+          },
+          "distance": {
+            "type": "number",
+            "label": "Расстояние до предмета"
+          },
+          "canApproach": {
+            "type": "boolean",
+            "label": "Можно подойти"
+          },
+          "item": {
+            "type": "reference",
+            "referenceType": "item",
+            "label": "Предмет",
+            "optional": true
+          },
+          "hasPickupEvent": {
+            "type": "boolean",
+            "label": "Есть Event подбора"
+          },
+          "pickupEvent": {
+            "type": "reference",
+            "referenceType": "event",
+            "label": "Event подбора",
+            "optional": true
+          }
+        }
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Прочитать предмет на сцене"
+      },
+      "pure": true,
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/interaction.js",
+        "line": 1
+      },
+      "id": "sacura.interaction.approach",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "union",
+            "label": "Владелец",
+            "variants": [
+              {
+                "type": "reference",
+                "referenceType": "object",
+                "label": "Объект"
+              },
+              {
+                "type": "reference",
+                "referenceType": "scene",
+                "label": "Сцена"
+              },
+              {
+                "type": "reference",
+                "referenceType": "project",
+                "label": "Проект"
+              }
+            ]
+          },
+          "object": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Предмет на сцене"
+          },
+          "stopDistance": {
+            "type": "number",
+            "min": 0,
+            "default": 1.5,
+            "label": "Остановиться на расстоянии"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Подойти к предмету"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/interaction.js",
+        "line": 1
+      },
+      "id": "sacura.interaction.publish",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "union",
+            "label": "Владелец",
+            "variants": [
+              {
+                "type": "reference",
+                "referenceType": "object",
+                "label": "Объект"
+              },
+              {
+                "type": "reference",
+                "referenceType": "scene",
+                "label": "Сцена"
+              },
+              {
+                "type": "reference",
+                "referenceType": "project",
+                "label": "Проект"
+              }
+            ]
+          },
+          "object": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Предмет на сцене"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Запустить обработчик получения предмета"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/interaction.js",
+        "line": 1
+      },
+      "id": "sacura.interaction.signal",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "union",
+            "label": "Владелец",
+            "variants": [
+              {
+                "type": "reference",
+                "referenceType": "object",
+                "label": "Объект"
+              },
+              {
+                "type": "reference",
+                "referenceType": "scene",
+                "label": "Сцена"
+              },
+              {
+                "type": "reference",
+                "referenceType": "project",
+                "label": "Проект"
+              }
+            ]
+          },
+          "object": {
+            "type": "reference",
+            "referenceType": "object",
+            "label": "Предмет на сцене"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Сообщить о получении предмета"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/timers.js",
+        "line": 1
+      },
+      "id": "sacura.timer.start",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "union",
+            "label": "Владелец",
+            "variants": [
+              {
+                "type": "reference",
+                "referenceType": "object",
+                "label": "Объект"
+              },
+              {
+                "type": "reference",
+                "referenceType": "scene",
+                "label": "Сцена"
+              },
+              {
+                "type": "reference",
+                "referenceType": "project",
+                "label": "Проект"
+              }
+            ]
+          },
+          "name": {
+            "type": "string",
+            "default": "Таймер",
+            "label": "Название таймера"
+          },
+          "seconds": {
+            "type": "number",
+            "min": 0,
+            "default": 2,
+            "label": "Через сколько секунд"
+          },
+          "repeat": {
+            "type": "boolean",
+            "default": false,
+            "label": "Повторять"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Запустить игровой таймер"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/timers.js",
+        "line": 1
+      },
+      "id": "sacura.timer.stop",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "union",
+            "label": "Владелец",
+            "variants": [
+              {
+                "type": "reference",
+                "referenceType": "object",
+                "label": "Объект"
+              },
+              {
+                "type": "reference",
+                "referenceType": "scene",
+                "label": "Сцена"
+              },
+              {
+                "type": "reference",
+                "referenceType": "project",
+                "label": "Проект"
+              }
+            ]
+          },
+          "name": {
+            "type": "string",
+            "default": "Таймер",
+            "label": "Название таймера"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Остановить игровой таймер"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/camera.js",
+        "line": 1
+      },
+      "id": "sacura.camera.look",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "delta": {
+            "type": "vector",
+            "size": 2,
+            "label": "Поворот",
+            "default": [
+              0,
+              0
+            ]
+          },
+          "device": {
+            "type": "string",
+            "enum": [
+              "pointer",
+              "axis",
+              "gamepad-axis",
+              "gamepad",
+              "touch"
+            ],
+            "options": {
+              "pointer": "Мышь",
+              "axis": "Ось",
+              "gamepad-axis": "Ось геймпада",
+              "gamepad": "Геймпад",
+              "touch": "Сенсорный ввод"
+            },
+            "default": "pointer",
+            "label": "Источник"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Повернуть камеру"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/resources.js",
+        "line": 1
+      },
+      "id": "sacura.resource.add",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "union",
+            "label": "Владелец",
+            "variants": [
+              {
+                "type": "reference",
+                "referenceType": "object",
+                "label": "Объект"
+              },
+              {
+                "type": "reference",
+                "referenceType": "scene",
+                "label": "Сцена"
+              },
+              {
+                "type": "reference",
+                "referenceType": "project",
+                "label": "Проект"
+              }
+            ]
+          },
+          "resource": {
+            "type": "reference",
+            "referenceType": "resource",
+            "label": "Счётчик"
+          },
+          "amount": {
+            "type": "integer",
+            "default": 1,
+            "label": "Добавить"
+          }
+        }
+      },
+      "result": {
+        "type": "integer"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Изменить счётчик"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/turns.js",
+        "line": 1
+      },
+      "id": "sacura.turn.start",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "mechanic": {
+            "type": "reference",
+            "referenceType": "mechanic",
+            "label": "Очередность ходов"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Начать очередность ходов"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/turns.js",
+        "line": 1
+      },
+      "id": "sacura.turn.next",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "mechanic": {
+            "type": "reference",
+            "referenceType": "mechanic",
+            "label": "Очередность ходов"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Передать ход"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/turns.js",
+        "line": 1
+      },
+      "id": "sacura.turn.current",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "mechanic": {
+            "type": "reference",
+            "referenceType": "mechanic",
+            "label": "Очередность ходов"
+          }
+        }
+      },
+      "result": {
+        "type": "reference",
+        "referenceType": "object",
+        "optional": true
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Текущий участник"
+      },
+      "pure": true,
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/turns.js",
+        "line": 1
+      },
+      "id": "sacura.turn.read",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "mechanic": {
+            "type": "reference",
+            "referenceType": "mechanic",
+            "label": "Очередность ходов"
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "label": "Индекс текущего участника"
+          },
+          "round": {
+            "type": "integer",
+            "label": "Номер круга"
+          },
+          "count": {
+            "type": "integer",
+            "label": "Количество участников"
+          },
+          "active": {
+            "type": "boolean",
+            "label": "Очередность запущена"
+          }
+        }
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Прочитать очередность ходов"
+      },
+      "pure": true,
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/turns.js",
+        "line": 1
+      },
+      "id": "sacura.turn.write",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "mechanic": {
+            "type": "reference",
+            "referenceType": "mechanic",
+            "label": "Очередность ходов"
+          },
+          "index": {
+            "type": "integer",
+            "min": 0,
+            "label": "Номер участника"
+          },
+          "round": {
+            "type": "integer",
+            "min": 1,
+            "label": "Круг"
+          },
+          "active": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Выбрать участника и круг"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "source": {
+        "path": "src/capabilities/turns.js",
+        "line": 1
+      },
+      "id": "sacura.turn.publish",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "mechanic": {
+            "type": "reference",
+            "referenceType": "mechanic",
+            "label": "Очередность ходов"
+          },
+          "signal": {
+            "type": "string",
+            "enum": [
+              "started",
+              "changed"
+            ],
+            "default": "changed",
+            "label": "Сигнал"
+          }
+        }
+      },
+      "result": {
+        "type": "void"
+      },
+      "editor": {
+        "category": "Игровые возможности",
+        "label": "Сообщить о смене хода"
+      },
+      "version": 1,
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "schemaVersion": 1
+    },
+    {
+      "id": "sacura.reward.scale",
+      "version": 1,
+      "pure": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "reward": {
+            "type": "number",
+            "default": 100,
+            "label": "Награда"
+          },
+          "multiplier": {
+            "type": "number",
+            "default": 1,
+            "label": "Множитель"
+          }
+        }
+      },
+      "result": {
+        "type": "number"
+      },
+      "contexts": [
+        "event",
+        "function",
+        "rule",
+        "mechanic",
+        "widget"
+      ],
+      "editor": {
+        "category": "Ресурсы",
+        "label": "Рассчитать награду",
+        "description": "Умножить награду на коэффициент."
+      },
+      "source": {
+        "path": "src/extensions/reward.js",
+        "line": 15
+      },
+      "engineModule": {
+        "id": "sacura.reward-extension",
+        "version": 1
+      },
+      "schemaVersion": 1
+    }
+  ],
+  "nativeActions": [
+    "gameplay",
+    "move",
+    "pose",
+    "camera",
+    "music",
+    "pause",
+    "resume",
+    "stop",
+    "duck",
+    "weather",
+    "time",
+    "sound",
+    "wait",
+    "variable",
+    "visibility",
+    "lighting",
+    "particles",
+    "door",
+    "highlight"
+  ],
+  "legacyCommands": {
+    "goTo": "Перейти к ноде истории",
+    "damage": "Нанести урон",
+    "heal": "Лечить",
+    "shoot": "Выстрелить",
+    "reload": "Перезарядить",
+    "jump": "Прыгнуть",
+    "impulse": "Толкнуть объект",
+    "addItem": "Добавить предмет",
+    "removeItem": "Убрать предмет",
+    "equip": "Экипировать",
+    "useItem": "Использовать предмет",
+    "combine": "Соединить предметы",
+    "startTimer": "Запустить таймер",
+    "stopTimer": "Остановить таймер",
+    "runEvent": "Запустить событие",
+    "callFunction": "Вызвать функцию",
+    "save": "Сохранить прохождение",
+    "load": "Загрузить прохождение"
+  }
+}

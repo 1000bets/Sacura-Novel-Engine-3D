@@ -1,7 +1,7 @@
 .theme-picker{position:relative;flex-shrink:0;margin-left:8px;z-index:60}
 .theme-picker>button{width:30px;height:30px}
 .theme-picker>button[aria-expanded=true]{background:var(--bg-active);color:var(--accent)}
-.theme-popover{position:absolute;right:0;top:calc(100% + 8px);width:340px;max-width:calc(100vw - 24px);max-height:calc(100dvh - 64px);overflow:auto;padding:16px 8px 10px;background:var(--bg-panel-elevated);border:1px solid var(--border-subtle);border-radius:6px;box-shadow:var(--shadow-popup)}
+.theme-popover{padding:16px 8px 10px}
 .theme-popover fieldset{margin:0;padding:0;border:0;min-width:0}
 .theme-popover legend{padding:0 8px;font-size:14px;font-weight:500;color:var(--text-primary)}
 .theme-popover fieldset>p{font-size:12px;color:var(--text-muted);margin:6px 8px 14px}

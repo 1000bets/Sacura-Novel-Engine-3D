@@ -3,6 +3,12 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      deploy_staging:
+        description: Deploy the selected branch to staging after verification
+        required: true
+        default: false
+        type: boolean
 permissions:
   contents: read
 jobs:
@@ -14,7 +20,9 @@ jobs:
       - uses: ./engine-web-prototype/ci
   deploy-staging:
     needs: verify
-    if: github.ref == 'refs/heads/staging' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    if: >-
+      (github.ref == 'refs/heads/staging' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')) ||
+      (github.event_name == 'workflow_dispatch' && inputs.deploy_staging == true)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment:

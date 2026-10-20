@@ -1,7 +1,9 @@
+import {t as tr, useLocale} from './i18n.jsx';
 import React,{useState} from 'react';
 import {BaseEdge,EdgeLabelRenderer,getBezierPath,getSmoothStepPath} from '@xyflow/react';
 import './blueprintEdges.css';
 export default function BlueprintEdge(props){
+ useLocale();
  const {id,sourceX,sourceY,targetX,targetY,sourcePosition,targetPosition,label,data={},selected}=props;
  const [hover,setHover]=useState(false),active=selected||data.highlighted||hover;
  const backward=targetX-sourceX<70;
@@ -16,7 +18,7 @@ export default function BlueprintEdge(props){
   <path className="blueprint-wire-halo" d={path} fill="none" stroke="var(--bg-app)" strokeWidth={width+5} vectorEffect="non-scaling-stroke"/>
   <BaseEdge id={id} path={path} interactionWidth={24} markerEnd={data.valueWire?undefined:'url(#'+marker+')'} style={{stroke:color,strokeWidth:width,strokeDasharray:data.valueWire?'3 5':data.broken?'7 5':undefined,strokeLinecap:'round',strokeLinejoin:'round',vectorEffect:'non-scaling-stroke'}}/>
   {data.valueWire?<><circle cx={sourceX+5} cy={sourceY} r="3" fill={color}/><circle cx={targetX-5} cy={targetY} r="3" fill={color}/></>:active&&<path d="M -5 -4 L 1 0 L -5 4" transform={'translate('+arrowX+' '+arrowY+') rotate('+angle+')'} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>}
-  {label&&(active||data.showLabel)&&<EdgeLabelRenderer><div className="blueprint-wire-label" title={String(label)} style={{transform:'translate(-50%, -100%) translate('+labelX+'px,'+(labelY-8)+'px)',color}}>{label}</div></EdgeLabelRenderer>}
+  {label&&(active||data.showLabel)&&<EdgeLabelRenderer><div className="blueprint-wire-label" title={String(label)} style={{transform:'translate(-50%, -100%) translate('+labelX+'px,'+(labelY-8)+'px)',color}}>{data.port?.startsWith('choice:')?label:tr(label)}</div></EdgeLabelRenderer>}
  </g>;
 }
 export const blueprintEdgeTypes={blueprint:BlueprintEdge};

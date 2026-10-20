@@ -1,12 +1,14 @@
+import {t as tr} from './i18n.js';
 import {runtimeVariableType} from './variableModel.js';
 import {typedValue,availabilityOf,ANSWER_VARIABLE,variableName,choiceResultType} from './choiceModel.js';
+import {callScriptFunction,scriptFunctionType} from './scriptFunctions.js';
 export const MATH_OPERATIONS={add:{label:'Сложить · +',arity:2},sub:{label:'Вычесть · −',arity:2},mul:{label:'Умножить · ×',arity:2},div:{label:'Разделить · ÷',arity:2},mod:{label:'Остаток · %',arity:2},pow:{label:'Степень',arity:2},min:{label:'Минимум',arity:2},max:{label:'Максимум',arity:2},negate:{label:'Сменить знак',arity:1},abs:{label:'Модуль',arity:1},round:{label:'Округлить',arity:1},floor:{label:'Округлить вниз',arity:1},ceil:{label:'Округлить вверх',arity:1},sqrt:{label:'Квадратный корень',arity:1}};
-export const PURE_KINDS=['variable','literal','compare','and','or','not','math','convert'];
+export const PURE_KINDS=['variable','literal','compare','and','or','not','math','convert','script-function'];
 export const isDataSource=node=>isPureNode(node)||node?.kind==='set-variable'||node?.kind==='choice'&&!!choiceResultType(node);
 export const isPureNode=node=>PURE_KINDS.includes(node?.kind);
 export const logicNodes=p=>(p.chapters||[]).flatMap(c=>c.beats||[]);
 export const compareSymbols={eq:'==',ne:'!=',gt:'>',gte:'>=',lt:'<',lte:'<='};
-export const logicType=(p,node)=>node?.kind==='choice'?choiceResultType(node):['variable','set-variable'].includes(node?.kind)?runtimeVariableType(p,node.variable)||node.valueType||'string':['compare','and','or','not'].includes(node?.kind)?'boolean':node?.kind==='math'?'number':node?.valueType||'string';
+export const logicType=(p,node)=>node?.kind==='script-function'?scriptFunctionType(p.functions?.find(f=>f.id===node.functionId)):node?.kind==='choice'?choiceResultType(node):['variable','set-variable'].includes(node?.kind)?runtimeVariableType(p,node.variable)||node.valueType||'string':['compare','and','or','not'].includes(node?.kind)?'boolean':node?.kind==='math'?'number':node?.valueType||'string';
 export function convertValue(value,type){
  if(type==='string')return String(value);
  if(type==='number'){const n=typeof value==='boolean'?Number(value):typeof value==='string'&&value.trim()===''?NaN:Number(value);if(!Number.isFinite(n))throw new Error('Не удалось преобразовать значение в число.');return n;}
@@ -22,6 +24,7 @@ export function readLogic(p,id,variables,visiting=new Set(),choiceResults={}){
  if(visiting.has(id))throw new Error('Цикл в проводах значений. Разорвите циклическую связь.');
  const node=logicNodes(p).find(n=>n.id===id);if(!isDataSource(node))throw new Error('Источник значения не найден. Переподключите провод.');
  const path=new Set(visiting).add(id),read=(port,fallback)=>node.inputs?.[port]?readLogic(p,node.inputs[port],variables,path,choiceResults):fallback;
+ if(node.kind==='script-function')return callScriptFunction(p,node.functionId,Object.fromEntries(Object.entries(node.args||{}).map(([name,value])=>[name,read('arg:'+name,value)])),variables);
  if(node.kind==='choice'){const result=choiceResults[id];if(!result||result.type==='none')throw new Error('Этот выбор ещё не вернул значение. Выполните выбор перед чтением результата.');return result.value;}
  if(node.kind==='variable'||node.kind==='set-variable'){if(!Object.hasOwn(variables,node.variable))throw new Error(`Переменная «${node.variable||'без имени'}» не задана.`);return variables[node.variable];}
  if(node.kind==='literal')return typedValue(node.value,node.valueType);
@@ -42,6 +45,7 @@ export function readLogic(p,id,variables,visiting=new Set(),choiceResults={}){
 }
 export const choiceEnabled=(p,choice,variables,choiceResults={})=>choice.enabledSource?readLogic(p,choice.enabledSource,variables,new Set(),choiceResults)===true:null;
 export function dataTargets(node){
+ if(node.kind==='script-function')return Object.keys(node.args||{}).map(name=>'arg:'+name);
  if(['compare','and','or'].includes(node.kind)||node.kind==='math'&&MATH_OPERATIONS[node.operator]?.arity===2)return ['a','b'];
  if(node.kind==='math'||node.kind==='not')return ['a'];
  if(node.kind==='branch')return ['condition'];
@@ -50,6 +54,7 @@ export function dataTargets(node){
  return [];
 }
 export function dataTargetType(p,node,port){
+ if(node.kind==='script-function'){const parameter=p.functions?.find(f=>f.id===node.functionId)?.parameters.find(a=>'arg:'+a.name===port),type=parameter?.schema?.type||parameter?.type;return ({integer:'number',collection:'array',object:'struct'})[type]||type||'any';}
  if(node.kind==='convert')return 'any';
  if(node.kind==='math')return 'number';
  if(node.kind==='compare')return node.valueType||'number';
@@ -65,6 +70,7 @@ export function dataConnectionError(p,c){
  if(!target||!dataTargets(target).includes(c.targetHandle))return 'Значение подключается к круглому входу, а ход истории — к стрелке.';
  if(source.id===target.id)return 'Нельзя соединить ноду с собой.';
  const type=logicType(p,source);
+ if(target.kind==='script-function'&&dataTargetType(p,target,c.targetHandle)!==type)return 'Тип значения должен совпадать с типом аргумента функции.';
  if(type==='any'&&target.kind!=='convert')return 'У ответов разные типы. Добавьте конвертацию результата выбора.';
  if(target.kind==='math'&&type!=='number')return 'Математическая операция принимает числа. Добавьте конвертацию в число.';
  if(target.kind==='set-variable'&&logicType(p,target)!==type)return 'Тип значения должен совпадать с типом переменной.';
@@ -89,7 +95,7 @@ export function migrateLogicGraph(p){
 // Palette entries reference the existing variable; adding a getter never changes its value.
 export function variablePalette(project){
  return [...(logicNodes(project).some(n=>n.variable===ANSWER_VARIABLE)?[ANSWER_VARIABLE]:[]),...Object.keys(project.variables||{}).filter(id=>id!==ANSWER_VARIABLE)].flatMap(variable=>(variable===ANSWER_VARIABLE?['variable']:['variable','set-variable']).map(kind=>({
-  id:kind+':'+variable,variable,kind,label:(kind==='variable'?'Получить · ':'Задать · ')+variableName(variable),searchText:variable+' '+variableName(variable)+' переменная '+(kind==='variable'?'get получить':'set задать'),
+  id:kind+':'+variable,variable,kind,label:tr(kind==='variable'?'Получить · ':'Задать · ')+variableName(variable),searchText:variable+' '+variableName(variable)+' переменная '+(kind==='variable'?'get получить':'set задать'),
  })));
 }
 export function initializeVariableNode(project,node,variable){

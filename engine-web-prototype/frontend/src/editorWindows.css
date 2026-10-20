@@ -1,0 +1,80 @@
+/* Local, configurable editor windows. Uses the current theme's semantic tokens. */
+.editor-app .managed-dock-tabs { overflow: hidden; gap: 0; padding: 0; z-index: 1; }
+.workspace-tab-list { display: flex; min-width: 0; flex: 1; overflow-x: auto; scrollbar-width: thin; }
+.workspace-tab { display: flex; align-items: stretch; flex-shrink: 0; position: relative; border-right: 1px solid var(--line); }
+.workspace-tab.active { color: var(--accent); box-shadow: inset 0 -2px var(--accent); }
+.workspace-tab>button { border: 0; border-radius: 0; white-space: nowrap; padding-inline: 12px 5px; font-size: 12px; }
+.workspace-tab>button[role=tab] { color: inherit; cursor: grab; touch-action: none; user-select: none; }
+.workspace-tab>button[role=tab]:active { cursor: grabbing; }
+.workspace-tab .workspace-tab-close { width: 27px; min-width: 27px; padding: 0; color: var(--muted); }
+.workspace-tab-actions { display: flex; flex-shrink: 0; padding: 3px; background: var(--surface-1); border-left: 1px solid var(--line); }
+.workspace-tab-actions>.btn { padding: 3px 6px; min-width: 28px; border: 0; }
+.managed-workspace { min-width: 0; }
+.editor-window-stack, .editor-window-body { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.editor-window-panel.is-docked { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.editor-window-panel[hidden], .editor-window-title[hidden] { display: none; }
+.editor-window-panel .editor-window-body>.dock-content { flex: 1; }
+.editor-window-panel.is-floating { display: flex; flex-direction: column; position: fixed; visibility: visible; pointer-events: auto; min-width: 0; min-height: 0; background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 16px 48px color-mix(in srgb, var(--bg) 60%, transparent); }
+.editor-window-panel.is-floating.is-focused { border-color: var(--accent); }
+.editor-window-title { display: flex; flex-shrink: 0; align-items: center; gap: 8px; min-height: 36px; padding: 3px 6px 3px 12px; border-bottom: 1px solid var(--line); background: var(--surface-heading); border-radius: 6px 6px 0 0; cursor: move; touch-action: none; user-select: none; }
+.editor-window-title strong { font-size: 12px; font-weight: 500; }
+.editor-window-title>.btn { padding: 4px; border: 0; min-height: 28px; min-width: 28px; }
+.editor-window-resize { position: absolute; right: 0; bottom: 0; width: 23px; height: 23px; padding: 2px; justify-content: flex-end; align-items: flex-end; cursor: nwse-resize; touch-action: none; color: var(--muted); border: 0; background: var(--surface-1); }
+.editor-window-title:focus-visible, .editor-window-resize:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.editor-center.no-docked-windows { grid-template-rows: minmax(0,1fr) 0 0; }
+.editor-center.no-docked-windows>.splitter { visibility: hidden; pointer-events: none; }
+.editor-center.no-docked-windows>.managed-workspace>.editor-window-stack { min-height: 0; }
+@media (min-width:1001px) {
+  .editor-center.dock-right:not(.graph-max):not(.scene-max):not(.no-docked-windows) { grid-template-rows: minmax(0,1fr); grid-template-columns: minmax(200px,1fr) 6px minmax(260px,min(var(--workspace-width),55%)); }
+  .editor-center.dock-left:not(.graph-max):not(.scene-max):not(.no-docked-windows) { grid-template-rows: minmax(0,1fr); grid-template-columns: minmax(260px,min(var(--workspace-width),55%)) 6px minmax(200px,1fr); }
+  .editor-center.dock-left:not(.graph-max):not(.scene-max):not(.no-docked-windows)>.viewport-panel { grid-row: 1; grid-column: 3; }
+  .editor-center.dock-left:not(.graph-max):not(.scene-max):not(.no-docked-windows)>.splitter { grid-row: 1; grid-column: 2; }
+  .editor-center.dock-left:not(.graph-max):not(.scene-max):not(.no-docked-windows)>.managed-workspace { grid-row: 1; grid-column: 1; }
+}
+.editor-menu { z-index: 140; }
+.editor-menu.windows-menu-container { width: min(340px,calc(100vw - 16px)); padding: 5px; }
+.editor-windows-menu { display: flex; flex-direction: column; }
+.editor-windows-menu button { display: flex; justify-content: flex-start; align-items: center; min-height: 30px; width: 100%; gap: 8px; border: 0; padding: 5px 8px; font-size: 12px; text-align: left; }
+.editor-windows-menu button>span:not(.window-check) { flex: 1; }
+.editor-windows-menu button[aria-checked=true] { color: var(--text-primary); }
+.window-check { width: 16px; height: 16px; flex-shrink: 0; color: var(--accent); }
+.window-menu-search { display: flex; align-items: center; gap: 6px; padding: 4px 8px 8px; }
+.window-menu-search input { width: 100%; font-size: 12px; }
+.window-menu-group { border-bottom: 1px solid var(--line); padding-block: 4px; }
+.window-menu-row { display: flex; min-width: 0; }
+.window-menu-row>button:first-child { flex: 1; min-width: 0; }
+.window-menu-row .window-reveal { width: 30px; flex-shrink: 0; justify-content: center; padding: 4px; }
+.window-menu-position { padding: 10px 8px 5px; display: grid; gap: 6px; font-size: 12px; }
+.window-menu-position select { width: 100%; min-height: 30px; }
+.window-menu-hint { padding: 5px 8px 10px; font-size: 11px; line-height: 1.5; color: var(--muted); }
+.window-menu-row small { color: var(--amber); }
+.managed-workspace, .dockable-region { position: relative; }
+.editor-panel-mount, .dock-region-content { display: flex; flex: 1; flex-direction: column; min-height: 0; min-width: 0; }
+.editor-panel-mount { height: 100%; }
+.editor-panel-mount[hidden], .dock-region-content[hidden] { display: none; }
+.floating-window-layer { display: contents; }
+.dockable-region.has-docked-tool>:not(.panel-tabs):not(.dock-region-content):not(.dock-drop-target) { display: none; }
+.embedded-dock-tabs { display: flex; align-items: stretch; min-width: 70px; flex: 1; }
+.embedded-dock-tabs .workspace-tab-actions { padding-block: 2px; }
+.embedded-dock-tabs .workspace-tab>button { padding-inline: 7px 4px; }
+.embedded-dock-tabs .workspace-tab-close { min-width: 24px; width: 24px; }
+.dockable-region>.panel-tabs:has(.embedded-dock-tabs)>.flex-space { display: none; }
+.dockable-region>.panel-tabs>[data-dock-base] { flex-shrink: 0; }
+.inspector-panel>.panel-tabs:has(.embedded-dock-tabs)>button:not([data-dock-base]):not([title]) { display: none; }
+.dock-drop-target { position: absolute; inset: 36px 6px 6px; z-index: 90; display: flex; align-items: center; justify-content: center; min-height: 60px; border: 2px dashed var(--accent); border-radius: 4px; background: color-mix(in srgb, var(--accent) 12%, var(--surface-1) 88%); opacity: .94; }
+.dock-drop-target.drag-over { border-style: solid; background: color-mix(in srgb, var(--accent) 24%, var(--surface-1) 76%); }
+.dock-drop-target>span { padding: 12px 16px; text-align: center; font-size: 12px; line-height: 1.6; color: var(--text-primary); background: var(--surface-1); border: 1px solid var(--accent); border-radius: 4px; }
+.dock-drop-target strong { display: block; color: var(--accent); font-size: 13px; font-weight: 500; }
+.pointer-dock-target { pointer-events: none; background: transparent; border-color: transparent; }
+.pointer-dock-target>span { pointer-events: auto; }
+.dock-drag-preview { position: fixed; z-index: 160; padding: 8px 12px; pointer-events: none; background: var(--surface-active); border: 1px solid var(--accent); border-radius: 4px; color: var(--text-primary); font-size: 12px; }
+.editor-center.no-docked-windows:has(.dock-drop-target) { grid-template-rows: minmax(0,1fr) 6px 120px; }
+.editor-center.no-docked-windows>.managed-workspace>.dock-drop-target { top: 6px; }
+.hierarchy-hidden:not(.focus-hierarchy)>.hierarchy-panel>.dock-drop-target,
+.inspector-hidden:not(.focus-inspector)>.inspector-panel>.dock-drop-target { display: flex; top: 6px; width: 155px; }
+.hierarchy-hidden>.hierarchy-panel>.dock-drop-target { left: 2px; right: auto; }
+.inspector-hidden>.inspector-panel>.dock-drop-target { right: 2px; left: auto; }
+@media (max-width:1000px) {
+  .editor-center.dock-left>.splitter.x, .editor-center.dock-right>.splitter.x { cursor: row-resize; }
+  .editor-center.dock-left>.splitter.x>span, .editor-center.dock-right>.splitter.x>span { width: 28px; height: 2px; }
+}

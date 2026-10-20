@@ -137,3 +137,9 @@ venv/
 Thumbs.db
 Desktop.ini
 $RECYCLE.BIN/
+
+# Generated standalone game runtime
+/engine-web-prototype/frontend/public/player-runtime.js
+/engine-web-prototype/frontend/public/player-runtime.css
+/engine-web-prototype/frontend/.player-build/
+/engine-web-prototype/frontend/public/game-exports/

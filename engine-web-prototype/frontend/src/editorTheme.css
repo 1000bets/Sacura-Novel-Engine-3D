@@ -128,7 +128,6 @@ select option, select optgroup { background: var(--surface-2); color: var(--text
 .viewport-commandbar .scene-edit-bar { gap: 2px; flex-wrap: wrap; }
 .viewport-commandbar .scene-edit-bar button { padding: 4px 6px; min-height: 26px; font-size: 12px; border-color: transparent; color: var(--text-secondary); }
 .viewport-commandbar .scene-edit-bar .active { color: var(--text-primary); background: var(--surface-active); }
-.scene-edit-add { border: 0; margin-right: 8px; }
 .viewport-commandbar .camera-view-badge { color: var(--text-secondary); font-size: 12px; display: flex; align-items: center; gap: 6px; }
 .viewport-commandbar .camera-pilot-bar { display: flex; align-items: center; gap: 8px; }
 .viewport-commandbar .camera-pilot-bar small { display: none; }
@@ -282,10 +281,7 @@ select option, select optgroup { background: var(--surface-2); color: var(--text
 .viewport-tabs>.viewport-location { margin-left: 16px; }
 .viewport-commandbar { background: var(--surface-1); padding-block: 5px; }
 .viewport-commandbar .scene-edit-bar button.active { box-shadow: inset 0 -2px var(--accent); }
-.scene-edit-bar select { background: transparent; }
 .tree-controls { padding-top: 6px; }
-.tree-controls>button { opacity: 0; }
-.tree-controls:hover>button, .tree-controls:focus-within>button { opacity: 1; }
 .tree-object>button:first-child { min-height: 30px; padding-left: 28px; font-size: 13px; }
 .tree-object.character>button:first-child { padding-left: 6px; }
 .tree-object.selected { box-shadow: inset 2px 0 var(--graph-node-selected); }
@@ -325,7 +321,6 @@ select option, select optgroup { background: var(--surface-2); color: var(--text
 .tree-root-row>.tree-scene { flex: 1; min-width: 0; }
 .tree-root-row .tree-controls { padding: 0; flex-shrink: 0; }
 .tree-root-row .tree-controls>button { padding: 3px; width: 24px; height: 26px; }
-.tree-root-row:hover .tree-controls>button, .tree-root-row:focus-within .tree-controls>button { opacity: 1; }
 .tree-root-row .tree-scene strong { white-space: normal; text-align: left; line-height: 1.4; }
 .scene-activity { background: var(--surface-chrome); backdrop-filter: none; border: 0; box-shadow: var(--shadow-soft); }
 .create-overlay { backdrop-filter: none; }
@@ -356,7 +351,6 @@ select option, select optgroup { background: var(--surface-2); color: var(--text
 .viewport-commandbar .scene-edit-bar .tool-label { display: none; }
 .viewport-commandbar .scene-edit-bar button { min-width: 28px; }
 .viewport-commandbar .scene-edit-bar button.active.transform-tool { background: var(--surface-active); box-shadow: none; }
-.scene-edit-add { margin-right: 12px; }
 .viewport-commandbar .viewport-state>span>svg { display: none; }
 .splitter { background: var(--app-background); }
 .panel-search { background: transparent; margin: 4px 12px 0; padding-inline: 0; }
@@ -400,8 +394,8 @@ select option, select optgroup { background: var(--surface-2); color: var(--text
   .main-play-controls { margin-inline: 12px; }
 }
 @media(max-width:1000px) {
-  .editor-menubar { flex-wrap: wrap; }
-  .editor-app { grid-template-rows: 76px minmax(0,1fr) 24px; }
+  .editor-menubar { flex-wrap: wrap; padding-block: 6px; overflow: visible; }
+  .editor-app { grid-template-rows: auto minmax(0,1fr) 24px; }
   .toolbar-layout select { max-width: 130px; }
   .viewport-tabs .toolbar-project { margin-left: 8px; max-width: 210px; }
 }
@@ -420,3 +414,44 @@ button:focus-visible { outline-color: var(--accent); }
 .subscene-map .react-flow__controls-button { background: var(--bg-panel-elevated); color: var(--text-primary); fill: var(--text-primary); border-color: var(--border-subtle); }
 .subscene-map .react-flow__controls-button:hover { background: var(--bg-hover); }
 .global-timeline-node.playing { box-shadow: none; outline-color: var(--success); }
+
+/* One scene tree; only author-created groups add another level. */
+.hierarchy-toolbar { display: grid; grid-template-columns: 32px minmax(0,1fr); align-items: center; gap: 6px; margin: 10px 12px 8px; }
+.hierarchy-toolbar>.hierarchy-add { width: 32px; height: 32px; padding: 0; background: var(--surface-2); color: var(--text-primary); }
+.hierarchy-toolbar>.hierarchy-add>svg { width: 16px; height: 16px; }
+.hierarchy-toolbar>.panel-search { min-width: 0; height: 32px; margin: 0; padding: 0 9px; gap: 7px; background: var(--surface-input); border-radius: var(--radius-control); }
+.hierarchy-toolbar>.panel-search>svg { flex-shrink: 0; }
+.hierarchy-toolbar>.panel-search>input { height: 100%; min-height: 0; font-size: 12px; }
+.scene-objects-heading { position: sticky; top: 0; z-index: 1; min-height: 38px; margin: 0 8px 4px; padding: 8px; gap: 6px; background: var(--surface-2); border-radius: var(--radius-control); }
+.scene-objects-heading>h2 { flex: 1; min-width: 0; margin: 0; color: var(--text-primary); font-size: 12px; line-height: 1.4; font-weight: 600; }
+.scene-object-count { padding: 2px 5px; background: var(--accent-muted); color: var(--accent); border-radius: var(--radius-control); font-size: 11px; line-height: 1.4; font-variant-numeric: tabular-nums; }
+.scene-objects-heading .tree-controls>button { width: 22px; }
+.scene-objects-children { min-width: 0; min-height: 32px; padding: 2px 0 12px; }
+.scene-objects-children .tree-object { margin: 0 8px 0 20px; }
+.scene-objects-children .tree-object>button:first-child { gap: 7px; min-width: 0; padding-left: 8px; }
+.scene-objects-children .tree-object>button:first-child>svg { flex-shrink: 0; }
+.scene-objects-children .tree-object>button:first-child>span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scene-objects-children .scene-entity { width: calc(100% - 28px); min-height: 30px; margin: 0 8px 0 20px; padding: 6px 8px; gap: 7px; align-items: center; border-radius: var(--radius-control); text-align: left; }
+.scene-entity>svg { flex-shrink: 0; }
+.scene-entity>span { flex: 1; min-width: 0; }
+.scene-objects-children .tree-object-group { margin: 0 8px 0 16px; padding: 0; border: 0; }
+.scene-objects-children .tree-object-group .tree-root-row { min-height: 32px; padding: 0; }
+.scene-objects-children .tree-object-group .tree-folder { min-width: 0; padding: 6px 4px; color: var(--text-secondary); }
+.tree-object-group .tree-folder>span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-object-group .tree-folder>small { margin-left: auto; color: var(--text-muted); }
+.scene-objects-children .tree-object-group .tree-object { margin-right: 0; }
+.camera-inspector { padding-top: 8px; }
+.camera-default { display: flex; align-items: center; gap: 6px; padding: 4px 6px; color: var(--text-secondary); font-size: 12px; }
+/* Camera names and actions wrap within the available scene width. */
+.viewport-commandbar .camera-view-badge { flex: 1 1 220px; min-width: 0; flex-wrap: wrap; }
+.camera-view-name { min-width: 0; overflow-wrap: anywhere; white-space: normal; line-height: 1.5; }
+.camera-view-badge>svg, .camera-view-badge>button { flex-shrink: 0; }
+.viewport-commandbar .camera-pilot-bar { flex-wrap: wrap; min-width: 0; }
+.viewport-commandbar .camera-pilot-bar>span { min-width: 0; overflow-wrap: anywhere; }
+.viewport-commandbar .camera-pilot-bar small { display: block; line-height: 1.5; }
+
+/* Anchor scene help to the toolbar rather than the small help icon. */
+.viewport-commandbar { position: relative; }
+.viewport-commandbar .viewport-help { position: static; margin: 0; padding: 0; border: 0; }
+.viewport-commandbar .viewport-help summary { margin: 0; }
+.viewport-commandbar .viewport-help>div { top: 100%; left: 8px; right: 8px; width: auto; max-width: 290px; max-height: min(260px, 40dvh); overflow: auto; overflow-wrap: anywhere; z-index: 20; }

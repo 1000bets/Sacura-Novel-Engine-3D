@@ -1,6 +1,7 @@
+import {createAuth} from '../auth.js';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,rmSync} from 'node:fs';
+import {mkdtempSync,rmSync,readFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {Readable} from 'node:stream';
@@ -18,13 +19,25 @@ async function fixture(run){
  const server=createApp(storage).listen(0,'127.0.0.1');
  await new Promise(resolve=>server.once('listening',resolve));
  const base=`http://127.0.0.1:${server.address().port}`;
- const registration=await fetch(base+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({login:'owner',password:'1'})});
+ const auth=createAuth(storage.db);await auth.migrateOwner('seed','seed');
+ const seed=await auth.login({login:'seed',password:'seed'});
+ const registration=await fetch(base+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({login:'owner',password:'1',invite:auth.createInvite(seed.id).token})});
  const cookie=registration.headers.get('set-cookie').split(';')[0],user=(await registration.json()).user;
  const request=(path,options={})=>fetch(base+path,{...options,headers:{Cookie:cookie,...options.headers}});
  try{await run({storage,request,base,filename,s3,user,puts:()=>puts});}
  finally{await new Promise(resolve=>server.close(resolve));storage.db.close();rmSync(dir,{recursive:true,force:true});}
 }
 const project={id:'project-test',version:2,title:'История',objects:[],chapters:[{id:'chapter',beats:[]}],events:[]};
+test('API saves the actual storyless clicker, preserves editable sources and refuses invalid empty-story projects atomically',()=>fixture(async({request,filename,s3,user})=>{
+ const content=JSON.parse(readFileSync(new URL('../../frontend/public/game-templates/ui-clicker.sacura-template.json',import.meta.url),'utf8')).content;
+ const p={...content,id:'storyless-clicker',title:'Кликер без фиктивной главы',scene:{location:content.subscenes[0].id}};
+ assert.equal(p.chapters.length,0);assert.equal(p.gameplay.storyPolicy.mode,'none');assert.ok(p.logicResources.some(r=>r.name==='PeriodicReward'&&r.source.includes('async run')));
+ const put=value=>request('/api/projects/'+p.id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({project:value,expectedRevision:1})});
+ assert.equal((await request('/api/projects/'+p.id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({project:p,expectedRevision:0})})).status,200);
+ for(const broken of [{...p,version:1},{...p,gameplay:{...p.gameplay,enabled:false}},{...p,gameplay:{...p.gameplay,storyPolicy:{mode:'story'}}},{...p,subscenes:[]},{...p,subscenes:[{}]},{...p,subscenes:[p.subscenes[0],p.subscenes[0]]},{...p,scene:{location:'deleted'}}])assert.equal((await put(broken)).status,400);
+ const saved=await(await request('/api/projects/'+p.id)).json();assert.equal(saved.revision,1);assert.deepEqual(saved.project,p);
+ const reopened=createStorage({filename,s3,bucket:'test'});try{assert.deepEqual(reopened.get(user.id,p.id).project,p);}finally{reopened.db.close();}
+}));
 test('API auth, CSRF, malformed input, DB persistence and optimistic concurrency',()=>fixture(async({request,base,filename,s3,user})=>{
  assert.equal((await fetch(base+'/api/projects')).status,401);
  assert.equal((await fetch(base+'/api/auth')).status,401);

@@ -28,7 +28,8 @@ export class BufferPlayer extends EventTarget {
   get duration(){return this.data?.buffer.duration||NaN;}
   get loop(){return this._loop;}
   set loop(value){this._loop=!!value;if(this.source)this.source.loop=this._loop;}
-  get currentTime(){const t=this.offset+(this.paused?0:this.output.context.currentTime-this.began);return this.loop&&this.duration?t%this.duration:Math.min(t,this.duration||0);}
+  get timelineTime(){return this.offset+(this.paused?0:this.output.context.currentTime-this.began);}
+  get currentTime(){const t=this.timelineTime;return this.loop&&this.duration?t%this.duration:Math.min(t,this.duration||0);}
   set currentTime(value){const playing=!this.paused;this.pause();this.offset=Math.max(0,Number(value));if(playing)this.play().catch(()=>{});}
   get volume(){return this._volume;}
   set volume(value){this._volume=value;this.updateGain(!this.paused);}
@@ -39,12 +40,25 @@ export class BufferPlayer extends EventTarget {
   }
   async play(){
     const serial=++this.serial;await this.output.unlock();this.data=await this.output.load(this.url);if(serial!==this.serial)return;
-    this.dispatchEvent(new Event('loadedmetadata'));if(this.offset>=this.duration)this.offset=0;
-    if(this.source){this.source.onended=null;this.source.stop();this.source.disconnect();}this.gain?.disconnect();
+    this.dispatchEvent(new Event('loadedmetadata'));if(!this.loop&&this.offset>=this.duration)this.offset=0;
+    if(this.source){this.source.onended=null;this.source.stop();this.source.disconnect();}this.gain?.disconnect();this.boundaryGain?.disconnect();
     const ctx=this.output.context,source=ctx.createBufferSource();this.gain=ctx.createGain();this.source=source;source.buffer=this.data.buffer;source.loop=this.loop;
-    this.updateGain();source.connect(this.gain);this.gain.connect(this.output.master);this.began=ctx.currentTime;this.paused=false;
-    source.onended=()=>{if(serial!==this.serial||this.paused)return;this.offset=this.duration;this.paused=true;clearInterval(this.timer);source.disconnect();this.gain.disconnect();this.dispatchEvent(new Event('ended'));};
-    source.start(0,this.offset);clearInterval(this.timer);this.timer=setInterval(()=>this.dispatchEvent(new Event('timeupdate')),80);
+    this.updateGain();source.connect(this.gain);this.boundaryGain=ctx.createGain();this.gain.connect(this.boundaryGain);this.boundaryGain.connect(this.output.master);this.began=ctx.currentTime;this.paused=false;
+    source.onended=()=>{if(serial!==this.serial||this.paused)return;const boundary=this.boundary;this.offset=boundary?boundary.position:this.duration;this.paused=true;clearInterval(this.timer);source.disconnect();this.source=null;this.gain.disconnect();this.boundaryGain?.disconnect();this.boundary=null;if(boundary)boundary.finish();else this.dispatchEvent(new Event('ended'));};
+    source.start(0,this.loop?this.offset%this.duration:this.offset);clearInterval(this.timer);this.timer=setInterval(()=>this.dispatchEvent(new Event('timeupdate')),80);
   }
-  pause(){const offset=this.currentTime;this.serial++;this.paused=true;this.offset=offset;clearInterval(this.timer);if(this.source){this.source.onended=null;try{this.source.stop();}catch{}this.source.disconnect();this.source=null;}this.gain?.disconnect();}
+  pause(){const offset=this.timelineTime;this.cancelBoundary();this.serial++;this.paused=true;this.offset=offset;clearInterval(this.timer);if(this.source){this.source.onended=null;try{this.source.stop();}catch{}this.source.disconnect();this.source=null;}this.gain?.disconnect();this.boundaryGain?.disconnect();}
+  scheduleBoundary(seconds,fadeOut,finish){
+    if(!this.source||this.paused)return false;
+    this.cancelBoundary();const ctx=this.output.context,end=ctx.currentTime+seconds,param=this.boundaryGain.gain;
+    const fade=Math.min(seconds,fadeOut);param.setValueAtTime(fadeOut?Math.min(1,seconds/fadeOut):1,ctx.currentTime);
+    if(fade>0){if(seconds>=fadeOut)param.setValueAtTime(1,end-fade);param.linearRampToValueAtTime(0,end);}
+    this.boundary={finish,position:this.timelineTime+seconds};this.source.stop(end);return true;
+  }
+  cancelBoundary(){
+    if(!this.boundary)return;this.boundary=null;const ctx=this.output.context;
+    // A later stop replaces a previously scheduled stop on this source.
+    if(this.source&&!this.paused)this.source.stop(ctx.currentTime+1e9);
+    const param=this.boundaryGain?.gain;if(param){param.cancelScheduledValues(ctx.currentTime);param.setValueAtTime(1,ctx.currentTime);}
+  }
 }

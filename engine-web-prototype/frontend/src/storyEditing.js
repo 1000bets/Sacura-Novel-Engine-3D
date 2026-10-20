@@ -1,7 +1,7 @@
 import {isPureNode,dataTargets,getInput,setInput} from './logicModel.js';
 import {allBeats,sceneFor,uid} from './studioModel.js';
 
-export const STORY_NODE_KINDS=[['dialogue','Реплика'],['choice','Выбор'],['branch','If · Если'],['gate','Взаимодействие'],['merge','Схождение'],['end','Концовка']];
+export const STORY_NODE_KINDS=[['dialogue','Реплика'],['gameplay','Игровая сцена'],['choice','Выбор'],['branch','If · Если'],['gate','Взаимодействие'],['merge','Схождение'],['end','Концовка']];
 
 export function changeStoryNodeKind(node,kind){
  if(!STORY_NODE_KINDS.some(([id])=>id===kind))return;
@@ -33,9 +33,9 @@ export function deleteStoryNode(project,id){
  if(!owner)return {error:'Реплика не найдена.'};
  const scene=project.subscenes.find(s=>s.id===owner.subsceneId);
  const remaining=project.chapters.filter(c=>c.subsceneId===owner.subsceneId).flatMap(c=>c.beats).filter(b=>b.id!==id&&!isPureNode(b));
- if(!remaining.length)return {error:'В сабсцене должна оставаться хотя бы одна реплика.'};
+ if(!remaining.length&&project.gameplay?.storyPolicy?.mode!=='none')return {error:'В сабсцене должна оставаться хотя бы одна реплика.'};
  const removed=owner.beats.find(b=>b.id===id);
- const nextId=remaining.find(b=>b.id===removed.next)?.id||remaining[0].id;
+ const nextId=remaining.find(b=>b.id===removed.next)?.id||remaining[0]?.id||null;
  owner.beats=owner.beats.filter(b=>b.id!==id);
  for(const beat of allBeats(project)){
   for(const port of dataTargets(beat))if(getInput(beat,port)===id)setInput(beat,port,null);
