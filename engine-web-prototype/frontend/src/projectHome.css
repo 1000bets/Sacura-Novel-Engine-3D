@@ -52,6 +52,14 @@
 .project-home h2 { font-size: 20px; font-weight: 600; letter-spacing: -.5px; margin: 0; }
 .project-home-section-meta { color: var(--text-muted); font-size: 11px; }
 .project-home-template-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 20px; }
+.project-home-extra { margin-top: 24px; border-top: 1px solid var(--border-subtle); }
+.project-home-extra summary { display: flex; align-items: center; gap: 14px; min-height: 52px; cursor: pointer; list-style: none; font-weight: 600; }
+.project-home-extra summary::-webkit-details-marker { display: none; }
+.project-home-extra summary span { color: var(--text-muted); font-weight: 400; font-size: 11px; }
+.project-home-extra summary svg { margin-left: auto; transition: transform .18s; }
+.project-home-extra[open] summary svg { transform: rotate(180deg); }
+.project-home-extra summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.project-home-extra .project-home-template-grid { margin-top: 8px; }
 .project-template-entry { position: relative; min-width: 0; display: flex; flex-direction: column; padding-bottom: 32px; }
 .project-home button.project-template-open { display: flex; flex: 1; flex-direction: column; justify-content: flex-start; gap: 0; padding: 0; border: 1px solid var(--border-subtle); border-radius: 9px; background: var(--bg-panel); text-align: left; overflow: hidden; width: 100%; }
 .project-home button.project-template-open:hover:not(:disabled) { background: var(--bg-panel-elevated); border-color: color-mix(in srgb, var(--accent) 55%, var(--border-subtle)); }

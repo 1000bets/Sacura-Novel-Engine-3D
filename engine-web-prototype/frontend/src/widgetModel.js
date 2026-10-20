@@ -32,12 +32,15 @@ export function createWidget(id,kind='dialogue',name=WIDGET_KINDS[kind]){
   element('title','text',{name:'Заголовок',parentId:root,role:kind==='mainMenu'?'title':'none',text:'Пауза',layout:rectTransform({anchorMin:[0,0],anchorMax:[1,0],pivot:[0,0],x:30,y:35,width:-60,height:90}),style:{background:'transparent',color:'#fff4f8',fontSize:36,fontWeight:600,textAlign:'center',padding:0}}),
   ...((kind==='mainMenu')?[['start','Начать игру'],['restart','Начать заново']]:[['resume','Продолжить'],['restart','Начать заново'],['mainMenu','Главное меню']]).map(([action,text],i)=>element(action,'button',{name:text,parentId:root,text,action,layout:rectTransform({anchorMin:[.5,0],anchorMax:[.5,0],y:160+i*80,width:380,height:60}),style:{background:'#704e7c',color:'#fff4f8',fontSize:24,textAlign:'center',borderRadius:10,padding:8}})),
  ];
- return {id,name,kind,referenceSize:[1280,720],elements,css:''};
+ return {id,name,kind,...(id==='widget-default-'+kind?{builtinDefault:true}:{}),referenceSize:[1280,720],elements,css:''};
 }
 export function isUnmodifiedDefaultWidget(widget){
- if(widget.id!=='widget-default-'+widget.kind||widget.css?.trim())return false;
+ if(widget.id!=='widget-default-'+widget.kind&&widget.builtinDefault!==true||widget.css?.trim())return false;
  const standard=createWidget(widget.id,widget.kind);
- return JSON.stringify(widget.referenceSize)===JSON.stringify(standard.referenceSize)&&JSON.stringify(widget.elements)===JSON.stringify(standard.elements);
+ // Package import remaps both widget and element IDs. Compare the actual
+ // editable layout and relationships, rather than the recipient's local IDs.
+ const elements=w=>w.elements.map((e,i)=>({...e,id:String(i),parentId:e.parentId===null?null:String(w.elements.findIndex(parent=>parent.id===e.parentId))}));
+ return JSON.stringify(widget.referenceSize)===JSON.stringify(standard.referenceSize)&&JSON.stringify(elements(widget))===JSON.stringify(elements(standard));
 }
 export function ensureWidgets(project){
  project.widgets??=[];project.ui??={};

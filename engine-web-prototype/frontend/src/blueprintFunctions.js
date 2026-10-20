@@ -10,6 +10,8 @@ import {uid} from './model.js';
 import {migrateFunctionGraph,validateFunctionGraph} from './functionGraph.js';
 import {assertMechanicScript} from './mechanicScriptModel.js';
 import {runMechanicJavaScript} from './mechanicScriptRuntime.js';
+import {prepareMechanicScripts,mechanicScriptsReady} from './mechanicScriptRuntime.js';
+import {callScriptFunction,parseFunctionScript} from './scriptFunctions.js';
 const safe=k=>!['__proto__','constructor','prototype'].includes(String(k));
 export function pathValue(object,path){return String(path||'').split('.').filter(Boolean).reduce((v,k)=>safe(k)?v?.[k]:undefined,object);}
 export function writePath(object,path,value){const keys=String(path).split('.');if(keys.some(k=>!safe(k)||!k))throw Error('Недопустимое имя поля.');let target=object;for(const k of keys.slice(0,-1)){if(!target[k]||typeof target[k]!=='object')throw Error('Поле структуры не найдено: '+k);target=target[k];}target[keys.at(-1)]=structuredClone(value);}
@@ -63,6 +65,7 @@ function* blueprintSteps(p,id,args,variables,command,options={}){
  const send=call=>{const result=command(call,{assertActive,abortSignal:options.abortSignal,runId:options.runId,detached:options.detached});return parameterContext.componentTaskId&&result?.then?awaitOwnedWork(result,options.abortSignal,assertActive):result;};
  // The script override is opt-in at the gameplay boundary. Story, widget and
  // other function editors continue to use their existing graph implementation.
+ if(source.functionScript){if(!mechanicScriptsReady())yield prepareMechanicScripts();assertActive();return callScriptFunction(p,id,scope.args,variables);}
  const resource=source.logicResourceId?p.logicResources?.find(r=>r.id===source.logicResourceId):null;
  if(source.logicResourceId&&!resource)throw Error('Исходный ресурс метода недоступен: '+source.name);
  if(resource)assertPublishedSource(resource);
@@ -143,9 +146,11 @@ export function validateFunctions(p){
   if(functionIds.has(f.id))bad(f.id,'ID функций повторяются.');functionIds.add(f.id);
   if(f.localSchema)try{assertSchema(f.localSchema);for(const e of validateValue(f.localSchema,f.locals,{project:p,allowDeferred:true}))bad(f.id,e.message);}catch(e){bad(f.id,e.message);}
   if(f.mechanicScript)try{assertMechanicScript(f.mechanicScript);assertScriptFieldParameters(f);}catch(e){bad(f.id,e.message);}
+  if(f.functionScript)try{assertMechanicScript(f.functionScript);if(f.functionScript.compiledSource)parseFunctionScript(f.functionScript.compiledSource);}catch(e){bad(f.id,e.message);}
+  if(f.functionScript&&(f.mechanicScript||f.logicResourceId))bad(f.id,'У функции должна быть одна реализация. Создайте независимую функцию для нового скрипта.');
   if(f.resultSchema)try{assertSchema(f.resultSchema);}catch(e){bad(f.id,e.message);}
   const params=new Set();for(const a of f.parameters){if(a?.schema){try{assertSchema(a.schema);}catch(e){bad(f.id,e.message);}}if(!a||typeof a.name!=='string'||!a.name||!safe(a.name)||params.has(a.name)||!a.schema&&!['number','boolean','string','array','struct'].includes(a.type)||a.referenceType&&(!['object','item','scene','event','function'].includes(a.referenceType)||a.type!=='string'))bad(f.id,'Проверьте имена и типы параметров.');params.add(a?.name);}
-  if(!f.logicResourceId)for(const issue of validateFunctionGraph(p,f))bad(issue.nodeId,issue.message);
+  if(!f.logicResourceId&&!f.functionScript)for(const issue of validateFunctionGraph(p,f))bad(issue.nodeId,issue.message);
   const ids=new Set(f.nodes.map(n=>n.id));if(ids.size!==f.nodes.length||f.nodes.some(n=>typeof n.id!=='string'||!n.id))bad(f.id,'ID нод повторяются или отсутствуют.');
   for(const n of f.nodes){if(n.kind==='event'&&!p.events?.some(e=>e.id===n.eventId))bad(n.id,'Событие функции удалено.');if(!['set','branch','array','call','event','command','operation','value','return','wait','waitSignal','signal','parallel','timeout','start','await','cancel','btSequence','btSelector'].includes(n.kind))bad(n.id,'Неизвестный тип ноды.');for(const target of [n.next,n.trueNext,n.falseNext].filter(Boolean))if(!ids.has(target))bad(n.id,'Связь ведёт в удалённую ноду.');if(n.kind==='call'&&!p.functions.some(x=>x.id===n.functionId))bad(n.id,'Вызванная функция удалена.');if(['set','array'].includes(n.kind)&&(!/^(global|local|state)\.[^.]+/.test(n.path)||n.path.split('.').some(k=>!safe(k))))bad(n.id,'Выберите изменяемое значение.');}
  }

@@ -1,5 +1,5 @@
 import {t as tr,plural} from './i18n.js';
-export const beatIcon=node=>({gameplay:'Gamepad2',choice:'GitFork',branch:'GitFork',end:'Flag',gate:'MousePointerClick',merge:'Merge',variable:'Database','set-variable':'Pencil'})[node?.kind]||'MessageSquare';
+export const beatIcon=node=>({gameplay:'Gamepad2',choice:'GitFork',branch:'GitFork',end:'Flag',gate:'MousePointerClick',merge:'Merge',variable:'Database','set-variable':'Pencil','script-function':'Code2'})[node?.kind]||'MessageSquare';
 export function beatPreview(node,limit=4){
  if(node.kind==='branch')return tr("If · Если");
  if(node.kind==='set-variable')return 'Set · '+(node.variable||tr('Переменная'));

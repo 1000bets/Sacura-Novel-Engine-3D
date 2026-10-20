@@ -9,6 +9,7 @@ import {navMeshSettings,collisionSettings,samplePath,pathSection} from './sceneP
 import {projectAudioAssets} from './audioAssets.js';
 import {variableValue,runtimeVariableType} from './variableModel.js';
 import {isPureNode,readLogic} from './logicModel.js';
+import {prepareMechanicScripts} from './mechanicScriptRuntime.js';
 import {choiceValue,ANSWER_VARIABLE,typedValue} from './choiceModel.js';
 import {
   allBeats,
@@ -150,6 +151,8 @@ export class PreviewRuntime {
     };
     this.game=new GameSession(this);delete this.project.gameplayMigration;
     try {
+      if(this.project.functions.some(f=>f.functionScript))await prepareMechanicScripts();
+      if(!this.running||token!==this.generation)return;
       this.game?.initialize();
       if(this.project.gameplay.storyPolicy?.mode==='none')await this.enterScene(this.project.subscenes[0].id,token);else await this.enter(beatId, token);
     } catch (e) {
@@ -694,7 +697,7 @@ export class PreviewRuntime {
     if(phase!=='triggered')return;
     if(action.trigger!=='continuous')this.game?.post('input',{actionId,phase,value:value??0,...(device?{device}:{})},undefined,{source:{type:'inputAction',id:actionId}});
     if(!this.running)return;
-    if(action.behavior==='operation'){if(this.snapshot.paused||!this.snapshot.ready)return;try{const m=this.project.gameplay.mechanics.find(m=>m.id===action.mechanicId);if(action.mechanicId&&!m)return;await this.game.execute(action.operation,{kind:'event',scope:m?.scope||action.scope||{kind:'project',id:this.project.id},mechanicInstanceId:m?.definitionId?m.id:undefined,source:{type:'inputAction',id:action.id},args:{value:value??0,payload:payload||{},device:device||'axis'}});if(inputGeneration!==this.generation)return;await this.game.flushTransition();this.emit();}catch(e){if(inputGeneration===this.generation)this.game.error(e);}return;}
+    if(action.behavior==='operation'){if(this.snapshot.paused||!this.snapshot.ready)return;try{const m=this.project.gameplay.mechanics.find(m=>m.id===action.mechanicId);if(action.mechanicId&&!m)return;await this.game.execute(action.operation,{kind:'event',scope:m?.scope||action.scope||{kind:'project',id:this.project.id},mechanicInstanceId:m?.definitionId?m.id:undefined,source:{type:'inputAction',id:action.id},args:{value:value??0,payload:{...(device==='pointer'&&action.valueType==='axis2d'&&Array.isArray(value)?{delta:value}:{}),...payload||{}},device:device||'axis'}});if(inputGeneration!==this.generation)return;await this.game.flushTransition();this.emit();}catch(e){if(inputGeneration===this.generation)this.game.error(e);}return;}
     if(action.behavior==='pause'){this.togglePause();return;}
     if(this.snapshot.paused||!this.snapshot.ready)return;
     if(this.game&&['shoot','reload','jump','look','saveGame','loadGame'].includes(action.behavior)){try{if(action.behavior==='look')this.game.look(payload?.delta||value,device);else await this.game.command(({shoot:'shoot',saveGame:'save',loadGame:'load'})[action.behavior]||action.behavior,payload||{});if(inputGeneration!==this.generation)return;await this.game.flushTransition();this.emit();}catch(e){this.game.error(e);}return;}

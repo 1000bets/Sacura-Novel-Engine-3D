@@ -42,7 +42,7 @@ export function choiceResultType(beat){
  return types.length===1?types[0]:types.length?'any':null;
 }
 export function storyPorts(beat){
- if(beat.kind==='end'||['variable','literal','compare','and','or','not','math','convert'].includes(beat.kind))return [];
+ if(beat.kind==='end'||['variable','literal','compare','and','or','not','math','convert','script-function'].includes(beat.kind))return [];
  if(beat.kind==='branch')return [{id:'true',label:'Да',next:beat.trueNext},{id:'false',label:'Нет',next:beat.falseNext}];
  if(beat.kind!=='choice')return [{id:'next',label:'Дальше',next:beat.next}];
  return [...(beat.choices||[]).map(c=>({id:'choice:'+c.id,label:c.label,condition:c.enabledSource?'Условие из графа':conditionSummary(availabilityOf(c)),result:choiceValue(c),resultType:c.result?.type==='none'?null:c.result?.type||'string',next:c.next})),{id:'next',label:'После выбора',next:beat.choiceMode==='value'||(beat.choices||[]).some(c=>!c.next)?beat.next:null,common:true}];

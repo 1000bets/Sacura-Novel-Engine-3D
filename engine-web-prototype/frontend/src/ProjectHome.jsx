@@ -3,7 +3,7 @@ import {instantiateAuthoringTemplate} from './authoringTemplates.js';
 import LanguagePicker from './LanguagePicker.jsx';
 import {t as tr, useLocale, localeTag, message} from './i18n.jsx';
 import React,{useEffect,useRef,useState} from 'react';
-import {Flower2,Plus,FolderOpen,ArrowRight,LogOut,Upload,UserPlus,Search,RotateCw,Clock3,BookOpen,X,Monitor,ArrowUpRight} from 'lucide-react';
+import {Flower2,Plus,FolderOpen,ArrowRight,LogOut,Upload,UserPlus,Search,RotateCw,Clock3,BookOpen,X,Monitor,ArrowUpRight,ChevronDown} from 'lucide-react';
 import InviteDialog from './InviteDialog.jsx';
 import Dialog from './Dialog.jsx';
 import Editor from './Editor.jsx';
@@ -19,7 +19,8 @@ const templatePresentation={
  'builtin-quest':{art:'quest',label:'Квест',detail:'Point & click',icon:'01'},
  'builtin-shooter':{art:'shooter',label:'Шутер',detail:'FPS',icon:'02'},
  'builtin-novel':{art:'novel',label:'Визуальная новелла',detail:'Диалоги и выборы',icon:'03'},
- 'builtin-clicker':{art:'clicker',label:'UI-кликер',detail:'Интерфейс и механики',icon:'04'}
+ 'builtin-horror':{art:'horror',label:'Последний обход',detail:'Point & click · Хоррор',icon:'04'},
+ 'builtin-clicker':{art:'clicker',label:'UI-кликер',detail:'Интерфейс и механики',icon:'05'}
 };
 
 export default function ProjectHome({user=null,onLogout}) {
@@ -57,6 +58,17 @@ export default function ProjectHome({user=null,onLogout}) {
  }
  function beginCreate(){setName(tr('Новый проект'));setCreating(true);setError('');}
  const filteredProjects=projects.filter(project=>project.title.toLocaleLowerCase(localeTag()).includes(search.trim().toLocaleLowerCase(localeTag())));
+ const mainTemplates=builtinTemplates.filter(t=>!t.featured&&!t.extra),extraTemplates=builtinTemplates.filter(t=>t.extra);
+ const templateCard=template=>{
+  const presentation=templatePresentation[template.id];
+  return <article key={template.id} className="project-template-entry">
+   <button className="project-template-open" disabled={busy} aria-label={tr('Открыть шаблон: {0}',[tr(template.name)])} onClick={()=>run(async()=>open(await createBuiltinProject(template.id),{save:true}))}>
+    <div className="project-template-art"><ProjectArtwork variant={presentation.art}/><span className="project-template-number">{presentation.icon}</span><span className="project-template-arrow"><ArrowUpRight aria-hidden="true" size={20}/></span></div>
+    <div className="project-template-copy"><span className="project-template-genre">{tr(presentation.detail)}</span><h3>{tr(presentation.label)}</h3><p>{tr(template.description)}</p></div>
+   </button>
+   {template.guide&&<button className="project-template-help" onClick={()=>setGuide(template)}><BookOpen aria-hidden="true" size={14}/>{tr('Разбор шаблона')}<ArrowRight aria-hidden="true" size={14}/></button>}
+  </article>;
+ };
  if(active)return <Editor key={active.id} initialProject={active} user={user} onLogout={onLogout} onHome={home}/>;
  return <main className="project-home">
   <header className="project-home-header">
@@ -80,17 +92,9 @@ export default function ProjectHome({user=null,onLogout}) {
 
    {error&&!creating&&<p className="project-home-error" role="alert">{message(error)}</p>}
    <section id="project-templates" className="project-home-templates" aria-labelledby="templates-title">
-    <div className="project-home-section-heading"><div><h2 id="templates-title">{tr('Начните с готовой идеи')}</h2></div><span className="project-home-section-meta">{tr('4 шаблона · разные жанры')}</span></div>
-    <div className="project-home-template-grid">{builtinTemplates.filter(t=>!t.featured).map(template=>{
-     const presentation=templatePresentation[template.id];
-     return <article key={template.id} className="project-template-entry">
-      <button className="project-template-open" disabled={busy} aria-label={tr('Открыть шаблон: {0}',[tr(template.name)])} onClick={()=>run(async()=>open(await createBuiltinProject(template.id),{save:true}))}>
-       <div className="project-template-art"><ProjectArtwork variant={presentation.art}/><span className="project-template-number">{presentation.icon}</span><span className="project-template-arrow"><ArrowUpRight aria-hidden="true" size={20}/></span></div>
-       <div className="project-template-copy"><span className="project-template-genre">{tr(presentation.detail)}</span><h3>{tr(presentation.label)}</h3><p>{tr(template.description)}</p></div>
-      </button>
-      {template.guide&&<button className="project-template-help" onClick={()=>setGuide(template)}><BookOpen aria-hidden="true" size={14}/>{tr('Разбор шаблона')}<ArrowRight aria-hidden="true" size={14}/></button>}
-     </article>;
-    })}</div>
+    <div className="project-home-section-heading"><div><h2 id="templates-title">{tr('Начните с готовой идеи')}</h2></div><span className="project-home-section-meta">{tr('{0} шаблона · разные жанры',[mainTemplates.length])}</span></div>
+    <div className="project-home-template-grid">{mainTemplates.map(templateCard)}</div>
+    {extraTemplates.length>0&&<details className="project-home-extra"><summary>{tr('Ещё')}<span>{tr('Дополнительные примеры')}</span><ChevronDown aria-hidden="true" size={18}/></summary><div className="project-home-template-grid">{extraTemplates.map(templateCard)}</div></details>}
    </section>
 
    <section id="previous-projects" className="project-home-recent" aria-labelledby="recent-title">

@@ -629,18 +629,18 @@
     "standardEventsVersion": 1,
     "events": [
       {
-        "id": "event-8507c53d-c424-455f-93d8-698155c30dde",
+        "id": "event-bc427f43-bfc9-47b9-90e9-e7e652eb1e73",
         "name": "Дверь склада → Задать замок",
         "description": "",
         "retention": "AUTO_CLOSE_ON_FLOW_END",
         "owner": "SubScene",
         "groups": [
           {
-            "id": "group-f4cd2dea-a2d6-4860-ae01-cff201641b2d",
+            "id": "group-1656f2d7-3938-4f2a-a772-51b3e80255b1",
             "name": "Основное действие",
             "actions": [
               {
-                "id": "action-6d0173df-08a0-4b7c-b6b2-b5093e9f2ccc",
+                "id": "action-562dca47-7591-48a9-a165-213f38fbe465",
                 "type": "gameplay",
                 "target": "world",
                 "value": {
@@ -675,18 +675,18 @@
         "componentAction": true
       },
       {
-        "id": "event-47e43bac-b07e-4242-8100-86aad1698f91",
+        "id": "event-52f23eb8-9996-4b57-9a89-7de84aef5b2c",
         "name": "Дверь склада → Открыть",
         "description": "",
         "retention": "AUTO_CLOSE_ON_FLOW_END",
         "owner": "SubScene",
         "groups": [
           {
-            "id": "group-0013fdcd-1e21-48ee-b41f-25f0d2fbc774",
+            "id": "group-e70966a2-4a8e-4097-b9d5-7be6619ecb61",
             "name": "Основное действие",
             "actions": [
               {
-                "id": "action-51f08cdd-0773-4147-84ca-632b84e4f045",
+                "id": "action-9de54aec-db92-46f5-a24c-9311f7f46b62",
                 "type": "gameplay",
                 "target": "world",
                 "value": {
@@ -807,6 +807,7 @@
         "id": "widget-default-dialogue",
         "name": "Диалог",
         "kind": "dialogue",
+        "builtinDefault": true,
         "referenceSize": [
           1280,
           720
@@ -1031,6 +1032,7 @@
         "id": "widget-default-mainMenu",
         "name": "Главное меню",
         "kind": "mainMenu",
+        "builtinDefault": true,
         "referenceSize": [
           1280,
           720
@@ -1188,6 +1190,7 @@
         "id": "widget-default-pauseMenu",
         "name": "Меню паузы",
         "kind": "pauseMenu",
+        "builtinDefault": true,
         "referenceSize": [
           1280,
           720
@@ -1819,23 +1822,23 @@
             "next": "quest-next",
             "bindings": [
               {
-                "id": "bind-85ad3069-6fa4-4363-845b-1c5e5bb5f66f",
-                "eventId": "event-8507c53d-c424-455f-93d8-698155c30dde",
+                "id": "bind-d73af0de-2504-4eb5-ba1a-eb99306827cb",
+                "eventId": "event-bc427f43-bfc9-47b9-90e9-e7e652eb1e73",
                 "hook": "BEFORE",
                 "join": "EVENT_END",
                 "overrides": {},
                 "actionOverrides": {},
-                "localEventId": "event-8507c53d-c424-455f-93d8-698155c30dde"
+                "localEventId": "event-bc427f43-bfc9-47b9-90e9-e7e652eb1e73"
               }
             ],
             "mode": "SEQUENTIAL",
             "batches": {
               "BEFORE": [
                 {
-                  "id": "batch-51b6c446-cfbe-48eb-bc91-322e8a6cb5f9",
+                  "id": "batch-fb91217b-868b-41aa-a8a4-23e1aa66041f",
                   "mode": "SEQUENTIAL",
                   "bindingIds": [
-                    "bind-85ad3069-6fa4-4363-845b-1c5e5bb5f66f"
+                    "bind-d73af0de-2504-4eb5-ba1a-eb99306827cb"
                   ]
                 }
               ],
@@ -1865,23 +1868,23 @@
             "next": "quest-end",
             "bindings": [
               {
-                "id": "bind-887d7413-1f8f-4888-b1df-497d46190e40",
-                "eventId": "event-47e43bac-b07e-4242-8100-86aad1698f91",
+                "id": "bind-a92ec031-7228-40c2-9218-6367291090b5",
+                "eventId": "event-52f23eb8-9996-4b57-9a89-7de84aef5b2c",
                 "hook": "BEFORE",
                 "join": "EVENT_END",
                 "overrides": {},
                 "actionOverrides": {},
-                "localEventId": "event-47e43bac-b07e-4242-8100-86aad1698f91"
+                "localEventId": "event-52f23eb8-9996-4b57-9a89-7de84aef5b2c"
               }
             ],
             "mode": "SEQUENTIAL",
             "batches": {
               "BEFORE": [
                 {
-                  "id": "batch-d5759fef-e60d-4b6e-b043-b330c08b71cc",
+                  "id": "batch-70cc2a24-123a-4d58-805a-809cbf69e19e",
                   "mode": "SEQUENTIAL",
                   "bindingIds": [
-                    "bind-887d7413-1f8f-4888-b1df-497d46190e40"
+                    "bind-a92ec031-7228-40c2-9218-6367291090b5"
                   ]
                 }
               ],

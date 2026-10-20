@@ -355,6 +355,19 @@
             }
           },
           "methods": {
+            "collect": {
+              "name": "Получить награду вручную",
+              "parameters": {
+                "type": "object",
+                "properties": {}
+              },
+              "result": {
+                "type": "number"
+              },
+              "logic": {
+                "functionId": "sample-method-PeriodicReward-collect"
+              }
+            },
             "prepare": {
               "name": "Подготовить таймер",
               "parameters": {
@@ -678,8 +691,8 @@
         "definitionId": "sample.component.periodicreward",
         "status": "ready",
         "approved": true,
-        "source": "// Timer — сериализуемый native handle этого компонента. Tick вызывает тот же Reward,\n// что кнопка. Disable/Stop удаляет только его таймер; восстановление сохраняет remaining.\nconst component = {\n  name: \"PeriodicReward\",\n  parameters: {\n    type: \"object\",\n    properties: {\n      seconds: { type: \"number\", min: 0.05, default: 1, label: \"Интервал\" },\n      initialRate: { type: \"number\", default: 1, label: \"Начальная скорость\" },\n      autoStart: { type: \"boolean\", default: true, label: \"Запустить после подготовки\" },\n    },\n  },\n  state: {\n    type: \"object\",\n    properties: {\n      rate: { type: \"number\", default: 1, label: \"Награда за тик\" },\n      running: { type: \"boolean\", default: false, label: \"Таймер включён\" },\n    },\n  },\n  stateFromParameters: { rate: \"initialRate\", running: \"autoStart\" },\n  references: {\n    type: \"object\",\n    properties: {\n      reward: { type: \"reference\", referenceType: \"mechanic\", label: \"Общая награда\" },\n    },\n  },\n  lifecycle: { enable: \"prepare\", disable: \"stop\" },\n  subscriptions: [{ id: \"own-timer\", signal: \"timer\", match: \"timer\", methodId: \"tick\" }],\n  methods: {\n    prepare: {\n      name: \"Подготовить таймер\",\n      async run({ state, self, engine }) {\n        if (state.running) await engine.invoke(self, \"start\", {});\n      },\n    },\n    start: {\n      name: \"Запустить таймер\",\n      async run({ params, state, owner, engine }) {\n        state.running = true;\n        await engine.operation(\"sacura.timer.start\", {\n          owner,\n          name: \"reward\",\n          seconds: params.seconds,\n          repeat: true,\n          restart: false,\n        });\n      },\n    },\n    stop: {\n      name: \"Остановить таймер\",\n      async run({ state, owner, engine }) {\n        state.running = false;\n        await engine.operation(\"sacura.timer.stop\", { owner, name: \"reward\" });\n      },\n    },\n    tick: {\n      name: \"Выдать периодическую награду\",\n      async run({ state, refs, engine }) {\n        if (state.running) await engine.invoke(refs.reward, \"award\", { factor: state.rate });\n      },\n    },\n    upgrade: {\n      name: \"Улучшить\",\n      result: { type: \"number\" },\n      run({ state }) {\n        state.rate += 1;\n        return state.rate;\n      },\n    },\n  },\n};\n",
-        "fingerprint": "2234:939e1006",
+        "source": "// Timer — сериализуемый native handle этого компонента. Tick вызывает тот же Reward,\n// что кнопка. Disable/Stop удаляет только его таймер; восстановление сохраняет remaining.\nconst component = {\n  name: \"PeriodicReward\",\n  parameters: {\n    type: \"object\",\n    properties: {\n      seconds: { type: \"number\", min: 0.05, default: 1, label: \"Интервал\" },\n      initialRate: { type: \"number\", default: 1, label: \"Начальная скорость\" },\n      autoStart: { type: \"boolean\", default: true, label: \"Запустить после подготовки\" },\n    },\n  },\n  state: {\n    type: \"object\",\n    properties: {\n      rate: { type: \"number\", default: 1, label: \"Награда за тик\" },\n      running: { type: \"boolean\", default: false, label: \"Таймер включён\" },\n    },\n  },\n  stateFromParameters: { rate: \"initialRate\", running: \"autoStart\" },\n  references: {\n    type: \"object\",\n    properties: {\n      reward: { type: \"reference\", referenceType: \"mechanic\", label: \"Общая награда\" },\n    },\n  },\n  lifecycle: { enable: \"prepare\", disable: \"stop\" },\n  subscriptions: [{ id: \"own-timer\", signal: \"timer\", match: \"timer\", methodId: \"tick\" }],\n  methods: {\n    collect: {\n      name: \"Получить награду вручную\",\n      result: { type: \"number\" },\n      async run({ state, refs, engine }) {\n        // Улучшение меняет ручной сбор и таймер через один общий Reward.\n        return await engine.invoke(refs.reward, \"award\", { factor: state.rate });\n      },\n    },\n    prepare: {\n      name: \"Подготовить таймер\",\n      async run({ state, self, engine }) {\n        if (state.running) await engine.invoke(self, \"start\", {});\n      },\n    },\n    start: {\n      name: \"Запустить таймер\",\n      async run({ params, state, owner, engine }) {\n        state.running = true;\n        await engine.operation(\"sacura.timer.start\", {\n          owner,\n          name: \"reward\",\n          seconds: params.seconds,\n          repeat: true,\n          restart: false,\n        });\n      },\n    },\n    stop: {\n      name: \"Остановить таймер\",\n      async run({ state, owner, engine }) {\n        state.running = false;\n        await engine.operation(\"sacura.timer.stop\", { owner, name: \"reward\" });\n      },\n    },\n    tick: {\n      name: \"Выдать периодическую награду\",\n      async run({ state, refs, engine }) {\n        if (state.running) await engine.invoke(refs.reward, \"award\", { factor: state.rate });\n      },\n    },\n    upgrade: {\n      name: \"Улучшить\",\n      result: { type: \"number\" },\n      run({ state }) {\n        state.rate += 1;\n        return state.rate;\n      },\n    },\n  },\n};\n",
+        "fingerprint": "2538:b0aa8881",
         "dependencies": {
           "functions": {},
           "events": {},
@@ -700,24 +713,28 @@
         "signalBindings": {},
         "lesson": "Что открыть → PeriodicReward.tick / upgrade. Измените правило улучшения. Таймер принадлежит подключению и удаляется при остановке.",
         "locations": {
+          "collect": {
+            "line": 33,
+            "column": 7
+          },
           "prepare": {
-            "line": 32,
+            "line": 40,
             "column": 7
           },
           "start": {
-            "line": 38,
+            "line": 46,
             "column": 7
           },
           "stop": {
-            "line": 51,
+            "line": 59,
             "column": 7
           },
           "tick": {
-            "line": 58,
+            "line": 66,
             "column": 7
           },
           "upgrade": {
-            "line": 65,
+            "line": 73,
             "column": 7
           }
         }
@@ -815,6 +832,20 @@
         "nodes": []
       },
       {
+        "id": "sample-method-PeriodicReward-collect",
+        "name": "PeriodicReward · Получить награду вручную",
+        "graphVersion": 1,
+        "logicResourceId": "sample-source-PeriodicReward",
+        "componentMethodId": "collect",
+        "parameters": [],
+        "resultSchema": {
+          "type": "number"
+        },
+        "locals": {},
+        "entry": "",
+        "nodes": []
+      },
+      {
         "id": "sample-method-PeriodicReward-prepare",
         "name": "PeriodicReward · Подготовить таймер",
         "graphVersion": 1,
@@ -892,6 +923,7 @@
         "id": "widget-default-dialogue",
         "name": "Диалог",
         "kind": "dialogue",
+        "builtinDefault": true,
         "referenceSize": [
           1280,
           720
@@ -1116,6 +1148,7 @@
         "id": "widget-default-mainMenu",
         "name": "Главное меню",
         "kind": "mainMenu",
+        "builtinDefault": true,
         "referenceSize": [
           1280,
           720
@@ -1273,6 +1306,7 @@
         "id": "widget-default-pauseMenu",
         "name": "Меню паузы",
         "kind": "pauseMenu",
+        "builtinDefault": true,
         "referenceSize": [
           1280,
           720
@@ -1472,10 +1506,120 @@
         ],
         "elements": [
           {
+            "id": "clicker-background",
+            "name": "",
+            "type": "panel",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                1,
+                1
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 0,
+              "y": 0,
+              "width": 0,
+              "height": 0
+            },
+            "style": {
+              "background": "#171d28",
+              "borderRadius": 0,
+              "padding": 0
+            }
+          },
+          {
+            "id": "clicker-panel",
+            "name": "",
+            "type": "panel",
+            "parentId": null,
+            "role": "none",
+            "text": "",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0.5,
+                0.5
+              ],
+              "anchorMax": [
+                0.5,
+                0.5
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "x": 0,
+              "y": 0,
+              "width": 600,
+              "height": 610
+            },
+            "style": {
+              "background": "#222b3a",
+              "borderColor": "#3a485d",
+              "borderWidth": 1,
+              "borderRadius": 24,
+              "padding": 0
+            }
+          },
+          {
+            "id": "clicker-title",
+            "name": "ТИХАЯ МАСТЕРСКАЯ",
+            "type": "text",
+            "parentId": "clicker-panel",
+            "role": "none",
+            "text": "ТИХАЯ МАСТЕРСКАЯ",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 30,
+              "width": 528,
+              "height": 48
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#eaf0f7",
+              "fontSize": 22,
+              "fontFamily": "system-ui",
+              "fontWeight": 400,
+              "borderColor": "#ad849d",
+              "borderWidth": 0,
+              "borderRadius": 12,
+              "padding": 8,
+              "opacity": 1,
+              "textAlign": "center",
+              "gap": 8
+            }
+          },
+          {
             "id": "coin-text",
             "name": "Монеты",
             "type": "text",
-            "parentId": null,
+            "parentId": "clicker-panel",
             "role": "none",
             "text": "Монеты",
             "action": "none",
@@ -1493,23 +1637,23 @@
                 0,
                 0
               ],
-              "x": 24,
-              "y": 24,
-              "width": 380,
-              "height": 42
+              "x": 36,
+              "y": 75,
+              "width": 528,
+              "height": 70
             },
             "style": {
               "background": "transparent",
-              "color": "#fff4f8",
-              "fontSize": 24,
+              "color": "#eaf0f7",
+              "fontSize": 44,
               "fontFamily": "system-ui",
               "fontWeight": 400,
               "borderColor": "#ad849d",
               "borderWidth": 0,
               "borderRadius": 12,
-              "padding": 12,
+              "padding": 0,
               "opacity": 1,
-              "textAlign": "left",
+              "textAlign": "center",
               "gap": 8
             },
             "binding": {
@@ -1522,14 +1666,14 @@
               },
               "field": "value",
               "valueType": "number",
-              "format": "Монеты: {value}"
+              "format": "{value} монет"
             }
           },
           {
             "id": "rate-text",
             "name": "За тик",
             "type": "text",
-            "parentId": null,
+            "parentId": "clicker-panel",
             "role": "none",
             "text": "За тик",
             "action": "none",
@@ -1547,23 +1691,23 @@
                 0,
                 0
               ],
-              "x": 24,
-              "y": 70,
-              "width": 380,
-              "height": 42
+              "x": 36,
+              "y": 145,
+              "width": 528,
+              "height": 48
             },
             "style": {
               "background": "transparent",
-              "color": "#fff4f8",
-              "fontSize": 24,
+              "color": "#eaf0f7",
+              "fontSize": 22,
               "fontFamily": "system-ui",
               "fontWeight": 400,
               "borderColor": "#ad849d",
               "borderWidth": 0,
               "borderRadius": 12,
-              "padding": 12,
+              "padding": 8,
               "opacity": 1,
-              "textAlign": "left",
+              "textAlign": "center",
               "gap": 8
             },
             "binding": {
@@ -1576,14 +1720,14 @@
               },
               "field": "rate",
               "valueType": "number",
-              "format": "За тик: {value}"
+              "format": "За нажатие и за секунду: {value}"
             }
           },
           {
             "id": "coin-button",
             "name": "Получить монету",
             "type": "button",
-            "parentId": null,
+            "parentId": "clicker-panel",
             "role": "none",
             "text": "Получить монету",
             "action": "gameplay",
@@ -1601,23 +1745,23 @@
                 0,
                 0
               ],
-              "x": 24,
-              "y": 130,
-              "width": 380,
-              "height": 50
+              "x": 36,
+              "y": 215,
+              "width": 528,
+              "height": 58
             },
             "style": {
-              "background": "#704e7c",
-              "color": "#fff4f8",
-              "fontSize": 24,
+              "background": "#ae7944",
+              "color": "#eaf0f7",
+              "fontSize": 22,
               "fontFamily": "system-ui",
               "fontWeight": 400,
               "borderColor": "#ad849d",
               "borderWidth": 0,
               "borderRadius": 12,
-              "padding": 12,
+              "padding": 8,
               "opacity": 1,
-              "textAlign": "left",
+              "textAlign": "center",
               "gap": 8
             },
             "command": "sacura.component.call",
@@ -1626,9 +1770,9 @@
                 "kind": "reference",
                 "type": "mechanic",
                 "mode": "direct",
-                "id": "coins-reward"
+                "id": "coins-periodic"
               },
-              "methodId": "award",
+              "methodId": "collect",
               "args": {}
             },
             "operationVersion": 1
@@ -1637,7 +1781,7 @@
             "id": "upgrade-button",
             "name": "Улучшить (+1 за тик)",
             "type": "button",
-            "parentId": null,
+            "parentId": "clicker-panel",
             "role": "none",
             "text": "Улучшить (+1 за тик)",
             "action": "gameplay",
@@ -1655,23 +1799,23 @@
                 0,
                 0
               ],
-              "x": 24,
-              "y": 195,
-              "width": 380,
-              "height": 50
+              "x": 36,
+              "y": 288,
+              "width": 528,
+              "height": 58
             },
             "style": {
-              "background": "#704e7c",
-              "color": "#fff4f8",
-              "fontSize": 24,
+              "background": "#344359",
+              "color": "#eaf0f7",
+              "fontSize": 22,
               "fontFamily": "system-ui",
               "fontWeight": 400,
               "borderColor": "#ad849d",
               "borderWidth": 0,
               "borderRadius": 12,
-              "padding": 12,
+              "padding": 8,
               "opacity": 1,
-              "textAlign": "left",
+              "textAlign": "center",
               "gap": 8
             },
             "command": "sacura.component.call",
@@ -1691,7 +1835,7 @@
             "id": "stop-button",
             "name": "Остановить таймер",
             "type": "button",
-            "parentId": null,
+            "parentId": "clicker-panel",
             "role": "none",
             "text": "Остановить таймер",
             "action": "gameplay",
@@ -1709,23 +1853,23 @@
                 0,
                 0
               ],
-              "x": 24,
-              "y": 260,
-              "width": 380,
-              "height": 50
+              "x": 36,
+              "y": 361,
+              "width": 528,
+              "height": 58
             },
             "style": {
-              "background": "#704e7c",
-              "color": "#fff4f8",
-              "fontSize": 24,
+              "background": "#344359",
+              "color": "#eaf0f7",
+              "fontSize": 22,
               "fontFamily": "system-ui",
               "fontWeight": 400,
               "borderColor": "#ad849d",
               "borderWidth": 0,
               "borderRadius": 12,
-              "padding": 12,
+              "padding": 8,
               "opacity": 1,
-              "textAlign": "left",
+              "textAlign": "center",
               "gap": 8
             },
             "command": "sacura.component.call",
@@ -1745,7 +1889,7 @@
             "id": "start-button",
             "name": "Запустить таймер",
             "type": "button",
-            "parentId": null,
+            "parentId": "clicker-panel",
             "role": "none",
             "text": "Запустить таймер",
             "action": "gameplay",
@@ -1763,23 +1907,23 @@
                 0,
                 0
               ],
-              "x": 24,
-              "y": 325,
-              "width": 380,
-              "height": 50
+              "x": 36,
+              "y": 434,
+              "width": 528,
+              "height": 58
             },
             "style": {
-              "background": "#704e7c",
-              "color": "#fff4f8",
-              "fontSize": 24,
+              "background": "#344359",
+              "color": "#eaf0f7",
+              "fontSize": 22,
               "fontFamily": "system-ui",
               "fontWeight": 400,
               "borderColor": "#ad849d",
               "borderWidth": 0,
               "borderRadius": 12,
-              "padding": 12,
+              "padding": 8,
               "opacity": 1,
-              "textAlign": "left",
+              "textAlign": "center",
               "gap": 8
             },
             "command": "sacura.component.call",
@@ -1794,6 +1938,48 @@
               "args": {}
             },
             "operationVersion": 1
+          },
+          {
+            "id": "clicker-help",
+            "name": "Улучшайте сбор. Таймер можно остановить и запустить снова.",
+            "type": "text",
+            "parentId": "clicker-panel",
+            "role": "none",
+            "text": "Улучшайте сбор. Таймер можно остановить и запустить снова.",
+            "action": "none",
+            "visible": true,
+            "layout": {
+              "anchorMin": [
+                0,
+                0
+              ],
+              "anchorMax": [
+                0,
+                0
+              ],
+              "pivot": [
+                0,
+                0
+              ],
+              "x": 36,
+              "y": 515,
+              "width": 528,
+              "height": 48
+            },
+            "style": {
+              "background": "transparent",
+              "color": "#eaf0f7",
+              "fontSize": 16,
+              "fontFamily": "system-ui",
+              "fontWeight": 400,
+              "borderColor": "#ad849d",
+              "borderWidth": 0,
+              "borderRadius": 12,
+              "padding": 8,
+              "opacity": 1,
+              "textAlign": "center",
+              "gap": 8
+            }
           }
         ],
         "css": ""

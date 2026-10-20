@@ -11,6 +11,9 @@ import {activityValue} from './runtimePresentation.js';
 import InputWorkspace,{InputContextSettings} from './InputWorkspace.jsx';
 import TouchInput from './TouchInput.jsx';
 import GameplayWorkspace from './GameplayWorkspace.jsx';
+import FunctionScriptsWorkspace from './FunctionScriptsWorkspace.jsx';
+import {newScriptFunction,scriptFunctionType,scriptParameterType} from './scriptFunctions.js';
+import {schemaDefaults} from './valueSchemas.js';
 import GameHUD from './GameHUD.jsx';
 import {exportPlayableGame} from './gameExport.js';
 import {instantiateAuthoringTemplate} from './authoringTemplates.js';
@@ -203,7 +206,7 @@ function ResizeBar({ axis, onMove, onReset, label }) {
   );
 }
 
-function GameDialogue({
+export function GameDialogue({
   project,
   beat,
   preview,
@@ -225,7 +228,7 @@ function GameDialogue({
         <Icon name="Flower2" size={29} />
         <span>{tr("Конец истории")}</span>
         <strong>{preview.ending}</strong>
-        <Button onClick={onStart}>{tr("Сыграть ещё раз")}</Button>
+        <Button onClick={()=>onStart()}>{tr("Сыграть ещё раз")}</Button>
       </div>
     );
   const ready = !running || (preview.ready && !preview.paused);
@@ -305,6 +308,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     [history, setHistory] = useState([]),
     [future,setFuture]=useState([]),
     [gameplayRequest,setGameplayRequest]=useState(null),
+    [scriptFunctionId,setScriptFunctionId]=useState(null),
     [logicReturn,setLogicReturn]=useState(null),
     [authorRequest,setAuthorRequest]=useState(null),
     [widgetRequest,setWidgetRequest]=useState(null),
@@ -568,6 +572,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   }, []);
   const openGraph = useCallback(
     (data) => {
+      if(data.kind==='script-function'){setScriptFunctionId(data.functionId);setDock('scripting');setCompactPanel('workspace');maximizeWindow('scripting');return;}
       if (data.kind === "portal") {
         selectBeat(data.beat.id);
         setDock("story");
@@ -900,6 +905,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       if(kind==='not'){b.a=false;}
       if(kind==='compare'){b.operator=placement?.operator||'eq';b.valueType=placement?.valueType||'number';b.a=typedValue('',b.valueType);b.b=typedValue('',b.valueType);}
       if(kind==='set-variable')initializeVariableNode(p,b,placement?.variable||Object.keys(p.variables).find(id=>id!==ANSWER_VARIABLE)||'Переменная 1');
+      if(kind==='script-function'){if(placement.scriptFunction)p.functions.push(placement.scriptFunction);const fn=p.functions.find(f=>f.id===placement.functionId);b.functionId=fn.id;b.text=fn.name;b.args=Object.fromEntries(fn.parameters.map(a=>[a.name,a.default??schemaDefaults(a.schema||{type:a.type})??null]));}
       if(isPureNode(b)||['branch','set-variable'].includes(kind))b.next=null;
       if (kind === "gate") {
         b.signal = objects.find(o=>o.type==='Активный меш'&&o.active!==false)?.id || 'letter';
@@ -911,7 +917,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       }
       let owner=p.chapters.find(c=>c.id===chapter.id);if(!owner){owner={id:uid('chapter'),name:'Первый эпизод',subsceneId:scene.id,beats:[]};p.chapters.push(owner);p.subscenes.find(s=>s.id===scene.id).entry=b.id;}insertStoryNode(p,owner.id,beat.id,b);
       if(placement?.pin){const pin=placement.pin;
-        const connection=pin.handleType==='source'?{source:pin.nodeId,sourceHandle:pin.handleId,target:id,targetHandle:placement.wireType==='flow'?'in':kind==='branch'?'condition':['set-variable','convert'].includes(kind)?'value':'a'}:{source:id,sourceHandle:placement.wireType==='flow'?'next':'value',target:pin.nodeId,targetHandle:pin.handleId};
+        const connection=pin.handleType==='source'?{source:pin.nodeId,sourceHandle:pin.handleId,target:id,targetHandle:placement.wireType==='flow'?'in':kind==='script-function'?'arg:'+(placement.argumentName||p.functions.find(f=>f.id===b.functionId).parameters[0]?.name):kind==='branch'?'condition':['set-variable','convert'].includes(kind)?'value':'a'}:{source:id,sourceHandle:placement.wireType==='flow'?'next':'value',target:pin.nodeId,targetHandle:pin.handleId};
         const error=applyConnections(p,[connection]);if(error)setNotice(error);
       }
     });
@@ -920,6 +926,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     setSelection({ kind: "beat", id });
     setPicker(null);
     setDock("story");
+    if(placement?.scriptFunction){setScriptFunctionId(placement.scriptFunction.id);setDock('scripting');setCompactPanel('workspace');maximizeWindow('scripting');}
   };
   const addEvent = (id) => {
     mutate((p) =>
@@ -936,7 +943,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     setNotice("Событие добавлено в постановку реплики.");
   };
   const openAuthoring=(kind='event',options={})=>{setAuthorRequest({kind,...options,token:uid('request')});setDock('create');maximizeWindow('create');setDetailEditor(false);setEventContext(null);setPicker(null);setMenu(null);};
-  const openImplementation=id=>{setLogicReturn({dock});setGameplayRequest({functionId:id,nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');maximizeWindow('gameplay');};
+  const openImplementation=id=>{if(project.functions.find(f=>f.id===id)?.functionScript){setScriptFunctionId(id);setDock('scripting');setCompactPanel('workspace');maximizeWindow('scripting');return;}setLogicReturn({dock});setGameplayRequest({functionId:id,nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');maximizeWindow('gameplay');};
   const openLogicEvent=id=>{setLogicReturn({dock});openAuthoring('event',id?{id}:{});};
   const returnToLogicCaller=()=>{if(logicReturn){setDock(logicReturn.dock);setLogicReturn(null);setGameplayRequest(null);}};
   const createEvent = () => openAuthoring('event');
@@ -1839,6 +1846,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     placeContextNode(action.id,contextMenu);setSelection({kind:'action',id:action.id});
   };
   const contextItems=()=>{
+    const scripting=()=>{const type=contextMenu?.valueType,fromSource=contextMenu?.pin?.handleType==='source';return {label:'Скриптинг',icon:'Code2',children:[{label:'Создать JavaScript-функцию…',icon:'FilePlus2',action:()=>{const fn=newScriptFunction(project,type);addBeat('script-function',{...contextMenu,functionId:fn.id,scriptFunction:fn,wireType:type});}},...project.functions.filter(f=>f.functionScript&&(!type||type==='any'||(fromSource?f.parameters.some(a=>scriptParameterType(a)===type):scriptFunctionType(f)===type))).map(fn=>({label:fn.name,icon:'Code2',action:()=>addBeat('script-function',{...contextMenu,functionId:fn.id,wireType:type,argumentName:fn.parameters.find(a=>scriptParameterType(a)===type)?.name})}))]};};
     if(contextMenu?.kind==='wire-drop'){
       const type=contextMenu.valueType,fromSource=contextMenu.pin.handleType==='source';
       const add=(kind,patch={})=>addBeat(kind,{...contextMenu,...patch,wireType:type});
@@ -1858,7 +1866,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         for(const item of variablePalette(project).filter(i=>i.kind==='variable'&&(type==='any'||logicType(project,{kind:'variable',variable:i.variable})===type)))items.push({label:item.label,action:()=>add('variable',{variable:item.variable})});
         if(type!=='any')items.push({label:tr('Конвертация в ')+tr(type),icon:'RefreshCw',action:()=>add('convert')});
       }
-      return items;
+      return [scripting(),...items];
     }
 
     if(contextMenu?.kind==='variable-drop')return [['variable','Получить · Get'],...(contextMenu.variable===ANSWER_VARIABLE?[]:[['set-variable','Задать · Set']])].map(([kind,label])=>({label,icon:'Database',action:()=>addBeat(kind,contextMenu)}));
@@ -1884,6 +1892,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       {label:'Редактировать исходный шаблон',icon:'Layers',group:'Состав нод задаётся в шаблоне',action:()=>setEventContext({eventId:event.id})}
     ]:Object.entries(TYPES).map(([type,t])=>({label:t.label,icon:t.icon,group:'Добавить ноду действия',action:()=>addContextAction(type)}));
     return [
+      scripting(),
       {label:'Переменные проекта',icon:'Database',children:variablePalette(project).map(item=>({...item,icon:item.kind==='variable'?'Database':'Pencil',action:()=>addBeat(item.kind,{...contextMenu,variable:item.variable})}))},
       {label:'Математические операции',icon:'Calculator',children:Object.entries(MATH_OPERATIONS).map(([operator,op])=>({label:op.label,action:()=>addBeat('math',{...contextMenu,operator})}))},
       {label:'Конвертации',icon:'RefreshCw',children:[['number','В число'],['boolean','В Да / нет'],['string','В текст']].map(([valueType,label])=>({label,action:()=>addBeat('convert',{...contextMenu,valueType})}))},
@@ -2064,7 +2073,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 onGraph={id=>{setEventContext({eventId:id});setSelection({kind:'event',id});setDock('event');}}
                 onPreview={draft=>{setCameraPreviewId(null);setCameraPilotId(null);const test=structuredClone(project);const i=test.events.findIndex(e=>e.id===draft.id);if(i<0)test.events.push(draft);else test.events[i]=draft;soundDesk.unlock();rt.stop();setMode('game');setMaximized(null);setFollow(false);rt.previewEvent(test,draft.id,beat.id);}}
                 onPlace={(draft,hook)=>{mutate(p=>addToBatch(p,beat.id,hook,null,draft.id));setPhase(hook);setDock('story');setMaximized(null);setNotice(tr("Добавлено: {0} · {1}", [draft.name, PHASES.find(x=>x.id===hook).label]));}}/>}
-              {dock==='create'?null:dock==='gameplay'?<GameplayWorkspace onReturn={logicReturn?.dock!=='gameplay'&&logicReturn?returnToLogicCaller:undefined} preview={preview} onObject={id=>{setSelection({kind:"object",id});openObjectTransform();}} addRequest={gameplayRequest} onUndo={undo} onRedo={redo} canUndo={!!history.length} canRedo={!!future.length} onPlay={()=>start()} selectedObjectId={selection.kind==="object"?selection.id:null} project={project} onChange={mutate} onImport={plan=>changeAssetLibrary(p=>Object.assign(p,plan.apply(p)))} sceneId={displayScene.id} running={running} onStop={()=>rt.stop()} onWidgets={()=>{setWidgetRequest({id:project.gameplay.hudWidgetId||project.ui.hud});setDock('widgets');}} onInput={()=>setDock('input')} onEvent={openLogicEvent} onStory={()=>{setDock('story');setDetailEditor(false);}}/>:dock==='input'?<InputWorkspace project={project} onChange={mutate} beat={playBeat} preview={preview} devices={inputDevices} running={running} onStop={()=>rt.stop()}/>:dock==='event' && detailEditor && event ? (
+              {dock==='create'?null:dock==='scripting'?<FunctionScriptsWorkspace project={project} requestedId={scriptFunctionId} onChange={mutate} disabled={running} onBack={()=>{setDock('story');setMaximized(null);}} onInsert={fn=>{addBeat('script-function',{functionId:fn.id});setMaximized(null);}}/>:dock==='gameplay'?<GameplayWorkspace onReturn={logicReturn?.dock!=='gameplay'&&logicReturn?returnToLogicCaller:undefined} preview={preview} onObject={id=>{setSelection({kind:"object",id});openObjectTransform();}} addRequest={gameplayRequest} onUndo={undo} onRedo={redo} canUndo={!!history.length} canRedo={!!future.length} onPlay={()=>start()} selectedObjectId={selection.kind==="object"?selection.id:null} project={project} onChange={mutate} onImport={plan=>changeAssetLibrary(p=>Object.assign(p,plan.apply(p)))} sceneId={displayScene.id} running={running} onStop={()=>rt.stop()} onWidgets={()=>{setWidgetRequest({id:project.gameplay.hudWidgetId||project.ui.hud});setDock('widgets');}} onInput={()=>setDock('input')} onEvent={openLogicEvent} onStory={()=>{setDock('story');setDetailEditor(false);}}/>:dock==='input'?<InputWorkspace project={project} onChange={mutate} beat={playBeat} preview={preview} devices={inputDevices} running={running} onStop={()=>rt.stop()}/>:dock==='event' && detailEditor && event ? (
                 <EventEditor
                   project={project}
                   event={event}

@@ -1,8 +1,8 @@
 # Учебные проекты на компонентах
 
-Поставляются пять редактируемых проектов в `sacura-authoring-package@3` и пакет
-Reward + Counter. Каталог — `src/builtinTemplates.js`; четыре обычные карточки
-и отдельный featured-проект «Письма после дождя» на главной странице.
+Поставляются шесть редактируемых проектов в `sacura-authoring-package@3` и пакет
+Reward + Counter. Каталог — `src/builtinTemplates.js`; четыре основные карточки,
+UI-кликер в сворачиваемом разделе «Ещё» и featured-проект «Письма после дождя».
 
 | Проект | Где открыть реальное поведение | Упражнение |
 | --- | --- | --- |
@@ -10,6 +10,7 @@ Reward + Counter. Каталог — `src/builtinTemplates.js`; четыре о�
 | point-and-click | Две двери → общий LockedDoor; ключ → Pickup | Потребовать два ключа вместо одного |
 | novel | Отношение → Reward/Counter | Изменить награду за ответ; сравнить live binding со снимком |
 | ui-clicker | Экономика кликера → Reward/Counter/PeriodicReward | Изменить формулу кнопки, улучшение и остановить собственный таймер |
+| horror · Последний обход | Сцена → HauntedRoom; предмет → HauntedProp; выход → LockedDoor | Изменить условие escape или реакцию mirror; WASD и ПКМ + мышь, щелчок по предмету рядом |
 | letters-after-rain | Алиса → Reward; письмо/шкатулка/записка/билет → StoryFlag; дверь → LockedDoor | Изменить действие осмотра и доступность чтения письма |
 
 Путь: **Иерархия → объект → подключение → Открыть общую реализацию**.
@@ -34,8 +35,9 @@ npm run build
 node scripts/export-template-players.mjs
 ```
 
-`build:templates` обновляет bundle исходников, пять публичных проектов, reward
-и media manifest. `templates/projects.mjs` строит четыре проекта;
+`build:templates` обновляет bundle исходников, шесть публичных проектов, reward
+и media manifest. `templates/projects.mjs` строит пять проектов (хоррор использует
+`templates/horror.mjs`);
 `src/standardProjectComponents.js` добавляет компоненты featured-проекту.
 HTML в `dist/examples/` содержат player, исходники и медиа. Они работают без
 редактора и исходного проекта. Следующая build очищает dist; экспорт повторяется.

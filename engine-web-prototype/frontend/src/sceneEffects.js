@@ -110,6 +110,9 @@ export function atmosphere(scene,{kind,renderer,sun,hemi}){
 // Called after the authored transform is applied, so rotation never accumulates.
 export function updateDoorEffect(mesh,world,id,dt,playing=true) {
   const motion=playing&&world.doorMotions?.[id];if(motion){const progress=motion.cancelled?motion.progress:motion.seconds?Math.max(0,Math.min(1,((world.game?.clock||0)-motion.start)/motion.seconds)):1;mesh.userData.openAngle=motion.from+(motion.to-motion.from)*progress;mesh.rotation.y+=mesh.userData.openAngle;return;}
+  // No command/motion in a restored world means the authored closed pose,
+  // not a cached angle left over from the abandoned playthrough.
+  if(!playing||!world.doors?.[id]){mesh.userData.openAngle=0;return;}
   const target=playing&&world.doors?.[id]==='Открыть'?-1.25:0;
   const seconds=world.paused||world.pausedDoors?.[id]?0:Math.max(0,Math.min(.1,dt||0));
   const current=mesh.userData.openAngle||0;

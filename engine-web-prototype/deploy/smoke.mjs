@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {readFile,writeFile} from 'node:fs/promises';
 import {checkModels} from './model-smoke.mjs';
+import {checkRuntimePolicy} from './check-runtime-policy.mjs';
 import {createEmptyProject} from '../frontend/src/projectLifecycle.js';
 const base=process.env.SACURA_SMOKE_URL||'http://127.0.0.1:8080';
+await checkRuntimePolicy(base);
 if(process.env.SACURA_SMOKE_STATE){
  let state;try{state=JSON.parse(await readFile(process.env.SACURA_SMOKE_STATE,'utf8'));}catch(error){if(error.code!=='ENOENT')throw error;}
  if(state){

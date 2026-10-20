@@ -43,7 +43,11 @@ export function createStorage({filename,s3,bucket}){
   listOthers(owner){return db.prepare('SELECT projects.id,projects.title,projects.revision,projects.updated_at AS updatedAt,users.id AS ownerId,users.login AS ownerLogin FROM projects JOIN users ON users.id=projects.owner_id WHERE projects.owner_id<>? ORDER BY projects.updated_at DESC,users.login,projects.id').all(owner);},
   get(owner,id){const row=db.prepare('SELECT json,revision,updated_at AS updatedAt FROM projects WHERE owner_id=? AND id=?').get(owner,id);if(!row)throw httpError(404,'Проект не найден.');return {project:JSON.parse(row.json),revision:row.revision,updatedAt:row.updatedAt};},
   save(owner,id,project,expectedRevision){
-   if(!project||project.id!==id||![1,2].includes(project.version)||typeof project.title!=='string'||!project.title.trim()||project.title.length>120||!Array.isArray(project.objects)||!Array.isArray(project.chapters)||!project.chapters.length||!Array.isArray(project.events))throw httpError(400,'Некорректный проект.');
+   const sceneIds=Array.isArray(project?.subscenes)?project.subscenes.map(s=>s?.id):[],validScenes=sceneIds.length>0&&sceneIds.every(id=>typeof id==='string'&&id.trim())&&new Set(sceneIds).size===sceneIds.length;
+   // Storyless v2 projects are an existing runtime contract, not a dummy chapter.
+   const storyless=project?.version===2&&project.gameplay?.enabled===true&&project.gameplay.storyPolicy?.mode==='none'&&validScenes&&sceneIds.includes(project.scene?.location);
+   if(!project||project.id!==id||![1,2].includes(project.version)||typeof project.title!=='string'||!project.title.trim()||project.title.length>120||!Array.isArray(project.objects)||!Array.isArray(project.chapters)||!Array.isArray(project.events))throw httpError(400,'Некорректный проект.');
+   if(!project.chapters.length&&!storyless)throw httpError(400,project.gameplay?.storyPolicy?.mode==='none'?'Для игры без истории включите игровой режим и выберите доступную сцену.':'Некорректный проект.');
    if(!Number.isSafeInteger(expectedRevision)||expectedRevision<0)throw httpError(400,'Нужна версия проекта.');
    const check=value=>{
     if(!value||typeof value!=='object')return;

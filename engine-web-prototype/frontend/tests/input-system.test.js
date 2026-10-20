@@ -111,3 +111,30 @@ test('FPS releases mouse capture for pause and game endings so menu buttons rema
  const controls=createGameControls(camera,canvas,()=>live);
  try{doc.pointerLockElement=canvas;controls.tick(.02);assert.equal(releases,0);live.state.paused=true;controls.tick(.02);assert.equal(releases,1);live.state.paused=false;doc.pointerLockElement=canvas;live.state.game.active=false;controls.tick(.02);assert.equal(releases,2);live.state.game.active=true;doc.pointerLockElement=canvas;live.mode='scene';controls.tick(.02);assert.equal(releases,3);}finally{controls.dispose();globalThis.window=previousWindow;globalThis.document=previousDocument;}
 });
+test('third-person right-drag looks on both axes without capturing the pointer or blocking ordinary point-and-click',()=>{
+ const previousWindow=globalThis.window,previousDocument=globalThis.document;globalThis.window=new EventTarget();
+ const viewport=new EventTarget(),canvas={closest:()=>viewport},doc=new EventTarget();doc.activeElement=viewport;doc.pointerLockElement=null;globalThis.document=doc;
+ const events=[],settings=defaultInputSettings();settings.actions.push({id:'look',name:'Look',valueType:'axis2d',behavior:'look',trigger:'continuous'});settings.contexts.find(c=>c.id==='gameplay').bindings.push({id:'look-delta',actionId:'look',device:'pointer',control:'delta',scale:[1,1],deadZone:0});
+ const live={mode:'game',inputSettings:settings,state:{inputActive:true,inputReady:true,inputContexts:['gameplay'],game:{active:true,camera:{mode:'thirdPerson',pointerLock:false}},playerControl:{mode:'wasd'}},onInputAction:e=>events.push(e)};
+ const controls=createGameControls(new THREE.PerspectiveCamera(),canvas,()=>live),move=buttons=>{const e=new Event('pointermove');Object.assign(e,{buttons,movementX:12,movementY:-7});window.dispatchEvent(e);};
+ try{move(0);assert.equal(events.length,0);move(2);const look=events.find(e=>e.actionId==='look'&&e.phase==='triggered');assert.deepEqual(look.payload.delta,[12,-7]);assert.ok(look.value[0]>0&&look.value[1]<0);assert.equal(doc.pointerLockElement,null);
+  const menu=new Event('contextmenu',{cancelable:true});viewport.dispatchEvent(menu);assert.equal(menu.defaultPrevented,true);
+  events.length=0;live.state.paused=true;move(2);assert.equal(events.filter(e=>e.phase==='triggered').length,0);live.state.paused=false;live.state.game.camera.mode='authored';move(2);assert.equal(events.filter(e=>e.phase==='triggered').length,0);
+  controls.dispose();const clean=new Event('contextmenu',{cancelable:true});viewport.dispatchEvent(clean);assert.equal(clean.defaultPrevented,false);
+ }finally{controls.dispose();globalThis.window=previousWindow;globalThis.document=previousDocument;}
+});
+
+test('FPS can aim by dragging when Pointer Lock is unavailable, without firing on drag release',()=>{
+ const previousWindow=globalThis.window,previousDocument=globalThis.document;globalThis.window=new EventTarget();
+ const viewport=new EventTarget(),canvas={closest:()=>viewport},doc=new EventTarget();doc.activeElement=viewport;doc.pointerLockElement=null;globalThis.document=doc;
+ const events=[],settings=defaultInputSettings();settings.actions.push({id:'look',name:'Look',valueType:'axis2d',behavior:'look',trigger:'continuous'});settings.contexts.find(c=>c.id==='gameplay').bindings.push({id:'look-delta',actionId:'look',device:'pointer',control:'delta',scale:[1,1],deadZone:0});
+ const live={mode:'game',inputSettings:settings,state:{inputActive:true,inputReady:true,inputContexts:['gameplay'],game:{active:true,camera:{mode:'firstPerson',pointerLock:true}},playerControl:{mode:'wasd'}},onInputAction:e=>events.push(e)};
+ const controls=createGameControls(new THREE.PerspectiveCamera(),canvas,()=>live),move=buttons=>{const e=new Event('pointermove');Object.assign(e,{buttons,movementX:24,movementY:-12});window.dispatchEvent(e);};
+ try{
+  move(0);assert.equal(events.length,0);move(1);assert.deepEqual(triggered(events,'look').at(-1).payload.delta,[24,-12]);
+  const ray=new THREE.Raycaster(new THREE.Vector3(0,1,0),new THREE.Vector3(0,0,-1));assert.equal(controls.click(ray),true);assert.equal(triggered(events,'point').length,0,'releasing a look drag cannot shoot');
+  controls.click(ray);assert.equal(triggered(events,'point').length,1,'ordinary clicks still work');
+  events.length=0;live.state.paused=true;move(1);assert.equal(events.filter(e=>e.phase==='triggered').length,0);
+  live.state.paused=false;live.state.game.camera.mode='authored';move(1);assert.equal(events.filter(e=>e.phase==='triggered').length,0);
+ }finally{controls.dispose();globalThis.window=previousWindow;globalThis.document=previousDocument;}
+});

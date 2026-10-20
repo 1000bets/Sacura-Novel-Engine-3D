@@ -1404,7 +1404,7 @@
           "subscriptions": []
         },
         {
-          "id": "user.component.type-e5be51cd-8003-4a3d-a34b-5ef0f4f32644",
+          "id": "user.component.type-3896b0dc-c27f-42d2-b3fc-f510702bfb5e",
           "version": 1,
           "scopes": [
             "object",
@@ -1452,7 +1452,7 @@
                 "type": "void"
               },
               "logic": {
-                "functionId": "function-a308ad85-7428-4080-8a6d-d158a14835f9"
+                "functionId": "function-a588286c-e9c6-48ad-8aa0-07336ddf4539"
               }
             },
             "stop": {
@@ -1465,14 +1465,14 @@
                 "type": "void"
               },
               "logic": {
-                "functionId": "function-5ee83c57-db57-4e39-bc20-1c2224fc304b"
+                "functionId": "function-e08e3037-8fa1-4d00-9d8c-334c0df02293"
               }
             }
           },
           "events": {},
-          "logicResourceId": "logic-902851e7-f838-490d-b675-1f93669daa53",
+          "logicResourceId": "logic-d178960d-07c5-4a44-af40-881fc1a3c353",
           "behaviorTree": {
-            "treeResourceId": "logic-902851e7-f838-490d-b675-1f93669daa53",
+            "treeResourceId": "logic-d178960d-07c5-4a44-af40-881fc1a3c353",
             "interval": 0.1,
             "autoStart": false
           }
@@ -1946,7 +1946,7 @@
         {
           "id": "tree-enemy-1",
           "type": "definition",
-          "definitionId": "user.component.type-e5be51cd-8003-4a3d-a34b-5ef0f4f32644",
+          "definitionId": "user.component.type-3896b0dc-c27f-42d2-b3fc-f510702bfb5e",
           "definitionVersion": 1,
           "scope": {
             "kind": "object",
@@ -2061,7 +2061,7 @@
         {
           "id": "tree-enemy-2",
           "type": "definition",
-          "definitionId": "user.component.type-e5be51cd-8003-4a3d-a34b-5ef0f4f32644",
+          "definitionId": "user.component.type-3896b0dc-c27f-42d2-b3fc-f510702bfb5e",
           "definitionVersion": 1,
           "scope": {
             "kind": "object",
@@ -2176,7 +2176,7 @@
         {
           "id": "tree-enemy-3",
           "type": "definition",
-          "definitionId": "user.component.type-e5be51cd-8003-4a3d-a34b-5ef0f4f32644",
+          "definitionId": "user.component.type-3896b0dc-c27f-42d2-b3fc-f510702bfb5e",
           "definitionVersion": 1,
           "scope": {
             "kind": "object",
@@ -2291,7 +2291,7 @@
         {
           "id": "tree-enemy-4",
           "type": "definition",
-          "definitionId": "user.component.type-e5be51cd-8003-4a3d-a34b-5ef0f4f32644",
+          "definitionId": "user.component.type-3896b0dc-c27f-42d2-b3fc-f510702bfb5e",
           "definitionVersion": 1,
           "scope": {
             "kind": "object",
@@ -2406,7 +2406,7 @@
         {
           "id": "tree-enemy-5",
           "type": "definition",
-          "definitionId": "user.component.type-e5be51cd-8003-4a3d-a34b-5ef0f4f32644",
+          "definitionId": "user.component.type-3896b0dc-c27f-42d2-b3fc-f510702bfb5e",
           "definitionVersion": 1,
           "scope": {
             "kind": "object",
@@ -3170,12 +3170,12 @@
         }
       },
       {
-        "id": "logic-902851e7-f838-490d-b675-1f93669daa53",
+        "id": "logic-d178960d-07c5-4a44-af40-881fc1a3c353",
         "version": 1,
         "kind": "behavior.tree",
         "name": "EnemyBehavior",
         "path": "Компоненты/EnemyBehavior.bt",
-        "definitionId": "user.component.type-e5be51cd-8003-4a3d-a34b-5ef0f4f32644",
+        "definitionId": "user.component.type-3896b0dc-c27f-42d2-b3fc-f510702bfb5e",
         "status": "ready",
         "approved": true,
         "root": "select-reaction",
@@ -3310,18 +3310,18 @@
     "standardEventsVersion": 1,
     "events": [
       {
-        "id": "event-db8ef395-4a0a-4898-b7b2-88bd8aa22705",
+        "id": "event-a6b36d15-50b8-4f6f-8dcc-ce177fcc9404",
         "name": "Арена · Последний рубеж → Запустить бой",
         "description": "",
         "retention": "AUTO_CLOSE_ON_FLOW_END",
         "owner": "SubScene",
         "groups": [
           {
-            "id": "group-d68ccad1-9122-4983-b143-b0ac4faa76c0",
+            "id": "group-39744d40-b965-41fc-bc24-9a1ff5ccf2b7",
             "name": "Основное действие",
             "actions": [
               {
-                "id": "action-cd7b9664-bce0-4f6d-8a46-7330876c666d",
+                "id": "action-e03ffb36-f3b7-4f4a-9ff6-13f93520909f",
                 "type": "gameplay",
                 "target": "world",
                 "value": {
@@ -3781,7 +3781,7 @@
         "nodes": []
       },
       {
-        "id": "function-a308ad85-7428-4080-8a6d-d158a14835f9",
+        "id": "function-a588286c-e9c6-48ad-8aa0-07336ddf4539",
         "name": "Запустить поведение",
         "graphVersion": 1,
         "parameters": [],
@@ -3794,10 +3794,10 @@
         },
         "initialState": {},
         "locals": {},
-        "entry": "bt-control-1b6c0cac-21db-46ee-ac7e-5064309fde96",
+        "entry": "bt-control-d9da6c4f-7d90-4757-acb7-fefa3e0fd60a",
         "nodes": [
           {
-            "id": "bt-control-1b6c0cac-21db-46ee-ac7e-5064309fde96",
+            "id": "bt-control-d9da6c4f-7d90-4757-acb7-fefa3e0fd60a",
             "kind": "operation",
             "call": {
               "id": "sacura.behavior-tree.run",
@@ -3809,17 +3809,17 @@
                 }
               }
             },
-            "next": "function-a308ad85-7428-4080-8a6d-d158a14835f9-return"
+            "next": "function-a588286c-e9c6-48ad-8aa0-07336ddf4539-return"
           },
           {
-            "id": "function-a308ad85-7428-4080-8a6d-d158a14835f9-return",
+            "id": "function-a588286c-e9c6-48ad-8aa0-07336ddf4539-return",
             "kind": "return"
           }
         ],
-        "componentDefinitionId": "user.component.type-e5be51cd-8003-4a3d-a34b-5ef0f4f32644"
+        "componentDefinitionId": "user.component.type-3896b0dc-c27f-42d2-b3fc-f510702bfb5e"
       },
       {
-        "id": "function-5ee83c57-db57-4e39-bc20-1c2224fc304b",
+        "id": "function-e08e3037-8fa1-4d00-9d8c-334c0df02293",
         "name": "Остановить поведение",
         "graphVersion": 1,
         "parameters": [],
@@ -3832,10 +3832,10 @@
         },
         "initialState": {},
         "locals": {},
-        "entry": "bt-control-034db90f-bbca-4cd7-8cab-d7d377bcf71b",
+        "entry": "bt-control-4b82e493-e1e5-4477-afca-5eabb16f1c55",
         "nodes": [
           {
-            "id": "bt-control-034db90f-bbca-4cd7-8cab-d7d377bcf71b",
+            "id": "bt-control-4b82e493-e1e5-4477-afca-5eabb16f1c55",
             "kind": "operation",
             "call": {
               "id": "sacura.behavior-tree.stop",
@@ -3847,14 +3847,14 @@
                 }
               }
             },
-            "next": "function-5ee83c57-db57-4e39-bc20-1c2224fc304b-return"
+            "next": "function-e08e3037-8fa1-4d00-9d8c-334c0df02293-return"
           },
           {
-            "id": "function-5ee83c57-db57-4e39-bc20-1c2224fc304b-return",
+            "id": "function-e08e3037-8fa1-4d00-9d8c-334c0df02293-return",
             "kind": "return"
           }
         ],
-        "componentDefinitionId": "user.component.type-e5be51cd-8003-4a3d-a34b-5ef0f4f32644"
+        "componentDefinitionId": "user.component.type-3896b0dc-c27f-42d2-b3fc-f510702bfb5e"
       }
     ],
     "actionTemplates": [],
@@ -3864,6 +3864,7 @@
         "id": "widget-default-dialogue",
         "name": "Диалог",
         "kind": "dialogue",
+        "builtinDefault": true,
         "referenceSize": [
           1280,
           720
@@ -4088,6 +4089,7 @@
         "id": "widget-default-mainMenu",
         "name": "Главное меню",
         "kind": "mainMenu",
+        "builtinDefault": true,
         "referenceSize": [
           1280,
           720
@@ -4245,6 +4247,7 @@
         "id": "widget-default-pauseMenu",
         "name": "Меню паузы",
         "kind": "pauseMenu",
+        "builtinDefault": true,
         "referenceSize": [
           1280,
           720
@@ -5904,23 +5907,23 @@
             "next": "shooter-watch",
             "bindings": [
               {
-                "id": "bind-deb39d88-e5ae-49c6-b75b-66e44dbbfedc",
-                "eventId": "event-db8ef395-4a0a-4898-b7b2-88bd8aa22705",
+                "id": "bind-26bf3b91-7746-4c0e-9414-946a536d421c",
+                "eventId": "event-a6b36d15-50b8-4f6f-8dcc-ce177fcc9404",
                 "hook": "BEFORE",
                 "join": "EVENT_END",
                 "overrides": {},
                 "actionOverrides": {},
-                "localEventId": "event-db8ef395-4a0a-4898-b7b2-88bd8aa22705"
+                "localEventId": "event-a6b36d15-50b8-4f6f-8dcc-ce177fcc9404"
               }
             ],
             "mode": "SEQUENTIAL",
             "batches": {
               "BEFORE": [
                 {
-                  "id": "batch-bcd7997e-4983-4c6a-9e55-0cd2060053d0",
+                  "id": "batch-22cb1d82-4169-4345-adb0-7e300c82359a",
                   "mode": "SEQUENTIAL",
                   "bindingIds": [
-                    "bind-deb39d88-e5ae-49c6-b75b-66e44dbbfedc"
+                    "bind-26bf3b91-7746-4c0e-9414-946a536d421c"
                   ]
                 }
               ],
@@ -6185,7 +6188,7 @@
             "parameters": {
               "delta": {
                 "op": "get",
-                "path": "args.value"
+                "path": "args.payload.delta"
               },
               "device": {
                 "op": "get",

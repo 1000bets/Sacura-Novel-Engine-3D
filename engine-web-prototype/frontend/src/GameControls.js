@@ -7,7 +7,7 @@ export function gameSceneHit(hits,state,mode){
 }
 export function createGameControls(camera,canvas,getLive){
  const viewport=canvas.closest('.scene-viewport')||canvas,win=globalThis.window;
- let move=[0,0],system,settings,deviceSignature='',padIds=new Set(),padsNeedNeutral=false;
+ let move=[0,0],system,settings,deviceSignature='',padIds=new Set(),padsNeedNeutral=false,lookDrag=0;
  const focused=()=>!globalThis.document||viewport.contains?.(document.activeElement)||document.activeElement===viewport;
  const enabled=()=>{const live=getLive();return live.mode==='game'&&(live.state.inputActive??!!live.state.playerControl);};
  const action=event=>{const live=getLive();
@@ -23,16 +23,19 @@ export function createGameControls(camera,canvas,getLive){
   return enabled();
  };
  const defaults=defaultInputSettings();
- const clear=()=>{system?.clear();move=[0,0];padsNeedNeutral=true;};
+ const clear=()=>{system?.clear();move=[0,0];padsNeedNeutral=true;lookDrag=0;};
  const uses=(device,control)=>settings.contexts.some(c=>system.contextIds.includes(c.id)&&c.bindings.some(b=>b.device===device&&b.control===control));
  const keydown=e=>{if(!sync()||(!focused()&&e.target!==viewport)||(e.target!==viewport&&!(getLive().state.paused&&e.code==='Escape'))||e.ctrlKey||e.metaKey||e.altKey||e.target.isContentEditable||['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName))return;
   if(!uses('keyboard',e.code))return;e.preventDefault();if(e.repeat)return;
   system.feed('keyboard',e.code,1);system.tick(0);
  };
  const keyup=e=>{system?.feed('keyboard',e.code,0);system?.tick(0);};
- const pointerDown=e=>{if(e.target!==canvas||!sync())return;if(getLive().state.game?.active&&getLive().state.game.camera?.pointerLock&&!getLive().state.paused&&globalThis.document?.pointerLockElement!==canvas)canvas.requestPointerLock?.()?.catch?.(()=>{});const code='button'+e.button;if(uses('pointer',code)){system.feed('pointer',code,1);system.tick(0);}};
- const pointerMove=e=>{if(!sync()||getLive().state.paused||globalThis.document?.pointerLockElement!==canvas)return;if(uses('pointer','delta')){system.feed('pointer','delta',[e.movementX,e.movementY],{payload:{delta:[e.movementX,e.movementY]}});system.tick(0);system.feed('pointer','delta',[0,0]);}};
+ const pointerDown=e=>{if(e.target!==canvas||!sync())return;lookDrag=0;if(getLive().state.game?.active&&getLive().state.game.camera?.pointerLock&&!getLive().state.paused&&globalThis.document?.pointerLockElement!==canvas)canvas.requestPointerLock?.()?.catch?.(()=>{});const code='button'+e.button;if(uses('pointer',code)){system.feed('pointer',code,1);system.tick(0);}};
+ // Embedded browsers can refuse Pointer Lock. FPS still supports click-drag
+ // looking; dragging must not also release an unintended shot.
+ const pointerMove=e=>{if(!sync()||getLive().state.paused)return;const cameraMode=getLive().state.game?.camera,locked=globalThis.document?.pointerLockElement===canvas,dragging=focused()&&(cameraMode?.mode==='firstPerson'?!!(e.buttons&3):cameraMode?.mode==='thirdPerson'&&!cameraMode.pointerLock&&!!(e.buttons&2));if(!locked&&!dragging)return;if(uses('pointer','delta')){if(!locked&&cameraMode?.mode==='firstPerson')lookDrag+=Math.hypot(e.movementX||0,e.movementY||0);system.feed('pointer','delta',[e.movementX,e.movementY],{payload:{delta:[e.movementX,e.movementY]}});system.tick(0);system.feed('pointer','delta',[0,0]);}};
  const pointerUp=e=>{system?.feed('pointer','button'+e.button,0);system?.tick(0);};
+ const contextmenu=e=>{const c=getLive().state.game?.camera;if(enabled()&&c?.mode==='thirdPerson'&&!c.pointerLock&&uses('pointer','delta'))e.preventDefault();};
  const visibility=()=>{if(globalThis.document?.hidden)clear();};
  const external=e=>{if(!sync())return;const d=e.detail||{};if(typeof d.control!=='string')return;
   if(d.pulse)system.pulse(d.device||'external',d.control,d.payload,d.sourceId||'external-pulse');
@@ -51,14 +54,14 @@ export function createGameControls(camera,canvas,getLive){
   }
   for(const id of padIds)if(!current.has(id))system.removeSource(id,{cancel:true});padIds=current;
  };
- win?.addEventListener('pointermove',pointerMove);viewport.addEventListener('keydown',keydown);viewport.addEventListener('pointerdown',pointerDown);win?.addEventListener('pointerup',pointerUp);globalThis.document?.addEventListener('visibilitychange',visibility);win?.addEventListener('keyup',keyup);win?.addEventListener('blur',clear);viewport.addEventListener('blur',clear,true);viewport.addEventListener('sacura-input',external);
+ win?.addEventListener('pointermove',pointerMove);viewport.addEventListener('contextmenu',contextmenu);viewport.addEventListener('keydown',keydown);viewport.addEventListener('pointerdown',pointerDown);win?.addEventListener('pointerup',pointerUp);globalThis.document?.addEventListener('visibilitychange',visibility);win?.addEventListener('keyup',keyup);win?.addEventListener('blur',clear);viewport.addEventListener('blur',clear,true);viewport.addEventListener('sacura-input',external);
  sync();
  return {tick(dt){if(!sync()){clear();return;}pollPads();system.tick(dt);
   const c=getLive().state.playerControl;if(getLive().state.paused)return;if(!c){getLive().onPlayerStep?.([0,0,0],dt);return;}
   const allowed=['wasd','both'].includes(c.mode),x=allowed?move[0]:0,z=allowed?move[1]:0;
   const forward=camera.getWorldDirection(new THREE.Vector3());forward.y=0;if(forward.lengthSq()<.001)forward.set(0,0,-1);forward.normalize();const right=new THREE.Vector3(-forward.z,0,forward.x),direction=forward.multiplyScalar(z).add(right.multiplyScalar(x));
   getLive().onPlayerStep?.(direction.toArray(),dt);
- },click(ray,id){if(!sync()||getLive().state.paused)return false;if(!uses('pointer','primary'))return id&&getLive().state.componentInteractions?.includes(id)?false:getLive().state.inputActive===true;
+ },click(ray,id){if(!sync()||getLive().state.paused)return false;if(lookDrag>4){lookDrag=0;return true;}if(!uses('pointer','primary'))return id&&getLive().state.componentInteractions?.includes(id)?false:getLive().state.inputActive===true;
   const shot=getLive().state.game?.active&&getLive().state.game.camera?.pointerLock?{origin:camera.getWorldPosition(new THREE.Vector3()).toArray(),direction:camera.getWorldDirection(new THREE.Vector3()).toArray()}:{origin:ray.ray.origin.toArray(),direction:ray.ray.direction.toArray()};const ground=ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0),new THREE.Vector3());system.pulse('pointer','primary',{point:ground?.toArray(),id,...shot});return true;
- },feed(device,control,value,options){if(sync()){system.feed(device,control,value,options);system.tick(0);}},get input(){return system;},dispose(){clear();system?.dispose();if(globalThis.document?.pointerLockElement===canvas)globalThis.document?.exitPointerLock?.();win?.removeEventListener('pointermove',pointerMove);viewport.removeEventListener('keydown',keydown);viewport.removeEventListener('pointerdown',pointerDown);win?.removeEventListener('pointerup',pointerUp);globalThis.document?.removeEventListener('visibilitychange',visibility);win?.removeEventListener('keyup',keyup);win?.removeEventListener('blur',clear);viewport.removeEventListener('blur',clear,true);viewport.removeEventListener('sacura-input',external);}};
+ },feed(device,control,value,options){if(sync()){system.feed(device,control,value,options);system.tick(0);}},get input(){return system;},dispose(){clear();system?.dispose();if(globalThis.document?.pointerLockElement===canvas)globalThis.document?.exitPointerLock?.();win?.removeEventListener('pointermove',pointerMove);viewport.removeEventListener('contextmenu',contextmenu);viewport.removeEventListener('keydown',keydown);viewport.removeEventListener('pointerdown',pointerDown);win?.removeEventListener('pointerup',pointerUp);globalThis.document?.removeEventListener('visibilitychange',visibility);win?.removeEventListener('keyup',keyup);win?.removeEventListener('blur',clear);viewport.removeEventListener('blur',clear,true);viewport.removeEventListener('sacura-input',external);}};
 }

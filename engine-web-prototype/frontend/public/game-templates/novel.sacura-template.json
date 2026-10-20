@@ -542,18 +542,18 @@
     "standardEventsVersion": 1,
     "events": [
       {
-        "id": "event-5eec3663-2a85-4078-bc4a-7f9d839e0a45",
+        "id": "event-f5ade9b2-b6d9-4bd7-911b-d0f69cf36acd",
         "name": "Отношение → Начислить награду",
         "description": "",
         "retention": "AUTO_CLOSE_ON_FLOW_END",
         "owner": "SubScene",
         "groups": [
           {
-            "id": "group-beb50c6e-6a82-41c1-81c8-06301387b9eb",
+            "id": "group-5cda5adb-a44a-4261-8ba2-32c53a43e470",
             "name": "Основное действие",
             "actions": [
               {
-                "id": "action-fab6c68e-485a-44dd-9943-a7b38debf898",
+                "id": "action-99ee1ac4-7f33-4c91-9a9b-d3cee8fe35b7",
                 "type": "gameplay",
                 "target": "world",
                 "value": {
@@ -586,18 +586,18 @@
         "componentAction": true
       },
       {
-        "id": "event-7bb4552b-76df-4800-a338-cb9467d3010d",
+        "id": "event-19e092cc-09dc-40bc-8b88-5017b6501b73",
         "name": "Запомненное отношение → Добавить",
         "description": "",
         "retention": "AUTO_CLOSE_ON_FLOW_END",
         "owner": "SubScene",
         "groups": [
           {
-            "id": "group-1cb4b49e-ec83-46d7-89a2-24f3e0c7b011",
+            "id": "group-02ef7cf3-a4b8-42f6-9cd5-02c77d4d7d8d",
             "name": "Основное действие",
             "actions": [
               {
-                "id": "action-d853e09c-56b1-4c33-a602-17897d239921",
+                "id": "action-79cd26f3-f663-48fa-b8c1-98d3f3d88309",
                 "type": "gameplay",
                 "target": "world",
                 "value": {
@@ -640,18 +640,18 @@
         "componentAction": true
       },
       {
-        "id": "event-dbbea7f5-05a0-451b-8e56-612cb151a644",
+        "id": "event-f983c7df-65ae-4327-992c-2fa073e13d33",
         "name": "Отношение → Начислить награду",
         "description": "",
         "retention": "AUTO_CLOSE_ON_FLOW_END",
         "owner": "SubScene",
         "groups": [
           {
-            "id": "group-01d5d86f-5da2-464d-afa0-ada78216db3f",
+            "id": "group-98e2d354-e7e0-4a1f-be61-12a739ff72d2",
             "name": "Основное действие",
             "actions": [
               {
-                "id": "action-ad87aa5a-826a-4d56-86fc-cf82cb56813a",
+                "id": "action-e4ae9192-d147-4959-9158-57d167c76c59",
                 "type": "gameplay",
                 "target": "world",
                 "value": {
@@ -776,6 +776,7 @@
         "id": "widget-default-dialogue",
         "name": "Диалог",
         "kind": "dialogue",
+        "builtinDefault": true,
         "referenceSize": [
           1280,
           720
@@ -1000,6 +1001,7 @@
         "id": "widget-default-mainMenu",
         "name": "Главное меню",
         "kind": "mainMenu",
+        "builtinDefault": true,
         "referenceSize": [
           1280,
           720
@@ -1157,6 +1159,7 @@
         "id": "widget-default-pauseMenu",
         "name": "Меню паузы",
         "kind": "pauseMenu",
+        "builtinDefault": true,
         "referenceSize": [
           1280,
           720
@@ -1618,39 +1621,39 @@
             "next": "next-choice",
             "bindings": [
               {
-                "id": "bind-341e7904-0987-4b46-b520-9f02f2b54193",
-                "eventId": "event-5eec3663-2a85-4078-bc4a-7f9d839e0a45",
+                "id": "bind-9490e54c-4130-46e7-813d-a7eaa0bf680c",
+                "eventId": "event-f5ade9b2-b6d9-4bd7-911b-d0f69cf36acd",
                 "hook": "BEFORE",
                 "join": "EVENT_END",
                 "overrides": {},
                 "actionOverrides": {},
-                "localEventId": "event-5eec3663-2a85-4078-bc4a-7f9d839e0a45"
+                "localEventId": "event-f5ade9b2-b6d9-4bd7-911b-d0f69cf36acd"
               },
               {
-                "id": "bind-7e94d175-cbca-4599-88d8-8f139cf3dfce",
-                "eventId": "event-7bb4552b-76df-4800-a338-cb9467d3010d",
+                "id": "bind-2fb53859-acd7-4fb1-a73f-c3eb1c5b2f7b",
+                "eventId": "event-19e092cc-09dc-40bc-8b88-5017b6501b73",
                 "hook": "BEFORE",
                 "join": "EVENT_END",
                 "overrides": {},
                 "actionOverrides": {},
-                "localEventId": "event-7bb4552b-76df-4800-a338-cb9467d3010d"
+                "localEventId": "event-19e092cc-09dc-40bc-8b88-5017b6501b73"
               }
             ],
             "mode": "SEQUENTIAL",
             "batches": {
               "BEFORE": [
                 {
-                  "id": "batch-4d32805a-05eb-4c4f-b4ba-bf2d7cbc21e9",
+                  "id": "batch-62cade0f-8bdd-4aee-91ea-f738478291aa",
                   "mode": "SEQUENTIAL",
                   "bindingIds": [
-                    "bind-341e7904-0987-4b46-b520-9f02f2b54193"
+                    "bind-9490e54c-4130-46e7-813d-a7eaa0bf680c"
                   ]
                 },
                 {
-                  "id": "batch-818b4499-fa95-42e3-a11c-e9533ec1685f",
+                  "id": "batch-fb8deb08-bb0c-4a64-b481-5a22f4a13aad",
                   "mode": "SEQUENTIAL",
                   "bindingIds": [
-                    "bind-7e94d175-cbca-4599-88d8-8f139cf3dfce"
+                    "bind-2fb53859-acd7-4fb1-a73f-c3eb1c5b2f7b"
                   ]
                 }
               ],
@@ -1710,23 +1713,23 @@
             "next": "novel-end",
             "bindings": [
               {
-                "id": "bind-aa07fc40-9800-49a1-9774-f9fd9c7d4fd9",
-                "eventId": "event-dbbea7f5-05a0-451b-8e56-612cb151a644",
+                "id": "bind-a64cd76a-443e-440b-935c-f3bba588189d",
+                "eventId": "event-f983c7df-65ae-4327-992c-2fa073e13d33",
                 "hook": "BEFORE",
                 "join": "EVENT_END",
                 "overrides": {},
                 "actionOverrides": {},
-                "localEventId": "event-dbbea7f5-05a0-451b-8e56-612cb151a644"
+                "localEventId": "event-f983c7df-65ae-4327-992c-2fa073e13d33"
               }
             ],
             "mode": "SEQUENTIAL",
             "batches": {
               "BEFORE": [
                 {
-                  "id": "batch-74f3aa7f-10b2-40ad-b6ac-1ee8be93c21b",
+                  "id": "batch-388fcd5e-5a80-4ba1-a927-822341d8a640",
                   "mode": "SEQUENTIAL",
                   "bindingIds": [
-                    "bind-aa07fc40-9800-49a1-9774-f9fd9c7d4fd9"
+                    "bind-a64cd76a-443e-440b-935c-f3bba588189d"
                   ]
                 }
               ],

@@ -89,10 +89,10 @@ export function validateValue(schema,value,context={},path=''){
 export function materializeValue(schema,value,context){
  if(value===undefined)value=schemaDefaults(schema);
  if(value?.op){value=context.evaluate(value);}
- if(['variableValue','signalPayload','componentArguments','componentResult'].includes(schema.type)){const s=dependentSchema(schema,context);if(!s)throw Error('Не назначена связь значения.');return materializeValue(s,value,context);}
+ if(['variableValue','signalPayload','componentArguments','componentResult'].includes(schema.type)){const s=dependentSchema(schema,context);if(!s)throw Error('Не назначена связь значения.');return materializeValue(s,value,schema.type==='componentArguments'?{...context,preserveReferences:true}:context);}
  if(schema.type==='union'){const variant=schema.variants.find(s=>!validateValue(s,value,context).length);if(!variant)throw Error('Неверный тип значения.');return materializeValue(variant,value,context);}
- if(schema.type==='reference')return resolveReference(value,schema.referenceType,context);
- if(schema.type==='collection'&&value?.mode==='tag')return resolveReference(value,'object',context);
+ if(schema.type==='reference'){const id=resolveReference(value,schema.referenceType,context);return context.preserveReferences?(Array.isArray(id)?structuredClone(value):reference(schema.referenceType,id)):id;}
+ if(schema.type==='collection'&&value?.mode==='tag'){const ids=resolveReference(value,'object',context);return context.preserveReferences?ids.map(id=>reference('object',id)):ids;}
  if(schema.type==='collection')return value.map(x=>materializeValue(schema.items,x,context));
  if(schema.type==='object')return Object.fromEntries(Object.entries(schema.properties).filter(([k,s])=>value?.[k]!==undefined||schemaDefaults(s)!==undefined).map(([k,s])=>[k,materializeValue(s,value?.[k],context)]));
  return structuredClone(value);

@@ -15,6 +15,8 @@ import {SoundDesk} from '../src/audio.js';
 import {gameSave,restoreGameSave} from '../src/gameSave.js';
 import {preparePlayableGame} from '../src/gameExport.js';
 import {widgetValue} from '../src/widgetBindings.js';
+import {objectTransform,isObjectInScene,BUILTIN_TRANSFORMS,BUILTIN_KINDS} from '../src/sceneEditing.js';
+import {isUnmodifiedDefaultWidget} from '../src/widgetModel.js';
 const pkg=name=>readFile(new URL('../public/game-templates/'+name+'.sacura-template.json',import.meta.url),'utf8').then(JSON.parse);
 const runtime=()=>new PreviewRuntime(new SoundDesk(()=>{throw Error('Examples do not request audio');}));
 const meta={author:'Локальный автор',license:'MIT',name:'Локальный вариант'};
@@ -30,7 +32,16 @@ function edit(p,name,change){const r=p.logicResources.find(r=>r.name===name);edi
 async function start(p){const rt=runtime();await rt.start(p,p.subscenes[0].entry);assert.equal(rt.snapshot.error,null);return rt;}
 const button=(p,id)=>p.widgets.flatMap(w=>w.elements).find(e=>e.id===id||e.name===({'coin-button':'Получить монету','upgrade-button':'Улучшить (+1 за тик)','stop-button':'Остановить таймер','start-button':'Запустить таймер'}[id]||id));
 const press=async(rt,e)=>rt.uiAction(e.action,e);
-for(const name of ['shooter','point-and-click','novel','ui-clicker'])test('public '+name+' is a portable v3 component project, imports independently, runs and builds without editor modules',async()=>{
+test('Letters package remapping retains native prop geometry, placement and scene membership; default dialogue keeps the unobstructed interaction view',async()=>{
+ const raw=await pkg('letters-after-rain'),before=JSON.stringify(raw),p=await instantiateAuthoringTemplate(raw,undefined,{reviewedSources:true});
+ for(const key of ['letter','door','fireplace','garden-note','ticket']){
+  const original=raw.content.objects.find(o=>o.builtin===key),copy=p.objects.find(o=>o.name===original?.name&&o.builtin===key);assert.ok(copy,key+' retains its native geometry');assert.notEqual(copy.id,original.id);
+  for(const scene of p.subscenes){assert.equal(isObjectInScene(copy,scene),scene.kind===BUILTIN_KINDS[key]);if(scene.kind===BUILTIN_KINDS[key])assert.deepEqual(objectTransform(copy,scene.id,scene.kind).position,BUILTIN_TRANSFORMS[key]);}
+ }
+ const dialogue=p.widgets.find(w=>w.id===p.ui.dialogue);assert.equal(isUnmodifiedDefaultWidget(dialogue),true);dialogue.elements[0].layout.y-=20;assert.equal(isUnmodifiedDefaultWidget(dialogue),false,'an edited imported widget remains custom');
+ assert.equal(JSON.stringify(raw),before,'import does not mutate the source package');
+});
+for(const name of ['shooter','point-and-click','novel','ui-clicker','horror'])test('public '+name+' is a portable v3 component project, imports independently, runs and builds without editor modules',async()=>{
  const raw=await pkg(name),original=JSON.stringify(raw);assert.equal(raw.formatVersion,3);assert.equal(raw.inputs.length,0);assert.ok(raw.content.logicResources.some(r=>r.kind==='component.code'));assert.ok(raw.content.description.includes('Что открыть'));assert.equal(raw.content.gameplay.preset,undefined);assert.equal(raw.content.gameplay.legacyCompatibility,undefined);assert.ok(raw.content.gameplay.mechanicDefinitions.every(d=>d.componentVersion===1));assert.ok(raw.content.functions.every(f=>!f.builtin));
  const p=await load(name),other=await load(name);assert.equal(JSON.stringify(raw),original);assert.notEqual(p.id,other.id);assert.notEqual(p.objects[0]?.id,other.objects[0]?.id);assert.deepEqual(validateStudio(p),[]);assert.deepEqual(readProject(JSON.stringify(p)),p);
  const exported=await exportAuthoringPackage(p,p,{...meta,kind:'template'}),next=await instantiateAuthoringTemplate(exported,undefined,{reviewedSources:true});assert.deepEqual(validateStudio(next),[]);const html=await preparePlayableGame(next,{readRuntime:async()=>({js:await readFile('public/player-runtime.js','utf8'),css:await readFile('public/player-runtime.css','utf8')})}),built=JSON.parse(html.split('globalThis.SACURA_PROJECT=')[1].split(';</script>')[0]);assert.equal(built.gameplayMigration,undefined);assert.ok(built.logicResources.some(r=>r.source));const rt=await start(built);rt.stop();
@@ -38,6 +49,22 @@ for(const name of ['shooter','point-and-click','novel','ui-clicker'])test('publi
 test('two shared LockedDoor instances: locked message, story unlock without opening, independent state, awaited Open and save restore',async()=>{
  const p=await load('point-and-click'),a=m(p,'Замок · ключ'),b=m(p,'Замок · история'),rt=await start(p);try{assert.equal(a.definitionId,b.definitionId);assert.equal(await rt.game.callComponent(b.id,'interact'),false);assert.equal(rt.game.state.message,'Заперто');assert.equal(state(rt,a).IsLocked,true);await rt.advance();assert.equal(state(rt,b).IsLocked,false);assert.equal(state(rt,a).IsLocked,true);assert.notEqual(rt.snapshot.world.doors[b.scope.id],'Открыть');await rt.advance();assert.equal(state(rt,b).IsLocked,false);
   let finished=false;const opening=rt.game.callComponent(b.id,'open').then(()=>finished=true);await turn();assert.equal(finished,false);await during(rt,opening);assert.equal(finished,true);assert.equal(rt.snapshot.world.doorMotions[b.scope.id].finished,true);const save=JSON.parse(JSON.stringify(gameSave(rt)));await rt.start(p,p.subscenes[0].entry);await restoreGameSave(rt,save);assert.equal(state(rt,b).IsLocked,false);assert.equal(state(rt,a).IsLocked,true);
+ }finally{rt.stop();}
+});
+
+test('shooter mouse input turns the actual camera using raw movement rather than a normalized axis',async()=>{
+ const p=await load('shooter'),rt=await start(p);
+ try{const look=p.input.actions.find(a=>a.name==='Осмотреться'),yaw=rt.game.state.yaw,pitch=rt.game.state.pitch;
+  await rt.inputAction({actionId:look.id,phase:'triggered',device:'pointer',value:[.8,-.6],payload:{delta:[50,-20]}});
+  assert.ok(rt.game.state.yaw<yaw-.1);assert.ok(rt.game.state.pitch>pitch+.05);
+ }finally{rt.stop();}
+});
+test('weapon selection through the actual input action keeps a typed instance reference and updates HUD, fire and save consistently',async()=>{
+ const p=await load('shooter'),rt=await start(p),loadout=m(p,'Выбранное оружие'),launcher=m(p,'Гранатомёт'),pistol=m(p,'Пистолет'),ammo=p.widgets.flatMap(w=>w.elements).find(e=>e.name==='Патроны').binding;
+ const choose=async name=>rt.inputAction({actionId:p.input.actions.find(a=>a.name===name).id,phase:'triggered',value:1,device:'keyboard'}),hud=()=>widgetValue({project:rt.project,variables:rt.snapshot.variables,game:rt.game.state},ammo);
+ try{await choose('Гранатомёт');assert.deepEqual(state(rt,loadout).selected,reference('mechanic',launcher.id));assert.equal(hud(),2);await rt.inputAction({actionId:p.input.actions.find(a=>a.name==='Огонь').id,phase:'triggered',value:1,device:'pointer'});assert.equal(hud(),1);assert.equal(state(rt,pistol).ammo,6);
+  // Let the serializable native projectile finish before saving the checkpoint.
+  await drive(rt,3);const save=JSON.parse(JSON.stringify(gameSave(rt)));await choose('Пистолет');assert.equal(hud(),6);await restoreGameSave(rt,save);assert.equal(hud(),1);assert.equal(state(rt,loadout).selected.id,launcher.id);assert.strictEqual(rt.game.state.weapons[launcher.references.record.id],state(rt,launcher));
  }finally{rt.stop();}
 });
 test('key condition source really changes interaction; native inventory is an explicit instance link; one pickup gives one key',async()=>{
