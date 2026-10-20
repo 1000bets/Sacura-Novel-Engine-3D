@@ -1,0 +1,9 @@
+.git
+.idea
+.agents
+node_modules
+**/node_modules
+**/dist
+.env
+*.sqlite*
+.DS_Store

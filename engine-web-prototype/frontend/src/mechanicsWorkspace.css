@@ -1,0 +1,168 @@
+/* Editor-only styles; the player continues to use gameplay.css. */
+.mechanics-workbench {
+ --border:var(--border-subtle); --panel:var(--bg-panel); --panel-raised:var(--bg-panel-elevated);
+ --input:var(--bg-input); --text:var(--text-primary); --muted:var(--text-muted);
+ background:var(--bg-panel); color:var(--text-primary); font-size:12px; container:mechanics-panel / inline-size;
+}
+.mechanics-workbench *, .mechanics-workbench *::before { box-sizing:border-box; }
+.mechanics-workbench button { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:32px; padding:7px 10px; background:var(--bg-panel-elevated); color:var(--text-secondary); border:1px solid var(--border-subtle); border-radius:5px; font:inherit; white-space:normal; }
+.mechanics-workbench button:hover:not(:disabled) { color:var(--text-primary); background:var(--bg-hover); border-color:var(--border-strong); }
+.mechanics-workbench button:disabled { opacity:.45; cursor:default; }
+.mechanics-workbench button[aria-pressed=true] { box-shadow:none; background:var(--accent-muted); color:var(--accent); border-color:color-mix(in srgb,var(--accent) 35%,var(--border-subtle)); }
+.mechanics-workbench button.mechanics-primary { color:var(--bg-app); background:var(--accent); border-color:var(--accent); font-weight:600; }
+.mechanics-workbench button.mechanics-primary:hover:not(:disabled) { color:var(--bg-app); background:var(--accent-hover); border-color:var(--accent-hover); }
+.mechanics-workbench :is(button,input,select,textarea,summary):focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.mechanics-workbench input,.mechanics-workbench select,.mechanics-workbench textarea,.mechanics-workbench .game-field input,.mechanics-workbench .game-field select,.mechanics-workbench .game-field textarea { background:var(--bg-input); color:var(--text-primary); border:1px solid var(--border-subtle); border-radius:4px; font:inherit; padding:7px 9px; }
+.mechanics-workbench input,.mechanics-workbench select { min-height:32px; }
+.mechanics-workbench input[type=checkbox] { width:15px; height:15px; min-height:0; padding:0; flex-shrink:0; accent-color:var(--accent); }
+.mechanics-workbench .game-field { color:var(--text-secondary); font-size:11px; gap:7px; margin-bottom:15px; }
+.mechanics-workbench label:not(.game-field) { line-height:1.5; }
+.mechanics-workbench .game-check { color:var(--text-secondary); }
+.mechanics-workbench h2 { color:var(--text-primary); font-size:16px; line-height:1.4; margin:0 0 18px; font-weight:600; }
+.mechanics-workbench h3 { color:var(--text-primary); font-size:13px; line-height:1.5; font-weight:600; }
+.mechanics-workbench h4 { color:var(--text-primary); font-size:12px; line-height:1.5; }
+.mechanics-workbench p { color:var(--text-muted); font-size:12px; line-height:1.6; }
+.mechanics-workbench small { color:var(--text-muted); font-size:11px; line-height:1.5; }
+.mechanics-workbench>header.mechanics-toolbar { min-height:34px; padding:3px 8px; gap:4px 8px; border-color:var(--border-subtle); background:var(--bg-panel); }
+.mechanics-workbench .mechanics-toolbar>.mechanics-tools { min-width:0; max-width:100%; margin-left:auto; gap:4px; justify-content:flex-end; }
+.mechanics-workbench .mechanics-toolbar button { flex-shrink:0; min-height:26px; padding:4px 6px; gap:5px; font-size:11px; line-height:1.2; white-space:nowrap; }
+.mechanics-toolbar button>svg { flex-shrink:0; }
+.mechanics-toolbar>strong { color:var(--text-muted); font-size:11px; font-weight:500; }
+.mechanics-workbench .mechanics-toolbar button { background:transparent; border-color:transparent; }
+.mechanics-workbench .mechanics-toolbar button.mechanics-primary { background:var(--accent); color:var(--bg-app); border-color:var(--accent); }
+.mechanics-workbench .mechanics-icon-button { width:30px; min-width:30px; height:30px; min-height:30px; padding:0; border-color:transparent; background:transparent; }
+.mechanics-workbench .mechanics-toolbar .mechanics-icon-button { width:26px; min-width:26px; height:26px; min-height:26px; padding:0; }
+.mechanics-toolbar-divider { display:block; width:1px; height:18px; background:var(--border-subtle); margin:0 4px; }
+.mechanics-workbench .mechanics-content { min-height:0; min-width:0; overflow:hidden; }
+.mechanics-workbench .mechanics-layout { grid-template-columns:210px minmax(0,1fr); height:100%; min-height:0; }
+.mechanics-workbench .mechanics-catalog { display:flex; flex-direction:column; padding:15px 12px; border-color:var(--border-subtle); background:color-mix(in srgb,var(--bg-app) 30%,var(--bg-panel)); }
+.mechanics-target>.game-field { margin-bottom:10px; }
+.mechanics-workbench .mechanics-add { width:100%; margin-bottom:18px; }
+.mechanics-search { position:relative; display:flex; align-items:center; gap:7px; padding:0 8px; min-height:33px; border:1px solid var(--border-subtle); border-radius:5px; background:var(--bg-input); color:var(--text-muted); }
+.mechanics-workbench .mechanics-search input { min-width:0; width:100%; border:0; border-radius:0; background:transparent; padding:6px 0; font-size:11px; box-shadow:none; }
+.mechanics-workbench .mechanics-search input:focus { outline:none; }
+.mechanics-search:focus-within { outline:2px solid var(--accent); outline-offset:2px; }
+.mechanics-search svg { flex-shrink:0; }
+.mechanics-workbench input::placeholder { color:var(--text-muted); opacity:.8; }
+.mechanics-list-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:20px 3px 9px; }
+.mechanics-workbench .mechanics-list-heading h3 { margin:0; color:var(--text-muted); font-size:11px; font-weight:500; }
+.mechanics-list-heading>span { min-width:21px; padding:2px 5px; border-radius:4px; background:var(--bg-panel-elevated); color:var(--text-muted); text-align:center; font-size:10px; font-variant-numeric:tabular-nums; }
+.mechanics-workbench .mechanics-list { gap:4px; margin:0 0 12px; }
+.mechanics-workbench .mechanics-list button { display:flex; flex-direction:row; justify-content:flex-start; align-items:flex-start; padding:10px 8px; gap:9px; border:1px solid transparent; background:transparent; }
+.mechanics-list button>svg { flex-shrink:0; color:var(--text-muted); margin-top:2px; }
+.mechanics-list button>span { min-width:0; }
+.mechanics-list strong { display:block; font-size:12px; line-height:1.5; font-weight:500; overflow-wrap:anywhere; }
+.mechanics-list small { margin-top:4px; font-size:10px; line-height:1.5; }
+.mechanics-workbench .mechanics-list button[aria-pressed=true] { background:var(--accent-muted); border-color:color-mix(in srgb,var(--accent) 25%,transparent); color:var(--text-primary); box-shadow:none; }
+.mechanics-list button[aria-pressed=true]>svg { color:var(--accent); }
+.mechanics-workbench .mechanics-list-empty { margin:2px 4px 16px; font-size:11px; }
+.mechanics-sidebar-tools { margin-top:auto; padding-top:16px; border-top:1px solid var(--border-subtle); }
+.mechanics-workbench .mechanics-sidebar-tools>button,.mechanics-workbench .mechanics-more button { width:100%; justify-content:flex-start; padding:8px; border-color:transparent; background:transparent; text-align:left; }
+.mechanics-workbench .mechanics-more { margin-top:7px; padding-top:7px; border-top:1px solid var(--border-subtle); }
+.mechanics-workbench .mechanics-more summary { display:flex; align-items:center; gap:7px; min-height:32px; color:var(--text-muted); padding:5px 8px; }
+.mechanics-more summary>svg:last-child { margin-left:auto; }
+.mechanics-more>div { display:grid; gap:3px; margin-top:5px; }
+.mechanics-workbench .mechanics-inspector { padding:24px 26px 30px; }
+.mechanics-workbench .mechanics-ready-picker { display:none; }
+.mechanics-workbench .mechanics-library { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(220px,100%),1fr)); gap:12px; max-width:1120px; padding:0; margin:0 0 18px; list-style:none; }
+.mechanics-library li { display:flex; min-width:0; }
+.mechanics-workbench .mechanics-library button { display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-start; gap:0; width:100%; min-height:138px; padding:16px; text-align:left; background:color-mix(in srgb,var(--bg-panel-elevated) 65%,var(--bg-panel)); border:1px solid var(--border-subtle); border-radius:8px; }
+.mechanics-workbench .mechanics-library button:hover:not(:disabled) { background:var(--bg-hover); border-color:var(--border-strong); }
+.mechanics-workbench .mechanics-library button[aria-pressed=true] { background:color-mix(in srgb,var(--accent-muted) 45%,var(--bg-panel)); border-color:var(--accent); color:var(--text-primary); box-shadow:none; }
+.mechanics-card-top { display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:15px; color:var(--accent); }
+.mechanics-card-icon { display:inline-grid; place-items:center; color:var(--text-muted); }
+.mechanics-library button[aria-pressed=true] .mechanics-card-icon { color:var(--accent); }
+.mechanics-library strong { display:block; font-size:14px; font-weight:600; line-height:1.4; margin-bottom:7px; }
+.mechanics-card-description { font-size:11px; line-height:1.6; color:var(--text-muted); text-wrap:pretty; }
+.mechanics-workbench .mechanics-source { margin-top:12px; color:var(--accent); font-size:10px; line-height:1.4; }
+.mechanics-add-bar { max-width:1120px; display:flex; align-items:center; justify-content:space-between; gap:18px; padding:14px 16px; border:1px solid var(--border-subtle); border-radius:7px; background:var(--bg-panel-elevated); margin-bottom:20px; }
+.mechanics-add-bar>div { min-width:0; }
+.mechanics-add-bar strong { display:block; font-size:13px; font-weight:600; line-height:1.5; overflow-wrap:anywhere; }
+.mechanics-add-bar small { margin-top:3px; }
+.mechanics-workbench .mechanics-add-bar button { flex-shrink:0; min-width:112px; min-height:36px; }
+.mechanics-workbench .mechanics-panel-library>details { max-width:1120px; }
+.mechanics-workbench .mechanics-panel-library>details>.game-field { max-width:560px; }
+.mechanics-workbench summary { min-height:30px; display:flex; align-items:center; gap:8px; list-style:none; cursor:pointer; font-size:12px; font-weight:500; color:var(--text-secondary); margin-bottom:0; }
+.mechanics-workbench summary::-webkit-details-marker { display:none; }
+.mechanics-workbench details>summary::before { content:'›'; font-size:17px; font-weight:400; color:var(--text-muted); }
+.mechanics-workbench details[open]>summary::before { transform:rotate(90deg); }
+.mechanics-workbench details[open]>summary { margin-bottom:12px; }
+.mechanics-workbench .mechanics-more summary::before,.mechanics-workbench .mechanics-instance-advanced summary::before { content:none; }
+.mechanics-workbench details { border-top-color:var(--border-subtle); }
+.mechanics-workbench .mechanics-owner { margin-top:-10px; margin-bottom:20px; font-size:11px; }
+.mechanics-instance-toolbar { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; padding:0 0 18px; margin-bottom:20px; border-bottom:1px solid var(--border-subtle); }
+.mechanics-workbench .mechanics-instance-toolbar .mechanics-tools>button:not(.mechanics-danger) { background:transparent; border-color:transparent; font-size:11px; }
+.mechanics-workbench .mechanics-instance-toolbar .mechanics-logic-toggle { color:var(--accent); border-color:color-mix(in srgb,var(--accent) 30%,var(--border-subtle)); background:var(--accent-muted); box-shadow:none; }
+.mechanics-workbench .mechanics-danger { color:var(--error); }
+.mechanics-workbench .mechanics-danger:hover:not(:disabled) { color:var(--error); background:color-mix(in srgb,var(--error) 8%,var(--bg-panel)); border-color:transparent; }
+.mechanics-parameters { max-width:900px; }
+.mechanics-workbench .mechanics-description { margin:0 0 18px; font-size:12px; }
+.mechanics-workbench .mechanics-instance-advanced { margin-top:24px; padding-top:14px; }
+.mechanics-instance-advanced summary { color:var(--text-muted); font-size:11px; }
+.mechanics-instance-advanced summary>svg { margin-left:auto; }
+.mechanics-instance-advanced[open] summary>svg { transform:rotate(180deg); }
+.mechanics-workbench .mechanics-rule-summary { margin-top:16px; padding-top:13px; border-top-color:var(--border-subtle); color:var(--text-muted); font-size:11px; }
+.mechanics-workbench .mechanics-empty { max-width:580px; padding:35px 0; color:var(--text-muted); }
+.mechanics-empty>svg { color:var(--text-muted); margin-bottom:15px; }
+.mechanics-empty h3 { margin:0 0 8px; font-size:15px; }
+.mechanics-empty p { margin-bottom:18px; }
+.mechanics-workbench>.mechanics-diagnostics { border-top:1px solid var(--border-subtle); background:var(--bg-panel); padding:2px 8px; margin:0; max-height:45%; overflow:auto; flex-shrink:0; }
+.mechanics-workbench>.mechanics-diagnostics>summary { min-height:24px; margin:0; font-size:11px; color:var(--text-muted); }
+.mechanics-workbench .mechanics-validation { margin-top:22px; padding:14px; border:1px solid var(--border-subtle); border-radius:6px; background:var(--bg-panel-elevated); }
+.mechanics-workbench .mechanics-error,.mechanics-workbench [role=alert] { color:var(--error); line-height:1.6; }
+.mechanics-workbench>.mechanics-error { margin:0; padding:10px 15px; border-top:1px solid var(--error); background:var(--bg-panel-elevated); }
+.mechanics-workbench .mechanics-transfer-panel { max-width:650px; }
+.mechanics-workbench .mechanics-export-function { display:flex; flex-wrap:wrap; align-items:end; gap:12px; padding-top:20px; max-width:900px; }
+.mechanics-export-function>.game-field { flex:1; min-width:180px; margin:0; }
+.mechanics-workbench .package-exchange { max-width:850px; }
+.mechanics-workbench .package-exchange>header { padding:0 0 16px; margin-bottom:18px; border-bottom:1px solid var(--border-subtle); }
+.mechanics-workbench .package-exchange fieldset { min-width:0; }
+.mechanics-workbench .package-exchange>fieldset>.game-field { max-width:600px; }
+.mechanics-workbench .mechanics-mobile-picker { display:none; }
+.mechanics-sr-only { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+@container mechanics-panel (max-width:720px) {
+ .mechanics-toolbar>strong { display:none; }
+ .mechanics-workbench .mechanics-layout { grid-template-columns:170px minmax(0,1fr); }
+ .mechanics-workbench .mechanics-catalog { padding:12px 9px; }
+ .mechanics-workbench .mechanics-inspector { padding:18px 16px 24px; }
+ .mechanics-workbench .mechanics-library { grid-template-columns:minmax(0,1fr); gap:9px; }
+ .mechanics-workbench .mechanics-library button { min-height:120px; padding:14px; }
+ .mechanics-card-top { margin-bottom:10px; }
+ .mechanics-instance-toolbar { align-items:flex-start; }
+ .mechanics-workbench .mechanics-instance-toolbar .mechanics-tools { flex-wrap:wrap; }
+}
+@container mechanics-panel (max-width:480px) {
+ .mechanics-toolbar>strong { display:none; }
+ .mechanics-workbench .mechanics-toolbar>.mechanics-tools { width:100%; justify-content:flex-start; }
+ .mechanics-toolbar-divider { display:none; }
+ .mechanics-toolbar .mechanics-tools>button:last-child { margin-left:auto; }
+ .mechanics-workbench .mechanics-content { overflow:auto; }
+ .mechanics-workbench .mechanics-content.mechanics-component-mode { overflow:hidden; }
+ .mechanics-workbench .mechanics-layout { display:block; height:auto; min-height:100%; overflow:visible; }
+ .mechanics-workbench .mechanics-catalog { border-right:0; border-bottom:1px solid var(--border-subtle); padding:12px; overflow:visible; }
+ .mechanics-target { display:grid; grid-template-columns:minmax(0,1fr) 34px; align-items:end; gap:8px; margin-bottom:12px; }
+ .mechanics-target>.game-field { margin:0; }
+ .mechanics-workbench .mechanics-add { width:34px; height:34px; margin:0; padding:0; }
+ .mechanics-add>span { display:none; }
+ .mechanics-workbench .mechanics-list { display:none; }
+ .mechanics-workbench .mechanics-list-heading { margin-top:14px; }
+ .mechanics-workbench .mechanics-mobile-picker { display:block; }
+ .mechanics-mobile-picker .game-field { margin-bottom:0; }
+ .mechanics-workbench .mechanics-inspector { overflow:visible; padding:18px 13px 26px; }
+ .mechanics-workbench .mechanics-sidebar-tools { padding-top:7px; margin-top:10px; display:flex; flex-wrap:wrap; align-items:flex-start; gap:5px; }
+ .mechanics-workbench .mechanics-sidebar-tools>button { width:auto; font-size:11px; }
+ .mechanics-workbench .mechanics-more { border:0; padding:0; margin:0; flex:1; min-width:130px; }
+ .mechanics-more summary { font-size:11px; }
+ .mechanics-workbench .mechanics-ready-picker { display:block; }
+ .mechanics-workbench .mechanics-ready-picker p { margin:-4px 0 14px; font-size:11px; }
+ .mechanics-workbench .mechanics-library { display:none; }
+ .mechanics-add-bar { padding:12px; gap:10px; }
+ .mechanics-workbench .mechanics-add-bar button { min-width:85px; }
+ .mechanics-instance-toolbar { gap:8px; padding-bottom:14px; margin-bottom:17px; }
+ .mechanics-instance-toolbar .mechanics-tools { width:100%; }
+ .mechanics-instance-toolbar .mechanics-tools>.mechanics-danger { margin-left:auto; }
+ .mechanics-workbench .game-grid { grid-template-columns:minmax(0,1fr); }
+ .mechanics-workbench .mechanics-action { grid-template-columns:minmax(0,1fr); }
+ .mechanics-workbench .mechanics-action-settings { grid-template-columns:minmax(0,1fr); }
+ .mechanics-workbench .package-exchange>header { gap:10px; }
+}

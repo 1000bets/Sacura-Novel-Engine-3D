@@ -1,0 +1,2348 @@
+{
+  "version": 2,
+  "id": "project-d8047453-d110-4020-8e93-51fe4b2f57d5",
+  "title": "Приёмка · Код, граф и BT",
+  "revision": 2,
+  "visualExamplesVersion": 1,
+  "sceneEditingVersion": 2,
+  "variables": {
+    "slowMode": true
+  },
+  "objects": [],
+  "events": [
+    {
+      "id": "event-3a5bec2a-13af-431e-a1db-4616de075d5b",
+      "name": "Подойти с анимацией",
+      "description": "",
+      "retention": "AUTO_CLOSE_ON_FLOW_END",
+      "owner": "SubScene",
+      "groups": [
+        {
+          "id": "group-fab3c65a-d17f-40fe-9cdd-86b7a5e79135",
+          "name": "Подойти",
+          "actions": [
+            {
+              "id": "action-0e81e3bd-adcb-4dcf-9927-1da11d31df7b",
+              "type": "move",
+              "target": "",
+              "value": [
+                0,
+                0,
+                0
+              ],
+              "wait": "COMPLETED",
+              "scope": "SELF",
+              "conflict": "FAIL_NEW",
+              "footstepAssetId": "",
+              "footstepVolume": 1,
+              "duration": 2,
+              "queueTimeout": 10,
+              "startTimeout": 5,
+              "executionTimeout": 30,
+              "stopTimeout": 3,
+              "onFailure": "Остановить событие",
+              "finalState": "Сохранить результат",
+              "fallback": "Безопасное исходное состояние",
+              "animationId": "ходит"
+            }
+          ]
+        }
+      ],
+      "standardPreset": true
+    },
+    {
+      "id": "event-a099b259-5a5e-4847-a870-a67706cd3312",
+      "name": "Подойти и сесть",
+      "description": "",
+      "retention": "AUTO_CLOSE_ON_FLOW_END",
+      "owner": "SubScene",
+      "groups": [
+        {
+          "id": "group-2184076a-4e46-4b1a-b6b7-004217b8675d",
+          "name": "Подойти к месту",
+          "actions": [
+            {
+              "id": "action-72df7306-8a9c-4d1d-8c96-cd9ee01b66d9",
+              "type": "move",
+              "target": "",
+              "value": [
+                0,
+                0,
+                0
+              ],
+              "wait": "COMPLETED",
+              "scope": "SELF",
+              "conflict": "FAIL_NEW",
+              "footstepAssetId": "",
+              "footstepVolume": 1,
+              "duration": 2,
+              "queueTimeout": 10,
+              "startTimeout": 5,
+              "executionTimeout": 30,
+              "stopTimeout": 3,
+              "onFailure": "Остановить событие",
+              "finalState": "Сохранить результат",
+              "fallback": "Безопасное исходное состояние",
+              "animationId": "ходит"
+            }
+          ]
+        },
+        {
+          "id": "group-f12406f7-810e-4545-8a5b-07fb4376c6d6",
+          "name": "Сесть",
+          "actions": [
+            {
+              "id": "action-261320f8-5277-4e73-8221-e1f7442aba29",
+              "type": "pose",
+              "target": "",
+              "value": "сидит",
+              "wait": "COMPLETED",
+              "scope": "SELF",
+              "conflict": "FAIL_NEW",
+              "duration": 2,
+              "queueTimeout": 10,
+              "startTimeout": 5,
+              "executionTimeout": 30,
+              "stopTimeout": 3,
+              "onFailure": "Остановить событие",
+              "finalState": "Сохранить результат",
+              "fallback": "Безопасное исходное состояние"
+            }
+          ]
+        }
+      ],
+      "standardPreset": true
+    },
+    {
+      "id": "event-53224014-a1d9-465f-a5b1-a57a8ae3f0c2",
+      "name": "Приветствие крупным планом",
+      "description": "",
+      "retention": "AUTO_CLOSE_ON_FLOW_END",
+      "owner": "SubScene",
+      "groups": [
+        {
+          "id": "group-e1f9bae1-974a-4686-8cb9-d49dd88112d6",
+          "name": "Приветствие",
+          "actions": [
+            {
+              "id": "action-272ef13a-984e-4c8c-88a0-b10a5f793f70",
+              "type": "pose",
+              "target": "",
+              "value": "машет",
+              "wait": "COMPLETED",
+              "scope": "SELF",
+              "conflict": "FAIL_NEW",
+              "duration": 2,
+              "queueTimeout": 10,
+              "startTimeout": 5,
+              "executionTimeout": 30,
+              "stopTimeout": 3,
+              "onFailure": "Остановить событие",
+              "finalState": "Сохранить результат",
+              "fallback": "Безопасное исходное состояние"
+            },
+            {
+              "id": "action-be10c312-c47c-4482-a5a8-eda331ab6391",
+              "type": "camera",
+              "target": "camera",
+              "value": "Крупный план",
+              "wait": "COMPLETED",
+              "scope": "SELF",
+              "conflict": "REPLACE_CURRENT",
+              "duration": 2,
+              "queueTimeout": 10,
+              "startTimeout": 5,
+              "executionTimeout": 30,
+              "stopTimeout": 3,
+              "onFailure": "Остановить событие",
+              "finalState": "Сохранить результат",
+              "fallback": "Безопасное исходное состояние"
+            }
+          ]
+        }
+      ],
+      "standardPreset": true
+    },
+    {
+      "id": "event-106d10df-f99f-4587-a604-bc87147ec719",
+      "name": "Наступает вечер",
+      "description": "",
+      "retention": "AUTO_CLOSE_ON_FLOW_END",
+      "owner": "SubScene",
+      "groups": [
+        {
+          "id": "group-952eb6e4-e22e-4619-8160-cf8076a07afd",
+          "name": "Окружение",
+          "actions": [
+            {
+              "id": "action-242dddd4-027d-465c-8f50-899ad1ff09a2",
+              "type": "time",
+              "target": "world",
+              "value": "Закат",
+              "wait": "COMPLETED",
+              "scope": "SELF",
+              "conflict": "FAIL_NEW",
+              "duration": 2,
+              "queueTimeout": 10,
+              "startTimeout": 5,
+              "executionTimeout": 30,
+              "stopTimeout": 3,
+              "onFailure": "Остановить событие",
+              "finalState": "Сохранить результат",
+              "fallback": "Безопасное исходное состояние"
+            },
+            {
+              "id": "action-11bb08b7-48f2-4d75-8e06-8046d8946a23",
+              "type": "lighting",
+              "target": "world",
+              "value": "Тёплый свет",
+              "wait": "COMPLETED",
+              "scope": "SELF",
+              "conflict": "FAIL_NEW",
+              "duration": 2,
+              "queueTimeout": 10,
+              "startTimeout": 5,
+              "executionTimeout": 30,
+              "stopTimeout": 3,
+              "onFailure": "Остановить событие",
+              "finalState": "Сохранить результат",
+              "fallback": "Безопасное исходное состояние"
+            }
+          ]
+        }
+      ],
+      "standardPreset": true
+    },
+    {
+      "id": "event-aa449638-595f-4412-8701-2a0471714eee",
+      "name": "Появиться в кадре",
+      "description": "",
+      "retention": "AUTO_CLOSE_ON_FLOW_END",
+      "owner": "SubScene",
+      "groups": [
+        {
+          "id": "group-c6dcd523-bdd6-465b-a565-623b33cb5af0",
+          "name": "Появление",
+          "actions": [
+            {
+              "id": "action-084a9f82-fc0b-4f80-b331-670c6ba27205",
+              "type": "visibility",
+              "target": "",
+              "value": "Показать",
+              "wait": "COMPLETED",
+              "scope": "SELF",
+              "conflict": "FAIL_NEW",
+              "duration": 2,
+              "queueTimeout": 10,
+              "startTimeout": 5,
+              "executionTimeout": 30,
+              "stopTimeout": 3,
+              "onFailure": "Остановить событие",
+              "finalState": "Сохранить результат",
+              "fallback": "Безопасное исходное состояние"
+            },
+            {
+              "id": "action-29ae7570-1e80-49a9-ab40-ec18a9cbd9aa",
+              "type": "pose",
+              "target": "",
+              "value": "стоит",
+              "wait": "COMPLETED",
+              "scope": "SELF",
+              "conflict": "FAIL_NEW",
+              "duration": 2,
+              "queueTimeout": 10,
+              "startTimeout": 5,
+              "executionTimeout": 30,
+              "stopTimeout": 3,
+              "onFailure": "Остановить событие",
+              "finalState": "Сохранить результат",
+              "fallback": "Безопасное исходное состояние"
+            }
+          ]
+        }
+      ],
+      "standardPreset": true
+    },
+    {
+      "id": "event-e943315e-57fc-447c-b5b8-50cec14da0e2",
+      "name": "Приёмка · Код, граф и BT → Вызвать граф",
+      "description": "",
+      "retention": "AUTO_CLOSE_ON_FLOW_END",
+      "owner": "SubScene",
+      "groups": [
+        {
+          "id": "group-65500d16-c6c2-4510-9ed0-24e81a3681e0",
+          "name": "Основное действие",
+          "actions": [
+            {
+              "id": "action-add2e14d-0edc-499e-bdcf-c23eb6d3ea5f",
+              "type": "gameplay",
+              "target": "world",
+              "value": {
+                "instance": {
+                  "kind": "reference",
+                  "type": "mechanic",
+                  "mode": "direct",
+                  "id": "mechanic-2442dc90-f885-44a0-af2f-2757a3301cdd"
+                },
+                "methodId": "runGraph",
+                "args": {}
+              },
+              "wait": "COMPLETED",
+              "scope": "SELF",
+              "conflict": "FAIL_NEW",
+              "command": "sacura.component.call",
+              "duration": 2,
+              "queueTimeout": 10,
+              "startTimeout": 5,
+              "executionTimeout": 30,
+              "stopTimeout": 3,
+              "onFailure": "Остановить событие",
+              "finalState": "Сохранить результат",
+              "fallback": "Безопасное исходное состояние",
+              "operationVersion": 1
+            }
+          ]
+        }
+      ],
+      "componentAction": true
+    },
+    {
+      "id": "event-05740a60-00e3-43d5-ac8e-2e5ba2d9a3fa",
+      "name": "Приёмка · Код, граф и BT → Проверить отмену BT",
+      "description": "",
+      "retention": "AUTO_CLOSE_ON_FLOW_END",
+      "owner": "SubScene",
+      "groups": [
+        {
+          "id": "group-f8f6fb1d-95ad-40c7-bf81-de8b14ec12c1",
+          "name": "Основное действие",
+          "actions": [
+            {
+              "id": "action-e34947a0-761d-4df5-867f-2a7ecdb0410b",
+              "type": "gameplay",
+              "target": "world",
+              "value": {
+                "instance": {
+                  "kind": "reference",
+                  "type": "mechanic",
+                  "mode": "direct",
+                  "id": "mechanic-2442dc90-f885-44a0-af2f-2757a3301cdd"
+                },
+                "methodId": "testTree",
+                "args": {}
+              },
+              "wait": "COMPLETED",
+              "scope": "SELF",
+              "conflict": "FAIL_NEW",
+              "command": "sacura.component.call",
+              "duration": 2,
+              "queueTimeout": 10,
+              "startTimeout": 5,
+              "executionTimeout": 30,
+              "stopTimeout": 3,
+              "onFailure": "Остановить событие",
+              "finalState": "Сохранить результат",
+              "fallback": "Безопасное исходное состояние",
+              "operationVersion": 1
+            }
+          ]
+        }
+      ],
+      "componentAction": true
+    }
+  ],
+  "audioAssets": [],
+  "actionTemplates": [],
+  "groupTemplates": [],
+  "scene": {
+    "location": "scene-88963f91-5c0a-45fd-badc-fa7241a876ec",
+    "weather": "Ясно",
+    "time": "День",
+    "camera": "Общий план"
+  },
+  "subscenes": [
+    {
+      "id": "scene-88963f91-5c0a-45fd-badc-fa7241a876ec",
+      "name": "Новая сцена",
+      "location": "Пустая сцена",
+      "kind": "living",
+      "entry": "line-51f716e9-96f1-49fa-9f8c-00ea635687fe",
+      "sceneId": "chapter1",
+      "weather": "Ясно",
+      "time": "День",
+      "color": "#bd94a9",
+      "stagingPoints": [],
+      "cameras": [
+        {
+          "id": "camera-142e2de0-b5f2-4520-8690-d93030d98d41",
+          "name": "Основная камера",
+          "position": [
+            -2.8,
+            1.65,
+            2.8
+          ],
+          "target": [
+            0.3,
+            1.02,
+            -1.3
+          ],
+          "mode": "fixed",
+          "fov": 58,
+          "distance": 3,
+          "height": 1.65,
+          "yaw": 0,
+          "targetHeight": 1.08,
+          "smoothing": 0.2
+        }
+      ],
+      "defaultCameraId": "camera-142e2de0-b5f2-4520-8690-d93030d98d41"
+    }
+  ],
+  "chapters": [
+    {
+      "id": "chapter-222b4ea2-867f-4caf-be48-7c4504473a0a",
+      "name": "Первый эпизод",
+      "subsceneId": "scene-88963f91-5c0a-45fd-badc-fa7241a876ec",
+      "beats": [
+        {
+          "id": "line-51f716e9-96f1-49fa-9f8c-00ea635687fe",
+          "kind": "dialogue",
+          "speaker": "Рассказчик",
+          "text": "",
+          "next": null,
+          "bindings": [
+            {
+              "id": "bind-a4985e80-2469-4685-919c-a88a52af4bbc",
+              "eventId": "event-e943315e-57fc-447c-b5b8-50cec14da0e2",
+              "hook": "BEFORE",
+              "join": "EVENT_END",
+              "overrides": {},
+              "actionOverrides": {},
+              "localEventId": "event-e943315e-57fc-447c-b5b8-50cec14da0e2"
+            },
+            {
+              "id": "bind-bf32da73-1375-4caf-8c6e-d6083b769307",
+              "eventId": "event-05740a60-00e3-43d5-ac8e-2e5ba2d9a3fa",
+              "hook": "BEFORE",
+              "join": "EVENT_END",
+              "overrides": {},
+              "actionOverrides": {},
+              "localEventId": "event-05740a60-00e3-43d5-ac8e-2e5ba2d9a3fa"
+            }
+          ],
+          "mode": "SEQUENTIAL",
+          "batches": {
+            "BEFORE": [
+              {
+                "id": "batch-57c4d855-9310-476a-8a88-09a49ee17a32",
+                "mode": "SEQUENTIAL",
+                "bindingIds": [
+                  "bind-a4985e80-2469-4685-919c-a88a52af4bbc"
+                ]
+              },
+              {
+                "id": "batch-759fb735-d687-4869-97ff-6cdc940f83f4",
+                "mode": "SEQUENTIAL",
+                "bindingIds": [
+                  "bind-bf32da73-1375-4caf-8c6e-d6083b769307"
+                ]
+              }
+            ],
+            "ON_START": [],
+            "AFTER": []
+          }
+        }
+      ]
+    }
+  ],
+  "audioSettings": {
+    "sidechain": {
+      "reductionDb": 4,
+      "attack": 0.6,
+      "release": 0.9
+    }
+  },
+  "input": {
+    "version": 1,
+    "touchMode": "auto",
+    "actions": [
+      {
+        "id": "move",
+        "name": "Двигаться",
+        "valueType": "axis2d",
+        "behavior": "move",
+        "trigger": "continuous",
+        "holdSeconds": 0.4,
+        "consume": true
+      },
+      {
+        "id": "interact",
+        "name": "Осмотреть",
+        "valueType": "boolean",
+        "behavior": "interact",
+        "trigger": "pressed",
+        "holdSeconds": 0.4,
+        "consume": true
+      },
+      {
+        "id": "point",
+        "name": "Идти по указателю",
+        "valueType": "boolean",
+        "behavior": "point",
+        "trigger": "pressed",
+        "holdSeconds": 0.4,
+        "consume": true
+      },
+      {
+        "id": "advance",
+        "name": "Дальше",
+        "valueType": "boolean",
+        "behavior": "advance",
+        "trigger": "pressed",
+        "holdSeconds": 0.4,
+        "consume": true
+      },
+      {
+        "id": "pause",
+        "name": "Пауза",
+        "valueType": "boolean",
+        "behavior": "pause",
+        "trigger": "pressed",
+        "holdSeconds": 0.4,
+        "consume": true
+      },
+      {
+        "id": "choiceNext",
+        "name": "Следующий ответ",
+        "valueType": "boolean",
+        "behavior": "choiceNext",
+        "trigger": "pressed",
+        "holdSeconds": 0.4,
+        "consume": true
+      },
+      {
+        "id": "choicePrevious",
+        "name": "Предыдущий ответ",
+        "valueType": "boolean",
+        "behavior": "choicePrevious",
+        "trigger": "pressed",
+        "holdSeconds": 0.4,
+        "consume": true
+      }
+    ],
+    "contexts": [
+      {
+        "id": "system",
+        "name": "Система",
+        "priority": 100,
+        "bindings": [
+          {
+            "actionId": "pause",
+            "device": "keyboard",
+            "control": "Escape",
+            "scale": 1,
+            "id": "system-0"
+          },
+          {
+            "actionId": "pause",
+            "device": "gamepad-button",
+            "control": "9",
+            "scale": 1,
+            "deadZone": 0,
+            "id": "system-1"
+          },
+          {
+            "actionId": "pause",
+            "device": "touch",
+            "control": "pause",
+            "scale": 1,
+            "deadZone": 0,
+            "id": "system-2"
+          }
+        ]
+      },
+      {
+        "id": "dialogue",
+        "name": "Диалог",
+        "priority": 10,
+        "bindings": [
+          {
+            "actionId": "advance",
+            "device": "keyboard",
+            "control": "Enter",
+            "scale": 1,
+            "id": "dialogue-0"
+          },
+          {
+            "actionId": "advance",
+            "device": "keyboard",
+            "control": "Space",
+            "scale": 1,
+            "id": "dialogue-1"
+          },
+          {
+            "actionId": "advance",
+            "device": "gamepad-button",
+            "control": "0",
+            "scale": 1,
+            "deadZone": 0,
+            "id": "dialogue-2"
+          },
+          {
+            "actionId": "advance",
+            "device": "touch",
+            "control": "advance",
+            "scale": 1,
+            "deadZone": 0,
+            "id": "dialogue-3"
+          },
+          {
+            "actionId": "choiceNext",
+            "device": "keyboard",
+            "control": "ArrowDown",
+            "scale": 1,
+            "id": "dialogue-4"
+          },
+          {
+            "actionId": "choicePrevious",
+            "device": "keyboard",
+            "control": "ArrowUp",
+            "scale": 1,
+            "id": "dialogue-5"
+          },
+          {
+            "actionId": "choiceNext",
+            "device": "gamepad-button",
+            "control": "13",
+            "scale": 1,
+            "deadZone": 0,
+            "id": "dialogue-6"
+          },
+          {
+            "actionId": "choicePrevious",
+            "device": "gamepad-button",
+            "control": "12",
+            "scale": 1,
+            "deadZone": 0,
+            "id": "dialogue-7"
+          }
+        ]
+      },
+      {
+        "id": "gameplay",
+        "name": "Ходьба и взаимодействие",
+        "priority": 20,
+        "bindings": [
+          {
+            "actionId": "move",
+            "device": "keyboard",
+            "control": "KeyW",
+            "scale": [
+              0,
+              1
+            ],
+            "id": "gameplay-0"
+          },
+          {
+            "actionId": "move",
+            "device": "keyboard",
+            "control": "ArrowUp",
+            "scale": [
+              0,
+              1
+            ],
+            "id": "gameplay-1"
+          },
+          {
+            "actionId": "move",
+            "device": "keyboard",
+            "control": "KeyS",
+            "scale": [
+              0,
+              -1
+            ],
+            "id": "gameplay-2"
+          },
+          {
+            "actionId": "move",
+            "device": "keyboard",
+            "control": "ArrowDown",
+            "scale": [
+              0,
+              -1
+            ],
+            "id": "gameplay-3"
+          },
+          {
+            "actionId": "move",
+            "device": "keyboard",
+            "control": "KeyA",
+            "scale": [
+              -1,
+              0
+            ],
+            "id": "gameplay-4"
+          },
+          {
+            "actionId": "move",
+            "device": "keyboard",
+            "control": "ArrowLeft",
+            "scale": [
+              -1,
+              0
+            ],
+            "id": "gameplay-5"
+          },
+          {
+            "actionId": "move",
+            "device": "keyboard",
+            "control": "KeyD",
+            "scale": [
+              1,
+              0
+            ],
+            "id": "gameplay-6"
+          },
+          {
+            "actionId": "move",
+            "device": "keyboard",
+            "control": "ArrowRight",
+            "scale": [
+              1,
+              0
+            ],
+            "id": "gameplay-7"
+          },
+          {
+            "actionId": "interact",
+            "device": "keyboard",
+            "control": "KeyE",
+            "scale": 1,
+            "id": "gameplay-8"
+          },
+          {
+            "actionId": "move",
+            "device": "gamepad-axis",
+            "control": "0",
+            "scale": [
+              1,
+              0
+            ],
+            "deadZone": 0.18,
+            "id": "gameplay-9"
+          },
+          {
+            "actionId": "move",
+            "device": "gamepad-axis",
+            "control": "1",
+            "scale": [
+              0,
+              -1
+            ],
+            "deadZone": 0.18,
+            "id": "gameplay-10"
+          },
+          {
+            "actionId": "move",
+            "device": "gamepad-button",
+            "control": "12",
+            "scale": [
+              0,
+              1
+            ],
+            "deadZone": 0,
+            "id": "gameplay-11"
+          },
+          {
+            "actionId": "move",
+            "device": "gamepad-button",
+            "control": "13",
+            "scale": [
+              0,
+              -1
+            ],
+            "deadZone": 0,
+            "id": "gameplay-12"
+          },
+          {
+            "actionId": "move",
+            "device": "gamepad-button",
+            "control": "14",
+            "scale": [
+              -1,
+              0
+            ],
+            "deadZone": 0,
+            "id": "gameplay-13"
+          },
+          {
+            "actionId": "move",
+            "device": "gamepad-button",
+            "control": "15",
+            "scale": [
+              1,
+              0
+            ],
+            "deadZone": 0,
+            "id": "gameplay-14"
+          },
+          {
+            "actionId": "interact",
+            "device": "gamepad-button",
+            "control": "0",
+            "scale": 1,
+            "deadZone": 0,
+            "id": "gameplay-15"
+          },
+          {
+            "actionId": "point",
+            "device": "pointer",
+            "control": "primary",
+            "scale": 1,
+            "deadZone": 0,
+            "id": "gameplay-16"
+          },
+          {
+            "actionId": "move",
+            "device": "touch",
+            "control": "move",
+            "scale": [
+              1,
+              1
+            ],
+            "deadZone": 0,
+            "id": "gameplay-17"
+          },
+          {
+            "actionId": "interact",
+            "device": "touch",
+            "control": "interact",
+            "scale": 1,
+            "deadZone": 0,
+            "id": "gameplay-18"
+          }
+        ]
+      }
+    ]
+  },
+  "gameplay": {
+    "version": 2,
+    "behaviorSchemaVersion": 1,
+    "capabilitySchemaVersion": 1,
+    "resources": [],
+    "inventories": [],
+    "movements": [],
+    "stateBindings": [],
+    "mechanicSchemaVersion": 1,
+    "mechanicDefinitions": [
+      {
+        "id": "user.component.type-9717b45b-5d36-4e19-ac42-03a835828b97",
+        "version": 1,
+        "scopes": [
+          "object",
+          "scene",
+          "project"
+        ],
+        "when": "start",
+        "stateSchema": {
+          "type": "object",
+          "properties": {
+            "calls": {
+              "type": "number",
+              "default": 0
+            }
+          }
+        },
+        "initialState": {},
+        "requirements": [],
+        "name": "BridgeWorker",
+        "componentVersion": 1,
+        "stateVersion": 1,
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        },
+        "references": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "reference",
+              "referenceType": "variable",
+              "optional": true,
+              "label": "Режим ветви"
+            },
+            "tree": {
+              "type": "reference",
+              "referenceType": "mechanic",
+              "optional": true,
+              "label": "Дерево поведения"
+            },
+            "graph": {
+              "type": "reference",
+              "referenceType": "mechanic",
+              "optional": true,
+              "label": "Граф-получатель"
+            }
+          }
+        },
+        "methods": {
+          "testTree": {
+            "name": "Проверить отмену BT",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            },
+            "result": {
+              "type": "boolean"
+            },
+            "logic": {
+              "functionId": "method-af7eeef4-3f74-4410-832d-e2602a7389b3"
+            }
+          },
+          "runGraph": {
+            "name": "Вызвать граф",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            },
+            "result": {
+              "type": "number"
+            },
+            "logic": {
+              "functionId": "method-c568e83e-2da5-4049-8f1d-31a427bd9626"
+            }
+          },
+          "double": {
+            "name": "Удвоить",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "amount": {
+                  "type": "number",
+                  "default": 4,
+                  "label": "Количество"
+                }
+              }
+            },
+            "result": {
+              "type": "number"
+            },
+            "logic": {
+              "functionId": "method-ecb3dec7-5221-426e-93fd-078288edccd0"
+            }
+          },
+          "slow": {
+            "name": "Медленная ветвь",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            },
+            "result": {
+              "type": "boolean"
+            },
+            "logic": {
+              "functionId": "method-42a93460-362b-4b84-94f0-ac368c019aeb"
+            }
+          },
+          "safe": {
+            "name": "Безопасная ветвь",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            },
+            "result": {
+              "type": "boolean"
+            },
+            "logic": {
+              "functionId": "method-f7049b06-fbaf-49cd-88c9-46a4f2788aa4"
+            }
+          }
+        },
+        "events": {},
+        "logicResourceId": "logic-a7c6b01e-2629-4792-abdf-b08f65548ca6",
+        "stateFromParameters": {},
+        "lifecycle": {},
+        "subscriptions": []
+      },
+      {
+        "id": "user.component.type-731e639c-def6-4c6c-b0a6-ef06e8bc3b60",
+        "version": 1,
+        "scopes": [
+          "object",
+          "scene",
+          "project"
+        ],
+        "when": "start",
+        "stateSchema": {
+          "type": "object",
+          "properties": {}
+        },
+        "initialState": {},
+        "requirements": [],
+        "name": "BridgeGraph",
+        "componentVersion": 1,
+        "stateVersion": 1,
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        },
+        "references": {
+          "type": "object",
+          "properties": {}
+        },
+        "methods": {
+          "method-3358a3c1-198b-490b-b89d-60d805e6b48b": {
+            "name": "Start",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            },
+            "result": {
+              "type": "number"
+            },
+            "logic": {
+              "functionId": "function-33397027-b091-4850-98ed-e222d3a4a7e2"
+            }
+          }
+        },
+        "events": {},
+        "logicResourceId": "logic-e0bb4ad9-d292-4b82-9e85-0fa8861c3941"
+      },
+      {
+        "id": "user.component.type-e8a744ff-4e1f-4506-92d3-f543e4c7b9fd",
+        "version": 1,
+        "scopes": [
+          "object",
+          "scene",
+          "project"
+        ],
+        "when": "start",
+        "stateSchema": {
+          "type": "object",
+          "properties": {}
+        },
+        "initialState": {},
+        "requirements": [],
+        "name": "BranchBehavior",
+        "componentVersion": 1,
+        "stateVersion": 1,
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        },
+        "references": {
+          "type": "object",
+          "properties": {}
+        },
+        "methods": {
+          "start": {
+            "name": "Запустить поведение",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            },
+            "result": {
+              "type": "void"
+            },
+            "logic": {
+              "functionId": "function-892b7a81-9d19-4000-876f-6c958c6802ec"
+            }
+          },
+          "stop": {
+            "name": "Остановить поведение",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            },
+            "result": {
+              "type": "void"
+            },
+            "logic": {
+              "functionId": "function-166aeb87-7eee-411e-901e-9235d9e188b3"
+            }
+          }
+        },
+        "events": {},
+        "logicResourceId": "logic-2903cb91-f5d5-44e1-9838-194f45847de9",
+        "behaviorTree": {
+          "treeResourceId": "logic-2903cb91-f5d5-44e1-9838-194f45847de9",
+          "interval": 0.1,
+          "autoStart": false
+        }
+      }
+    ],
+    "signals": [],
+    "variableBindings": [
+      {
+        "id": "variable-910276b1-6c85-4ebe-8872-680ca6602233",
+        "key": "slowMode"
+      }
+    ],
+    "enabled": true,
+    "activation": "continuous",
+    "camera": {
+      "mode": "authored",
+      "targetId": "",
+      "pointerLock": false,
+      "crosshair": false
+    },
+    "mechanics": [
+      {
+        "id": "mechanic-2442dc90-f885-44a0-af2f-2757a3301cdd",
+        "type": "definition",
+        "definitionId": "user.component.type-9717b45b-5d36-4e19-ac42-03a835828b97",
+        "definitionVersion": 1,
+        "scope": {
+          "kind": "project",
+          "id": "project-d8047453-d110-4020-8e93-51fe4b2f57d5"
+        },
+        "values": {},
+        "enabled": true,
+        "references": {
+          "graph": {
+            "kind": "reference",
+            "type": "mechanic",
+            "mode": "direct",
+            "id": "mechanic-c3b039c9-5ae6-4f26-bbb1-f3a3e3a90679"
+          },
+          "mode": {
+            "kind": "reference",
+            "type": "variable",
+            "mode": "direct",
+            "id": "variable-910276b1-6c85-4ebe-8872-680ca6602233"
+          },
+          "tree": {
+            "kind": "reference",
+            "type": "mechanic",
+            "mode": "direct",
+            "id": "mechanic-24e84bcb-97fb-4f2c-900b-d91f8c84ad01"
+          }
+        },
+        "name": "BridgeWorker"
+      },
+      {
+        "id": "mechanic-c3b039c9-5ae6-4f26-bbb1-f3a3e3a90679",
+        "type": "definition",
+        "definitionId": "user.component.type-731e639c-def6-4c6c-b0a6-ef06e8bc3b60",
+        "definitionVersion": 1,
+        "scope": {
+          "kind": "project",
+          "id": "project-d8047453-d110-4020-8e93-51fe4b2f57d5"
+        },
+        "values": {},
+        "enabled": true,
+        "references": {},
+        "name": "BridgeGraph"
+      },
+      {
+        "id": "mechanic-24e84bcb-97fb-4f2c-900b-d91f8c84ad01",
+        "type": "definition",
+        "definitionId": "user.component.type-e8a744ff-4e1f-4506-92d3-f543e4c7b9fd",
+        "definitionVersion": 1,
+        "scope": {
+          "kind": "project",
+          "id": "project-d8047453-d110-4020-8e93-51fe4b2f57d5"
+        },
+        "values": {},
+        "enabled": true,
+        "references": {},
+        "name": "BranchBehavior"
+      }
+    ],
+    "playerId": "",
+    "controller": {
+      "ownerId": "",
+      "mode": "none",
+      "speed": 3.5,
+      "jumpSpeed": 5,
+      "gravity": 16,
+      "eyeHeight": 1.25,
+      "sensitivity": 0.003,
+      "distance": 3,
+      "fov": 70
+    },
+    "actors": {},
+    "weapons": [],
+    "items": [],
+    "recipes": [],
+    "rules": [],
+    "inventory": {
+      "slots": 12,
+      "starting": [],
+      "equipment": {},
+      "owner": {
+        "kind": "project",
+        "id": "project-d8047453-d110-4020-8e93-51fe4b2f57d5"
+      }
+    },
+    "hudWidgetId": null,
+    "cameraSettings": {
+      "eyeHeight": 1.25,
+      "sensitivity": 0.003,
+      "distance": 3,
+      "fov": 70
+    }
+  },
+  "functions": [
+    {
+      "id": "method-ecb3dec7-5221-426e-93fd-078288edccd0",
+      "name": "BridgeWorker · Удвоить",
+      "graphVersion": 1,
+      "logicResourceId": "logic-a7c6b01e-2629-4792-abdf-b08f65548ca6",
+      "componentMethodId": "double",
+      "parameters": [
+        {
+          "name": "amount",
+          "schema": {
+            "type": "number",
+            "default": 4,
+            "label": "Количество"
+          }
+        }
+      ],
+      "resultSchema": {
+        "type": "number"
+      },
+      "locals": {},
+      "entry": "",
+      "nodes": []
+    },
+    {
+      "id": "method-42a93460-362b-4b84-94f0-ac368c019aeb",
+      "name": "BridgeWorker · Медленная ветвь",
+      "graphVersion": 1,
+      "logicResourceId": "logic-a7c6b01e-2629-4792-abdf-b08f65548ca6",
+      "componentMethodId": "slow",
+      "parameters": [],
+      "resultSchema": {
+        "type": "boolean"
+      },
+      "locals": {},
+      "entry": "",
+      "nodes": []
+    },
+    {
+      "id": "method-f7049b06-fbaf-49cd-88c9-46a4f2788aa4",
+      "name": "BridgeWorker · Безопасная ветвь",
+      "graphVersion": 1,
+      "logicResourceId": "logic-a7c6b01e-2629-4792-abdf-b08f65548ca6",
+      "componentMethodId": "safe",
+      "parameters": [],
+      "resultSchema": {
+        "type": "boolean"
+      },
+      "locals": {},
+      "entry": "",
+      "nodes": []
+    },
+    {
+      "id": "function-33397027-b091-4850-98ed-e222d3a4a7e2",
+      "name": "Start",
+      "graphVersion": 1,
+      "parameters": [],
+      "resultSchema": {
+        "type": "number"
+      },
+      "stateSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "initialState": {},
+      "locals": {},
+      "entry": "fn-node-e9f32226-020b-4b51-b945-21fd04a2cbc5",
+      "nodes": [
+        {
+          "id": "function-33397027-b091-4850-98ed-e222d3a4a7e2-return",
+          "kind": "return",
+          "value": {
+            "op": "node",
+            "nodeId": "fn-node-e9f32226-020b-4b51-b945-21fd04a2cbc5",
+            "port": "value"
+          }
+        },
+        {
+          "id": "fn-node-e9f32226-020b-4b51-b945-21fd04a2cbc5",
+          "kind": "operation",
+          "componentMethod": {
+            "definitionId": "user.component.type-9717b45b-5d36-4e19-ac42-03a835828b97",
+            "definitionVersion": 1,
+            "methodId": "double"
+          },
+          "call": {
+            "id": "sacura.component.call",
+            "version": 1,
+            "parameters": {
+              "methodId": "double",
+              "args": {
+                "amount": 4
+              },
+              "instance": {
+                "kind": "reference",
+                "type": "mechanic",
+                "mode": "direct",
+                "id": "mechanic-2442dc90-f885-44a0-af2f-2757a3301cdd"
+              }
+            }
+          },
+          "next": "function-33397027-b091-4850-98ed-e222d3a4a7e2-return",
+          "position": {
+            "x": 430,
+            "y": 140
+          }
+        }
+      ],
+      "componentDefinitionId": "user.component.type-731e639c-def6-4c6c-b0a6-ef06e8bc3b60"
+    },
+    {
+      "id": "method-c568e83e-2da5-4049-8f1d-31a427bd9626",
+      "name": "BridgeWorker · Вызвать граф",
+      "graphVersion": 1,
+      "logicResourceId": "logic-a7c6b01e-2629-4792-abdf-b08f65548ca6",
+      "componentMethodId": "runGraph",
+      "parameters": [],
+      "resultSchema": {
+        "type": "number"
+      },
+      "locals": {},
+      "entry": "",
+      "nodes": []
+    },
+    {
+      "id": "function-892b7a81-9d19-4000-876f-6c958c6802ec",
+      "name": "Запустить поведение",
+      "graphVersion": 1,
+      "parameters": [],
+      "resultSchema": {
+        "type": "void"
+      },
+      "stateSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "initialState": {},
+      "locals": {},
+      "entry": "bt-control-5bd738b5-b720-4d0c-99f8-145dfb38d8fb",
+      "nodes": [
+        {
+          "id": "bt-control-5bd738b5-b720-4d0c-99f8-145dfb38d8fb",
+          "kind": "operation",
+          "call": {
+            "id": "sacura.behavior-tree.run",
+            "version": 1,
+            "parameters": {
+              "instance": {
+                "op": "get",
+                "path": "self"
+              }
+            }
+          },
+          "next": "function-892b7a81-9d19-4000-876f-6c958c6802ec-return"
+        },
+        {
+          "id": "function-892b7a81-9d19-4000-876f-6c958c6802ec-return",
+          "kind": "return"
+        }
+      ],
+      "componentDefinitionId": "user.component.type-e8a744ff-4e1f-4506-92d3-f543e4c7b9fd"
+    },
+    {
+      "id": "function-166aeb87-7eee-411e-901e-9235d9e188b3",
+      "name": "Остановить поведение",
+      "graphVersion": 1,
+      "parameters": [],
+      "resultSchema": {
+        "type": "void"
+      },
+      "stateSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "initialState": {},
+      "locals": {},
+      "entry": "bt-control-666ff34c-5b85-489e-b627-3424275e0c29",
+      "nodes": [
+        {
+          "id": "bt-control-666ff34c-5b85-489e-b627-3424275e0c29",
+          "kind": "operation",
+          "call": {
+            "id": "sacura.behavior-tree.stop",
+            "version": 1,
+            "parameters": {
+              "instance": {
+                "op": "get",
+                "path": "self"
+              }
+            }
+          },
+          "next": "function-166aeb87-7eee-411e-901e-9235d9e188b3-return"
+        },
+        {
+          "id": "function-166aeb87-7eee-411e-901e-9235d9e188b3-return",
+          "kind": "return"
+        }
+      ],
+      "componentDefinitionId": "user.component.type-e8a744ff-4e1f-4506-92d3-f543e4c7b9fd"
+    },
+    {
+      "id": "method-af7eeef4-3f74-4410-832d-e2602a7389b3",
+      "name": "BridgeWorker · Проверить отмену BT",
+      "graphVersion": 1,
+      "logicResourceId": "logic-a7c6b01e-2629-4792-abdf-b08f65548ca6",
+      "componentMethodId": "testTree",
+      "parameters": [],
+      "resultSchema": {
+        "type": "boolean"
+      },
+      "locals": {},
+      "entry": "",
+      "nodes": []
+    }
+  ],
+  "handlerGraphVersion": 1,
+  "authoringGraphVersion": 1,
+  "standardEventsVersion": 1,
+  "widgets": [
+    {
+      "id": "widget-default-dialogue",
+      "name": "Диалог",
+      "kind": "dialogue",
+      "referenceSize": [
+        1280,
+        720
+      ],
+      "elements": [
+        {
+          "id": "widget-default-dialogue-panel",
+          "name": "Диалоговое окно",
+          "type": "panel",
+          "parentId": null,
+          "role": "none",
+          "text": "",
+          "action": "none",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0,
+              1
+            ],
+            "anchorMax": [
+              1,
+              1
+            ],
+            "pivot": [
+              0.5,
+              1
+            ],
+            "x": 0,
+            "y": -34,
+            "width": -100,
+            "height": 205
+          },
+          "style": {
+            "background": "#211c29",
+            "color": "#fff4f8",
+            "opacity": 0.96,
+            "borderRadius": 16,
+            "borderWidth": 1,
+            "borderColor": "#ad849d",
+            "padding": 0
+          }
+        },
+        {
+          "id": "widget-default-dialogue-speaker",
+          "name": "Имя персонажа",
+          "type": "text",
+          "parentId": "widget-default-dialogue-panel",
+          "role": "speaker",
+          "text": "Новый текст",
+          "action": "none",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0,
+              0
+            ],
+            "anchorMax": [
+              1,
+              0
+            ],
+            "pivot": [
+              0,
+              0
+            ],
+            "x": 28,
+            "y": 18,
+            "width": -56,
+            "height": 32
+          },
+          "style": {
+            "background": "transparent",
+            "color": "#e2b8d1",
+            "fontSize": 23,
+            "fontWeight": 600,
+            "padding": 0
+          }
+        },
+        {
+          "id": "widget-default-dialogue-text",
+          "name": "Текст реплики",
+          "type": "text",
+          "parentId": "widget-default-dialogue-panel",
+          "role": "dialogueText",
+          "text": "Новый текст",
+          "action": "none",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0,
+              0
+            ],
+            "anchorMax": [
+              1,
+              1
+            ],
+            "pivot": [
+              0,
+              0
+            ],
+            "x": 28,
+            "y": 60,
+            "width": -88,
+            "height": -105
+          },
+          "style": {
+            "background": "transparent",
+            "color": "#fff4f8",
+            "fontSize": 24,
+            "padding": 0
+          }
+        },
+        {
+          "id": "widget-default-dialogue-status",
+          "name": "Подсказка",
+          "type": "text",
+          "parentId": "widget-default-dialogue-panel",
+          "role": "status",
+          "text": "Новый текст",
+          "action": "none",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0,
+              1
+            ],
+            "anchorMax": [
+              1,
+              1
+            ],
+            "pivot": [
+              0,
+              1
+            ],
+            "x": 28,
+            "y": -16,
+            "width": -90,
+            "height": 25
+          },
+          "style": {
+            "background": "transparent",
+            "color": "#d1bfd0",
+            "fontSize": 15,
+            "padding": 0
+          }
+        },
+        {
+          "id": "widget-default-dialogue-next",
+          "name": "Продолжить",
+          "type": "button",
+          "parentId": "widget-default-dialogue-panel",
+          "role": "none",
+          "text": "›",
+          "action": "advance",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              1,
+              1
+            ],
+            "anchorMax": [
+              1,
+              1
+            ],
+            "pivot": [
+              1,
+              1
+            ],
+            "x": -20,
+            "y": -14,
+            "width": 44,
+            "height": 44
+          },
+          "style": {
+            "background": "#704e7c",
+            "color": "#fff4f8",
+            "fontSize": 28,
+            "borderRadius": 10,
+            "textAlign": "center",
+            "padding": 0
+          }
+        },
+        {
+          "id": "widget-default-dialogue-choices",
+          "name": "Ответы игрока",
+          "type": "choices",
+          "parentId": null,
+          "role": "choices",
+          "text": "",
+          "action": "none",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0.5,
+              1
+            ],
+            "anchorMax": [
+              0.5,
+              1
+            ],
+            "pivot": [
+              0.5,
+              1
+            ],
+            "x": 0,
+            "y": -255,
+            "width": 620,
+            "height": 190
+          },
+          "style": {
+            "background": "transparent",
+            "color": "#fff4f8",
+            "fontSize": 22,
+            "borderRadius": 10,
+            "padding": 4,
+            "gap": 8
+          }
+        }
+      ],
+      "css": ""
+    },
+    {
+      "id": "widget-default-mainMenu",
+      "name": "Главное меню",
+      "kind": "mainMenu",
+      "referenceSize": [
+        1280,
+        720
+      ],
+      "elements": [
+        {
+          "id": "widget-default-mainMenu-panel",
+          "name": "Панель меню",
+          "type": "panel",
+          "parentId": null,
+          "role": "none",
+          "text": "",
+          "action": "none",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "x": 0,
+            "y": 0,
+            "width": 510,
+            "height": 440
+          },
+          "style": {
+            "background": "#211c29",
+            "color": "#fff4f8",
+            "opacity": 0.98,
+            "borderRadius": 20,
+            "borderWidth": 1,
+            "borderColor": "#ad849d",
+            "padding": 0
+          }
+        },
+        {
+          "id": "widget-default-mainMenu-title",
+          "name": "Заголовок",
+          "type": "text",
+          "parentId": "widget-default-mainMenu-panel",
+          "role": "title",
+          "text": "Пауза",
+          "action": "none",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0,
+              0
+            ],
+            "anchorMax": [
+              1,
+              0
+            ],
+            "pivot": [
+              0,
+              0
+            ],
+            "x": 30,
+            "y": 35,
+            "width": -60,
+            "height": 90
+          },
+          "style": {
+            "background": "transparent",
+            "color": "#fff4f8",
+            "fontSize": 36,
+            "fontWeight": 600,
+            "textAlign": "center",
+            "padding": 0
+          }
+        },
+        {
+          "id": "widget-default-mainMenu-start",
+          "name": "Начать игру",
+          "type": "button",
+          "parentId": "widget-default-mainMenu-panel",
+          "role": "none",
+          "text": "Начать игру",
+          "action": "start",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0.5,
+              0
+            ],
+            "anchorMax": [
+              0.5,
+              0
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "x": 0,
+            "y": 160,
+            "width": 380,
+            "height": 60
+          },
+          "style": {
+            "background": "#704e7c",
+            "color": "#fff4f8",
+            "fontSize": 24,
+            "textAlign": "center",
+            "borderRadius": 10,
+            "padding": 8
+          }
+        },
+        {
+          "id": "widget-default-mainMenu-restart",
+          "name": "Начать заново",
+          "type": "button",
+          "parentId": "widget-default-mainMenu-panel",
+          "role": "none",
+          "text": "Начать заново",
+          "action": "restart",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0.5,
+              0
+            ],
+            "anchorMax": [
+              0.5,
+              0
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "x": 0,
+            "y": 240,
+            "width": 380,
+            "height": 60
+          },
+          "style": {
+            "background": "#704e7c",
+            "color": "#fff4f8",
+            "fontSize": 24,
+            "textAlign": "center",
+            "borderRadius": 10,
+            "padding": 8
+          }
+        }
+      ],
+      "css": ""
+    },
+    {
+      "id": "widget-default-pauseMenu",
+      "name": "Меню паузы",
+      "kind": "pauseMenu",
+      "referenceSize": [
+        1280,
+        720
+      ],
+      "elements": [
+        {
+          "id": "widget-default-pauseMenu-panel",
+          "name": "Панель меню",
+          "type": "panel",
+          "parentId": null,
+          "role": "none",
+          "text": "",
+          "action": "none",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "x": 0,
+            "y": 0,
+            "width": 510,
+            "height": 440
+          },
+          "style": {
+            "background": "#211c29",
+            "color": "#fff4f8",
+            "opacity": 0.98,
+            "borderRadius": 20,
+            "borderWidth": 1,
+            "borderColor": "#ad849d",
+            "padding": 0
+          }
+        },
+        {
+          "id": "widget-default-pauseMenu-title",
+          "name": "Заголовок",
+          "type": "text",
+          "parentId": "widget-default-pauseMenu-panel",
+          "role": "none",
+          "text": "Пауза",
+          "action": "none",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0,
+              0
+            ],
+            "anchorMax": [
+              1,
+              0
+            ],
+            "pivot": [
+              0,
+              0
+            ],
+            "x": 30,
+            "y": 35,
+            "width": -60,
+            "height": 90
+          },
+          "style": {
+            "background": "transparent",
+            "color": "#fff4f8",
+            "fontSize": 36,
+            "fontWeight": 600,
+            "textAlign": "center",
+            "padding": 0
+          }
+        },
+        {
+          "id": "widget-default-pauseMenu-resume",
+          "name": "Продолжить",
+          "type": "button",
+          "parentId": "widget-default-pauseMenu-panel",
+          "role": "none",
+          "text": "Продолжить",
+          "action": "resume",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0.5,
+              0
+            ],
+            "anchorMax": [
+              0.5,
+              0
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "x": 0,
+            "y": 160,
+            "width": 380,
+            "height": 60
+          },
+          "style": {
+            "background": "#704e7c",
+            "color": "#fff4f8",
+            "fontSize": 24,
+            "textAlign": "center",
+            "borderRadius": 10,
+            "padding": 8
+          }
+        },
+        {
+          "id": "widget-default-pauseMenu-restart",
+          "name": "Начать заново",
+          "type": "button",
+          "parentId": "widget-default-pauseMenu-panel",
+          "role": "none",
+          "text": "Начать заново",
+          "action": "restart",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0.5,
+              0
+            ],
+            "anchorMax": [
+              0.5,
+              0
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "x": 0,
+            "y": 240,
+            "width": 380,
+            "height": 60
+          },
+          "style": {
+            "background": "#704e7c",
+            "color": "#fff4f8",
+            "fontSize": 24,
+            "textAlign": "center",
+            "borderRadius": 10,
+            "padding": 8
+          }
+        },
+        {
+          "id": "widget-default-pauseMenu-mainMenu",
+          "name": "Главное меню",
+          "type": "button",
+          "parentId": "widget-default-pauseMenu-panel",
+          "role": "none",
+          "text": "Главное меню",
+          "action": "mainMenu",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0.5,
+              0
+            ],
+            "anchorMax": [
+              0.5,
+              0
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "x": 0,
+            "y": 320,
+            "width": 380,
+            "height": 60
+          },
+          "style": {
+            "background": "#704e7c",
+            "color": "#fff4f8",
+            "fontSize": 24,
+            "textAlign": "center",
+            "borderRadius": 10,
+            "padding": 8
+          }
+        }
+      ],
+      "css": ""
+    },
+    {
+      "id": "widget-default-hud",
+      "name": "Игровой HUD",
+      "kind": "hud",
+      "referenceSize": [
+        1280,
+        720
+      ],
+      "elements": [
+        {
+          "id": "widget-default-hud-hp",
+          "name": "Здоровье",
+          "type": "text",
+          "parentId": null,
+          "role": "none",
+          "text": "HP",
+          "action": "none",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0,
+              0
+            ],
+            "anchorMax": [
+              0,
+              0
+            ],
+            "pivot": [
+              0,
+              0
+            ],
+            "x": 24,
+            "y": 22,
+            "width": 200,
+            "height": 42
+          },
+          "style": {
+            "fontSize": 24,
+            "padding": 0
+          },
+          "binding": {
+            "source": "variable",
+            "path": "hp",
+            "format": "HP: {value}"
+          }
+        },
+        {
+          "id": "widget-default-hud-health",
+          "name": "Шкала здоровья",
+          "type": "progress",
+          "parentId": null,
+          "role": "none",
+          "text": "",
+          "action": "none",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0,
+              0
+            ],
+            "anchorMax": [
+              0,
+              0
+            ],
+            "pivot": [
+              0,
+              0
+            ],
+            "x": 24,
+            "y": 68,
+            "width": 220,
+            "height": 16
+          },
+          "style": {
+            "background": "transparent",
+            "color": "#fff4f8",
+            "fontSize": 24,
+            "fontFamily": "system-ui",
+            "fontWeight": 400,
+            "borderColor": "#ad849d",
+            "borderWidth": 0,
+            "borderRadius": 12,
+            "padding": 12,
+            "opacity": 1,
+            "textAlign": "left",
+            "gap": 8
+          },
+          "binding": {
+            "source": "variable",
+            "path": "hp"
+          },
+          "maxVariable": "maxHp",
+          "min": 0,
+          "max": 100
+        },
+        {
+          "id": "widget-default-hud-ammo",
+          "name": "Патроны",
+          "type": "text",
+          "parentId": null,
+          "role": "none",
+          "text": "Новый текст",
+          "action": "none",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0,
+              0
+            ],
+            "anchorMax": [
+              0,
+              0
+            ],
+            "pivot": [
+              0,
+              0
+            ],
+            "x": 24,
+            "y": 98,
+            "width": 220,
+            "height": 40
+          },
+          "style": {
+            "fontSize": 24,
+            "padding": 0
+          },
+          "binding": {
+            "source": "variable",
+            "path": "ammo",
+            "format": "Ammo: {value}"
+          }
+        },
+        {
+          "id": "widget-default-hud-inventory",
+          "name": "Инвентарь",
+          "type": "inventory",
+          "parentId": null,
+          "role": "none",
+          "text": "",
+          "action": "none",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              1,
+              1
+            ],
+            "anchorMax": [
+              1,
+              1
+            ],
+            "pivot": [
+              1,
+              1
+            ],
+            "x": -24,
+            "y": -24,
+            "width": 440,
+            "height": 130
+          },
+          "style": {
+            "background": "transparent",
+            "color": "#fff4f8",
+            "fontSize": 24,
+            "fontFamily": "system-ui",
+            "fontWeight": 400,
+            "borderColor": "#ad849d",
+            "borderWidth": 0,
+            "borderRadius": 12,
+            "padding": 12,
+            "opacity": 1,
+            "textAlign": "left",
+            "gap": 8
+          }
+        }
+      ],
+      "css": ""
+    }
+  ],
+  "ui": {
+    "dialogue": "widget-default-dialogue",
+    "mainMenu": "widget-default-mainMenu",
+    "pauseMenu": "widget-default-pauseMenu",
+    "hud": "widget-default-hud"
+  },
+  "logicResources": [
+    {
+      "id": "logic-a7c6b01e-2629-4792-abdf-b08f65548ca6",
+      "version": 1,
+      "kind": "component.code",
+      "name": "BridgeWorker",
+      "path": "Компоненты/BridgeWorker.js",
+      "definitionId": "user.component.type-9717b45b-5d36-4e19-ac42-03a835828b97",
+      "status": "ready",
+      "approved": true,
+      "source": "const component = {\n name: \"BridgeWorker\",\n state: {type:\"object\",properties:{calls:{type:\"number\",default:0}}},\n references: {type:\"object\",properties:{mode:{type:\"reference\",referenceType:\"variable\",optional:true,label:\"Режим ветви\"},tree:{type:\"reference\",referenceType:\"mechanic\",optional:true,label:\"Дерево поведения\"},graph:{type:\"reference\",referenceType:\"mechanic\",optional:true,label:\"Граф-получатель\"}}},\n methods: {\n testTree:{name:\"Проверить отмену BT\",result:{type:\"boolean\"},async run({refs,engine,state,owner}){await engine.operation(\"sacura.variable.set\",{variable:refs.mode,value:true});await engine.operation(\"sacura.component.start\",{instance:refs.tree,methodId:\"start\",args:{},lifetime:\"project\",lifetimeOwner:owner});await engine.wait(0.6);await engine.operation(\"sacura.variable.set\",{variable:refs.mode,value:false});await engine.wait(0.6);await engine.invoke(refs.tree,\"stop\",{});const stopped=state.calls;await engine.wait(5.5);await engine.operation(\"sacura.game.message\",{message:\"BT отмена: \"+(state.calls===stopped?\"чисто\":\"ОШИБКА\")+\"; вызовы \"+stopped+\"/\"+state.calls});return state.calls===stopped;}},\n runGraph: {name:\"Вызвать граф\",result:{type:\"number\"},async run({refs,engine}){const value = await engine.invoke(refs.graph, \"method-3358a3c1-198b-490b-b89d-60d805e6b48b\", {}); await engine.operation(\"sacura.game.message\",{message:\"Код → граф → код: \"+value});await engine.wait(2);return value;}},\n  double: {name:\"Удвоить\",parameters:{type:\"object\",properties:{amount:{type:\"number\",default:4,label:\"Количество\"}}},result:{type:\"number\"},run({args,state}){state.calls++;return args.amount*2;}},\n  slow: {name:\"Медленная ветвь\",result:{type:\"boolean\"},async run({engine,state}){await engine.operation(\"sacura.game.message\",{message:\"Ожидание ветви\"});await engine.wait(5);state.calls++;await engine.operation(\"sacura.game.message\",{message:\"Поздняя ветвь завершилась: \"+state.calls});return true;}},\n  safe: {name:\"Безопасная ветвь\",result:{type:\"boolean\"},async run({engine,state}){state.calls++;await engine.operation(\"sacura.game.message\",{message:\"Безопасная ветвь: \"+state.calls});await engine.wait(1);return true;}}\n }\n};",
+      "fingerprint": "2161:8a385d30",
+      "dependencies": {
+        "functions": {},
+        "events": {},
+        "references": {},
+        "globals": {},
+        "signals": {},
+        "operations": {
+          "sacura.game.message": {
+            "operationId": "sacura.game.message",
+            "operationVersion": 1
+          },
+          "sacura.variable.set": {
+            "operationId": "sacura.variable.set",
+            "operationVersion": 1
+          },
+          "sacura.component.start": {
+            "operationId": "sacura.component.start",
+            "operationVersion": 1
+          }
+        }
+      },
+      "signalBindings": {},
+      "locations": {
+        "testTree": {
+          "line": 6,
+          "column": 63
+        },
+        "runGraph": {
+          "line": 7,
+          "column": 56
+        },
+        "double": {
+          "line": 8,
+          "column": 142
+        },
+        "slow": {
+          "line": 9,
+          "column": 57
+        },
+        "safe": {
+          "line": 10,
+          "column": 58
+        }
+      }
+    },
+    {
+      "id": "logic-e0bb4ad9-d292-4b82-9e85-0fa8861c3941",
+      "version": 1,
+      "kind": "component.graph",
+      "name": "BridgeGraph",
+      "path": "Компоненты/BridgeGraph.graph",
+      "definitionId": "user.component.type-731e639c-def6-4c6c-b0a6-ef06e8bc3b60",
+      "status": "ready",
+      "approved": true
+    },
+    {
+      "id": "logic-2903cb91-f5d5-44e1-9838-194f45847de9",
+      "version": 1,
+      "kind": "behavior.tree",
+      "name": "BranchBehavior",
+      "path": "Компоненты/BranchBehavior.bt",
+      "definitionId": "user.component.type-e8a744ff-4e1f-4506-92d3-f543e4c7b9fd",
+      "status": "ready",
+      "approved": true,
+      "root": "bt-1944b407-bbcd-4953-b746-23cb56d2480e",
+      "nodes": [
+        {
+          "id": "bt-1944b407-bbcd-4953-b746-23cb56d2480e",
+          "kind": "selector",
+          "name": "Выбор поведения",
+          "children": [
+            "bt-6ae7e09c-852c-4097-886c-26df65d5aae7",
+            "bt-a3b394b0-0c41-4f8d-ad07-6cd66910bbc3"
+          ],
+          "position": {
+            "x": 80,
+            "y": 60
+          }
+        },
+        {
+          "id": "bt-6ae7e09c-852c-4097-886c-26df65d5aae7",
+          "kind": "sequence",
+          "name": "Последовательность",
+          "position": {
+            "x": 420,
+            "y": 80
+          },
+          "children": [
+            "bt-784fbc1c-6195-4552-b6c5-019b8dcaa020",
+            "bt-b9eb6c2a-1123-42a2-94ca-709a25e82d65"
+          ]
+        },
+        {
+          "id": "bt-784fbc1c-6195-4552-b6c5-019b8dcaa020",
+          "kind": "condition",
+          "name": "Условие",
+          "position": {
+            "x": 760,
+            "y": 80
+          },
+          "condition": {
+            "op": "node",
+            "nodeId": "bt-058b3619-49aa-4f18-8e38-e51d6f585b98"
+          }
+        },
+        {
+          "id": "bt-058b3619-49aa-4f18-8e38-e51d6f585b98",
+          "kind": "value",
+          "name": "Данные экземпляра",
+          "position": {
+            "x": 80,
+            "y": 340
+          },
+          "value": {
+            "op": "get",
+            "path": "global.slowMode"
+          }
+        },
+        {
+          "id": "bt-b9eb6c2a-1123-42a2-94ca-709a25e82d65",
+          "kind": "task",
+          "name": "BridgeWorker · Медленная ветвь",
+          "position": {
+            "x": 420,
+            "y": 340
+          },
+          "call": {
+            "methodId": "slow",
+            "args": {},
+            "instance": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "mechanic-2442dc90-f885-44a0-af2f-2757a3301cdd"
+            }
+          },
+          "componentMethod": {
+            "definitionId": "user.component.type-9717b45b-5d36-4e19-ac42-03a835828b97",
+            "definitionVersion": 1,
+            "methodId": "slow"
+          }
+        },
+        {
+          "id": "bt-a3b394b0-0c41-4f8d-ad07-6cd66910bbc3",
+          "kind": "task",
+          "name": "BridgeWorker · Безопасная ветвь",
+          "position": {
+            "x": 760,
+            "y": 340
+          },
+          "call": {
+            "methodId": "safe",
+            "args": {},
+            "instance": {
+              "kind": "reference",
+              "type": "mechanic",
+              "mode": "direct",
+              "id": "mechanic-2442dc90-f885-44a0-af2f-2757a3301cdd"
+            }
+          },
+          "componentMethod": {
+            "definitionId": "user.component.type-9717b45b-5d36-4e19-ac42-03a835828b97",
+            "definitionVersion": 1,
+            "methodId": "safe"
+          }
+        }
+      ]
+    }
+  ],
+  "variableTypes": {
+    "slowMode": "boolean"
+  }
+}

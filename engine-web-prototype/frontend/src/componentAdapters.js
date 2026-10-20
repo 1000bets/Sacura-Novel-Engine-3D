@@ -1,0 +1,23 @@
+import {componentParameterView} from './componentFieldBindings.js';
+import {descriptionFor} from './mechanicDescriptions.js';
+// Explicit native adapters are references to one instance, never a search by type.
+export function adapterInstance(config, adapter) {
+ if(adapter?.version!==undefined&&adapter.version!==1)throw Error('Версия native-адаптера недоступна.');
+ const id=adapter?.instance?.id, m=config.mechanics.find(m=>m.id===id);
+ if(!m)throw Error('Подключение native-адаптера удалено: '+(id||'не назначено'));
+ return m;
+}
+export function adapterParameters(project,adapter,variables=project.variables){const m=adapterInstance(project.gameplay,adapter),d=descriptionFor(project,m.definitionId,m.definitionVersion);return componentParameterView(project,m,d,variables);}
+export function callAdapter(game,adapter,method,args,context={}){if(!adapter.methods?.[method])throw Error('Метод native-адаптера не назначен: '+method);return game.callComponent(adapter.instance,adapter.methods[method],args,context);}
+export function attachComponentAdapters(game){
+ const s=game.state;
+ for(const [id,a] of Object.entries(game.config.actors))if(a.componentHealth)s.actors[id]=s.mechanicStates[adapterInstance(game.config,a.componentHealth).id];
+ for(const w of game.config.weapons)if(w.component)s.weapons[w.id]=s.mechanicStates[adapterInstance(game.config,w.component).id];
+ const owners=new Set();for(const w of game.config.weapons){const selector=w.component?.selector;if(!selector||owners.has(w.ownerId))continue;owners.add(w.ownerId);const state=s.mechanicStates[adapterInstance(game.config,selector).id];if(!state)throw Error('Состояние выбора оружия отсутствует.');Object.defineProperty(s.selectedWeapons,w.ownerId,{enumerable:true,configurable:true,get(){const selected=state[selector.field];if(!selected)return '';const target=game.config.weapons.find(item=>item.ownerId===w.ownerId&&item.component?.instance.id===selected.id);if(!target)throw Error('Выбранное подключение оружия недоступно.');return target.id;},set(id){if(!id){state[selector.field]=null;return;}const target=game.config.weapons.find(item=>item.ownerId===w.ownerId&&item.id===id);if(!target?.component)throw Error('Выбранному оружию нужен явный компонент.');state[selector.field]={kind:'reference',type:'mechanic',mode:'direct',id:target.component.instance.id};}});}
+
+}
+// Native maps are runtime views. Only mechanicStates owns authored HP/ammunition in saves.
+export function stripComponentAdapterViews(project,state){for(const [id,a]of Object.entries(project.gameplay.actors))if(a.componentHealth)delete state.actors[id];for(const w of project.gameplay.weapons)if(w.component){delete state.weapons[w.id];if(w.component.selector)delete state.selectedWeapons[w.ownerId];}}
+export function releaseComponentNativeHandles(game,taskId){for(const [key,h]of game.componentNativeHandles||[])if(h.taskId===taskId){h.release();game.componentNativeHandles.delete(key);}}
+export function ownComponentNativeHandle(game,key,context,release){game.componentNativeHandles?.delete(key);if(!context.componentTaskId)return;game.componentNativeHandles??=new Map();game.componentNativeHandles.set(key,{taskId:context.componentTaskId,release});}
+export function validateComponentAdapters(project){const issues=[];for(const [owner,adapter,required]of [...Object.entries(project.gameplay.actors).filter(([,a])=>a.componentHealth).map(([id,a])=>[id,a.componentHealth,['hp','maxHP','dead']]),...project.gameplay.weapons.filter(w=>w.component).map(w=>[w.ownerId,w.component,['ammo','reserve','nextShot','reloadUntil','enabled']])]){try{const m=adapterInstance(project.gameplay,adapter),d=descriptionFor(project,m.definitionId,m.definitionVersion);if(m.scope.kind!=='object'||m.scope.id!==owner)throw Error('Владелец native-адаптера не совпадает с компонентом.');for(const field of required)if(!d?.stateSchema.properties[field]||m.fieldBindings?.some(b=>b.target==='state'&&b.field===field))throw Error('Адаптеру нужно собственное поле состояния '+field);if(adapter.selector){const selector=adapterInstance(project.gameplay,adapter.selector),definition=descriptionFor(project,selector.definitionId,selector.definitionVersion),schema=definition?.stateSchema.properties[adapter.selector.field];if(selector.scope.kind!=='object'||selector.scope.id!==owner||schema?.type!=='reference'||schema.referenceType!=='mechanic'||selector.fieldBindings?.some(b=>b.target==='state'&&b.field===adapter.selector.field))throw Error('Выбор оружия должен ссылаться на собственное поле подключения владельца.');}for(const method of Object.values(adapter.methods||{}))if(!d.methods[method])throw Error('Метод адаптера удалён: '+method);}catch(e){issues.push(e.message);}}return issues;}

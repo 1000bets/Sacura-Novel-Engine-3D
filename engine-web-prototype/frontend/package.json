@@ -1,0 +1,38 @@
+{
+  "name": "sacura-ui-study",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node --test tests/*.test.js",
+    "build:player": "node scripts/build-player.mjs",
+    "predev": "npm run build:player",
+    "prebuild": "npm run build:player",
+    "build:templates": "node scripts/build-component-sources.mjs && node scripts/build-builtin-templates.mjs",
+    "pretest": "npm run build:player"
+  },
+  "dependencies": {
+    "@babel/parser": "^7.29.9",
+    "@codemirror/lang-javascript": "^6.2.5",
+    "@codemirror/language": "^6.13.1",
+    "@codemirror/lint": "^6.9.7",
+    "@dagrejs/dagre": "^3.1.1",
+    "@jitl/quickjs-singlefile-browser-release-sync": "^0.32.0",
+    "@lezer/highlight": "^1.2.5",
+    "@xyflow/react": "^12.11.6",
+    "codemirror": "^6.0.2",
+    "lucide-react": "^0.468.0",
+    "quickjs-emscripten-core": "^0.32.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.3",
+    "jsdom": "^29.1.1",
+    "vite": "^7.1.0"
+  }
+}

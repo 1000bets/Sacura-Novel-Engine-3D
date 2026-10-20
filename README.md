@@ -94,3 +94,29 @@ Editor и Player принимают `--backend Auto`, `--backend D3D12`, `--back
 ```powershell
 & './build/Stage/Bin/SakuraPlayer.exe' --project './Samples/SampleProject/SampleProject.project' --backend Vulkan --screenshot-player './build/player-vulkan.png'
 ```
+
+## Обязательные требования продукта
+
+[Требования Sacura](docs/PRODUCT-REQUIREMENTS.md) имеют приоритет над прежними архитектурными предложениями. Каждое изменение проверяется по трём принципам: простота, переносимость и редактируемость, универсальность.
+
+- [Проверка каждого изменения](docs/CHANGE-CHECKLIST.md).
+- [Минимальный формат авторского пакета v1](docs/AUTHORING-PACKAGE-V1.md).
+- [Приёмка «Дверь с ключом»: A → B → C](docs/ACCEPTANCE-DOOR-WITH-KEY.md).
+
+Авторский пакет сохраняет редактируемую логику и зависимости; экспорт целого проекта или готовой игры не заменяет перенос отдельной механики. Новые компоненты используют пакет исходников [v3](docs/AUTHORING-PACKAGE-V3.md); старые v1/v2 читаются через совместимость. Текущий авторский путь и фактические результаты — в [приёмке компонентов](docs/COMPONENT-ACCEPTANCE.md).
+
+Выберите объект в иерархии → подключите компонент → настройте параметры в инспекторе → откройте общую реализацию. Новый тип создаётся через **Создать → Компонент → Код / Граф**. Вызов метода из истории, ввода и UI использует одного явного получателя. [Каталог пяти учебных проектов](docs/COMPONENT-TEMPLATES.md), [SDK](docs/COMPONENT-SDK.md).
+
+## Прототип и запуск
+
+Веб-прототип редактора на React и Three.js, его сервер, тесты, контейнеры и инфраструктура находятся в [engine-web-prototype](engine-web-prototype/README.md).
+
+Для запуска редактора:
+
+```sh
+cd engine-web-prototype/frontend
+npm install
+npm run dev
+```
+
+Контейнерный запуск с SQLite и S3, настройка HTTPS и резервное копирование описаны в [руководстве размещения](engine-web-prototype/deploy/README.md). Команды Docker Compose выполняются из `engine-web-prototype`.

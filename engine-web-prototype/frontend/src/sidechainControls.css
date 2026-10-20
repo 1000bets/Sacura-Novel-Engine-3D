@@ -1,0 +1,8 @@
+.sidechain-settings{min-width:0;margin:0 0 14px;padding:12px;border:1px solid var(--line,#44404d);border-radius:5px;background:var(--panel,#282932)}
+.sidechain-settings legend{padding:0 6px;color:var(--text,#d5d3dc);font-weight:600;font-size:13px}
+.sidechain-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px}
+.sidechain-fields input{width:100%;min-width:0}
+.sidechain-fields small{color:var(--muted,#9694a4);font-size:11px;line-height:1.4}
+.sidechain-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:12px}
+.sidechain-footer>span{color:var(--muted,#9694a4);font-size:11px;line-height:1.5;flex:1;min-width:170px}
+.sidechain-footer button{font-size:11px;white-space:nowrap}

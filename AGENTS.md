@@ -428,3 +428,38 @@ Python @register_class / field()
 - Future material editing adapters must apply only the draft that completed compilation; edits during preparation require another Apply. Their previews must coalesce ancestor/include changes without dirtying local overrides. Parent shader edits are not write conflicts for an instance document. External texture changes prepare fingerprints on workers, update Game metadata, and replace bindings only after successful upload; moved/deleted texture watches cannot publish into another asset.
 - Pinned DiligentCore receives the reproducible `PatchDiligentOpenGLQuery.cmake` FetchContent patch: query names from glGenQueries are not labelable objects until initialized, so labels require glIsQuery. GPU timing and Debug validation remain enabled; no third-party source copy or manual dependency edit is required.
 - Material and MaterialInstance use the generic asset activation contract without builtin asset-editor handlers. Future material editing adapters own presentation only; EditorCore owns documents and commands, Engine/RHI owns compilation and immutable preview snapshots. Runtime MaterialWidget and UserInterface remain supported, as do Content creation, assignment and material binding controls. The proposed editing-session contract in `Root/EditorCore/MaterialEditorUiContract.md` is not yet implemented.
+
+# Обязательные продуктовые правила Sacura
+
+Перед изменениями прочитай [требования продукта](docs/PRODUCT-REQUIREMENTS.md).
+Они имеют приоритет над прежними архитектурными предложениями, заметками по
+дизайну и жанровыми примерами. Явные инструкции пользователя остаются главным
+источником требований.
+
+Для каждого изменения проверь три принципа по
+[списку проверки](docs/CHANGE-CHECKLIST.md): простота, переносимость и
+редактируемость, универсальность. В результате работы укажи фактическую
+проверку и незакрытые ограничения; неприменимость объясняй, а не считай успехом.
+
+- Основной путь: выбрать готовую механику → добавить → настроить понятные
+  параметры → запустить. Внутреннюю логику раскрывай по запросу в том же
+  редакторе и на тех же данных. Типовые сценарии не требуют JSON, ручных ID,
+  путей свойств или кода.
+- Пользовательские Events, функции, механики и шаблоны — локальные редактируемые
+  данные. Перенос с зависимостями является обязательной возможностью, а не
+  задачей после рефакторинга. Контракт: [пакет v1](docs/AUTHORING-PACKAGE-V1.md).
+  Экспорт проекта или готовой игры не заменяет экспорт авторской заготовки.
+- Импорт предварительно проверяет пакет, показывает состав и привязки,
+  разрешает конфликты без молчаливой перезаписи и применяется целиком либо
+  оставляет проект прежним. Не исполняй JavaScript и установочные скрипты из
+  пользовательских пакетов; расширения движка с кодом устанавливаются отдельно.
+- Все жанры используют общую модель Events, групп действий и функций.
+  Герой, HP, оружие и победа над врагами нужны только использующим их механикам.
+  Движение, физика и рендер остаются низкоуровневыми системами, без цепочек
+  асинхронных Events на каждый кадр.
+- Сейчас не реализуй магазин, оплату, аккаунты или облачную синхронизацию ради
+  обмена пакетами. Будущий магазин использует тот же локальный формат.
+
+Приёмка переноса: [«Дверь с ключом», A → B → C](docs/ACCEPTANCE-DOOR-WITH-KEY.md).
+Не объявляй её выполненной без проверки работы, редактирования и независимости
+копий. Техническая универсальность не компенсирует усложнение обычной механики.

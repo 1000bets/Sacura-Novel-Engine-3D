@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.sites-runtime/
+*.log
+
+.agents/
+design-system/
+
+# Generated alongside player-runtime.js/css by build:player
+public/player-runtime.manifest.json

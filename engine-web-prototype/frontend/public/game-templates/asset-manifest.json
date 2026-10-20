@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "assets": {
+    "153cb849eb62ca81e244942f4cef42e90b342c87f13ebf142dc7e6e9582bd04f": "sound/MainMenuSound.mp3",
+    "ba9fcb41df29ae6cad63434c778596d1882abe5a817d5e49add78b354d65814e": "sound/The_house_greeted_her_with_the_scent_of_wet_wood.mp3",
+    "fa1f64e9ccdce2f46879916bd05ef68915fa4253dfffd645bd9223945bc39e4b": "sound/You_came_back_after_all.mp3",
+    "d98480267df23a827a005a1142a7a2edcf3d68a2925e60d635f72993a1cd6036": "sound/I_promised_return_before_rain_goes.mp3"
+  }
+}

@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.sites-runtime/
+*.log
+.env
+.env.*
+!.env.example
+!.env.*.example
+!.env.sample
+!.env.*.sample
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+.DS_Store
+/design-system/

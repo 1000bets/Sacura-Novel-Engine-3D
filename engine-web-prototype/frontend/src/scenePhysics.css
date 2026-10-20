@@ -1,0 +1,9 @@
+.scene-physics-settings { border:1px solid var(--border-subtle); border-radius:8px; padding:12px; margin:14px 0; min-width:0; }
+.scene-physics-settings legend { font-weight:600; padding:0 5px; }
+.scene-physics-settings p { font-size:12px; line-height:1.6; margin:8px 0 12px; color:var(--text-secondary, #b7acbc); }
+.scene-physics-settings .check { display:flex; align-items:center; gap:8px; margin:8px 0; }
+.physics-fields { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:10px 0; }
+.physics-fields label { display:flex; flex-direction:column; gap:5px; font-size:12px; }
+.physics-fields input { width:100%; min-width:0; box-sizing:border-box; }
+.scene-physics-settings:disabled { opacity:.65; }
+@media(max-width:500px) { .physics-fields { grid-template-columns:1fr; } }

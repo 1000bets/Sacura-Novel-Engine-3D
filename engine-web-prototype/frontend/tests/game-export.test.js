@@ -1,0 +1,6 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {playableHtml} from '../src/gameExport.js';
+test('standalone export embeds authored data safely and drops remote stylesheet dependencies',()=>{const p={title:'Game < & >',text:'</script><script>bad()</script>'},html=playableHtml(p,'console.log("</script>")','@import url("https://example.com/font.css");body{color:white}');assert.ok(html.includes('<title>Game &lt; &amp; &gt;</title>'));assert.ok(html.includes('globalThis.SACURA_PROJECT='));assert.ok(!html.includes('<script>bad()'));assert.ok(!html.includes('https://example.com'));assert.ok(html.includes('console.log("<\\/script>")'));assert.throws(()=>playableHtml(p,''),/runtime/);});
+
+test('export removes minified font imports containing semicolons without consuming local CSS',()=>{const html=playableHtml({title:'Test'},'console.log(1)', '@import"https://fonts.googleapis.com/css2?family=Golos:wght@400;500;600&display=swap";.standalone-game{position:relative;height:100vh}');assert.ok(!html.includes('fonts.googleapis.com'));assert.ok(html.includes('<style>html,body,#game{margin:0;height:100%;overflow:hidden}.standalone-game{position:relative;height:100vh}</style>'));});

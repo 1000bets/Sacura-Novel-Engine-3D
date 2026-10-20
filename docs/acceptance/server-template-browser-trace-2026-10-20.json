@@ -1,0 +1,3097 @@
+{
+  "checkedAt": "2026-10-20",
+  "site": "https://sacura-test.duckdns.org/",
+  "browserClientRelease": "12172c939d2b2182401a3004bc616c6e28ebeea8",
+  "finalServerRelease": "5fc25d6a31d06e4d269da66f08b32c82e20e4c29",
+  "note": "Actual visible browser UI during branching playthroughs with real audio and staging. The journal proves visits to story blocks. Choice-click actions are recorded in the conversation and acceptance report; they are not inferred from available choices. The final release fixes typed component arguments; weapon and door scenarios were repeated on that client.",
+  "expectedBeats": 106,
+  "observedBeats": 106,
+  "missing": [],
+  "observations": [
+    {
+      "text": [
+        "Дом встретил её запахом мокрого дерева."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-74177019-6bc4-47c2-9211-9856c6111dd9 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Ты всё-таки вернулась."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-1cfab7cb-b626-4bf3-a408-0f29e8eb70ae / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Я обещала прийти до дождя."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-5c9d884c-a454-4f8f-b764-f15918e696e2 / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Он начался ещё час назад."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-fc5da094-0a06-419b-8de7-85260db2dc13 / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Здесь ничего не изменилось."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-6869543b-9514-4a15-a158-6fdc39fd8fd9 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [],
+      "status": [],
+      "choices": [],
+      "task": [
+        "Осмотрите письмо и шкатулку в любом порядке. Алиса может ходить по гостиной.Двигаться: W/↑/S/↓/A/←/D/→, геймпад, экран · Осмотреть: E, геймпад, экран · Идти по указателю: клик / касаниеПисьмоШкатулка с воспоминаниями"
+      ],
+      "caption": [
+        "Главная камераimport-b53d8709-e75b-4827-b11d-c08c3c73f401 / WAITING_OBJECT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Некоторые вещи просто ждут своего времени."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-61dee4d4-4333-4f9c-a0db-29bc69875581 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Часы пробили восемь."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-3ad52cef-869d-4f46-b2fe-4b8e9a828488 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "А некоторые ждут слишком долго."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-70b5ed2c-6db7-4048-88d0-d6c906a25851 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Я нашёл кое-что среди её вещей."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-3f8e0248-0cf0-4a6f-9d8a-03c86a4e81d2 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Ты ведь не открывал его?"
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-5e2c49da-616c-4032-8c9f-33e14265061e / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Алиса отворачивается к окну."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-1115b51a-875c-4592-8942-2cb5149988c2 / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Алиса отворачивается к окну."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-1115b51a-875c-4592-8942-2cb5149988c2 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Что сказать Бобу?"
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Рассказать правду",
+        "Спрятать письмо",
+        "Спросить о матери"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-f8a66ad5-4a1c-462e-a4e2-ee5f7cd78db1 / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Она говорила обо мне?"
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-324e8066-b029-4952-b2ac-989dd5976471 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "О каком воспоминании спросить?"
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "О последнем лете",
+        "О старом доме"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-bde7944d-f8ea-4ce7-a58b-eb2e77eba5ef / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Она не меняла замок."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-6eefdf10-11fa-4d70-959b-ccf5b887ffcc / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Хотела, чтобы твой ключ всегда подходил."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-70e5cb4d-c5c9-4cdf-8c9a-2c8ebd38baaf / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Каждый день. Даже когда молчала."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-4be92124-4706-40f2-8442-313a5c6a073b / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Я не знала."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-1812f88c-1f01-45e4-83ce-e97db57ee015 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Мокрые ветки заслоняют дорожку. Дом остался позади."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-7806d58f-f6f8-438e-869b-ba467fc12174 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "На земле чьи-то свежие следы."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-769362c7-c9e5-47c2-8b4a-dac2e5091fd6 / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Что делать со следами?"
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Пойти к старой скамье",
+        "Вернуться и всё рассказать",
+        "Уехать до рассвета"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-784eae35-0682-41cf-8853-152c1f45a11f / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "«Я ждала тебя здесь каждое утро»."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-705fde7d-c95d-42ea-9429-2486507700f5 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Я думал, ты её никогда не найдёшь."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-3b61b725-085b-4443-831d-558a6bcfc27b / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "У меня ещё есть время."
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Остаться до рассвета",
+        "Проводить Боба на поезд"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-d1359902-8d87-4c98-9464-fa218f1f2640 / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Дождь стихает. Сквозь ветви проходит первый свет."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-bfb363a1-8ad5-412e-84b1-d4efb5d1427d / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Я остаюсь. На этот раз — по-настоящему."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-c2d401c8-550b-43fb-9750-f2ad40eb37d1 / ENDING"
+      ],
+      "errors": []
+    },
+    {
+      "text": [],
+      "status": [],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-c2d401c8-550b-43fb-9750-f2ad40eb37d1 / FINISHED"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Это старые бумаги. Ничего важного."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-b29e6fe1-d398-4f43-a454-fe91f055afc9 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Тогда почему у тебя дрожат руки?"
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-119a6a3a-b1ff-492f-9f15-8e46b77419ee / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Наверное, из-за холода."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-a7831d18-943f-499e-af36-a1323dd62b62 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Вместо гостиной — пустая платформа и огни последнего поезда."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-7449a035-64b8-4511-a026-6587da3c893d / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Билет в один конец. Как и в прошлый раз."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-a73a4dfb-d622-470d-bf22-0e77e1f67ade / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Поезд отправится через несколько минут."
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Сесть в поезд",
+        "Вернуться домой"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-7a1ad298-a073-4127-9b02-f2bd25967fc8 / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Двери закрываются. Дом растворяется в тумане."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-6b9c9960-ff81-4ba3-97c9-fe7961343dca / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Некоторые письма нужно прочитать в дороге."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-fa4d2332-84fb-4b4e-9665-e6e48372dad8 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Впереди — другая история."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-a9ceaefe-c2b2-4d67-84d3-727bce89395b / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [],
+      "status": [],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-a9ceaefe-c2b2-4d67-84d3-727bce89395b / FINISHED"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Она говорила обо мне?"
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-324e8066-b029-4952-b2ac-989dd5976471 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "О каком воспоминании спросить?"
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "О последнем лете",
+        "О старом доме"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-bde7944d-f8ea-4ce7-a58b-eb2e77eba5ef / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Она каждое утро выходила в сад."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-20412405-066b-4c8c-b386-a438bc3e745e / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Говорила: яблоня ждёт тебя."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-89128c92-5988-4a62-9ecd-4697af972061 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Каждый день. Даже когда молчала."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-4be92124-4706-40f2-8442-313a5c6a073b / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Я не знала."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-1812f88c-1f01-45e4-83ce-e97db57ee015 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Мокрые ветки заслоняют дорожку. Дом остался позади."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-7806d58f-f6f8-438e-869b-ba467fc12174 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "На земле чьи-то свежие следы."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-769362c7-c9e5-47c2-8b4a-dac2e5091fd6 / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Что делать со следами?"
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Пойти к старой скамье",
+        "Вернуться и всё рассказать",
+        "Уехать до рассвета"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-784eae35-0682-41cf-8853-152c1f45a11f / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Я думала, что она сердится на меня."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-16af9005-3fd0-4bf8-b95f-5f94fff77b9d / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Она скучала. Это совсем другое."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-85920295-0e0d-4b2f-abe7-bd541784067f / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Можно начать сначала?"
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-1e2507ce-c412-438b-8ff6-2e159aac814e / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Как закончится этот разговор?"
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Остаться дома",
+        "Пообещать вернуться"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-c8345bc5-be3e-459a-b686-5408663fa3d6 / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Наверное, я всё ещё помню, где моя комната."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-37cb7e9b-9b60-434b-8707-42bf5b6664e4 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Что сказать напоследок?"
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Попросить прощения",
+        "Поговорить о завтра"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-a8eccace-035a-4bf8-b549-aaaf0db1c77c / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Завтра начнём с сада."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-6adc0ae7-b934-49d3-ad4e-f03e724c8add / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "А потом разберём чердак."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-ce135585-c560-43e0-9c1e-b5cc81e3527f / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Там всё готово."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-071aad71-a414-46d4-acf6-9be30839db08 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Тишина больше не кажется пустой."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-fbe1de9c-54a7-4159-92cd-33dab3930dc0 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Над садом светлеет небо."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-ef982770-a2a3-4c66-91f4-1ea74272b58b / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Утро начинается с маленького выбора."
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Заварить мамин чай",
+        "Открыть окно"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-5b7dbbb9-df0f-4ff8-9bee-eb217f931bc7 / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "В комнату вошёл свежий воздух."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-f2f26502-3fe6-4486-b9b9-6c41e25816d7 / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Дождь наконец закончился."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-b2ef79a6-5e05-4623-a390-af1ed931e7b3 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Я поставлю чайник."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-6507f574-c069-4a20-8207-4e52cabf6b4a / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Как раньше?"
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-0fcced8b-9796-4043-bdf2-2ee2f049ef0b / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Как раньше."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-5f4d40d4-057d-4be4-a814-1f242fb42eaf / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Камин догорает. На столе лежит открытое письмо."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-878e21b0-a130-41e4-b46b-49dfd1b7c469 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Конец главы."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-740cc041-8dc4-4291-bb0e-90516890a07e / ENDING"
+      ],
+      "errors": []
+    },
+    {
+      "text": [],
+      "status": [],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-740cc041-8dc4-4291-bb0e-90516890a07e / FINISHED"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Это последнее письмо от мамы."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-a80c2c30-148d-46d1-9a3e-8b3266b40ad1 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Спросить, почему письмо осталось здесь?"
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Спросить прямо",
+        "Дать ему время"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-3ba77aca-4152-4089-82e7-0eee1fa7f932 / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Не отвечай сейчас."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-f0c85b9f-13b6-4d33-a153-af2f0e31aa22 / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Я тоже долго не решалась вернуться."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-21df376e-4797-4466-b274-b3615a5020f9 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Ты можешь прочитать его здесь."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-31f01b5f-7be0-46cc-b299-b43f742da822 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Только останься рядом."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-82047f64-65db-4832-85da-b836e4b313e8 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "За окном стало совсем темно."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-db0b8163-5b9e-4676-8abf-9617e4c1cb64 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Письмо всё ещё на столе."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-463dc2cd-a052-4ef5-8761-734cd236ff10 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Я подожду у камина."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-5646802f-9634-460e-bcfc-f42467e666ef / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Найди письмо на столе."
+      ],
+      "status": [
+        "Нажмите на объект «Письмо»"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-e24afc03-41f6-4dfb-8db1-2d4686457070 / WAITING_OBJECT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Бумага всё ещё пахнет её духами."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-044bf723-60e5-4a92-bdec-5b71bafbf153 / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "На конверте только одно слово: «Домой»."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-6085f2eb-6e1e-468b-8255-e417f4674c52 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Почему она не отправила его?"
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-12328f1b-62f5-4a14-a3a8-e0c6f14f6fbd / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Возможно, хотела сказать всё сама."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-e997602e-32d5-4138-a975-1394f683588d / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Прочитать письмо?"
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Прочитать вслух",
+        "Оставить на потом"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-e5b1e09b-8161-495a-a01c-4530afedf45a / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Я пока не готова."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-e60f4e7a-98f8-448d-8b29-5f72f25d1548 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Мы никуда не торопимся."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-b04169c8-907f-43c6-865f-35f8c42f7f10 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Гром заставил стёкла задрожать."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-a2970464-d33e-4199-a751-ed7610976bb1 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Кажется, дверь в сад открыта."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-0d2faa32-9418-4822-9ecf-e19edcebc59e / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Я посмотрю."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-d9b389e2-729c-4a73-ae6c-26293a18b121 / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Ветер переворачивает страницу."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-3f657baa-a2a6-4c07-8d5b-ac209e7cf9d2 / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Ветер переворачивает страницу."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-3f657baa-a2a6-4c07-8d5b-ac209e7cf9d2 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Куда пойти?"
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Выйти в сад",
+        "Остаться с Бобом"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-caada95d-d636-4c95-bc87-d97922a5f8a5 / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Расскажи мне ещё что-нибудь о ней."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-cda54924-c316-41ac-98c0-0bc9ae0df1a3 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Она всегда оставляла свет на крыльце."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-e7d041e3-f01c-47f1-b330-e2c4d2df27d4 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Дождь постепенно стихает."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-b50eff0b-7981-45b1-ba80-6b56c7fc1f2e / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Я думала, что она сердится на меня."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-16af9005-3fd0-4bf8-b95f-5f94fff77b9d / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Она скучала. Это совсем другое."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-85920295-0e0d-4b2f-abe7-bd541784067f / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Можно начать сначала?"
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-1e2507ce-c412-438b-8ff6-2e159aac814e / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Я приеду на выходных."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-c2db827c-748a-4bb1-a796-d77be94a0a8b / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Ключ можешь оставить себе."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-e166b73c-f265-40a0-adcb-491247bd65cd / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Вместо гостиной — пустая платформа и огни последнего поезда."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-7449a035-64b8-4511-a026-6587da3c893d / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Билет в один конец. Как и в прошлый раз."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-a73a4dfb-d622-470d-bf22-0e77e1f67ade / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Поезд отправится через несколько минут."
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Сесть в поезд",
+        "Вернуться домой"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-7a1ad298-a073-4127-9b02-f2bd25967fc8 / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Я думала, что она сердится на меня."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-16af9005-3fd0-4bf8-b95f-5f94fff77b9d / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Она скучала. Это совсем другое."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-85920295-0e0d-4b2f-abe7-bd541784067f / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Можно начать сначала?"
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-1e2507ce-c412-438b-8ff6-2e159aac814e / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Как закончится этот разговор?"
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Остаться дома",
+        "Пообещать вернуться"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-c8345bc5-be3e-459a-b686-5408663fa3d6 / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Наверное, я всё ещё помню, где моя комната."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-37cb7e9b-9b60-434b-8707-42bf5b6664e4 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Что сказать напоследок?"
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Попросить прощения",
+        "Поговорить о завтра"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-a8eccace-035a-4bf8-b549-aaaf0db1c77c / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Прости, что меня не было рядом."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-5861034d-75d8-4e02-aa44-bc47a75fe760 / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Ты рядом сейчас."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-208a27a9-aeff-4a38-8a4e-b873f8d1e809 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Там всё готово."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-071aad71-a414-46d4-acf6-9be30839db08 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Тишина больше не кажется пустой."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-fbe1de9c-54a7-4159-92cd-33dab3930dc0 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Над садом светлеет небо."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-ef982770-a2a3-4c66-91f4-1ea74272b58b / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Утро начинается с маленького выбора."
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Заварить мамин чай",
+        "Открыть окно"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-5b7dbbb9-df0f-4ff8-9bee-eb217f931bc7 / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "На полке нашлась жестяная банка."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-d28a5759-8b3b-46c0-bbd6-56a65f4ca28b / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Тот самый запах бергамота."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-145c10b3-068e-45eb-b169-d727f74ba49a / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Я поставлю чайник."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-6507f574-c069-4a20-8207-4e52cabf6b4a / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Как раньше?"
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-0fcced8b-9796-4043-bdf2-2ee2f049ef0b / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Как раньше."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-5f4d40d4-057d-4be4-a814-1f242fb42eaf / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Камин догорает. На столе лежит открытое письмо."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-878e21b0-a130-41e4-b46b-49dfd1b7c469 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Конец главы."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-740cc041-8dc4-4291-bb0e-90516890a07e / ENDING"
+      ],
+      "errors": []
+    },
+    {
+      "text": [],
+      "status": [],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-740cc041-8dc4-4291-bb0e-90516890a07e / FINISHED"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Это последнее письмо от мамы."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-a80c2c30-148d-46d1-9a3e-8b3266b40ad1 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Спросить, почему письмо осталось здесь?"
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Спросить прямо",
+        "Дать ему время"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-3ba77aca-4152-4089-82e7-0eee1fa7f932 / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Я боялся, что ты снова уедешь."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-c29aa662-f59b-46a7-82f6-1a8f79c0e12a / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Но у тебя было право знать."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-6d352ec6-fe10-4be0-8929-5514fd27db1a / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Ты можешь прочитать его здесь."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-31f01b5f-7be0-46cc-b299-b43f742da822 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Только останься рядом."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-82047f64-65db-4832-85da-b836e4b313e8 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "За окном стало совсем темно."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-db0b8163-5b9e-4676-8abf-9617e4c1cb64 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Письмо всё ещё на столе."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-463dc2cd-a052-4ef5-8761-734cd236ff10 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Я подожду у камина."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-5646802f-9634-460e-bcfc-f42467e666ef / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Найди письмо на столе."
+      ],
+      "status": [
+        "Нажмите на объект «Письмо»"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-e24afc03-41f6-4dfb-8db1-2d4686457070 / WAITING_OBJECT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Бумага всё ещё пахнет её духами."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-044bf723-60e5-4a92-bdec-5b71bafbf153 / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "На конверте только одно слово: «Домой»."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-6085f2eb-6e1e-468b-8255-e417f4674c52 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Почему она не отправила его?"
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-12328f1b-62f5-4a14-a3a8-e0c6f14f6fbd / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Возможно, хотела сказать всё сама."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-e997602e-32d5-4138-a975-1394f683588d / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Прочитать письмо?"
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Прочитать вслух",
+        "Оставить на потом"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-e5b1e09b-8161-495a-a01c-4530afedf45a / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "«Если ты читаешь это, значит, нашла дорогу»."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-a9abdd0e-5893-423a-973c-1d2ba2c92340 / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Продолжить читать?"
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Прочитать следующую страницу",
+        "Сложить письмо"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-4c131a22-4144-4e04-96de-1064544fc58b / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "На сегодня достаточно."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-3b29dcfa-8d5a-4f65-884b-3ee96cc458d7 / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Остальное я прочту завтра."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-c11c879e-1ba5-466a-9a8b-1c141240174e / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Это очень на неё похоже."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-c1675d79-34f2-4ca7-acf3-3d6862e49bea / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Гром заставил стёкла задрожать."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-a2970464-d33e-4199-a751-ed7610976bb1 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Кажется, дверь в сад открыта."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-0d2faa32-9418-4822-9ecf-e19edcebc59e / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Я посмотрю."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-d9b389e2-729c-4a73-ae6c-26293a18b121 / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Ветер переворачивает страницу."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-3f657baa-a2a6-4c07-8d5b-ac209e7cf9d2 / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Ветер переворачивает страницу."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-3f657baa-a2a6-4c07-8d5b-ac209e7cf9d2 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Куда пойти?"
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Выйти в сад",
+        "Остаться с Бобом"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-caada95d-d636-4c95-bc87-d97922a5f8a5 / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Она посадила это дерево в год моего рождения."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-790d0505-3c01-47fc-ae04-397906b237df / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Что рассмотреть в саду?"
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Отметки на дереве",
+        "Свет на крыльце"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-c14d3a3c-c1f4-457f-9fc3-8e912d84aef1 / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Вот эта — когда мне было двенадцать."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-c1c01a0b-6aba-4e39-8a86-ff07d861e5ce / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "А рядом её почерк."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-c75e04ca-85bb-4c33-88d9-c96d5c839d45 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "И каждый год отмечала на нём твой рост."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-1abfe2a2-ad50-4604-8e50-d907a1bdb7ef / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Мокрые ветки заслоняют дорожку. Дом остался позади."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-7806d58f-f6f8-438e-869b-ba467fc12174 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "На земле чьи-то свежие следы."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-769362c7-c9e5-47c2-8b4a-dac2e5091fd6 / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Что делать со следами?"
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Пойти к старой скамье",
+        "Вернуться и всё рассказать",
+        "Уехать до рассвета"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-784eae35-0682-41cf-8853-152c1f45a11f / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "«Я ждала тебя здесь каждое утро»."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-705fde7d-c95d-42ea-9429-2486507700f5 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Я думал, ты её никогда не найдёшь."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-3b61b725-085b-4443-831d-558a6bcfc27b / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "У меня ещё есть время."
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Остаться до рассвета",
+        "Проводить Боба на поезд"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-d1359902-8d87-4c98-9464-fa218f1f2640 / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Вместо гостиной — пустая платформа и огни последнего поезда."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-7449a035-64b8-4511-a026-6587da3c893d / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Билет в один конец. Как и в прошлый раз."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-a73a4dfb-d622-470d-bf22-0e77e1f67ade / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Поезд отправится через несколько минут."
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Сесть в поезд",
+        "Вернуться домой"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-7a1ad298-a073-4127-9b02-f2bd25967fc8 / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Двери закрываются. Дом растворяется в тумане."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-6b9c9960-ff81-4ba3-97c9-fe7961343dca / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Некоторые письма нужно прочитать в дороге."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-fa4d2332-84fb-4b4e-9665-e6e48372dad8 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Впереди — другая история."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-a9ceaefe-c2b2-4d67-84d3-727bce89395b / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [],
+      "status": [],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-a9ceaefe-c2b2-4d67-84d3-727bce89395b / FINISHED"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "«Не вини себя за расстояние»."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-87efdf58-3caa-4c80-988c-850c9c16f62a / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "«Некоторые дороги нужны, чтобы вернуться»."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-bc6ef4cb-a364-4f1c-8d88-76ad506296f0 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Это очень на неё похоже."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-c1675d79-34f2-4ca7-acf3-3d6862e49bea / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Гром заставил стёкла задрожать."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-a2970464-d33e-4199-a751-ed7610976bb1 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Кажется, дверь в сад открыта."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-0d2faa32-9418-4822-9ecf-e19edcebc59e / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Я посмотрю."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-d9b389e2-729c-4a73-ae6c-26293a18b121 / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Ветер переворачивает страницу."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-3f657baa-a2a6-4c07-8d5b-ac209e7cf9d2 / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Ветер переворачивает страницу."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-3f657baa-a2a6-4c07-8d5b-ac209e7cf9d2 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Куда пойти?"
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Выйти в сад",
+        "Остаться с Бобом"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-caada95d-d636-4c95-bc87-d97922a5f8a5 / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Она посадила это дерево в год моего рождения."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-790d0505-3c01-47fc-ae04-397906b237df / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Что рассмотреть в саду?"
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Отметки на дереве",
+        "Свет на крыльце"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-c14d3a3c-c1f4-457f-9fc3-8e912d84aef1 / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Лампочку меняли недавно."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-64290d73-fc44-436d-9238-36e36c097e53 / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Кто-то всё это время оставлял свет."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-caeff34a-b60a-4ec3-a4a7-e3d7f7eebe47 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "И каждый год отмечала на нём твой рост."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-1abfe2a2-ad50-4604-8e50-d907a1bdb7ef / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Мокрые ветки заслоняют дорожку. Дом остался позади."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-7806d58f-f6f8-438e-869b-ba467fc12174 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "На земле чьи-то свежие следы."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-769362c7-c9e5-47c2-8b4a-dac2e5091fd6 / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Что делать со следами?"
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Пойти к старой скамье",
+        "Вернуться и всё рассказать",
+        "Уехать до рассвета"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-784eae35-0682-41cf-8853-152c1f45a11f / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Вместо гостиной — пустая платформа и огни последнего поезда."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-7449a035-64b8-4511-a026-6587da3c893d / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Билет в один конец. Как и в прошлый раз."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-a73a4dfb-d622-470d-bf22-0e77e1f67ade / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Поезд отправится через несколько минут."
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Сесть в поезд",
+        "Вернуться домой"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-7a1ad298-a073-4127-9b02-f2bd25967fc8 / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Предъявите билет у вагона."
+      ],
+      "status": [
+        "Осталось осмотреть: Билет."
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-8ea38ebe-14dc-478d-b35a-76132e5bf3e2 / WAITING_OBJECT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Двери закрываются. Дом растворяется в тумане."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-6b9c9960-ff81-4ba3-97c9-fe7961343dca / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Некоторые письма нужно прочитать в дороге."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-fa4d2332-84fb-4b4e-9665-e6e48372dad8 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Впереди — другая история."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-a9ceaefe-c2b2-4d67-84d3-727bce89395b / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [],
+      "status": [],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-a9ceaefe-c2b2-4d67-84d3-727bce89395b / FINISHED"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "«Не вини себя за расстояние»."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-87efdf58-3caa-4c80-988c-850c9c16f62a / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "«Некоторые дороги нужны, чтобы вернуться»."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-bc6ef4cb-a364-4f1c-8d88-76ad506296f0 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Это очень на неё похоже."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-c1675d79-34f2-4ca7-acf3-3d6862e49bea / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Гром заставил стёкла задрожать."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-a2970464-d33e-4199-a751-ed7610976bb1 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Кажется, дверь в сад открыта."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-0d2faa32-9418-4822-9ecf-e19edcebc59e / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Я посмотрю."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-d9b389e2-729c-4a73-ae6c-26293a18b121 / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Ветер переворачивает страницу."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-3f657baa-a2a6-4c07-8d5b-ac209e7cf9d2 / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Ветер переворачивает страницу."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-3f657baa-a2a6-4c07-8d5b-ac209e7cf9d2 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Куда пойти?"
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Выйти в сад",
+        "Остаться с Бобом"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-caada95d-d636-4c95-bc87-d97922a5f8a5 / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Она посадила это дерево в год моего рождения."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-790d0505-3c01-47fc-ae04-397906b237df / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Что рассмотреть в саду?"
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Отметки на дереве",
+        "Свет на крыльце"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-c14d3a3c-c1f4-457f-9fc3-8e912d84aef1 / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Лампочку меняли недавно."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-64290d73-fc44-436d-9238-36e36c097e53 / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Кто-то всё это время оставлял свет."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-caeff34a-b60a-4ec3-a4a7-e3d7f7eebe47 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "И каждый год отмечала на нём твой рост."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-1abfe2a2-ad50-4604-8e50-d907a1bdb7ef / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Мокрые ветки заслоняют дорожку. Дом остался позади."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-7806d58f-f6f8-438e-869b-ba467fc12174 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "На земле чьи-то свежие следы."
+      ],
+      "status": [
+        "Выполняются действия"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-769362c7-c9e5-47c2-8b4a-dac2e5091fd6 / ON_START"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Что делать со следами?"
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Пойти к старой скамье",
+        "Вернуться и всё рассказать",
+        "Уехать до рассвета"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-784eae35-0682-41cf-8853-152c1f45a11f / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Осмотрите записку на скамье."
+      ],
+      "status": [
+        "Нажмите на объект «Записка на скамье»"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-a25839ec-2f22-465c-9afd-8906a28337a8 / WAITING_OBJECT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "«Я ждала тебя здесь каждое утро»."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-705fde7d-c95d-42ea-9429-2486507700f5 / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Я думал, ты её никогда не найдёшь."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-3b61b725-085b-4443-831d-558a6bcfc27b / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "У меня ещё есть время."
+      ],
+      "status": [
+        "Выберите ответ"
+      ],
+      "choices": [
+        "Остаться до рассвета",
+        "Проводить Боба на поезд"
+      ],
+      "task": [],
+      "caption": [
+        "Главная камераimport-d1359902-8d87-4c98-9464-fa218f1f2640 / WAITING_CHOICE"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Дождь стихает. Сквозь ветви проходит первый свет."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-bfb363a1-8ad5-412e-84b1-d4efb5d1427d / WAITING_INPUT"
+      ],
+      "errors": []
+    },
+    {
+      "text": [
+        "Я остаюсь. На этот раз — по-настоящему."
+      ],
+      "status": [
+        "Нажмите, чтобы продолжить"
+      ],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-c2d401c8-550b-43fb-9750-f2ad40eb37d1 / ENDING"
+      ],
+      "errors": []
+    },
+    {
+      "text": [],
+      "status": [],
+      "choices": [],
+      "task": [],
+      "caption": [
+        "Главная камераimport-c2d401c8-550b-43fb-9750-f2ad40eb37d1 / FINISHED"
+      ],
+      "errors": []
+    }
+  ]
+}

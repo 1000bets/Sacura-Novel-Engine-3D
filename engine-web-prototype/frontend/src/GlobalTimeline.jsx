@@ -1,0 +1,234 @@
+import {flowAriaLabels} from './flowLocalization.js';
+import {t as tr, useLocale, message} from './i18n.jsx';
+import React, {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {ReactFlow, Background, Controls, MiniMap, Handle, Position, MarkerType, BaseEdge, EdgeLabelRenderer, useNodesInitialized, useReactFlow, useStore} from '@xyflow/react';
+import dagre from '@dagrejs/dagre';
+import {Icon, Button} from './StudioParts.jsx';
+import {buildTimelineModel, cleanTimelinePositions, timelineNodeForBeat, timelineVariableNodeId, timelineVariableValue} from './timelineModel.js';
+import '@xyflow/react/dist/style.css';
+import './globalTimeline.css';
+
+const NODE_WIDTH = 276;
+const MIN_ZOOM = .005;
+const FIT_ALL = {padding:.13,duration:350,minZoom:MIN_ZOOM,maxZoom:.85};
+const nodeHeight = node => node.kind === 'choice' ? 152 + node.choices.length * 58 : node.kind === 'ending' ? 187 : node.kind === 'missing' ? 128 : 219;
+
+function InitialTimelineViewport({nodeId}) {
+  const initialized = useNodesInitialized();
+  const {viewportInitialized,getNode,setCenter} = useReactFlow();
+  // React Flow updates these dimensions from its container ResizeObserver.
+  // onInit alone can fire before either the canvas or nodes have dimensions.
+  const width = useStore(state => state.width), height = useStore(state => state.height);
+  const focused = useRef(false);
+  useEffect(() => {
+    if (focused.current || !initialized || !viewportInitialized || !width || !height) return;
+    const node = getNode(nodeId);
+    if (!node?.measured?.width || !node.measured.height) return;
+    focused.current = true;
+    setCenter(node.position.x+node.measured.width/2,node.position.y+node.measured.height/2,{zoom:.85,duration:0});
+  },[initialized,viewportInitialized,width,height,nodeId,getNode,setCenter]);
+  return null;
+}
+
+function layoutTimeline(model) {
+  const graph = new dagre.graphlib.Graph({multigraph:true});
+  graph.setGraph({rankdir:'LR',ranksep:115,nodesep:75,edgesep:28,marginx:40,marginy:110});
+  graph.setDefaultEdgeLabel(() => ({}));
+  model.nodes.forEach(node => graph.setNode(node.id, {width:NODE_WIDTH,height:nodeHeight(node)}));
+  // Exclude cycle edges and visits back to earlier subscenes. Every remaining
+  // connection reads left to right; returns have separate lanes above the story.
+  model.edges.filter(edge => !edge.isReturn).forEach(edge => graph.setEdge(edge.source,edge.target,{},edge.id));
+  dagre.layout(graph);
+  return new Map(model.nodes.map(node => {
+    const position = graph.node(node.id);
+    return [node.id,{x:position.x - NODE_WIDTH / 2,y:position.y - nodeHeight(node) / 2}];
+  }));
+}
+
+const TimelineNode = memo(function TimelineNode({data}) {
+ useLocale();
+  const {node,active,running,selected,dependent,onSelect,onOpenBeat,onOpenScene} = data;
+  const open = () => node.entryBeatId ? onOpenBeat(node.entryBeatId) : onOpenScene?.(node.sceneId);
+  return <article className={`global-timeline-node ${node.kind}${active?' current':''}${running && active?' playing':''}${selected?' inspected':''}${dependent?' dependent':''}${!node.reachable?' disconnected':''}`} style={{'--scene-color':node.color || '#bd94a9'}}>
+    <Handle type="target" position={Position.Left}/>
+    {node.kind !== 'choice' && !['ending','missing'].includes(node.kind) && <Handle type="source" position={Position.Right}/>}
+    <div className="global-timeline-node-meta" title={tr("Потяните карточку, чтобы изменить её место на таймлайне")}><span>{node.kind === 'choice' ? tr("ВЫБОР / УСЛОВИЯ") : node.kind === 'ending' ? tr("КОНЕЦ ИГРЫ") : node.kind === 'missing' ? tr("ОБРЫВ МАРШРУТА") : node.isSceneEntry ? tr("НАЧАЛО САБСЦЕНЫ") : tr("САБСЦЕНА · ФРАГМЕНТ")}</span><Icon name="GripHorizontal" size={17}/></div>
+    {active && <div className="global-timeline-current"><i/>{running?tr("Сейчас в playtest"):tr("Текущая реплика")}</div>}
+    <div className="global-timeline-node-title" title={tr("Потяните для перемещения · двойной щелчок открывает сценарий")}>{node.systemTitle?tr(node.title):node.title}</div>
+    {node.kind !== 'subscene' && <small className="global-timeline-node-scene">{node.sceneId?node.sceneName:tr(node.sceneName)}</small>}
+    {node.kind === 'choice' ? <>
+      <p className="global-timeline-question">{node.kind==='missing'?tr(node.text):node.text}</p>
+      <div className="global-timeline-answers">{node.choices.map((choice,index) => <div className="global-timeline-answer" key={choice.id || index}>
+        <button className="nodrag" title={tr("Открыть исходный выбор и изменить ответ")} onClick={open}><b>{index+1}</b><span>{node.choicesAreSystem?tr(choice.label):choice.label || tr("Ответ без названия")}<small className={choice.condition && choice.condition !== 'always'?'conditional':''}>{message(choice.conditionLabel)}</small></span></button>
+        <Handle type="source" position={Position.Right} id={choice.id || String(index)}/>
+      </div>)}</div>
+      {node.emptyChoice && <p className="global-timeline-warning">{tr("У выбора нет ответов")}</p>}
+    </> : <>
+      <p className="global-timeline-excerpt">{node.empty?tr("Сабсцена ещё не содержит реплик"):node.text}</p>
+      {node.kind === 'subscene' && <div className="global-timeline-node-counts"><span>{node.beatIds.length} {tr("реплик")}{node.gates?tr(" · {0} взаимодействий", [node.gates]):''}</span>{node.parts>1 && <span>{node.part}/{node.parts}</span>}</div>}
+      {node.openEnd && <p className="global-timeline-warning">{node.empty?tr("Добавьте первую реплику"):tr("Продолжение ещё не задано")}</p>}
+      {node.kind !== 'missing' && <div className="global-timeline-node-actions"><Button className="nodrag" icon={node.kind==='ending'?'Flag':'Workflow'} onClick={open}>{node.kind === 'ending'?tr("Открыть концовку"):tr("Сценарий")}</Button>{node.kind === 'subscene' && onOpenScene && <Button className="nodrag" icon="Box" title={tr("Открыть 3D-сцену")} onClick={() => onOpenScene(node.sceneId)}/>}</div>}
+    </>}
+    {!node.reachable && node.kind !== 'missing' && <span className="global-timeline-disconnected">{tr("Нет пути от начала истории")}</span>}
+    <button className="nodrag global-timeline-inspect" aria-label={tr("Показать связи: {0}", [node.title])} title={tr("Показать связи узла")} onClick={() => onSelect(node.id)}><Icon name="ScanLine" size={13}/></button>
+  </article>;
+});
+
+function VariableNode({data}) {
+ useLocale();
+  return <div className="global-timeline-variable-node" title={tr("Потяните для перемещения")}><Handle type="source" position={Position.Right}/><small>{tr("ГЛОБАЛЬНАЯ ПЕРЕМЕННАЯ ")}<Icon name="GripHorizontal" size={14}/></small><strong><Icon name="Variable"/>{data.variable.name}</strong><span>{data.variable.id} = {timelineVariableValue(data.value)}</span><small>{tr("Пунктир → условие ответа")}</small></div>;
+}
+
+function ReturnEdge(props) {
+ useLocale();
+  const {sourceX,sourceY,targetX,targetY,data,markerEnd,style,label} = props;
+  const lane = data.laneY, bend = 48;
+  const path = `M ${sourceX} ${sourceY} C ${sourceX+bend} ${sourceY}, ${sourceX+bend} ${lane}, ${sourceX} ${lane} L ${targetX} ${lane} C ${targetX-bend} ${lane}, ${targetX-bend} ${targetY}, ${targetX} ${targetY}`;
+  return <><BaseEdge id={props.id} path={path} markerEnd={markerEnd} style={style} interactionWidth={22}/><EdgeLabelRenderer><span className="global-timeline-return-label nodrag nopan" style={{transform:`translate(-50%, -50%) translate(${(sourceX+targetX)/2}px, ${lane}px)`}}>{data?.authoredLabel?label:tr(label)}</span></EdgeLabelRenderer></>;
+}
+const nodeTypes = {timeline:TimelineNode,variable:VariableNode};
+const edgeTypes = {return:ReturnEdge};
+
+export default function GlobalTimeline({project,currentSceneId,currentBeatId,running=false,variables,onOpenScene,onOpenBeat,onOpenVariables,onLayoutChange}) {
+ useLocale();
+  const language=useLocale();
+  const model = useMemo(() => buildTimelineModel(project),[project,language]);
+  const autoPositions = useMemo(() => layoutTimeline(model),[model]);
+  const savedPositions = useMemo(() => cleanTimelinePositions(project,project.editor?.timelinePositions,model),[project,model]);
+  const [dragPositions,setDragPositions] = useState({});
+  const positions = useMemo(() => new Map([...autoPositions].map(([id,position]) => [id,dragPositions[id] || savedPositions[id] || position])),[autoPositions,savedPositions,dragPositions]);
+  const activeId = timelineNodeForBeat(model,currentBeatId);
+  const [selected,setSelected] = useState(null), [variableId,setVariableId] = useState(null);
+  const [follow,setFollow] = useState(true), [selectedEdge,setSelectedEdge] = useState(null);
+  const flow = useRef(null);
+  const dragStart = useRef(null), dragged = useRef(false), resetRequested = useRef(false);
+  const [measurements,setMeasurements] = useState({});
+  const onNodesChange = useCallback(changes => {
+    const moved = changes.filter(change => change.type === 'position' && change.position);
+    if (moved.length) setDragPositions(previous => ({...previous,...Object.fromEntries(moved.map(change => [change.id,{...change.position}]))}));
+    const resized = changes.filter(change => change.type === 'dimensions' && change.dimensions);
+    if (!resized.length) return;
+    // Controlled nodes must retain ResizeObserver measurements. Discarding
+    // dimension changes leaves useNodesInitialized false and fitView incomplete.
+    setMeasurements(previous => {
+      let next = previous;
+      for (const {id,dimensions} of resized) if (previous[id]?.width !== dimensions.width || previous[id]?.height !== dimensions.height) {
+        if (next === previous) next = {...previous};
+        next[id] = dimensions;
+      }
+      return next;
+    });
+  },[]);
+  useEffect(() => {
+    setDragPositions({});
+    if (resetRequested.current) {
+      resetRequested.current = false;
+      flow.current?.fitView(FIT_ALL);
+    }
+  },[project]);
+  const onNodeDragStart = (_,node,draggedNodes) => {
+    const moved = draggedNodes?.length ? draggedNodes : [node];
+    dragStart.current = Object.fromEntries(moved.map(item => [item.id,{...(savedPositions[item.id] || autoPositions.get(item.id) || item.position)}]));
+    dragged.current = true;
+    if (running) setFollow(false);
+  };
+  const onNodeDragStop = (_,node,draggedNodes) => {
+    const moved = draggedNodes?.length ? draggedNodes : [node];
+    const changed = moved.filter(item => {
+      const start = dragStart.current?.[item.id];
+      return start && (start.x !== item.position.x || start.y !== item.position.y);
+    });
+    dragStart.current = null;
+    if (!changed.length) {setDragPositions({});return;}
+    const next = cleanTimelinePositions(project,{...savedPositions,...Object.fromEntries(changed.map(item => [item.id,item.position]))},model);
+    // Pointer moves only affect local preview. One completed drag = one project
+    // mutation, so save/load keeps the layout and Ctrl+Z undoes the whole move.
+    onLayoutChange?.(next);
+  };
+  const restoreAutoLayout = () => {
+    if (!onLayoutChange || !Object.keys(savedPositions).length) return;
+    resetRequested.current = true;
+    onLayoutChange({});
+  };
+  const activeNode = model.nodes.find(node => node.id === activeId);
+  const shownNode = model.nodes.find(node => node.id === selected) || activeNode;
+  const shownEdge = model.edges.find(edge => edge.id === selectedEdge);
+  const variable = model.variables.find(item => item.id === variableId);
+  const currentValues = variables || project.variables || {};
+  const focusNode = useCallback(id => {
+    const node = model.nodes.find(item => item.id === id), position = positions.get(id);
+    if (position && flow.current) flow.current.setCenter(position.x+NODE_WIDTH/2,position.y+nodeHeight(node)/2,{zoom:.85,duration:320});
+  },[model,positions]);
+  useEffect(() => {
+    if (running && follow && activeId) focusNode(activeId);
+  },[running,follow,activeId,focusNode]);
+  const selectNode = id => {setSelected(id);setSelectedEdge(null);};
+  const nodes = model.nodes.map(node => ({id:node.id,type:'timeline',position:positions.get(node.id),measured:measurements[node.id],
+    style:{width:NODE_WIDTH},data:{node,active:node.id === activeId,running,selected:node.id === selected,
+      dependent:!!variable?.usedBy.includes(node.id),onSelect:selectNode,onOpenScene,onOpenBeat}}));
+  const storyTop = Math.min(0,...[...positions.values()].map(position => position.y));
+  let returnIndex = 0;
+  const edges = model.edges.map(edge => {
+    const highlighted = edge.id === selectedEdge || (selected && [edge.source,edge.target].includes(selected));
+    const stroke = highlighted?'var(--accent)':edge.isReturn?'var(--warning)':edge.crossScene?'var(--info)':'var(--graph-connection)';
+    const label = edge.isReturn ? `${tr('Возврат')}${edge.choiceId?' · '+edge.label:''}` : edge.crossScene ? tr('Другая сабсцена') : undefined;
+    return {id:edge.id,source:edge.source,target:edge.target,sourceHandle:edge.choiceId,
+      type:edge.isReturn?'return':'smoothstep',data:{authoredLabel:true,laneY:edge.isReturn?storyTop-45-(returnIndex++)*34:0},label,
+      markerEnd:{type:MarkerType.ArrowClosed,color:stroke,width:16,height:16},
+      style:{stroke,strokeWidth:highlighted?2.7:1.7,strokeDasharray:edge.isReturn?'7 5':undefined},
+      labelStyle:{fill:'var(--text-secondary)',fontSize:11},labelBgStyle:{fill:'var(--bg-app)'},
+      pathOptions:{borderRadius:14,offset:28},interactionWidth:22};
+  });
+  if (variable) {
+    const targets = variable.usedBy.map(id => autoPositions.get(id)).filter(Boolean);
+    const id = timelineVariableNodeId(variable.id);
+    const position = dragPositions[id] || savedPositions[id] || {x:Math.max(20,Math.min(...targets.map(item => item.x),100)-310),y:Math.min(0,...[...autoPositions.values()].map(item => item.y))-200};
+    nodes.push({id,type:'variable',position,measured:measurements[id],data:{variable,value:currentValues[variable.id]},style:{width:250}});
+    for (const dependency of model.dependencies.filter(item => item.variableId === variableId)) edges.push({
+      id:dependency.id,source:id,target:dependency.target,type:'bezier',
+      style:{stroke:'var(--info)',strokeDasharray:'4 5',strokeWidth:1.7},
+      markerEnd:{type:MarkerType.ArrowClosed,color:'var(--info)'},label:tr('условие'),
+      labelStyle:{fill:'var(--text-secondary)',fontSize:11},labelBgStyle:{fill:'var(--bg-app)'},
+    });
+  }
+  const firstInScene = sceneId => model.nodes.find(node => node.sceneId === sceneId && node.isSceneEntry) || model.nodes.find(node => node.sceneId === sceneId);
+  const localLinks = shownNode ? model.edges.filter(edge => [edge.source,edge.target].includes(shownNode.id)) : [];
+  return <section className="global-timeline" aria-label={tr("Общий таймлайн истории")} onPointerDownCapture={() => {if (!dragStart.current) dragged.current = false;}}>
+    <header className="global-timeline-header"><div><h2><Icon name="Waypoints" size={21}/>{tr("Общий таймлайн")}</h2><p>{model.counts.scenes} {tr("сабсцены · ")}{model.counts.choices} {tr("выборов · ")}{model.counts.endings} {tr("концовки")}</p></div><div className="global-timeline-tools">
+      {running && <label><input type="checkbox" checked={follow} onChange={event => setFollow(event.target.checked)}/>{tr("Следить за playtest")}</label>}
+      <Button icon="Focus" disabled={!activeId} onClick={() => focusNode(activeId)}>{running?tr("Сейчас в игре"):tr("Текущий узел")}</Button>
+      <Button icon="Maximize" onClick={() => flow.current?.fitView(FIT_ALL)}>{tr("Вся история")}</Button>
+      <Button icon="LayoutGrid" disabled={!onLayoutChange || !Object.keys(savedPositions).length} title={tr("Вернуть автоматическое расположение всех узлов. Ctrl+Z отменяет сброс.")} onClick={restoreAutoLayout}>{tr("Автораскладка")}</Button>
+    </div></header>
+    <div className="global-timeline-direction" title={tr("Порядок переходов; время зависит от чтения и выборов игрока")}><span>{tr("НАЧАЛО")}</span><i/><Icon name="ArrowRight" size={19}/><span>{tr("ХОД ИСТОРИИ")}</span><small>{tr("Порядок переходов; время зависит от чтения и выборов игрока")}</small></div>
+    <nav className="global-timeline-scenes" aria-label={tr("Сабсцены на таймлайне")}>{(project.subscenes || []).map(scene => <button key={scene.id} className={scene.id === (activeNode?.sceneId || currentSceneId)?'active':''} title={tr("Показать начало сабсцены на таймлайне. Двойной щелчок — открыть сцену.")} onClick={() => {const node = firstInScene(scene.id);if (node) {selectNode(node.id);focusNode(node.id);}}} onDoubleClick={() => onOpenScene?.(scene.id)}><i style={{background:scene.color || '#bd94a9'}}/>{scene.name}</button>)}</nav>
+    <div className="global-timeline-variables"><strong><Icon name="Variable" size={16}/>{tr("Глобальные переменные")}</strong>{model.variables.map(item => <button key={item.id} className={`${variableId === item.id?'active ':''}${item.missing?'missing':''}`} title={tr("{0} · {1} выборов. Нажмите, чтобы показать связи условий.", [item.id, item.usedBy.length])} onClick={() => setVariableId(current => current === item.id?null:item.id)}><span>{item.name}</span><b>{timelineVariableValue(currentValues[item.id])}</b><small>{item.usedBy.length}</small></button>)}{!model.variables.length && <span>{tr("Переменные ещё не созданы")}</span>}{onOpenVariables && <Button icon="SlidersHorizontal" title={tr("Редактировать глобальные переменные")} onClick={onOpenVariables}/>}</div>
+    <div className="global-timeline-canvas"><ReactFlow ariaLabelConfig={flowAriaLabels()} nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
+      panOnDrag={[0, 1, 2]} panOnScroll zoomOnScroll={false} zoomActivationKeyCode="Control" selectionOnDrag={false}
+      onPaneContextMenu={event => event.preventDefault()}
+      nodesDraggable={true} nodeDragThreshold={4} nodesConnectable={false} edgesReconnectable={false} minZoom={MIN_ZOOM} maxZoom={1.65}
+      onInit={instance => {flow.current=instance;}}
+      onNodesChange={onNodesChange}
+      onNodeDragStart={onNodeDragStart} onNodeDragStop={onNodeDragStop}
+      onNodeClick={(_,node) => {if (!dragged.current && node.type === 'timeline') selectNode(node.id);}}
+      onNodeDoubleClick={(_,node) => {if (!dragged.current && node.data.node?.entryBeatId) onOpenBeat(node.data.node.entryBeatId);}}
+      onEdgeClick={(_,edge) => {setSelectedEdge(edge.id);setSelected(null);}}
+      onPaneClick={() => {setSelected(null);setSelectedEdge(null);}}
+      proOptions={{hideAttribution:true}}>
+      <InitialTimelineViewport nodeId={activeId || model.entryNodeId}/>
+      <Background color="var(--graph-grid)" gap={28} size={0.7}/><Controls showInteractive={false} fitViewOptions={FIT_ALL}/><MiniMap nodeColor={node => node.data.node?.kind === 'ending'?'var(--warning)':node.data.node?.kind === 'choice'?'var(--info)':node.data.node?.color || 'var(--graph-connection)'} maskColor="var(--bg-app)" pannable zoomable/>
+    </ReactFlow>
+    {!model.nodes.length && <div className="global-timeline-empty">{tr("Добавьте сабсцену и первую реплику — здесь появится история.")}</div>}
+    <div className="global-timeline-legend"><span><i/>{tr("Сабсцена")}</span><span><i className="choice"/>{tr("Выбор / условие")}</span><span><i className="ending"/>{tr("Концовка")}</span><span className="return">{tr("↶ Возврат")}</span><small>{tr("ПКМ — панорама · Ctrl + колесо — масштаб · двойной щелчок — сценарий")}</small></div></div>
+    <footer className="global-timeline-details">{shownEdge?<>
+      <div><strong><Icon name={shownEdge.isReturn?'Undo2':'ArrowRight'}/>{tr("Переход")}{shownEdge.isReturn?tr(" с возвращением"):''}</strong><span>{model.nodes.find(node => node.id === shownEdge.source)?.sceneName} → {model.nodes.find(node => node.id === shownEdge.target)?.sceneName}</span></div>
+      <p>{shownEdge.choiceId?shownEdge.label:tr(shownEdge.label)}<small>{message(shownEdge.conditionLabel)} · {shownEdge.from} → {shownEdge.to || tr("продолжение не задано")}</small></p>
+      <Button icon="Pencil" onClick={() => onOpenBeat(shownEdge.from)}>{tr("Исходная реплика")}</Button>
+      {shownEdge.to && model.beatToNode[shownEdge.to] && <Button icon="ArrowUpRight" onClick={() => onOpenBeat(shownEdge.to)}>{tr("Назначение")}</Button>}
+    </>:shownNode?<>
+      <div><strong><Icon name={running && shownNode.id === activeId?'CirclePlay':'Waypoints'}/>{shownNode.kind === 'ending'?tr("Концовка"):shownNode.kind === 'choice'?tr("Выбор игрока"):shownNode.sceneName}</strong><span>{shownNode.kind === 'subscene'?tr("{0} реплик в фрагменте", [shownNode.beatIds.length]) : (shownNode.systemTitle?tr(shownNode.title):shownNode.title)}</span></div>
+      <p>{shownNode.text}<small>{shownNode.id === activeId?`${running?'Playtest':tr('Текущая реплика')}: ${currentBeatId} · `:''}{localLinks.filter(edge => edge.target === shownNode.id).length} {tr("входящих · ")}{localLinks.filter(edge => edge.source === shownNode.id).length} {tr("исходящих")}</small></p>
+      {shownNode.entryBeatId && <Button icon="ArrowUpRight" onClick={() => onOpenBeat(shownNode.id === activeId?currentBeatId:shownNode.entryBeatId)}>{tr("Открыть реплику")}</Button>}
+    </>:<p>{tr("Линейные реплики объединены в фрагменты сабсцен. Развилки, возвращения и концовки сохранены. Выберите узел или стрелку, чтобы открыть источник.")}</p>}</footer>
+  </section>;
+}
