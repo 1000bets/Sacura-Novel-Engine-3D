@@ -1,4 +1,6 @@
 #include "Shell/EditorMainWindow.h"
+#include "UI/Views/StoryWorkspaceView.h"
+#include "UI/Adapters/StoryGraphAdapter.h"
 
 #include "Actions/BuiltinEditorActions.h"
 #include "Actions/EditorAction.h"
@@ -134,37 +136,9 @@ void EditorMainWindow::RegisterBuiltInAssetEditors()
         statusBar()->showMessage(tr("Opened scene %1").arg(VirtualPath), 2500);
     });
 
-    RegisterAssetEditor(StoryAssetType, [this](
-        const AssetKey&,
-        const AssetRegistryEntry& Entry,
-        const QString& VirtualPath)
+    RegisterAssetEditor(StoryAssetType, [this](const AssetKey& Asset, const AssetRegistryEntry&, const QString&)
     {
-        if (BoundEngine.GetPlaySession().IsSimulating())
-        {
-            statusBar()->showMessage(tr("Stop Play before opening another story"), 2500);
-            return;
-        }
-        StoryPlayback.BindScene(GetEditScene());
-        if (!StoryPlayback.LoadFromFile(Entry.AbsolutePath))
-        {
-            QMessageBox::warning(
-                this,
-                tr("Open Story"),
-                QString::fromStdString(StoryPlayback.GetLastError().empty()
-                    ? "Failed to open story"
-                    : StoryPlayback.GetLastError()));
-            return;
-        }
-        for (int TabIndex = 0; TabIndex < DockTabs->count(); ++TabIndex)
-        {
-            if (DockTabs->widget(TabIndex) == StoryDockPage)
-            {
-                DockTabs->setCurrentIndex(TabIndex);
-                break;
-            }
-        }
-        RefreshStoryPlaybackUi();
-        statusBar()->showMessage(tr("Opened story %1").arg(VirtualPath), 2500);
+        OpenStoryAsset(Asset);
     });
 }
 

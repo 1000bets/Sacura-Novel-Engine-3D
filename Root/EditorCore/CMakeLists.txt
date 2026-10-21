@@ -1,4 +1,5 @@
 set(EDITOR_CORE_SRC
+    src/Assets/StoryAssetCreation.cpp
     src/Assets/AssetOperations.cpp
     src/Assets/AssetImporter.cpp
     src/Assets/FbxToGlbConverter.cpp
@@ -10,9 +11,11 @@ set(EDITOR_CORE_SRC
     src/Documents/MaterialDocument.cpp
     src/Documents/SceneDocument.cpp
     src/Documents/SceneWorkspace.cpp
+    src/Documents/StoryGraphDocument.cpp
 )
 
 set(EDITOR_CORE_HDR
+    inc/Assets/StoryAssetCreation.h
     inc/Assets/AssetOperations.h
     inc/Assets/AssetImporter.h
     inc/Assets/FbxToGlbConverter.h
@@ -27,6 +30,7 @@ set(EDITOR_CORE_HDR
     inc/Documents/MaterialDocument.h
     inc/Documents/SceneDocument.h
     inc/Documents/SceneWorkspace.h
+    inc/Documents/StoryGraphDocument.h
 )
 
 add_library(EditorCore STATIC ${EDITOR_CORE_SRC} ${EDITOR_CORE_HDR})

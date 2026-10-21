@@ -5,10 +5,27 @@
 #include "Core/Object/MemorySubsystem.h"
 #include "Physics/PhysicsWorld.h"
 #include "Navigation/NavigationWorld.h"
+#include "Authoring/Runtime.h"
+#include "Core/Threading/ThreadContext.h"
 
 #include <algorithm>
 
 Scene::Scene() = default;
+
+void Scene::SetAuthoringOperations(std::shared_ptr<const Authoring::OperationRegistry> Operations)
+{
+    AssertGameThread();
+    if (AuthoringOperations == Operations || bPlaying)
+    {
+        return;
+    }
+    AuthoringRuntime.reset();
+    AuthoringOperations = std::move(Operations);
+    if (AuthoringOperations)
+    {
+        AuthoringRuntime = std::make_unique<Authoring::Runtime>(AuthoringOperations, GetObjectHandle());
+    }
+}
 
 PhysicsWorld& Scene::GetPhysics()
 {
@@ -323,6 +340,17 @@ bool Scene::BeginPlay()
         return false;
     }
     bPlaying = true;
+    if (AuthoringRuntime)
+    {
+        const Authoring::Diagnostic Started = AuthoringRuntime->Start();
+        if (!Started.bOk)
+        {
+            bPlaying = false;
+            Physics->Shutdown();
+            PrintString("Scene: authoring session failed: " + Started.Message);
+            return false;
+        }
+    }
     bUpdatingComponents = true;
     BuildComponentSnapshot();
     for (const ObjectHandle Identity : ComponentSnapshot)
@@ -341,6 +369,10 @@ bool Scene::BeginPlay()
 
 void Scene::EndPlay()
 {
+    if (AuthoringRuntime)
+    {
+        AuthoringRuntime->Stop();
+    }
     if (!bPlaying)
     {
         return;
@@ -373,6 +405,10 @@ void Scene::Tick(float DeltaTime, bool bSinglePhysicsStep)
     if (bUpdatingComponents)
     {
         return;
+    }
+    if (bPlaying && AuthoringRuntime)
+    {
+        AuthoringRuntime->Tick(DeltaTime);
     }
     if (Navigation)
     {

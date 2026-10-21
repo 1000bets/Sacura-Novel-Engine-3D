@@ -126,6 +126,15 @@ bool TryReadAction(const nlohmann::json& JsonValue, StoryActionDefinition& OutAc
     {
         return false;
     }
+    if (JsonValue.contains("id"))
+    {
+        if (!JsonValue.at("id").is_string())
+        {
+            OutError = "Action id must be a string";
+            return false;
+        }
+        OutAction.Id = JsonValue.at("id").get<std::string>();
+    }
 
     if (JsonValue.contains("durationSeconds") && JsonValue.at("durationSeconds").is_number())
     {
@@ -233,6 +242,15 @@ bool TryReadNode(const nlohmann::json& JsonValue, StoryNode& OutNode, std::strin
                 return false;
             }
             StoryChoice Choice{};
+            if (ChoiceJson.contains("id"))
+            {
+                if (!ChoiceJson.at("id").is_string())
+                {
+                    OutError = "Choice id must be a string";
+                    return false;
+                }
+                Choice.Id = ChoiceJson.at("id").get<std::string>();
+            }
             Choice.Label = ChoiceJson.at("label").get<std::string>();
             Choice.NextNodeId = ChoiceJson.at("nextNodeId").get<std::string>();
             OutNode.Choices.push_back(std::move(Choice));
@@ -274,6 +292,10 @@ nlohmann::json ActionToJson(const StoryActionDefinition& Action)
         break;
     }
     Document["durationSeconds"] = Action.DurationSeconds;
+    if (!Action.Id.empty())
+    {
+        Document["id"] = Action.Id;
+    }
     if (!Action.TargetObjectId.empty())
     {
         Document["targetObjectId"] = Action.TargetObjectId;
@@ -340,6 +362,10 @@ nlohmann::json NodeToJson(const StoryNode& Node)
         {
             nlohmann::json ChoiceJson = nlohmann::json::object();
             ChoiceJson["label"] = Choice.Label;
+            if (!Choice.Id.empty())
+            {
+                ChoiceJson["id"] = Choice.Id;
+            }
             ChoiceJson["nextNodeId"] = Choice.NextNodeId;
             ChoicesJson.push_back(std::move(ChoiceJson));
         }
@@ -425,7 +451,8 @@ StorySerializeResult StoryDocumentIO::LoadFromJson(const std::string& JsonText, 
         OutDocument.Nodes.push_back(std::move(Node));
     }
 
-    if (SeenIds.find(OutDocument.StartNodeId) == SeenIds.end())
+    if (!(OutDocument.Nodes.empty() && OutDocument.StartNodeId.empty())
+        && SeenIds.find(OutDocument.StartNodeId) == SeenIds.end())
     {
         Result.Error = "startNodeId not found in nodes";
         return Result;

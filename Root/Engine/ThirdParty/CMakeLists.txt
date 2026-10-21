@@ -275,6 +275,23 @@ target_include_directories(SakuraEngineThirdParty INTERFACE
 function(sakura_copy_engine_runtime_dlls TargetName)
     sakura_deploy_qt_runtime(${TargetName})
     if(COMMAND copy_required_dlls)
+        # Recent Windows SDKs ship the DXIL signer in Redist/D3D rather
+        # than beside dxcompiler.dll. Diligent 2.5.6 assumes the older layout.
+        if(MSVC AND D3D12_SUPPORTED)
+            get_filename_component(SakuraWindowsSdkRoot
+                "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows Kits\\Installed Roots;KitsRoot10]"
+                ABSOLUTE)
+            if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+                set(SakuraSdkArchitecture x64)
+            else()
+                set(SakuraSdkArchitecture x86)
+            endif()
+            set(SakuraSdkSigner "${SakuraWindowsSdkRoot}/bin/${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}/${SakuraSdkArchitecture}/dxil.dll")
+            set(SakuraRedistributableSigner "${SakuraWindowsSdkRoot}/Redist/D3D/${SakuraSdkArchitecture}/dxil.dll")
+            if(NOT EXISTS "${SakuraSdkSigner}" AND EXISTS "${SakuraRedistributableSigner}")
+                set(VS_DXIL_SIGNER_PATH "\"${SakuraRedistributableSigner}\"")
+            endif()
+        endif()
         copy_required_dlls(${TargetName})
     endif()
 endfunction()

@@ -122,6 +122,10 @@ void StoryRuntime::Reset()
 
     if (Document.StartNodeId.empty())
     {
+        if (Document.Nodes.empty())
+        {
+            Phase = StoryPlaybackPhase::End;
+        }
         return;
     }
 
@@ -247,6 +251,11 @@ const StoryNode* StoryRuntime::FindNode(const StoryNodeId& NodeId) const
 
 void StoryRuntime::EnterNode(const StoryNodeId& NodeId)
 {
+    if (Document.Nodes.empty() && NodeId.empty())
+    {
+        Phase = StoryPlaybackPhase::End;
+        return;
+    }
     const StoryNode* Node = FindNode(NodeId);
     if (Node == nullptr)
     {

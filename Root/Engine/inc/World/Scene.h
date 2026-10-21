@@ -13,6 +13,11 @@ class PhysicsWorld;
 class AssetManager;
 class NavigationWorld;
 class JobSystem;
+namespace Authoring
+{
+class OperationRegistry;
+class Runtime;
+}
 
 class Scene : public Object
 {
@@ -37,6 +42,9 @@ public:
     NavigationWorld& GetNavigation();
     const NavigationWorld* GetNavigationIfCreated() const { return Navigation.get(); }
     void SetJobSystem(JobSystem* System);
+    void SetAuthoringOperations(std::shared_ptr<const Authoring::OperationRegistry> Operations);
+    Authoring::Runtime* GetAuthoringRuntime() { return AuthoringRuntime.get(); }
+    const Authoring::Runtime* GetAuthoringRuntime() const { return AuthoringRuntime.get(); }
 
     GameObject* FindByPersistentId(const std::string& PersistentId) const;
     GameObject* FindByName(const std::string& Name) const;
@@ -67,6 +75,8 @@ private:
     std::vector<GameObject*> m_Objects;
     std::unique_ptr<PhysicsWorld> Physics;
     std::unique_ptr<NavigationWorld> Navigation;
+    std::shared_ptr<const Authoring::OperationRegistry> AuthoringOperations;
+    std::unique_ptr<Authoring::Runtime> AuthoringRuntime;
     JobSystem* Jobs = nullptr;
     AssetManager* Assets = nullptr;
     std::vector<ObjectHandle> m_PendingDestroy;

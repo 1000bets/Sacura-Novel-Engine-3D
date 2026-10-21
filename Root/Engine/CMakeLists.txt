@@ -7,6 +7,11 @@ add_subdirectory(ThirdParty)
 # Engine library (explicit sources РІР‚вЂќ do not use file(GLOB) for compilation units)
 # ---------------------------------------------------------------
 set(ENGINE_SRC
+    src/Authoring/AuthoringTypes.cpp
+    src/Authoring/OperationRegistry.cpp
+    src/Authoring/OperationContext.cpp
+    src/Authoring/Runtime.cpp
+    src/Authoring/CoreOperations.cpp
     src/Physics/PhysicsTypes.cpp
     src/Physics/PhysicsWorld.cpp
     src/Physics/Backends/PhysXWorld.cpp
@@ -86,6 +91,12 @@ set(ENGINE_SRC
 )
 
 set(ENGINE_HDR
+    inc/Authoring/AuthoringTypes.h
+    inc/Authoring/OperationRegistry.h
+    inc/Authoring/OperationTask.h
+    inc/Authoring/OperationContext.h
+    inc/Authoring/Runtime.h
+    inc/Authoring/CoreOperations.h
     inc/Physics/IPhysicsWorld.h
     inc/Physics/PhysicsTypes.h
     inc/Physics/PhysicsWorld.h

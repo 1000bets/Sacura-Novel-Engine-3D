@@ -42,6 +42,15 @@ class QCloseEvent;
 class QEvent;
 class QButtonGroup;
 class QVBoxLayout;
+class QStackedWidget;
+
+namespace EditorUi
+{
+class StoryWorkspaceView;
+class StoryInspectorView;
+class HierarchyPanelView;
+class StoryGraphController;
+}
 
 class EditorMainWindow : public QMainWindow
 {
@@ -99,6 +108,15 @@ private:
     void PopulateDockPages();
     void RegisterBuiltInAssetEditors();
     void BuildStoryDockPage();
+    void InitializeStoryAuthoring();
+    void RefreshStoryTargets();
+    bool OpenStoryAsset(const AssetKey& Asset);
+    void OpenStoryFromDialog();
+    bool CreateStoryFromDialog();
+    bool SaveStory();
+    void SaveActiveDocument();
+    bool PromptSaveStoryIfDirty();
+    bool IsStoryEditingContext() const;
     void BuildRenderStatisticsDockPage();
     void BuildPostprocessDockPage();
     void RefreshStoryPlaybackUi();
@@ -111,7 +129,6 @@ private:
     GameObject* GetSelectedGameObject() const;
     void AddHierarchyItem(QTreeWidgetItem* ParentItem, GameObject* ObjectInstance);
     bool ReparentHierarchyObject(ObjectHandle Target, ObjectHandle NewParent);
-    QWidget* MakePlaceholderPage(const QString& Title, const QString& Description);
     void UpdateStatus();
     void UpdateWindowTitleDirty();
     void ConfigureComponentInspector(ReflectionInspector* ComponentInspector);
@@ -155,8 +172,10 @@ private:
     QSplitter* CenterSplitter = nullptr;
     QTabWidget* HierarchyTabs = nullptr;
     QTreeWidget* HierarchyTree = nullptr;
+    EditorUi::HierarchyPanelView* HierarchyContent = nullptr;
     EditorViewportWidget* PrimaryViewport = nullptr;
-    QLabel* ViewportModeLabel = nullptr;
+    QPushButton* LocationTab = nullptr;
+    QPushButton* GameTab = nullptr;
     QDoubleSpinBox* CameraSpeedSpin = nullptr;
     QButtonGroup* GizmoModeButtons = nullptr;
     QPushButton* TranslateGizmoButton = nullptr;
@@ -171,6 +190,13 @@ private:
     StoryWidget* GameDialogue = nullptr;
     StoryRuntime& StoryPlayback;
     QTabWidget* InspectorTabs = nullptr;
+    QStackedWidget* InspectorPages = nullptr;
+    QWidget* ObjectInspectorContent = nullptr;
+    QWidget* EmptyInspectorPage = nullptr;
+    EditorUi::StoryWorkspaceView* StoryGraph = nullptr;
+    EditorUi::StoryInspectorView* StoryInspector = nullptr;
+    std::unique_ptr<EditorUi::StoryGraphController> StoryAuthoring;
+    bool bStoryEditingContext = false;
     QLineEdit* ObjectNameEdit = nullptr;
     QDoubleSpinBox* PositionXSpin = nullptr;
     QDoubleSpinBox* PositionYSpin = nullptr;

@@ -35,6 +35,7 @@ struct StoryChoice
 {
     std::string Label;
     StoryNodeId NextNodeId;
+    std::string Id;
 };
 
 struct StoryActionDefinition
@@ -47,6 +48,7 @@ struct StoryActionDefinition
     Quaternion TargetRotation = Quaternion::Identity;
     bool bHasTargetRotation = false;
     bool bUseTargetObjectTransform = false;
+    std::string Id;
 };
 
 struct StoryNode

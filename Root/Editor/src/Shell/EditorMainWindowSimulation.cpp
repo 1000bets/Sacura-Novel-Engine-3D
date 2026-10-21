@@ -1,4 +1,6 @@
 #include "Shell/EditorMainWindow.h"
+#include "UI/Adapters/StoryGraphController.h"
+#include "UI/Styles/StudioIcons.h"
 
 #include "Actions/BuiltinEditorActions.h"
 #include "Actions/EditorAction.h"
@@ -93,6 +95,22 @@ void EditorMainWindow::OnPlayToggled(bool bChecked)
     bPlayRequested = bChecked;
     if (bChecked)
     {
+        if (StoryAuthoring != nullptr)
+        {
+            StoryAuthoring->FlushEdits();
+            std::string Error;
+            if (StoryAuthoring->GetDocument().IsOpen() && !StoryAuthoring->GetDocument().ValidateForPlayback(Error))
+            {
+                const QSignalBlocker Blocker(PlayButton);
+                PlayButton->setChecked(false);
+                LocationTab->setChecked(true);
+                GameTab->setChecked(false);
+                bPlayRequested = false;
+                statusBar()->showMessage(QString::fromStdString(Error), 12000);
+                return;
+            }
+            StoryAuthoring->SetLocked(true);
+        }
         Scene* World = GetEditScene();
         if (World != nullptr && (!BoundEngine.PrepareSceneMaterials(*World) || !BoundEngine.PrepareSceneSimulation(*World)))
         {
@@ -105,9 +123,31 @@ void EditorMainWindow::OnPlayToggled(bool bChecked)
             PlayButton->blockSignals(true);
             PlayButton->setChecked(false);
             PlayButton->blockSignals(false);
+            LocationTab->setChecked(true);
+            GameTab->setChecked(false);
+            if (StoryAuthoring != nullptr)
+            {
+                StoryAuthoring->SetLocked(false);
+            }
             statusBar()->showMessage(QString::fromUtf8("Play failed вЂ” check log"), 2500);
             UpdateStatus();
             return;
+        }
+        if (StoryAuthoring != nullptr && StoryAuthoring->GetDocument().IsOpen())
+        {
+            StoryPlayback.BindScene(Session.GetPlayWorld());
+            if (!StoryPlayback.LoadDocument(StoryAuthoring->GetDocument().GetStory()))
+            {
+                const QString StoryError = QString::fromStdString(StoryPlayback.GetLastError());
+                Session.StopPlay();
+                const QSignalBlocker Blocker(PlayButton);
+                PlayButton->setChecked(false);
+                LocationTab->setChecked(true);
+                GameTab->setChecked(false);
+                StoryAuthoring->SetLocked(false);
+                statusBar()->showMessage(StoryError, 12000);
+                return;
+            }
         }
         StartStoryPlayback();
     }
@@ -115,6 +155,10 @@ void EditorMainWindow::OnPlayToggled(bool bChecked)
     {
         StopStoryPlayback();
         Session.StopPlay();
+        if (StoryAuthoring != nullptr)
+        {
+            StoryAuthoring->SetLocked(false);
+        }
     }
 
     bPlaying = Session.IsSimulating();
@@ -125,7 +169,8 @@ void EditorMainWindow::OnPlayToggled(bool bChecked)
     ModeLabel->setText(bPlaying
         ? QString::fromUtf8("\xD0\x9F\xD1\x80\xD0\xB5\xD0\xB4\xD0\xBF\xD1\x80\xD0\xBE\xD1\x81\xD0\xBC\xD0\xBE\xD1\x82\xD1\x80")
         : QString::fromUtf8("\xD0\xA0\xD0\xB5\xD0\xB4\xD0\xB0\xD0\xBA\xD1\x82\xD0\xB8\xD1\x80\xD0\xBE\xD0\xB2\xD0\xB0\xD0\xBD\xD0\xB8\xD0\xB5"));
-    PlayButton->setText(bPlaying ? QString::fromUtf8("\xE2\x96\xA0") : QString::fromUtf8("\xE2\x96\xB6"));
+    PlayButton->setText(bPlaying ? tr("Стоп") : tr("Запуск"));
+    ModeLabel->setVisible(bPlaying);
     PrimaryViewport->SetEditorToolsEnabled(!bPlaying);
     if (CameraSpeedSpin != nullptr)
     {
@@ -143,9 +188,8 @@ void EditorMainWindow::OnPlayToggled(bool bChecked)
     {
         ScaleGizmoButton->setEnabled(!bPlaying);
     }
-    ViewportModeLabel->setText(bPlaying
-        ? QString::fromUtf8("Game В· Play World")
-        : QString::fromUtf8("Scene В· Edit World"));
+    LocationTab->setChecked(!bPlaying);
+    GameTab->setChecked(bPlaying);
     GameDialogue->setVisible(bPlaying);
     ClearSelection();
     PopulateHierarchy();

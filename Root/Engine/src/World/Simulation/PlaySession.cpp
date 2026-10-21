@@ -66,6 +66,7 @@ bool PlaySession::StartPlay()
     PlayWorld.reset(LoadedPlayWorld);
     PlayWorld->SetAssetManager(&BoundEngine->GetAssetManager());
     PlayWorld->SetJobSystem(&BoundEngine->GetJobSystem());
+    PlayWorld->SetAuthoringOperations(BoundEngine->AuthoringOperations);
     PlayWorld->GetNavigation().CopyMeshesFrom(SourceEditWorld->GetNavigation());
     State = PlaySessionState::Playing;
     if (!PlayWorld->BeginPlay())

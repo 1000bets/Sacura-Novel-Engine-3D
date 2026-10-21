@@ -1,4 +1,5 @@
 #include "Shell/EditorMainWindow.h"
+#include "UI/Adapters/StoryGraphController.h"
 
 #include "Actions/BuiltinEditorActions.h"
 #include "Actions/EditorAction.h"
@@ -89,16 +90,8 @@
 
 void EditorMainWindow::OnFocusActionsAndEvents()
 {
-    const QString EventTabTitle = QString::fromUtf8("\xD0\xA1\xD0\xBE\xD0\xB1\xD1\x8B\xD1\x82\xD0\xB8\xD0\xB5");
-    for (int TabIndex = 0; TabIndex < DockTabs->count(); ++TabIndex)
-    {
-        if (DockTabs->tabText(TabIndex) == EventTabTitle)
-        {
-            DockTabs->setCurrentIndex(TabIndex);
-            break;
-        }
-    }
     LayoutCombo->setCurrentIndex(1);
+    OnLayoutModeChanged(1);
 }
 
 bool EditorMainWindow::ExecuteCommand(std::unique_ptr<EditorCommand> Command)
@@ -121,6 +114,15 @@ bool EditorMainWindow::ExecuteCommand(std::unique_ptr<EditorCommand> Command)
 
 void EditorMainWindow::OnUndo()
 {
+    if (BoundEngine.GetPlaySession().IsSimulating())
+    {
+        return;
+    }
+    if (IsStoryEditingContext())
+    {
+        StoryAuthoring->Undo();
+        return;
+    }
     if (!CommandStack.Undo())
     {
         return;
@@ -137,6 +139,15 @@ void EditorMainWindow::OnUndo()
 
 void EditorMainWindow::OnRedo()
 {
+    if (BoundEngine.GetPlaySession().IsSimulating())
+    {
+        return;
+    }
+    if (IsStoryEditingContext())
+    {
+        StoryAuthoring->Redo();
+        return;
+    }
     if (!CommandStack.Redo())
     {
         return;
@@ -247,6 +258,15 @@ void EditorMainWindow::OnCreateEmptyObject()
 
 void EditorMainWindow::OnDeleteSelectedObject()
 {
+    if (BoundEngine.GetPlaySession().IsSimulating())
+    {
+        return;
+    }
+    if (IsStoryEditingContext())
+    {
+        StoryAuthoring->DeleteSelection();
+        return;
+    }
     Scene* EditScene = GetEditScene();
     GameObject* Selected = GetSelectedGameObject();
     if (EditScene == nullptr || Selected == nullptr)

@@ -6,6 +6,18 @@
 #include "Commands/EditorCommands.h"
 #include "Panels/ContentBrowserWidget.h"
 #include "Shell/EditorTheme.h"
+#include "UI/Adapters/WorkspaceLayoutAdapter.h"
+#include "UI/Views/WorkspaceView.h"
+#include "UI/Views/HierarchyPanelView.h"
+#include "UI/Views/StudioHeaderView.h"
+#include "UI/Views/StoryWorkspaceView.h"
+#include "UI/Views/StoryInspectorView.h"
+#include "UI/Adapters/StoryGraphAdapter.h"
+#include "UI/Styles/StudioIcons.h"
+#include <QStackedWidget>
+#include <QTabBar>
+#include <QToolButton>
+#include <QWidgetAction>
 #include "Viewport/EditorViewportWidget.h"
 #include "Engine.h"
 #include "World/Simulation/PlaySession.h"
@@ -94,6 +106,8 @@ void EditorMainWindow::BuildMenus()
     FileMenu->addAction(QString::fromUtf8("\xD0\x9D\xD0\xBE\xD0\xB2\xD1\x8B\xD0\xB9 \xD0\xBF\xD1\x80\xD0\xBE\xD0\xB5\xD0\xBA\xD1\x82..."), this, &EditorMainWindow::OnNewProject);
     FileMenu->addAction(QString::fromUtf8("\xD0\x9E\xD1\x82\xD0\xBA\xD1\x80\xD1\x8B\xD1\x82\xD1\x8C..."), this, &EditorMainWindow::OnOpenProject);
     FileMenu->addAction(QString::fromUtf8("\xD0\xA1\xD0\xBE\xD1\x85\xD1\x80\xD0\xB0\xD0\xBD\xD0\xB8\xD1\x82\xD1\x8C \xD1\x81\xD1\x86\xD0\xB5\xD0\xBD\xD1\x83"), this, &EditorMainWindow::OnSaveScene);
+    FileMenu->addAction(tr("Сохранить"), this, &EditorMainWindow::SaveActiveDocument, QKeySequence::Save);
+    FileMenu->addAction(tr("Сохранить историю"), this, [this]() { SaveStory(); });
     FileMenu->addSeparator();
     FileMenu->addAction(QString::fromUtf8("\xD0\x92\xD1\x8B\xD1\x85\xD0\xBE\xD0\xB4"), this, &QWidget::close);
 
@@ -111,7 +125,8 @@ void EditorMainWindow::BuildMenus()
     QMenu* CreateObjectsMenu = CreateMenu->addMenu(QString::fromUtf8("\xD0\x9E\xD0\xB1\xD1\x8A\xD0\xB5\xD0\xBA\xD1\x82\xD1\x8B"));
     QMenu* CreateComponentsMenu = CreateMenu->addMenu(QString::fromUtf8("\xD0\x9A\xD0\xBE\xD0\xBC\xD0\xBF\xD0\xBE\xD0\xBD\xD0\xB5\xD0\xBD\xD1\x82\xD1\x8B"));
     PopulateCreateMenus(CreateObjectsMenu, CreateComponentsMenu);
-    QMenu* NavigationMenu = menuBar()->addMenu(QString::fromUtf8("Навигация"));
+    CreateMenu->addAction(tr("Историю…"), this, [this]() { CreateStoryFromDialog(); });
+    QMenu* NavigationMenu = CreateMenu->addMenu(tr("Навигация"));
     QAction* BuildNavigation = NavigationMenu->addAction(QString::fromUtf8("Перестроить навигацию"), this, [this]()
     {
         Scene* World = GetEditScene();
@@ -147,107 +162,74 @@ void EditorMainWindow::BuildMenus()
     CreateMenu->addAction(QString::fromUtf8("\xD0\x94\xD0\xB5\xD0\xB9\xD1\x81\xD1\x82\xD0\xB2\xD0\xB8\xD1\x8F \xD0\xB8 \xD1\x81\xD0\xBE\xD0\xB1\xD1\x8B\xD1\x82\xD0\xB8\xD1\x8F"), this, &EditorMainWindow::OnFocusActionsAndEvents);
 
     QMenu* WindowMenu = menuBar()->addMenu(QString::fromUtf8("\xD0\x9E\xD0\xBA\xD0\xBD\xD0\xBE"));
+    WindowMenu->setObjectName("WindowsMenu");
+    WindowMenu->setTitle(tr("Окна"));
     WindowMenu->addAction(QString::fromUtf8("\xD0\x92\xD0\xBE\xD1\x81\xD1\x81\xD1\x82\xD0\xB0\xD0\xBD\xD0\xBE\xD0\xB2\xD0\xB8\xD1\x82\xD1\x8C \xD1\x80\xD0\xB0\xD1\x81\xD0\xBA\xD0\xBB\xD0\xB0\xD0\xB4\xD0\xBA\xD1\x83"), this, [this]()
     {
         if (LayoutCombo != nullptr)
         {
             LayoutCombo->setCurrentIndex(0);
         }
-        if (WorkspaceSplitter != nullptr)
+        if (WorkspaceSplitter != nullptr && CenterSplitter != nullptr)
         {
-            WorkspaceSplitter->setSizes({320, 900, 240});
-        }
-        if (CenterSplitter != nullptr)
-        {
-            CenterSplitter->setSizes({520, 280});
+            for (int Index = 0; Index < WorkspaceSplitter->count(); ++Index)
+            {
+                QWidget* Panel = WorkspaceSplitter->widget(Index);
+                if (auto* Visibility = findChild<QAction*>(Panel->objectName() + "Visibility"))
+                {
+                    Visibility->setChecked(true);
+                }
+                Panel->show();
+            }
+            EditorUi::WorkspaceLayoutAdapter::Reset(*WorkspaceSplitter, *CenterSplitter, height());
         }
     });
 
-    auto* Brand = new QLabel(menuBar());
-    Brand->setText(QString::fromUtf8("SakuraNovel Studio"));
-    Brand->setStyleSheet("padding: 0 12px; color: #c496ad; font-weight: 700;");
-    menuBar()->setCornerWidget(Brand, Qt::TopLeftCorner);
-
-    ProjectTitleLabel = new QLabel(menuBar());
-    ProjectTitleLabel->setObjectName("MutedLabel");
-    ProjectTitleLabel->setStyleSheet("color: #95909e; padding-right: 12px;");
-    menuBar()->setCornerWidget(ProjectTitleLabel, Qt::TopRightCorner);
+    ProjectTitleLabel = new QLabel(this);
 }
 
 void EditorMainWindow::BuildToolbar()
 {
-    auto* Toolbar = addToolBar("Editor");
-    Toolbar->setObjectName("EditorToolbar");
-    Toolbar->setMovable(false);
-    Toolbar->setFloatable(false);
-    Toolbar->setIconSize(QSize(16, 16));
-
-    PlayButton = new QPushButton(QString::fromUtf8("\xE2\x96\xB6"), Toolbar);
-    PlayButton->setObjectName("PlayButton");
-    PlayButton->setCheckable(true);
-    PlayButton->setToolTip(QString::fromUtf8("\xD0\x97\xD0\xB0\xD0\xBF\xD1\x83\xD1\x81\xD1\x82\xD0\xB8\xD1\x82\xD1\x8C \xD0\xBF\xD1\x80\xD0\xB5\xD0\xB4\xD0\xBF\xD1\x80\xD0\xBE\xD1\x81\xD0\xBC\xD0\xBE\xD1\x82\xD1\x80"));
-    PauseButton = new QPushButton(QString::fromUtf8("\xE2\x8F\xB8"), Toolbar);
-    PauseButton->setProperty("class", "EditorToolButton");
-    PauseButton->setCheckable(true);
-    PauseButton->setEnabled(false);
-    StepButton = new QPushButton(QString::fromUtf8("\xE2\x8F\xA9"), Toolbar);
-    StepButton->setProperty("class", "EditorToolButton");
-    StepButton->setEnabled(false);
-    Toolbar->addWidget(PlayButton);
-    Toolbar->addWidget(PauseButton);
-    Toolbar->addWidget(StepButton);
-    Toolbar->addSeparator();
-
-    ModeLabel = new QLabel(QString::fromUtf8("\xD0\xA0\xD0\xB5\xD0\xB4\xD0\xB0\xD0\xBA\xD1\x82\xD0\xB8\xD1\x80\xD0\xBE\xD0\xB2\xD0\xB0\xD0\xBD\xD0\xB8\xD0\xB5"), Toolbar);
-    ModeLabel->setObjectName("RoseLabel");
-    ModeLabel->setStyleSheet("color: #c496ad; padding: 0 8px;");
-    Toolbar->addWidget(ModeLabel);
-
-    auto* Spacer = new QWidget(Toolbar);
-    Spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    Toolbar->addWidget(Spacer);
-
-    LayoutCombo = new QComboBox(Toolbar);
-    LayoutCombo->addItem(QString::fromUtf8("\xD0\x9F\xD0\xBE\xD1\x81\xD1\x82\xD0\xB0\xD0\xBD\xD0\xBE\xD0\xB2\xD0\xBA\xD0\xB0"), "balanced");
-    LayoutCombo->addItem(QString::fromUtf8("\xD0\xA1\xD1\x86\xD0\xB5\xD0\xBD\xD0\xB0\xD1\x80\xD0\xB8\xD0\xB9"), "graph");
-    LayoutCombo->addItem(QString::fromUtf8("\xD0\xA2\xD0\xBE\xD0\xBB\xD1\x8C\xD0\xBA\xD0\xBE \xD1\x81\xD1\x86\xD0\xB5\xD0\xBD\xD0\xB0"), "scene");
-    LayoutCombo->addItem(QString::fromUtf8("\xD0\xA2\xD0\xBE\xD0\xBB\xD1\x8C\xD0\xBA\xD0\xBE \xD0\xB8\xD0\xB5\xD1\x80\xD0\xB0\xD1\x80\xD1\x85\xD0\xB8\xD1\x8F"), "hierarchy");
-    LayoutCombo->addItem(QString::fromUtf8("\xD0\xA2\xD0\xBE\xD0\xBB\xD1\x8C\xD0\xBA\xD0\xBE \xD0\xB8\xD0\xBD\xD1\x81\xD0\xBF\xD0\xB5\xD0\xBA\xD1\x82\xD0\xBE\xD1\x80"), "inspector");
-    Toolbar->addWidget(LayoutCombo);
-
-    auto* ActionsButton = new QPushButton(QString::fromUtf8("+\xC2\xA0\xD0\x94\xD0\xB5\xD0\xB9\xD1\x81\xD1\x82\xD0\xB2\xD0\xB8\xD1\x8F \xD0\xB8 \xD1\x81\xD0\xBE\xD0\xB1\xD1\x8B\xD1\x82\xD0\xB8\xD1\x8F"), Toolbar);
-    ActionsButton->setStyleSheet(
-        "QPushButton { background:#40323e; color:#e4b9cd; border:1px solid #67505f; border-radius:3px; padding:5px 10px; }"
-        "QPushButton:hover { background:#493b48; }");
-    Toolbar->addWidget(ActionsButton);
-
+    auto* Header = new EditorUi::StudioHeaderView(*menuBar(), *ProjectTitleLabel, this);
+    setMenuWidget(Header);
+    PlayButton = Header->Play;
+    PauseButton = Header->Pause;
+    StepButton = Header->Step;
+    ModeLabel = Header->Mode;
+    LayoutCombo = new QComboBox(Header);
+    LayoutCombo->hide();
+    LayoutCombo->addItem(tr("Постановка"), "balanced");
+    LayoutCombo->addItem(tr("Сценарий"), "graph");
+    LayoutCombo->addItem(tr("Только сцена"), "scene");
+    LayoutCombo->addItem(tr("Иерархия"), "hierarchy");
+    LayoutCombo->addItem(tr("Инспектор"), "inspector");
+    auto* LayoutMenu = findChild<QMenu*>("WindowsMenu")->addMenu(tr("Раскладка"));
+    for (int Index = 0; Index < LayoutCombo->count(); ++Index)
+    {
+        LayoutMenu->addAction(LayoutCombo->itemText(Index), this, [this, Index]()
+        {
+            LayoutCombo->setCurrentIndex(Index);
+            OnLayoutModeChanged(Index);
+        });
+    }
     connect(PlayButton, &QPushButton::toggled, this, &EditorMainWindow::OnPlayToggled);
     connect(PauseButton, &QPushButton::clicked, this, &EditorMainWindow::OnPauseClicked);
     connect(StepButton, &QPushButton::clicked, this, &EditorMainWindow::OnStepClicked);
-    connect(LayoutCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &EditorMainWindow::OnLayoutModeChanged);
-    connect(ActionsButton, &QPushButton::clicked, this, &EditorMainWindow::OnFocusActionsAndEvents);
+    connect(Header->Home, &QPushButton::clicked, this, &EditorMainWindow::OnNewProject);
+    connect(LayoutCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, &EditorMainWindow::OnLayoutModeChanged);
 }
 
 void EditorMainWindow::BuildUi()
 {
-    auto* Root = new QWidget(this);
-    Root->setObjectName("EditorRoot");
-    auto* RootLayout = new QVBoxLayout(Root);
-    RootLayout->setContentsMargins(0, 0, 0, 0);
-    RootLayout->setSpacing(0);
-
-    WorkspaceSplitter = new QSplitter(Qt::Horizontal, Root);
-    WorkspaceSplitter->setHandleWidth(5);
-
-    auto* HierarchyPanel = new QWidget(WorkspaceSplitter);
-    HierarchyPanel->setObjectName("HierarchyPanel");
-    HierarchyPanel->setMinimumWidth(180);
-    auto* HierarchyLayout = new QVBoxLayout(HierarchyPanel);
-    HierarchyLayout->setContentsMargins(0, 0, 0, 0);
-    HierarchyLayout->setSpacing(0);
+    auto* Root = new EditorUi::WorkspaceView(this);
+    WorkspaceSplitter = &Root->GetWorkspaceSplitter();
+    CenterSplitter = &Root->GetCenterSplitter();
+    QWidget* HierarchyPanel = &Root->GetHierarchyPanel();
+    QVBoxLayout* HierarchyLayout = &Root->GetHierarchyLayout();
 
     HierarchyTabs = new QTabWidget(HierarchyPanel);
-    auto* Tree = new HierarchyTreeWidget(HierarchyTabs);
+    auto* Tree = new HierarchyTreeWidget();
+    HierarchyContent = new EditorUi::HierarchyPanelView(*Tree, HierarchyTabs);
     HierarchyTree = Tree;
     HierarchyTree->setHeaderHidden(true);
     HierarchyTree->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -261,22 +243,12 @@ void EditorMainWindow::BuildUi()
     {
         return ReparentHierarchyObject(Target, NewParent);
     };
-    HierarchyTabs->addTab(HierarchyTree, QString::fromUtf8("\xD0\x98\xD0\xB5\xD1\x80\xD0\xB0\xD1\x80\xD1\x85\xD0\xB8\xD1\x8F"));
+    HierarchyTabs->addTab(HierarchyContent, tr("Иерархия"));
     HierarchyLayout->addWidget(HierarchyTabs, 1);
+    connect(&HierarchyContent->GetAddButton(), &QPushButton::clicked, this, &EditorMainWindow::OnCreateEmptyObject);
 
-    auto* CenterPanel = new QWidget(WorkspaceSplitter);
-    auto* CenterLayout = new QVBoxLayout(CenterPanel);
-    CenterLayout->setContentsMargins(0, 0, 0, 0);
-    CenterLayout->setSpacing(0);
-
-    CenterSplitter = new QSplitter(Qt::Vertical, CenterPanel);
-    CenterSplitter->setHandleWidth(5);
-
-    auto* ViewportPanel = new QWidget(CenterSplitter);
-    ViewportPanel->setObjectName("ViewportPanel");
-    auto* ViewportLayout = new QVBoxLayout(ViewportPanel);
-    ViewportLayout->setContentsMargins(0, 0, 0, 0);
-    ViewportLayout->setSpacing(0);
+    QWidget* ViewportPanel = &Root->GetViewportPanel();
+    QVBoxLayout* ViewportLayout = &Root->GetViewportLayout();
 
     PrimaryViewport = new EditorViewportWidget(ViewportPanel);
     connect(PrimaryViewport, &EditorViewportWidget::NavigationVisibilityChanged, this, [this](bool bVisible)
@@ -315,15 +287,48 @@ void EditorMainWindow::BuildUi()
             ExecuteCommand(MakeSetTransformCommand(EditScene, Selected->GetObjectHandle(), NewValue));
         });
 
+    auto* ViewportTabs = new QWidget(ViewportPanel);
+    ViewportTabs->setObjectName("ViewportTabs");
+    auto* TabsLayout = new QHBoxLayout(ViewportTabs);
+    TabsLayout->setContentsMargins(10, 0, 8, 0);
+    TabsLayout->setSpacing(12);
+    LocationTab = new QPushButton(tr("Локация"), ViewportTabs);
+    LocationTab->setProperty("uiRole", "chromeButton");
+    LocationTab->setCheckable(true);
+    LocationTab->setChecked(true);
+    LocationTab->setAutoExclusive(true);
+    connect(LocationTab, &QPushButton::clicked, this, [this]() { PlayButton->setChecked(false); });
+    TabsLayout->addWidget(LocationTab);
+    GameTab = new QPushButton(tr("Игра"), ViewportTabs);
+    GameTab->setProperty("uiRole", "chromeButton");
+    GameTab->setCheckable(true);
+    GameTab->setAutoExclusive(true);
+    GameTab->setToolTip(tr("Запустить игровую сцену"));
+    connect(GameTab, &QPushButton::clicked, this, [this]() { PlayButton->setChecked(true); });
+    TabsLayout->addWidget(GameTab);
+    TabsLayout->addStretch();
+    auto* MaximizeViewport = new QPushButton(EditorUi::MakeStudioIcon(EditorUi::StudioIcon::Expand), {}, ViewportTabs);
+    MaximizeViewport->setProperty("uiRole", "chromeButton");
+    MaximizeViewport->setToolTip(tr("Развернуть / восстановить локацию"));
+    MaximizeViewport->setCheckable(true);
+    connect(MaximizeViewport, &QPushButton::toggled, this, [this](bool bMaximized)
+    {
+        if (bMaximized)
+        {
+            CenterSplitter->setSizes({height(), 0});
+        }
+        else
+        {
+            EditorUi::WorkspaceLayoutAdapter::Reset(*WorkspaceSplitter, *CenterSplitter, height());
+        }
+    });
+    TabsLayout->addWidget(MaximizeViewport);
+    ViewportLayout->addWidget(ViewportTabs);
     auto* ViewportHeader = new QFrame(ViewportPanel);
     ViewportHeader->setObjectName("ViewportHeader");
     auto* ViewportHeaderLayout = new QHBoxLayout(ViewportHeader);
-    ViewportHeaderLayout->setContentsMargins(10, 4, 10, 4);
-    ViewportModeLabel = new QLabel(QString::fromUtf8("Scene В· Edit World"), ViewportHeader);
-    ViewportModeLabel->setObjectName("RoseLabel");
-    ViewportHeaderLayout->addWidget(ViewportModeLabel);
-    ViewportHeaderLayout->addStretch(1);
-
+    ViewportHeaderLayout->setContentsMargins(8, 0, 8, 0);
+    ViewportHeaderLayout->setSpacing(4);
     GizmoModeButtons = new QButtonGroup(ViewportHeader);
     GizmoModeButtons->setExclusive(true);
     auto MakeGizmoModeButton = [&](const QString& Label, const QString& ToolTip, int ModeId)
@@ -332,7 +337,7 @@ void EditorMainWindow::BuildUi()
         Button->setObjectName("ViewportGizmoButton");
         Button->setCheckable(true);
         Button->setFixedHeight(24);
-        Button->setMinimumWidth(28);
+        Button->setFixedWidth(28);
         Button->setToolTip(ToolTip);
         GizmoModeButtons->addButton(Button, ModeId);
         ViewportHeaderLayout->addWidget(Button);
@@ -350,6 +355,12 @@ void EditorMainWindow::BuildUi()
         QStringLiteral("R"),
         tr("Scale gizmo (R)"),
         static_cast<int>(EditorViewportWidget::GizmoOperation::Scale));
+    TranslateGizmoButton->setText({});
+    RotateGizmoButton->setText({});
+    ScaleGizmoButton->setText({});
+    TranslateGizmoButton->setIcon(EditorUi::MakeStudioIcon(EditorUi::StudioIcon::Move));
+    RotateGizmoButton->setIcon(EditorUi::MakeStudioIcon(EditorUi::StudioIcon::Rotate));
+    ScaleGizmoButton->setIcon(EditorUi::MakeStudioIcon(EditorUi::StudioIcon::Scale));
     TranslateGizmoButton->setChecked(true);
     connect(GizmoModeButtons, &QButtonGroup::idClicked, this, [this](int ModeId)
     {
@@ -365,16 +376,31 @@ void EditorMainWindow::BuildUi()
     });
 
     ViewportHeaderLayout->addSpacing(8);
-    ViewportHeaderLayout->addWidget(new QLabel(tr("Camera Speed"), ViewportHeader));
+    ViewportHeaderLayout->addStretch();
     CameraSpeedSpin = new QDoubleSpinBox(ViewportHeader);
     CameraSpeedSpin->setRange(0.25, 250.0);
     CameraSpeedSpin->setDecimals(2);
     CameraSpeedSpin->setSingleStep(0.5);
     CameraSpeedSpin->setValue(PrimaryViewport->GetCameraMoveSpeed());
     CameraSpeedSpin->setSuffix(tr(" u/s"));
-    CameraSpeedSpin->setFixedWidth(110);
+    CameraSpeedSpin->setFixedWidth(88);
     CameraSpeedSpin->setToolTip(tr("Editor camera fly speed. Shift multiplies, Ctrl divides, RMB+wheel adjusts."));
-    ViewportHeaderLayout->addWidget(CameraSpeedSpin);
+    auto* CameraOptions = new QToolButton(ViewportHeader);
+    CameraOptions->setIcon(EditorUi::MakeStudioIcon(EditorUi::StudioIcon::Camera));
+    CameraOptions->setToolTip(tr("Настройки камеры и отображения"));
+    CameraOptions->setPopupMode(QToolButton::InstantPopup);
+    auto* Options = new QMenu(CameraOptions);
+    auto* SpeedAction = new QWidgetAction(Options);
+    auto* CameraSettings = new QWidget(Options);
+    auto* CameraLayout = new QHBoxLayout(CameraSettings);
+    CameraLayout->addWidget(new QLabel(tr("Скорость камеры"), CameraSettings));
+    CameraLayout->addWidget(CameraSpeedSpin);
+    SpeedAction->setDefaultWidget(CameraSettings);
+    Options->addAction(SpeedAction);
+    Options->addAction(findChild<QAction*>("ShowNavigationAction"));
+    Options->addAction(findChild<QAction*>("ShowCollisionAction"));
+    CameraOptions->setMenu(Options);
+    ViewportHeaderLayout->addWidget(CameraOptions);
     connect(CameraSpeedSpin, qOverload<double>(&QDoubleSpinBox::valueChanged), this, [this](double Value)
     {
         if (PrimaryViewport != nullptr)
@@ -397,38 +423,34 @@ void EditorMainWindow::BuildUi()
     ViewportLayout->addWidget(GameDialogue);
     GameDialogue->hide();
 
-    auto* GraphDock = new QWidget(CenterSplitter);
-    GraphDock->setObjectName("GraphDock");
-    auto* GraphLayout = new QVBoxLayout(GraphDock);
-    GraphLayout->setContentsMargins(0, 0, 0, 0);
-    GraphLayout->setSpacing(0);
+    QWidget* GraphDock = &Root->GetToolsPanel();
+    QVBoxLayout* GraphLayout = &Root->GetToolsLayout();
     DockTabs = new QTabWidget(GraphDock);
     GraphLayout->addWidget(DockTabs);
 
-    CenterSplitter->addWidget(ViewportPanel);
-    CenterSplitter->addWidget(GraphDock);
-    CenterSplitter->setStretchFactor(0, 3);
-    CenterSplitter->setStretchFactor(1, 2);
-    CenterSplitter->setSizes({520, 280});
-    CenterLayout->addWidget(CenterSplitter);
-
-    auto* InspectorPanel = new QWidget(WorkspaceSplitter);
-    InspectorPanel->setObjectName("InspectorPanel");
-    InspectorPanel->setMinimumWidth(240);
-    auto* InspectorLayout = new QVBoxLayout(InspectorPanel);
-    InspectorLayout->setContentsMargins(0, 0, 0, 0);
-    InspectorLayout->setSpacing(0);
+    QWidget* InspectorPanel = &Root->GetInspectorPanel();
+    QVBoxLayout* InspectorLayout = &Root->GetInspectorLayout();
     InspectorTabs = new QTabWidget(InspectorPanel);
+    InspectorPages = new QStackedWidget(InspectorTabs);
+    EmptyInspectorPage = new QWidget(InspectorPages);
+    auto* EmptyLayout = new QVBoxLayout(EmptyInspectorPage);
+    auto* EmptyHint = new QLabel(tr("Выберите объект или блок истории"), EmptyInspectorPage);
+    EmptyHint->setObjectName("MutedLabel");
+    EmptyHint->setWordWrap(true);
+    EmptyLayout->addWidget(EmptyHint);
+    EmptyLayout->addStretch();
+    InspectorPages->addWidget(EmptyInspectorPage);
 
-    auto* ObjectInspectorPage = new QWidget(InspectorTabs);
+    auto* ObjectInspectorPage = new QWidget(InspectorPages);
+    ObjectInspectorContent = ObjectInspectorPage;
     ObjectInspectorPage->setObjectName("ObjectInspectorPage");
     ObjectInspectorPage->setAttribute(Qt::WA_StyledBackground, true);
     auto* ObjectInspectorLayout = new QVBoxLayout(ObjectInspectorPage);
-    ObjectInspectorLayout->setContentsMargins(8, 8, 8, 8);
+    ObjectInspectorLayout->setContentsMargins(16, 16, 16, 16);
     ObjectInspectorLayout->setSpacing(6);
 
     ObjectNameEdit = new QLineEdit(ObjectInspectorPage);
-    ObjectNameEdit->setPlaceholderText(QString::fromUtf8("Object name"));
+    ObjectNameEdit->setPlaceholderText(tr("Имя объекта"));
     ObjectInspectorLayout->addWidget(ObjectNameEdit);
 
     auto* TransformForm = new QFormLayout();
@@ -442,6 +464,8 @@ void EditorMainWindow::BuildUi()
         ZSpin = new QDoubleSpinBox(Row);
         for (QDoubleSpinBox* Spin : {XSpin, YSpin, ZSpin})
         {
+            Spin->setButtonSymbols(QAbstractSpinBox::NoButtons);
+            Spin->setMinimumWidth(0);
             Spin->setDecimals(3);
             Spin->setRange(-1.0e6, 1.0e6);
             Spin->setSingleStep(0.1);
@@ -470,8 +494,69 @@ void EditorMainWindow::BuildUi()
     ComponentScrollArea->setWidget(ComponentInspectorContainer);
     ObjectInspectorLayout->addWidget(ComponentScrollArea, 1);
 
-    InspectorTabs->addTab(ObjectInspectorPage, QString::fromUtf8("\xD0\x98\xD0\xBD\xD1\x81\xD0\xBF\xD0\xB5\xD0\xBA\xD1\x82\xD0\xBE\xD1\x80"));
+    InspectorPages->addWidget(ObjectInspectorPage);
+    StoryInspector = new EditorUi::StoryInspectorView(InspectorPages);
+    InspectorPages->addWidget(StoryInspector);
+    InspectorTabs->addTab(InspectorPages, QString::fromUtf8("\xD0\x98\xD0\xBD\xD1\x81\xD0\xBF\xD0\xB5\xD0\xBA\xD1\x82\xD0\xBE\xD1\x80"));
     InspectorLayout->addWidget(InspectorTabs);
+
+    auto AddPanelControls = [this](QTabWidget* Tabs, QWidget* Panel, const QString& Title)
+    {
+        auto* Visibility = findChild<QMenu*>("WindowsMenu")->addAction(Title);
+        Visibility->setObjectName(Panel->objectName() + "Visibility");
+        Visibility->setCheckable(true);
+        Visibility->setChecked(true);
+        connect(Visibility, &QAction::toggled, Panel, &QWidget::setVisible);
+        auto* Controls = new QWidget(Tabs);
+        auto* ControlLayout = new QHBoxLayout(Controls);
+        ControlLayout->setContentsMargins(0, 0, 4, 0);
+        ControlLayout->setSpacing(0);
+        auto* Expand = new QPushButton(EditorUi::MakeStudioIcon(EditorUi::StudioIcon::Expand), {}, Controls);
+        Expand->setProperty("uiRole", "chromeButton");
+        Expand->setToolTip(tr("Развернуть / восстановить панель"));
+        Expand->setCheckable(true);
+        ControlLayout->addWidget(Expand);
+        connect(Expand, &QPushButton::toggled, this, [this, Panel](bool bExpanded)
+        {
+            for (int Index = 0; Index < WorkspaceSplitter->count(); ++Index)
+            {
+                QWidget* Region = WorkspaceSplitter->widget(Index);
+                Region->setVisible(!bExpanded || Region == Panel);
+            }
+            if (!bExpanded)
+            {
+                EditorUi::WorkspaceLayoutAdapter::Reset(*WorkspaceSplitter, *CenterSplitter, height());
+            }
+        });
+        auto* Collapse = new QPushButton(EditorUi::MakeStudioIcon(EditorUi::StudioIcon::Panel), {}, Controls);
+        Collapse->setProperty("uiRole", "chromeButton");
+        Collapse->setToolTip(tr("Скрыть панель; вернуть через меню «Окна»"));
+        ControlLayout->addWidget(Collapse);
+        connect(Collapse, &QPushButton::clicked, Visibility, [Visibility]() { Visibility->setChecked(false); });
+        Tabs->setCornerWidget(Controls);
+    };
+    AddPanelControls(HierarchyTabs, HierarchyPanel, tr("Иерархия"));
+    AddPanelControls(InspectorTabs, InspectorPanel, tr("Инспектор"));
+    auto* DockControls = new QWidget(DockTabs);
+    auto* DockControlsLayout = new QHBoxLayout(DockControls);
+    DockControlsLayout->setContentsMargins(0, 0, 8, 0);
+    auto* ExpandGraph = new QPushButton(EditorUi::MakeStudioIcon(EditorUi::StudioIcon::Expand), {}, DockControls);
+    ExpandGraph->setProperty("uiRole", "chromeButton");
+    ExpandGraph->setToolTip(tr("Развернуть / восстановить поток истории"));
+    ExpandGraph->setCheckable(true);
+    DockControlsLayout->addWidget(ExpandGraph);
+    connect(ExpandGraph, &QPushButton::toggled, this, [this](bool bExpanded)
+    {
+        if (bExpanded)
+        {
+            CenterSplitter->setSizes({0, height()});
+        }
+        else
+        {
+            EditorUi::WorkspaceLayoutAdapter::Reset(*WorkspaceSplitter, *CenterSplitter, height());
+        }
+    });
+    DockTabs->setCornerWidget(DockControls);
 
     connect(ObjectNameEdit, &QLineEdit::editingFinished, this, &EditorMainWindow::OnObjectNameEdited);
     connect(PositionXSpin, &QDoubleSpinBox::editingFinished, this, &EditorMainWindow::OnTransformEdited);
@@ -485,15 +570,7 @@ void EditorMainWindow::BuildUi()
     connect(ScaleZSpin, &QDoubleSpinBox::editingFinished, this, &EditorMainWindow::OnTransformEdited);
     connect(ComponentCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, &EditorMainWindow::OnComponentFilterChanged);
 
-    WorkspaceSplitter->addWidget(InspectorPanel);
-    WorkspaceSplitter->addWidget(CenterPanel);
-    WorkspaceSplitter->addWidget(HierarchyPanel);
-    WorkspaceSplitter->setStretchFactor(0, 0);
-    WorkspaceSplitter->setStretchFactor(1, 1);
-    WorkspaceSplitter->setStretchFactor(2, 0);
-    WorkspaceSplitter->setSizes({320, 900, 240});
-
-    RootLayout->addWidget(WorkspaceSplitter, 1);
+    EditorUi::WorkspaceLayoutAdapter::Reset(*WorkspaceSplitter, *CenterSplitter, height());
     setCentralWidget(Root);
 
     StatusIssuesLabel = new QLabel(statusBar());
@@ -506,28 +583,11 @@ void EditorMainWindow::BuildUi()
     connect(HierarchyTree, &QTreeWidget::customContextMenuRequested, this, &EditorMainWindow::OnHierarchyContextMenu);
 }
 
-QWidget* EditorMainWindow::MakePlaceholderPage(const QString& Title, const QString& Description)
-{
-    auto* Page = new QWidget();
-    auto* Layout = new QVBoxLayout(Page);
-    Layout->setContentsMargins(16, 16, 16, 16);
-    auto* TitleLabel = new QLabel(Title, Page);
-    TitleLabel->setStyleSheet("color: #ead4df; font-size: 16px; font-weight: 600;");
-    auto* Body = new QLabel(Description, Page);
-    Body->setObjectName("MutedLabel");
-    Body->setWordWrap(true);
-    Body->setStyleSheet("color: #95909e;");
-    Layout->addWidget(TitleLabel);
-    Layout->addWidget(Body);
-    Layout->addStretch(1);
-    return Page;
-}
-
 void EditorMainWindow::BuildStoryDockPage()
 {
     StoryPanel = new StoryWidget(StoryPlayback, DockTabs);
     StoryDockPage = StoryPanel;
-    DockTabs->addTab(StoryDockPage, tr("Story"));
+    DockTabs->addTab(StoryDockPage, tr("Проигрыватель"));
 }
 
 void EditorMainWindow::BuildRenderStatisticsDockPage()
@@ -537,13 +597,13 @@ void EditorMainWindow::BuildRenderStatisticsDockPage()
     Layout->setContentsMargins(16, 16, 16, 16);
     Layout->setSpacing(8);
     auto* TitleLabel = new QLabel(QString::fromUtf8("\xD0\x9D\xD0\xB0\xD1\x81\xD1\x82\xD1\x80\xD0\xBE\xD0\xB9\xD0\xBA\xD0\xB8 \xD1\x81\xD1\x82\xD0\xB0\xD1\x82\xD0\xB8\xD1\x81\xD1\x82\xD0\xB8\xD0\xBA\xD0\xB8"), Page);
-    TitleLabel->setStyleSheet("color: #ead4df; font-size: 16px; font-weight: 600;");
+    TitleLabel->setProperty("uiRole", "sectionTitle");
     Layout->addWidget(TitleLabel);
     RenderStatisticsLabel = new QLabel(Page);
     RenderStatisticsLabel->setWordWrap(true);
     RenderStatisticsLabel->setObjectName("MutedLabel");
-    RenderStatisticsLabel->setStyleSheet("color: #95909e;");
-    RenderStatisticsLabel->setText(tr("Waiting for render statisticsвЂ¦"));
+    RenderStatisticsLabel->setProperty("uiRole", "description");
+    RenderStatisticsLabel->setText(tr("Ожидание статистики рендера…"));
     Layout->addWidget(RenderStatisticsLabel);
     NavigationStatisticsLabel = new QLabel(Page);
     NavigationStatisticsLabel->setObjectName("NavigationStatisticsLabel");
@@ -560,7 +620,7 @@ void EditorMainWindow::BuildPostprocessDockPage()
     Layout->setContentsMargins(16, 16, 16, 16);
     Layout->setSpacing(8);
     auto* TitleLabel = new QLabel(QString::fromUtf8("\xD0\x9D\xD0\xB0\xD1\x81\xD1\x82\xD1\x80\xD0\xBE\xD0\xB9\xD0\xBA\xD0\xB8 \xD0\xBF\xD0\xBE\xD1\x81\xD1\x82\xD0\xBE\xD0\xB1\xD1\x80\xD0\xB0\xD0\xB1\xD0\xBE\xD1\x82\xD0\xBA\xD0\xB8"), Page);
-    TitleLabel->setStyleSheet("color: #ead4df; font-size: 16px; font-weight: 600;");
+    TitleLabel->setProperty("uiRole", "sectionTitle");
     Layout->addWidget(TitleLabel);
 
     auto* Form = new QFormLayout();
@@ -622,53 +682,71 @@ void EditorMainWindow::BuildPostprocessDockPage()
 
 void EditorMainWindow::PopulateDockPages()
 {
+    StoryGraph = new EditorUi::StoryWorkspaceView(DockTabs);
+    DockTabs->addTab(StoryGraph, tr("Поток истории"));
+    InitializeStoryAuthoring();
+
     ContentBrowser = new ContentBrowserWidget(DockTabs);
     ContentBrowser->SetEngine(&BoundEngine);
     ContentBrowser->SetProjectContext(&BoundSession, &Document);
     connect(ContentBrowser, &ContentBrowserWidget::AssetsChanged, this, [this]()
     {
+        RefreshStoryTargets();
         UpdateWindowTitleDirty();
         UpdateStatus();
     });
     connect(ContentBrowser, &ContentBrowserWidget::AssetActivated, this, &EditorMainWindow::OnAssetActivated);
     DockTabs->addTab(ContentBrowser, tr("Content"));
-
     BuildStoryDockPage();
-
-    struct DockPage
-    {
-        const char* TitleUtf8;
-        const char* BodyUtf8;
-    };
-
-    const DockPage Pages[] = {
-        {"\xD0\xA2\xD0\xB0\xD0\xB9\xD0\xBC\xD0\xBB\xD0\xB0\xD0\xB9\xD0\xBD", "Global story timeline / route map"},
-        {"\xD0\xA1\xD0\xB0\xD0\xB1\xD1\x81\xD1\x86\xD0\xB5\xD0\xBD\xD1\x8B", "Subscene workspace and map"},
-        {"\xD0\x9A\xD0\xB0\xD0\xBC\xD0\xB5\xD1\x80\xD1\x8B", "Camera library and framing"},
-        {"\xD0\x9F\xD0\xBE\xD1\x81\xD1\x82\xD0\xB0\xD0\xBD\xD0\xBE\xD0\xB2\xD0\xBA\xD0\xB0", "Staging В· before / during / after line"},
-        {"\xD0\xA1\xD0\xBE\xD0\xB1\xD1\x8B\xD1\x82\xD0\xB8\xD0\xB5", "Event В· action groups and actions"},
-        {"\xD0\x9F\xD1\x80\xD0\xBE\xD0\xB5\xD0\xBA\xD1\x82", "Asset browser В· scenes / events / audio"},
-        {"\xD0\x97\xD0\xB2\xD1\x83\xD0\xBA", "Sound workspace and meters"},
-        {"\xD0\xAD\xD1\x84\xD1\x84\xD0\xB5\xD0\xBA\xD1\x82\xD1\x8B", "Effect samples playground"},
-        {"\xD0\x9E\xD1\x88\xD0\xB8\xD0\xB1\xD0\xBA\xD0\xB8", "Validation issues and failure lab"},
-    };
-
-    for (const DockPage& Page : Pages)
-    {
-        DockTabs->addTab(
-            MakePlaceholderPage(QString::fromUtf8(Page.TitleUtf8), QString::fromUtf8(Page.BodyUtf8)),
-            QString::fromUtf8(Page.TitleUtf8));
-    }
     BuildRenderStatisticsDockPage();
     BuildPostprocessDockPage();
+
+    auto* WindowMenu = findChild<QMenu*>("WindowsMenu");
+    WindowMenu->addSeparator();
+    for (int Index = 0; Index < DockTabs->count(); ++Index)
+    {
+        QWidget* Page = DockTabs->widget(Index);
+        // QStackedLayout otherwise includes every hidden page's minimum width.
+        // A wide Content filter row must not squeeze the shell's side rails.
+        Page->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
+        QAction* Action = new QAction(DockTabs->tabText(Index), Page);
+        Action->setObjectName("WorkspaceVisibility");
+        WindowMenu->addAction(Action);
+        Action->setCheckable(true);
+        Action->setChecked(Index == 0);
+        DockTabs->setTabVisible(Index, Index == 0);
+        connect(Action, &QAction::toggled, this, [this, Page](bool bVisible)
+        {
+            const int TabIndex = DockTabs->indexOf(Page);
+            DockTabs->setTabVisible(TabIndex, bVisible);
+            if (bVisible)
+            {
+                DockTabs->setCurrentIndex(TabIndex);
+            }
+        });
+        connect(DockTabs, &QTabWidget::tabCloseRequested, Action, [this, Action, Page](int TabIndex)
+        {
+            if (DockTabs->widget(TabIndex) == Page)
+            {
+                Action->setChecked(false);
+            }
+        });
+    }
+    DockTabs->setTabsClosable(true);
+    DockTabs->setCurrentWidget(StoryGraph);
 }
 
 void EditorMainWindow::OnDockTabChanged(int Index)
 {
-    if (Index >= 0)
+    for (int TabIndex = 0; TabIndex < DockTabs->count(); ++TabIndex)
     {
-        statusBar()->showMessage(QString::fromUtf8("Dock: ") + DockTabs->tabText(Index), 1200);
+        if (auto* Action = DockTabs->widget(TabIndex)->findChild<QAction*>("WorkspaceVisibility", Qt::FindDirectChildrenOnly))
+        {
+            const QSignalBlocker Blocker(Action);
+            Action->setChecked(DockTabs->isTabVisible(TabIndex));
+        }
     }
+    Q_UNUSED(Index);
 }
 
 void EditorMainWindow::OnLayoutModeChanged(int Index)
@@ -684,8 +762,9 @@ void EditorMainWindow::OnLayoutModeChanged(int Index)
         CenterSplitter->setSizes({120, 680});
         for (int TabIndex = 0; TabIndex < DockTabs->count(); ++TabIndex)
         {
-            if (DockTabs->tabText(TabIndex) == tr("Story"))
+            if (DockTabs->widget(TabIndex) == StoryGraph)
             {
+                DockTabs->setTabVisible(TabIndex, true);
                 DockTabs->setCurrentIndex(TabIndex);
                 break;
             }
@@ -697,16 +776,15 @@ void EditorMainWindow::OnLayoutModeChanged(int Index)
     }
     else if (Mode == "hierarchy")
     {
-        WorkspaceSplitter->setSizes({200, 500, 520});
+        WorkspaceSplitter->setSizes({520, 500, 200});
     }
     else if (Mode == "inspector")
     {
-        WorkspaceSplitter->setSizes({540, 500, 180});
+        WorkspaceSplitter->setSizes({180, 500, 540});
     }
     else
     {
-        WorkspaceSplitter->setSizes({320, 900, 240});
-        CenterSplitter->setSizes({520, 280});
+        EditorUi::WorkspaceLayoutAdapter::Reset(*WorkspaceSplitter, *CenterSplitter, height());
     }
 }
 

@@ -10,9 +10,24 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
 set(EDITOR_SRC
+    src/UI/Styles/StoryGraphStyle.cpp
+    src/UI/Styles/StudioIcons.cpp
+    src/UI/Adapters/StoryGraphController.cpp
+    src/UI/Views/StoryGraphicsScene.cpp
+    src/UI/Adapters/StoryGraphAdapter.cpp
+    src/UI/Views/HierarchyPanelView.cpp
+    src/UI/Views/StudioHeaderView.cpp
+    src/UI/Views/StoryWorkspaceView.cpp
+    src/UI/Views/StoryInspectorView.cpp
+    src/UI/Styles/EditorStyle.cpp
+    src/UI/Presentation/WorkspaceLayout.cpp
+    src/UI/Adapters/WorkspaceLayoutAdapter.cpp
+    src/UI/Adapters/WidgetCapture.cpp
+    src/UI/Views/WorkspaceView.cpp
     src/Editor.cpp
     src/Panels/AssetImportDialog.cpp
     src/Panels/ContentBrowserWidget.cpp
+    src/Shell/EditorMainWindowStory.cpp
     src/Shell/EditorMainWindow.cpp
     src/Shell/EditorMainWindowSupport.cpp
     src/Shell/EditorMainWindowLayout.cpp
@@ -32,6 +47,21 @@ set(EDITOR_SRC
 )
 
 set(EDITOR_HDR
+    inc/UI/Styles/StudioIcons.h
+    inc/UI/Styles/StoryGraphStyle.h
+    inc/UI/Presentation/StoryGraphModel.h
+    inc/UI/Adapters/StoryGraphController.h
+    inc/UI/Views/StoryGraphicsScene.h
+    inc/UI/Adapters/StoryGraphAdapter.h
+    inc/UI/Views/HierarchyPanelView.h
+    inc/UI/Views/StudioHeaderView.h
+    inc/UI/Views/StoryWorkspaceView.h
+    inc/UI/Views/StoryInspectorView.h
+    inc/UI/Styles/EditorStyle.h
+    inc/UI/Presentation/WorkspaceLayout.h
+    inc/UI/Adapters/WorkspaceLayoutAdapter.h
+    inc/UI/Adapters/WidgetCapture.h
+    inc/UI/Views/WorkspaceView.h
     inc/Editor.h
     inc/Actions/BuiltinEditorActions.h
     inc/Actions/PhysicsNavigationEditorActions.h

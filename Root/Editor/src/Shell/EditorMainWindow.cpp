@@ -1,4 +1,5 @@
 #include "Shell/EditorMainWindow.h"
+#include "UI/Adapters/StoryGraphController.h"
 
 #include "Actions/BuiltinEditorActions.h"
 #include "Actions/EditorAction.h"
@@ -99,7 +100,7 @@ EditorMainWindow::EditorMainWindow(Engine& InEngine, ProjectSession& InSession, 
     setObjectName("EditorMainWindow");
     setWindowTitle("Sacura Novel Studio");
     resize(1440, 900);
-    setStyleSheet(EditorTheme::Stylesheet());
+    EditorUi::EditorStyle::Apply(*this);
 
     BindDocumentFromSession();
 
@@ -122,6 +123,7 @@ EditorMainWindow::EditorMainWindow(Engine& InEngine, ProjectSession& InSession, 
 EditorMainWindow::~EditorMainWindow()
 {
     MaintenanceTimer->stop();
+    StoryAuthoring.reset();
     disconnect(PrimaryViewport, nullptr, this, nullptr);
     BoundEngine.StopPresenting();
     ClearSelection();

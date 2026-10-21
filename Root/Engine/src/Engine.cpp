@@ -13,6 +13,7 @@
 #include "Reflection/ReflectionSubsystem.h"
 #include "Physics/PhysicsWorld.h"
 #include "Navigation/NavigationWorld.h"
+#include "Authoring/CoreOperations.h"
 
 #include <chrono>
 #include <filesystem>
@@ -21,6 +22,7 @@
 
 Engine::Engine()
     : Scripting(ScriptingSubsystem::Get())
+    , AuthoringOperations(std::make_shared<Authoring::OperationRegistry>())
 {
 }
 
@@ -199,6 +201,16 @@ void Engine::InitializeCommon(bool bCreateWindowAndRender)
 {
     SetCurrentThreadRole(ThreadRole::Game);
     SetCurrentThreadDebugName("Game Thread");
+    if (!AuthoringOperations->Find("sacura.core.wait", 1))
+    {
+        const Authoring::Diagnostic Registered = Authoring::RegisterCoreOperations(*AuthoringOperations);
+        if (!Registered.bOk)
+        {
+            InitializationError = Registered.Message;
+            PrintString("Authoring operation registration failed: " + Registered.Message);
+            return;
+        }
+    }
     PrintString("Thread created: Game Thread");
 
     CreateSubsystem<MemorySubsystem>();
@@ -371,6 +383,7 @@ void Engine::AdoptScene(std::unique_ptr<Scene> NewScene)
     {
         OwnedScene->SetAssetManager(&Assets);
         OwnedScene->SetJobSystem(&Jobs);
+        OwnedScene->SetAuthoringOperations(AuthoringOperations);
     }
 }
 

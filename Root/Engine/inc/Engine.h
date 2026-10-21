@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ISystem.h"
+#include "Authoring/OperationRegistry.h"
 #include "Rendering/Assets/AssetGpuUploader.h"
 #include "Assets/AssetManager.h"
 #include "Assets/AssetRegistry.h"
@@ -51,6 +52,7 @@ public:
     SceneAssetResolver& GetSceneAssetResolver() { return AssetResolver; }
     std::shared_ptr<DynamicMaterialInstance> CreateDynamicMaterialInstance(const AssetKey& Material);
     ScriptingSubsystem& GetScripting() { return Scripting; }
+    Authoring::OperationRegistry& GetAuthoringOperations() { return *AuthoringOperations; }
     WindowSubsystem* GetWindowSubsystem() const;
 
     void SetContentRoot(const std::filesystem::path& ContentRoot);
@@ -127,6 +129,7 @@ private:
     AssetGpuUploader GpuUploader;
     SceneAssetResolver AssetResolver;
     ScriptingSubsystem& Scripting;
+    std::shared_ptr<Authoring::OperationRegistry> AuthoringOperations;
     PlaySession Play;
     std::unique_ptr<Scene> OwnedScene;
     StoryRuntime Story;

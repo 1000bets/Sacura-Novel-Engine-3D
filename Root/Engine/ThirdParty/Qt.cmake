@@ -127,7 +127,7 @@ find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
 
 # find_package(Qt6) creates directory-scoped imported targets; promote so
 # Runtime executables share the Qt targets discovered by Engine.
-foreach(SakuraQtModule Core Gui Widgets QWindowsIntegrationPlugin QJpegPlugin)
+foreach(SakuraQtModule Core Gui Widgets QWindowsIntegrationPlugin QJpegPlugin QOffscreenIntegrationPlugin)
     if(TARGET Qt6::${SakuraQtModule})
         get_target_property(SakuraQtIsGlobal Qt6::${SakuraQtModule} IMPORTED_GLOBAL)
         if(NOT SakuraQtIsGlobal)

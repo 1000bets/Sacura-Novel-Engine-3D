@@ -1,4 +1,5 @@
 #include "Shell/EditorMainWindow.h"
+#include "UI/Adapters/StoryGraphController.h"
 
 #include "Actions/BuiltinEditorActions.h"
 #include "Actions/EditorAction.h"
@@ -89,6 +90,7 @@
 
 #include "Shell/EditorMainWindowSupport.h"
 #include "Panels/HierarchyTreeWidget.h"
+#include "UI/Adapters/WidgetCapture.h"
 
 void EditorMainWindow::BindDocumentFromSession()
 {
@@ -105,20 +107,11 @@ void EditorMainWindow::BindDocumentFromSession()
 
 bool EditorMainWindow::CaptureScreenshot(const QString& OutputFile)
 {
-    show();
-    raise();
-    activateWindow();
-    QApplication::processEvents();
-    if (screen() != nullptr)
-    {
-        const QPoint Origin = mapToGlobal(QPoint(0, 0));
-        const QPixmap Screenshot = screen()->grabWindow(0, Origin.x(), Origin.y(), width(), height());
-        if (!Screenshot.isNull())
-        {
-            return Screenshot.save(OutputFile, "PNG");
-        }
-    }
-    return grab().save(OutputFile, "PNG");
+    const QList<int> PanelWidths = WorkspaceSplitter->sizes();
+    PrintString("Editor UI layout: hierarchy=" + std::to_string(PanelWidths.value(0))
+        + ", center=" + std::to_string(PanelWidths.value(1))
+        + ", inspector=" + std::to_string(PanelWidths.value(2)));
+    return EditorUi::WidgetCapture::Save(*this, OutputFile);
 }
 
 void EditorMainWindow::RefreshProjectTitle()
@@ -131,7 +124,7 @@ void EditorMainWindow::RefreshProjectTitle()
         return;
     }
 
-    ProjectTitleLabel->setText(QString::fromUtf8("\xF0\x9F\x93\x82  ") + QString::fromStdString(Descriptor->Name));
+    ProjectTitleLabel->setText(QString::fromStdString(Descriptor->Name));
     UpdateWindowTitleDirty();
 }
 
@@ -141,9 +134,9 @@ void EditorMainWindow::UpdateWindowTitleDirty()
     QString Title = "Sacura Novel Studio";
     if (Descriptor != nullptr)
     {
-        Title = QString("Sacura Novel Studio РІР‚вЂќ %1").arg(QString::fromStdString(Descriptor->Name));
+        Title = QString::fromUtf8("Sacura Novel Studio — %1").arg(QString::fromStdString(Descriptor->Name));
     }
-    if (Document.IsDirty())
+    if (Document.IsDirty() || (StoryAuthoring != nullptr && StoryAuthoring->GetDocument().IsDirty()))
     {
         Title += " *";
     }
@@ -162,7 +155,7 @@ void EditorMainWindow::UpdateStatus()
     {
         IssuesText += QString::fromUtf8(" (failed)");
     }
-    if (Document.IsDirty())
+    if (Document.IsDirty() || (StoryAuthoring != nullptr && StoryAuthoring->GetDocument().IsDirty()))
     {
         IssuesText += QString::fromUtf8(" Р’В· dirty");
     }
@@ -320,6 +313,12 @@ void EditorMainWindow::OnMaintenanceTick()
         if (bFailed)
         {
             bPlayRequested = false;
+            if (StoryAuthoring != nullptr)
+            {
+                StoryAuthoring->SetLocked(false);
+            }
+            LocationTab->setChecked(true);
+            GameTab->setChecked(false);
             const QSignalBlocker Blocker(PlayButton);
             PlayButton->setChecked(false);
             statusBar()->showMessage(QString::fromStdString(Diagnostic), 10000);
@@ -345,6 +344,10 @@ Scene* EditorMainWindow::GetHierarchyScene() const
 
 bool EditorMainWindow::PromptSaveIfDirty()
 {
+    if (!PromptSaveStoryIfDirty())
+    {
+        return false;
+    }
     if (!Document.IsDirty())
     {
         return true;

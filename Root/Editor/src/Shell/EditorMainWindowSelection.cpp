@@ -1,4 +1,8 @@
 #include "Shell/EditorMainWindow.h"
+#include "UI/Styles/StudioIcons.h"
+#include "UI/Views/StoryWorkspaceView.h"
+#include "UI/Views/HierarchyPanelView.h"
+#include <QStackedWidget>
 
 #include "Actions/BuiltinEditorActions.h"
 #include "Actions/EditorAction.h"
@@ -101,6 +105,8 @@ void EditorMainWindow::PopulateHierarchy()
         }
     }
 
+    HierarchyContent->Refresh();
+    RefreshStoryTargets();
     HierarchyTree->expandAll();
     HierarchyTree->blockSignals(false);
 
@@ -165,6 +171,16 @@ void EditorMainWindow::AddHierarchyItem(QTreeWidgetItem* ParentItem, GameObject*
     {
         Item = new QTreeWidgetItem(HierarchyTree, {QString::fromStdString(ObjectInstance->GetName())});
     }
+    EditorUi::StudioIcon Icon = EditorUi::StudioIcon::Cube;
+    if (ObjectInstance->GetComponent<CameraComponent>() != nullptr)
+    {
+        Icon = EditorUi::StudioIcon::Camera;
+    }
+    else if (ObjectInstance->GetComponent<LightComponent>() != nullptr)
+    {
+        Icon = EditorUi::StudioIcon::Light;
+    }
+    Item->setIcon(0, EditorUi::MakeStudioIcon(Icon));
     StoreObjectHandle(Item, ObjectInstance->GetObjectHandle());
     if (!BoundEngine.GetPlaySession().IsSimulating())
     {
@@ -367,6 +383,14 @@ void EditorMainWindow::RefreshSelectionUi()
 
     GameObject* Selected = GetSelectedGameObject();
     const bool bHasSelection = Selected != nullptr;
+    if (InspectorPages != nullptr)
+    {
+        InspectorPages->setCurrentWidget(bHasSelection ? ObjectInspectorContent : EmptyInspectorPage);
+        if (bHasSelection && StoryGraph != nullptr)
+        {
+            StoryGraph->ClearSelection();
+        }
+    }
     const bool bEditableSelection = bHasSelection && !BoundEngine.GetPlaySession().IsSimulating();
     if (ObjectNameEdit != nullptr)
     {
@@ -426,6 +450,7 @@ void EditorMainWindow::RefreshSelectionUi()
 
 void EditorMainWindow::OnHierarchySelectionChanged()
 {
+    bStoryEditingContext = false;
     QTreeWidgetItem* Current = HierarchyTree->currentItem();
     if (Current == nullptr)
     {
