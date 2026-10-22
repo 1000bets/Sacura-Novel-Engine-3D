@@ -1,3 +1,4 @@
+#include "UI/Views/StudioControls.h"
 #include "UI/Views/StoryEventInspectorView.h"
 #include "UI/Views/StoryActionFieldsView.h"
 #include "UI/Styles/StoryEventStyle.h"
@@ -96,9 +97,10 @@ QWidget* StoryEventInspectorView::Section(const QString& Key, const QString& Cap
     Stack->addWidget(Fields);
     connect(Toggle, &QToolButton::toggled, this, [this, Key, Toggle, Fields](bool Checked) {
         Sections[Key] = Checked;
-        Fields->setVisible(Checked);
+
         Toggle->setIcon(MakeStudioIcon(Checked ? StudioIcon::ChevronDown : StudioIcon::ChevronRight));
     });
+    AnimateDisclosure(*Toggle, *Fields);
     Layout->addWidget(Container);
     return Fields;
 }
@@ -215,11 +217,11 @@ void StoryEventInspectorView::Rebuild()
         Form->setSpacing(StoryEventStyle::FieldGap);
         Form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
         Form->setRowWrapPolicy(QFormLayout::WrapLongRows);
-        auto* Phase = new QComboBox(Fields);
+        auto* Phase = new EditorUi::StudioSelect(Fields);
         Phase->setObjectName("StoryEventPhase");
         Phase->addItems(StoryEventStyle::Phases());
         Phase->setCurrentIndex(Batch.Phase);
-        auto* Join = new QComboBox(Fields);
+        auto* Join = new EditorUi::StudioSelect(Fields);
         Join->setObjectName("StoryEventJoin");
         Join->addItems(StoryEventStyle::Joins());
         Join->setCurrentIndex(Binding.Join);

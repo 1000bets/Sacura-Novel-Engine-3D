@@ -1,4 +1,5 @@
 #include "UI/Styles/StoryInspectorStyle.h"
+#include "UI/Styles/ControlStyle.h"
 #include <QSignalBlocker>
 #include <QTextBlockFormat>
 #include <QTextCursor>
@@ -10,9 +11,7 @@ namespace EditorUi
 {
 void StoryInspectorStyle::ApplyDialogueTypography(QTextEdit& Text)
 {
-    QFont Font;
-    Font.setFamilies({QStringLiteral("Inter"), QStringLiteral("Segoe UI")});
-    Font.setPixelSize(13);
+    const QFont Font = ControlStyle::Font(13);
     // QTextDocument also needs the font: the Windows rich-text document can
     // otherwise retain its default serif face after stylesheet polishing.
     Text.setFont(Font);

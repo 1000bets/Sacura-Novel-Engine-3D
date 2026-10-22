@@ -1,3 +1,4 @@
+#include "UI/Views/StudioControls.h"
 #include "UI/Views/StoryActionFieldsView.h"
 #include "UI/Styles/StoryEventStyle.h"
 #include <QCheckBox>
@@ -21,7 +22,7 @@ StoryActionFieldsView::StoryActionFieldsView(StoryGraphAction Action, const Stor
     Form->setVerticalSpacing(StoryEventStyle::FieldGap);
     Form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     Form->setRowWrapPolicy(QFormLayout::WrapLongRows);
-    auto* Type = new QComboBox(this);
+    auto* Type = new EditorUi::StudioSelect(this);
     Type->setObjectName("StoryEventActionKind");
     Type->setMinimumContentsLength(4);
     Type->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
@@ -63,7 +64,7 @@ StoryActionFieldsView::StoryActionFieldsView(StoryGraphAction Action, const Stor
         Spin("StoryEventActionDuration", Value.Duration, [this](double Number) { Value.Duration = Number; }, true));
     if (Value.Kind == 2)
     {
-        auto* Copy = new QCheckBox(tr("Положение из объекта"), this);
+        auto* Copy = new EditorUi::StudioCheckBox(tr("Положение из объекта"), this);
         Copy->setChecked(Value.bCopyTarget);
         Form->addRow(Copy);
         connect(Copy, &QCheckBox::toggled, this, [this](bool Checked) {
@@ -77,7 +78,7 @@ StoryActionFieldsView::StoryActionFieldsView(StoryGraphAction Action, const Stor
     }
     if (Value.Kind != 0 && (Value.Kind != 2 || Value.bCopyTarget))
     {
-        auto* Target = new QComboBox(this);
+        auto* Target = new EditorUi::StudioSelect(this);
         Target->setObjectName("StoryEventActionTarget");
         Target->setMinimumContentsLength(4);
         Target->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
@@ -127,7 +128,7 @@ StoryActionFieldsView::StoryActionFieldsView(StoryGraphAction Action, const Stor
         Form->addRow(tr("Положение"), Coordinates);
         if (Value.Kind == 2)
         {
-            auto* Rotate = new QCheckBox(tr("Задать поворот"), this);
+            auto* Rotate = new EditorUi::StudioCheckBox(tr("Задать поворот"), this);
             Rotate->setChecked(Value.bHasRotation);
             Form->addRow(Rotate);
             connect(Rotate, &QCheckBox::toggled, this, [this](bool Checked) {

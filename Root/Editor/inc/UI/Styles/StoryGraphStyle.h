@@ -1,5 +1,6 @@
 #pragma once
 #include "UI/Styles/EditorStyle.h"
+#include "UI/Styles/ControlStyle.h"
 #include <QFont>
 #include <QPen>
 #include <QRectF>
@@ -44,11 +45,7 @@ struct StoryGraphStyle
     static void PaintConnection(QPainter& Painter, const QPainterPath& Path, bool bSelected);
     static QFont Font(int Size = 11, bool bStrong = false)
     {
-        QFont Result;
-        Result.setFamilies({QStringLiteral("Inter"), QStringLiteral("Segoe UI")});
-        Result.setPixelSize(Size);
-        Result.setWeight(bStrong ? QFont::DemiBold : QFont::Normal);
-        return Result;
+        return ControlStyle::Font(Size, bStrong);
     }
 };
 }

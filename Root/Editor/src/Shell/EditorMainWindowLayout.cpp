@@ -1,3 +1,5 @@
+#include "UI/Views/StudioControls.h"
+#include "UI/Views/ObjectInspectorView.h"
 #include "Shell/EditorMainWindow.h"
 
 #include "Actions/BuiltinEditorActions.h"
@@ -229,6 +231,7 @@ void EditorMainWindow::BuildUi()
 
     HierarchyTabs = new QTabWidget(HierarchyPanel);
     auto* Tree = new HierarchyTreeWidget();
+    Tree->setObjectName("SceneHierarchy");
     HierarchyContent = new EditorUi::HierarchyPanelView(*Tree, HierarchyTabs);
     HierarchyTree = Tree;
     HierarchyTree->setHeaderHidden(true);
@@ -441,58 +444,42 @@ void EditorMainWindow::BuildUi()
     EmptyLayout->addStretch();
     InspectorPages->addWidget(EmptyInspectorPage);
 
-    auto* ObjectInspectorPage = new QWidget(InspectorPages);
+    auto* ObjectInspectorPage = new EditorUi::ObjectInspectorView(InspectorPages);
     ObjectInspectorContent = ObjectInspectorPage;
-    ObjectInspectorPage->setObjectName("ObjectInspectorPage");
-    ObjectInspectorPage->setAttribute(Qt::WA_StyledBackground, true);
-    auto* ObjectInspectorLayout = new QVBoxLayout(ObjectInspectorPage);
-    ObjectInspectorLayout->setContentsMargins(16, 16, 16, 16);
-    ObjectInspectorLayout->setSpacing(6);
-
-    ObjectNameEdit = new QLineEdit(ObjectInspectorPage);
-    ObjectNameEdit->setPlaceholderText(tr("Имя объекта"));
-    ObjectInspectorLayout->addWidget(ObjectNameEdit);
-
-    auto* TransformForm = new QFormLayout();
-    auto MakeAxisRow = [&](QDoubleSpinBox*& XSpin, QDoubleSpinBox*& YSpin, QDoubleSpinBox*& ZSpin)
-    {
-        auto* Row = new QWidget(ObjectInspectorPage);
-        auto* RowLayout = new QHBoxLayout(Row);
-        RowLayout->setContentsMargins(0, 0, 0, 0);
-        XSpin = new QDoubleSpinBox(Row);
-        YSpin = new QDoubleSpinBox(Row);
-        ZSpin = new QDoubleSpinBox(Row);
-        for (QDoubleSpinBox* Spin : {XSpin, YSpin, ZSpin})
-        {
-            Spin->setButtonSymbols(QAbstractSpinBox::NoButtons);
-            Spin->setMinimumWidth(0);
-            Spin->setDecimals(3);
-            Spin->setRange(-1.0e6, 1.0e6);
-            Spin->setSingleStep(0.1);
-            RowLayout->addWidget(Spin);
-        }
-        return Row;
+    ObjectNameEdit = ObjectInspectorPage->Name;
+    const auto& Fields = ObjectInspectorPage->TransformFields;
+    PositionXSpin = Fields[0]; PositionYSpin = Fields[1]; PositionZSpin = Fields[2];
+    RotationXSpin = Fields[3]; RotationYSpin = Fields[4]; RotationZSpin = Fields[5];
+    ScaleXSpin = Fields[6]; ScaleYSpin = Fields[7]; ScaleZSpin = Fields[8];
+    ComponentCombo = ObjectInspectorPage->ComponentFilter;
+    ComponentInspectorLayout = ObjectInspectorPage->Components;
+    ObjectInspectorPage->ResetRequested = [this]() {
+        if (auto* Selected = GetSelectedGameObject(); Selected && !BoundEngine.GetPlaySession().IsSimulating())
+        { ExecuteCommand(MakeSetTransformCommand(GetEditScene(), Selected->GetObjectHandle(), Transform{})); }
     };
-    TransformForm->addRow(QString::fromUtf8("Position"), MakeAxisRow(PositionXSpin, PositionYSpin, PositionZSpin));
-    TransformForm->addRow(QString::fromUtf8("Rotation"), MakeAxisRow(RotationXSpin, RotationYSpin, RotationZSpin));
-    TransformForm->addRow(QString::fromUtf8("Scale"), MakeAxisRow(ScaleXSpin, ScaleYSpin, ScaleZSpin));
-    ObjectInspectorLayout->addLayout(TransformForm);
-
-    ComponentCombo = new QComboBox(ObjectInspectorPage);
-    ObjectInspectorLayout->addWidget(ComponentCombo);
-
-    auto* ComponentScrollArea = new QScrollArea(ObjectInspectorPage);
-    ComponentScrollArea->setObjectName("ComponentInspectorScroll");
-    ComponentScrollArea->setWidgetResizable(true);
-    ComponentScrollArea->setFrameShape(QFrame::NoFrame);
-    auto* ComponentInspectorContainer = new QWidget(ComponentScrollArea);
-    ComponentInspectorContainer->setObjectName("ComponentInspectorList");
-    ComponentInspectorContainer->setAttribute(Qt::WA_StyledBackground, true);
-    ComponentInspectorLayout = new QVBoxLayout(ComponentInspectorContainer);
-    ComponentInspectorLayout->setContentsMargins(0, 0, 0, 0);
-    ComponentInspectorLayout->setSpacing(6);
-    ComponentScrollArea->setWidget(ComponentInspectorContainer);
-    ObjectInspectorLayout->addWidget(ComponentScrollArea, 1);
+    ObjectInspectorPage->DeleteRequested = [this]() { OnDeleteSelectedObject(); };
+    ObjectInspectorPage->DuplicateRequested = [this]() {
+        auto* Selected = GetSelectedGameObject();
+        if (!Selected || BoundEngine.GetPlaySession().IsSimulating()) { return; }
+        std::string Json;
+        if (!SceneSerializer::SerializeSubtreeToJson(*Selected, Json).bOk) { return; }
+        const ObjectHandle Parent = Selected->GetParent() ? Selected->GetParent()->GetObjectHandle() : ObjectHandle{};
+        ObjectHandle Created;
+        if (ExecuteCommand(MakePasteSubtreeCommand(GetEditScene(), std::move(Json), Parent, &Created)))
+        { SelectObject(Created); }
+    };
+    ObjectInspectorPage->FrameRequested = [this]() {
+        auto* Selected = GetSelectedGameObject();
+        if (!Selected || !PrimaryViewport || BoundEngine.GetPlaySession().IsSimulating()) { return; }
+        auto Camera = PrimaryViewport->GetViewCamera();
+        Vector3 Direction = Camera.Position - Camera.Target;
+        if (Direction.LengthSquared() < .001f) { Direction = Vector3(1, 1, -1); }
+        Direction.Normalize();
+        const auto World = Selected->GetWorldTransform();
+        Camera.Target = World.Position;
+        Camera.Position = Camera.Target + Direction * std::max(2.0f, World.Scale.Length() * 3.0f);
+        PrimaryViewport->SetViewCamera(Camera);
+    };
 
     InspectorPages->addWidget(ObjectInspectorPage);
     StoryInspector = new EditorUi::StoryInspectorView(InspectorPages);
@@ -660,7 +647,7 @@ void EditorMainWindow::BuildPostprocessDockPage()
         RenderConfiguration.BloomIntensity = static_cast<float>(Value);
     });
 
-    auto* Antialiasing = new QCheckBox(tr("FXAA"), Page);
+    auto* Antialiasing = new EditorUi::StudioCheckBox(tr("FXAA"), Page);
     Antialiasing->setChecked(RenderConfiguration.bAntialiasing);
     Form->addRow(QString(), Antialiasing);
     connect(Antialiasing, &QCheckBox::toggled, this, [this](bool bEnabled)
@@ -668,7 +655,7 @@ void EditorMainWindow::BuildPostprocessDockPage()
         RenderConfiguration.bAntialiasing = bEnabled;
     });
 
-    auto* MaterialEffects = new QCheckBox(tr("Preview Camera Material Effects"), Page);
+    auto* MaterialEffects = new EditorUi::StudioCheckBox(tr("Preview Camera Material Effects"), Page);
     MaterialEffects->setChecked(RenderConfiguration.bMaterialPostProcess);
     Form->addRow(QString(), MaterialEffects);
     connect(MaterialEffects, &QCheckBox::toggled, this, [this](bool bEnabled)

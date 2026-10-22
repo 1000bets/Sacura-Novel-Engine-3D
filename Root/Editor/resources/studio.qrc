@@ -7,6 +7,7 @@
         <file alias="chevron-down.png">ui/styles/chevron-down.png</file>
         <file alias="close.png">ui/styles/close.png</file>
         <file alias="editor.qss">ui/styles/editor.qss</file>
+        <file alias="controls.qss">ui/styles/controls.qss</file>
         <file alias="story.qss">ui/styles/story.qss</file>
         <file alias="classic.json">ui/styles/classic.json</file>
         <file alias="sakura.json">ui/styles/sakura.json</file>

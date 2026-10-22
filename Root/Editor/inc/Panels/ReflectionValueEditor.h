@@ -1,4 +1,6 @@
 #pragma once
+#include "UI/Views/StudioControls.h"
+#include "UI/Presentation/InspectorLabels.h"
 
 #include "Assets/AssetRegistry.h"
 #include "Reflection/Json/ReflectionJson.h"
@@ -122,7 +124,7 @@ private:
                 {
                     Label = QString::fromUtf8(Field->Attributes.DisplayName);
                 }
-                Fields->addRow(Label, Build(Field->ValueTypeId, ChildPath, Field->Attributes,
+                Fields->addRow(EditorUi::InspectorLabel(Label), Build(Field->ValueTypeId, ChildPath, Field->Attributes,
                     bCanEdit && !Field->bReadOnly && HasPropertyFlag(Field->Attributes.Flags, PropertyFlags::EditorEditable)));
             }
         }
@@ -164,7 +166,7 @@ private:
                 });
                 Fields->addRow(Group);
             }
-            auto* Add = new QPushButton(tr("Add"), Container);
+            auto* Add = new QPushButton(tr("Добавить"), Container);
             Fields->addRow(Add);
             connect(Add, &QPushButton::clicked, this, [this, Path]()
             {
@@ -196,7 +198,7 @@ private:
         }
         else if (Current.ValueKind == ReflectedValue::Kind::Bool)
         {
-            auto* Editor = new QCheckBox(Container);
+            auto* Editor = new EditorUi::StudioCheckBox(Container);
             Editor->setChecked(Current.BoolValue);
             Fields->addRow(Editor);
             connect(Editor, &QCheckBox::toggled, this, [this, Path](bool Updated)
@@ -293,7 +295,7 @@ private:
         }
         else
         {
-            auto* Editor = new QComboBox(Container);
+            auto* Editor = new EditorUi::StudioSelect(Container);
             Editor->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
             Editor->setMinimumWidth(70);
             Editor->addItem(tr("None"), QString());

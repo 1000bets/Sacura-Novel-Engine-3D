@@ -1,0 +1,55 @@
+/* EditorSelect.jsx, objectInspector.css, editorTheme.css. Logical CSS pixels. */
+QWidget#HierarchyPanelContent { background: @--bg-panel@; }
+QComboBox[uiRole="studioSelect"] { padding-right: 24px; }
+QComboBox[uiRole="studioSelect"]:focus, QComboBox[uiRole="studioSelect"][popupOpen="true"],
+QWidget#StoryInspector QComboBox[uiRole="studioSelect"]:focus,
+QWidget#StoryInspector QComboBox[uiRole="studioSelect"][popupOpen="true"] { border: 1px solid @--accent@; }
+QWidget#StudioSelectPopup {
+    background: @--bg-panel-elevated@; border: 1px solid @--border-subtle@;
+    border-radius: 6px;
+}
+QListWidget#StudioSelectOptions {
+    background: transparent; border: none; padding: 0; outline: none; font-size: 13px;
+}
+QListWidget#StudioSelectOptions::item { padding: 0; border: none; background: transparent; }
+QWidget#StudioSelectPopup QLineEdit#StudioSelectSearch {
+    background: @--bg-input@; border: 1px solid transparent; border-radius: 4px;
+    min-height: 18px; max-height: 16777215px; padding: 5px 8px; font-size: 12px;
+}
+QWidget#StudioSelectPopup QLineEdit#StudioSelectSearch:focus { border-color: @--border-strong@; }
+QWidget#HierarchySearchBox {
+    min-height: 30px; max-height: 30px; border: 1px solid transparent;
+    border-radius: 4px; background: @--bg-input@;
+}
+QLineEdit#HierarchySearch {
+    min-height: 28px; max-height: 28px; padding: 0; border: none;
+    background: transparent; font-size: 12px;
+}
+QLineEdit#HierarchySearch:focus { border: none; }
+QWidget#HierarchySearchBox[searchFocused="true"] { border-color: @--accent@; }
+QWidget#SceneObjectsHeading { margin: 0; min-height: 38px; max-height: 38px; }
+QLabel#SceneObjectCount { min-height: 20px; max-height: 20px; padding: 0 4px; }
+QWidget#ObjectInspectorBody { background: @--bg-panel@; }
+QWidget#ObjectIdentity { min-height: 60px; border-bottom: 1px solid @--border-subtle@; }
+QLineEdit#ObjectName { background: transparent; font-size: 14px; font-weight: 600; padding: 3px 0; }
+QWidget#ObjectTransform { border-bottom: 1px solid @--border-subtle@; }
+QLabel[uiRole="objectSectionTitle"] { font-size: 12px; font-weight: 600; color: @--text-primary@; }
+QLabel[uiRole="transformCaption"], QLabel#TransformUnit { font-size: 11px; }
+QLabel#TransformAxisX, QLabel#TransformAxisY, QLabel#TransformAxisZ { font-size: 10px; font-weight: 500; }
+QLabel#TransformAxisX { color: #e99a9e; }
+QLabel#TransformAxisY { color: #8cbfad; }
+QLabel#TransformAxisZ { color: #9bb8d4; }
+QWidget#TransformVector QDoubleSpinBox {
+    font-size: 11px; min-height: 26px; padding: 0 4px; border-radius: 4px;
+}
+QWidget#ObjectTransform QPushButton { min-height: 26px; padding: 0 5px; font-size: 11px; }
+QToolButton[uiRole="objectSection"] {
+    min-height: 36px; max-height: 36px; padding: 0 16px; border: none;
+    border-radius: 0; background: transparent; text-align: left; font-size: 12px;
+    font-weight: 500; color: @--text-primary@;
+}
+QToolButton[uiRole="objectSection"]:hover { background: @--bg-hover@; }
+QWidget#ComponentInspectorCard { border-bottom: 1px solid @--border-subtle@; }
+QPushButton[uiRole="propertyReset"] { min-height: 26px; padding: 0; max-width: 24px; }
+QWidget#ReflectionInspector QPushButton { min-height: 24px; }
+QCheckBox { spacing: 8px; min-height: 24px; }

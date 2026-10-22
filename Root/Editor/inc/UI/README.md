@@ -68,3 +68,27 @@ are ordinary Game assets with metadata, created without hand-written JSON.
 
 Tests use Qt offscreen and native screenshot helpers. QWidget capture intentionally
 captures only application widgets; it does not capture a GPU swapchain or desktop.
+
+Shared native controls mirror `EditorSelect.jsx` and `objectInspector.css`.
+`StudioSelect` keeps QComboBox models/signals but uses a read-only trigger and a
+searchable popup with checked selection, keyboard navigation and screen bounds.
+Its snapshot retains persistent model indexes; search never edits the authored
+value. Rapid close/reopen reverses the existing popup animation. The speaker list
+uses speakers already present in the story; it is not a character asset editor.
+An empty speaker remains empty in the document while displaying “Рассказчик”.
+
+`StudioCheckBox` retains Qt toggle/accessibility behavior and animates its vector
+checkmark. `AnimateDisclosure` clips opening/closing fields without changing
+document history. Hierarchy branches use vector chevrons and Qt tree animation;
+scene handles, reparenting and filtering remain with their existing adapters.
+
+`ObjectInspectorView` owns identity/transform rows, action buttons and component
+disclosures. The shell supplies scene command callbacks, reflected fields and
+generation-checked selection. The entire inspector scrolls as one form; component
+disclosure state survives undo/redo refreshes. No raw component TypeId is used as
+its primary caption; the identity stays in data and tooltips.
+
+`ControlStyle` owns vector painting and resolves the frontend font stack to an
+installed Inter or Segoe UI face (system sans fallback elsewhere). `controls.qss`
+owns styling. Resolving an actual face avoids Windows Qt interpreting a CSS family
+list as a missing font; QTextDocument also receives the resolved font explicitly.

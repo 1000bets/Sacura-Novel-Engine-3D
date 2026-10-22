@@ -8,12 +8,16 @@
 #include <QTreeWidget>
 #include <QTreeWidgetItemIterator>
 #include <QVBoxLayout>
+#include <QApplication>
+#include <QStyle>
 #include <functional>
 
 namespace EditorUi
 {
 HierarchyPanelView::HierarchyPanelView(QTreeWidget& InTree, QWidget* Parent) : QWidget(Parent), Tree(InTree)
 {
+    setObjectName("HierarchyPanelContent");
+    setAttribute(Qt::WA_StyledBackground);
     auto* Layout = new QVBoxLayout(this);
     Layout->setContentsMargins(0, 0, 0, 0);
     Layout->setSpacing(0);
@@ -25,14 +29,37 @@ HierarchyPanelView::HierarchyPanelView(QTreeWidget& InTree, QWidget* Parent) : Q
     Add->setObjectName("HierarchyAdd");
     Add->setToolTip(tr("Создать объект"));
     SearchLayout->addWidget(Add);
-    Search = new QLineEdit(SearchRow);
+    auto* SearchBox = new QWidget(SearchRow);
+    SearchBox->setObjectName("HierarchySearchBox");
+    auto* SearchBoxLayout = new QHBoxLayout(SearchBox);
+    SearchBoxLayout->setContentsMargins(9, 0, 7, 0);
+    SearchBoxLayout->setSpacing(7);
+    auto* SearchIcon = new QLabel(SearchBox);
+    SearchIcon->setPixmap(MakeStudioIcon(StudioIcon::Search).pixmap(14, 14));
+    SearchIcon->setFixedSize(14, 14);
+    SearchBoxLayout->addWidget(SearchIcon);
+    Search = new QLineEdit(SearchBox);
     Search->setObjectName("HierarchySearch");
     Search->setPlaceholderText(tr("Найти объект…"));
-    Search->addAction(MakeStudioIcon(StudioIcon::Search), QLineEdit::LeadingPosition);
+    Search->setAccessibleName(tr("Найти объект"));
+    Search->setFrame(false);
     Search->setClearButtonEnabled(true);
-    SearchLayout->addWidget(Search, 1);
+    SearchBoxLayout->addWidget(Search, 1);
+    SearchBox->setFocusProxy(Search);
+    connect(qApp, &QApplication::focusChanged, SearchBox, [SearchBox, Search = Search](QWidget*, QWidget* Focus) {
+        const bool Focused = Focus == Search || (Focus && Search->isAncestorOf(Focus));
+        if (SearchBox->property("searchFocused").toBool() == Focused) { return; }
+        SearchBox->setProperty("searchFocused", Focused);
+        SearchBox->style()->unpolish(SearchBox);
+        SearchBox->style()->polish(SearchBox);
+        SearchBox->update();
+    });
+    SearchLayout->addWidget(SearchBox, 1);
     Layout->addWidget(SearchRow);
-    auto* Heading = new QWidget(this);
+    auto* HeadingRow = new QWidget(this);
+    auto* HeadingRowLayout = new QHBoxLayout(HeadingRow);
+    HeadingRowLayout->setContentsMargins(8, 0, 8, 4);
+    auto* Heading = new QWidget(HeadingRow);
     Heading->setObjectName("SceneObjectsHeading");
     auto* HeadingLayout = new QHBoxLayout(Heading);
     HeadingLayout->setContentsMargins(8, 0, 8, 0);
@@ -40,8 +67,15 @@ HierarchyPanelView::HierarchyPanelView(QTreeWidget& InTree, QWidget* Parent) : Q
     HeadingLayout->addStretch();
     Count = new QLabel(Heading);
     Count->setObjectName("SceneObjectCount");
+    Count->setAlignment(Qt::AlignCenter);
+    Count->setMinimumWidth(22);
     HeadingLayout->addWidget(Count, 0, Qt::AlignVCenter);
-    Layout->addWidget(Heading);
+    HeadingRowLayout->addWidget(Heading);
+    Layout->addWidget(HeadingRow);
+    Tree.setAnimated(true);
+    Tree.setUniformRowHeights(true);
+    Tree.setIndentation(16);
+    Tree.setIconSize(QSize(14, 14));
     Layout->addWidget(&Tree, 1);
     Footer = new QLabel(this);
     Footer->setObjectName("HierarchyFooter");

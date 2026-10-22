@@ -1,3 +1,4 @@
+#include "UI/Views/StudioControls.h"
 #include "UI/Views/StoryInspectorView.h"
 #include "UI/Views/StoryEventInspectorView.h"
 #include "UI/Styles/StoryEventStyle.h"
@@ -50,9 +51,10 @@ QWidget* StoryInspectorView::MakeSection(const QString& Key, const QString& Capt
     connect(Toggle, &QToolButton::toggled, this, [this, Key, Toggle, Fields](bool bExpanded)
     {
         SectionStates[Key] = bExpanded;
-        Fields->setVisible(bExpanded);
+
         Toggle->setIcon(MakeStudioIcon(bExpanded ? StudioIcon::ChevronDown : StudioIcon::ChevronRight));
     });
+    AnimateDisclosure(*Toggle, *Fields);
     DetailsLayout->addWidget(Section);
     return Fields;
 }
@@ -110,12 +112,11 @@ StoryInspectorView::StoryInspectorView(QWidget* Parent) : QWidget(Parent)
     Form->setContentsMargins(0, 0, 0, 0);
     Form->setHorizontalSpacing(8);
     Form->setVerticalSpacing(10);
-    Kind = new QComboBox(Body);
+    Kind = new EditorUi::StudioSelect(Body);
     Kind->setObjectName("StoryNodeKind");
     Kind->addItems({tr("Реплика"), tr("Выбор"), tr("Действие"), tr("Концовка")});
-    Speaker = new QComboBox(Body);
+    Speaker = new EditorUi::StudioSelect(Body);
     Speaker->setObjectName("StorySpeaker");
-    Speaker->setEditable(true);
     Speaker->setInsertPolicy(QComboBox::NoInsert);
     Form->addRow(tr("Тип блока"), Kind);
     KindCaption = Form->labelForField(Kind);
@@ -152,12 +153,12 @@ StoryInspectorView::StoryInspectorView(QWidget* Parent) : QWidget(Parent)
     auto* OptionFields = new QWidget(Options);
     auto* OptionLayout = new QVBoxLayout(OptionFields);
     OptionLayout->setContentsMargins(StoryInspectorStyle::SectionMargins());
-    Start = new QCheckBox(tr("Начало истории"), OptionFields);
+    Start = new EditorUi::StudioCheckBox(tr("Начало истории"), OptionFields);
     Start->setObjectName("StoryStart");
     OptionLayout->addWidget(Start);
     OptionFields->hide();
     OptionsLayout->addWidget(OptionFields);
-    connect(Toggle, &QToolButton::toggled, OptionFields, &QWidget::setVisible);
+    AnimateDisclosure(*Toggle, *OptionFields);
     connect(Toggle, &QToolButton::toggled, this, [Toggle](bool bOpen)
     {
         Toggle->setIcon(MakeStudioIcon(bOpen ? StudioIcon::ChevronDown : StudioIcon::ChevronRight));
@@ -181,7 +182,6 @@ StoryInspectorView::StoryInspectorView(QWidget* Parent) : QWidget(Parent)
     Text->installEventFilter(this);
     Kind->installEventFilter(this);
     Speaker->installEventFilter(this);
-    Speaker->lineEdit()->installEventFilter(this);
     connect(Text, &QTextEdit::textChanged, this,
             [this]()
             {
@@ -190,7 +190,6 @@ StoryInspectorView::StoryInspectorView(QWidget* Parent) : QWidget(Parent)
                     TextTimer->start();
                 }
             });
-    connect(Speaker->lineEdit(), &QLineEdit::editingFinished, this, &StoryInspectorView::Commit);
     connect(Speaker, &QComboBox::textActivated, this, [this]() { Commit(); });
     connect(Kind, &QComboBox::currentIndexChanged, this,
             [this](int Value)
@@ -261,15 +260,16 @@ void StoryInspectorView::SetNode(const StoryGraphNode& Node, const StoryGraphMod
     Start->show();
     Details->show();
     Speaker->clear();
-    Speaker->addItem(tr("Рассказчик"));
+    const QString Narrator = tr("Рассказчик");
+    Speaker->addItem(Narrator, Node.Speaker == Narrator ? Narrator : QString{});
     for (const auto& Candidate : Model.Nodes)
     {
-        if (!Candidate.Speaker.isEmpty() && Speaker->findText(Candidate.Speaker) < 0)
+        if (!Candidate.Speaker.isEmpty() && Candidate.Speaker != Narrator && Speaker->findData(Candidate.Speaker) < 0)
         {
-            Speaker->addItem(Candidate.Speaker);
+            Speaker->addItem(Candidate.Speaker, Candidate.Speaker);
         }
     }
-    Speaker->setCurrentText(Node.Speaker);
+    Speaker->setCurrentIndex(std::max(0, Speaker->findData(Node.Speaker)));
     Speaker->setVisible(Node.KindId == 0);
     SpeakerCaption->setVisible(Node.KindId == 0);
     if (!bSameText)
@@ -319,7 +319,7 @@ void StoryInspectorView::Commit()
     }
     bCollecting = false;
     Current.Text = Text->toPlainText();
-    Current.Speaker = Speaker->currentText();
+    Current.Speaker = Speaker->currentData().toString();
     Current.Kind = Kind->currentText();
     if (Current.KindId == 1)
     {
@@ -356,7 +356,7 @@ void StoryInspectorView::Clear()
 
 QComboBox* StoryInspectorView::MakeTargetPicker(QWidget* Parent, const QString& Target)
 {
-    auto* Picker = new QComboBox(Parent);
+    auto* Picker = new EditorUi::StudioSelect(Parent);
     Picker->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
     Picker->setMinimumContentsLength(4);
     Picker->addItem(tr("Не соединено"), QString{});
@@ -533,7 +533,7 @@ void StoryInspectorView::RebuildDetails()
         auto* Layout = new QVBoxLayout(Group);
         Layout->setContentsMargins(10, 20, 10, 10);
         Layout->setSpacing(10);
-        auto* Type = new QComboBox(Group);
+        auto* Type = new EditorUi::StudioSelect(Group);
         Type->addItems({tr("Ожидание"), tr("Переместить объект"), tr("Смена камеры"), tr("Движение по маршруту")});
         Type->setCurrentIndex(Value.Kind);
         Type->setObjectName(QStringLiteral("StoryActionKind%1").arg(Index));
@@ -577,7 +577,7 @@ void StoryInspectorView::RebuildDetails()
         {
             if (Value.Kind == 2)
             {
-                auto* Copy = new QCheckBox(tr("Положение из объекта"), Group);
+                auto* Copy = new EditorUi::StudioCheckBox(tr("Положение из объекта"), Group);
                 Copy->setChecked(Value.bCopyTarget);
                 Layout->addWidget(Copy);
                 connect(Copy, &QCheckBox::toggled, this,
@@ -594,7 +594,7 @@ void StoryInspectorView::RebuildDetails()
             }
             if (Value.Kind != 2 || Value.bCopyTarget)
             {
-                auto* Target = new QComboBox(Group);
+                auto* Target = new EditorUi::StudioSelect(Group);
                 Target->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
                 Target->setMinimumContentsLength(4);
                 Target->addItem(tr("Выберите объект"), QString{});
@@ -646,7 +646,7 @@ void StoryInspectorView::RebuildDetails()
                 }
                 if (Value.Kind == 1 || Value.Kind == 2)
                 {
-                    auto* Rotate = new QCheckBox(tr("Задать поворот"), Group);
+                    auto* Rotate = new EditorUi::StudioCheckBox(tr("Задать поворот"), Group);
                     Rotate->setChecked(Value.bHasRotation);
                     Layout->addWidget(Rotate);
                     connect(Rotate, &QCheckBox::toggled, this,

@@ -11,6 +11,7 @@ public:
     std::function<bool(ObjectHandle, ObjectHandle)> ReparentRequested;
 
 protected:
+    void drawBranches(QPainter* Painter, const QRect& Rect, const QModelIndex& Index) const override;
     void dragEnterEvent(QDragEnterEvent* Event) override;
     void dragMoveEvent(QDragMoveEvent* Event) override;
     void dropEvent(QDropEvent* Event) override;

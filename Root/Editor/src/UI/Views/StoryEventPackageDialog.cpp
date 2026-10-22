@@ -1,3 +1,4 @@
+#include "UI/Views/StudioControls.h"
 #include "UI/Views/StoryEventPackageDialog.h"
 #include <QComboBox>
 #include <QDialog>
@@ -87,7 +88,7 @@ bool StoryEventPackageDialog::Import(QWidget* Parent, const StoryEventPackageFor
     QMap<QString, QComboBox*> Pickers;
     for (const auto& Input : Form.Inputs)
     {
-        auto* Picker = new QComboBox(&Dialog);
+        auto* Picker = new EditorUi::StudioSelect(&Dialog);
         Picker->addItem(QObject::tr("Выберите объект"), QString{});
         for (const auto& Object : Model.Objects)
         {

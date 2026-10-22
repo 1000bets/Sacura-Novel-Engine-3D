@@ -1,3 +1,4 @@
+#include "UI/Views/StudioControls.h"
 #include "Panels/AssetImportDialog.h"
 
 #include <QCheckBox>
@@ -61,7 +62,7 @@ AssetImportDialog::AssetImportDialog(
     }
     Layout->addWidget(FilesTable, 1);
 
-    GenerateMissingNormalsCheck = new QCheckBox(tr("Generate missing normals for FBX meshes"), this);
+    GenerateMissingNormalsCheck = new EditorUi::StudioCheckBox(tr("Generate missing normals for FBX meshes"), this);
     GenerateMissingNormalsCheck->setChecked(true);
     GenerateMissingNormalsCheck->setVisible(bHasFbxSource);
     Layout->addWidget(GenerateMissingNormalsCheck);

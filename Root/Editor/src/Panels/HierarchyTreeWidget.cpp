@@ -3,6 +3,16 @@
 #include <QDragEnterEvent>
 #include <QDragMoveEvent>
 #include <QDropEvent>
+#include "UI/Styles/StudioIcons.h"
+
+void HierarchyTreeWidget::drawBranches(QPainter* Painter, const QRect& Rect, const QModelIndex& Index) const
+{
+    if (!model()->hasChildren(Index)) { return; }
+    const auto Icon = isExpanded(Index) ? EditorUi::StudioIcon::ChevronDown : EditorUi::StudioIcon::ChevronRight;
+    const QRect Indicator(Rect.right() - indentation() + (indentation() - 14) / 2,
+                          Rect.center().y() - 7, 14, 14);
+    EditorUi::MakeStudioIcon(Icon).paint(Painter, Indicator);
+}
 
 void HierarchyTreeWidget::dragEnterEvent(QDragEnterEvent* Event)
 {

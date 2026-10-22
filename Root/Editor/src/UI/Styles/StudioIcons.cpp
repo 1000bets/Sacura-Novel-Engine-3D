@@ -73,6 +73,8 @@ QIcon MakeStudioIcon(StudioIcon Icon, const char* ColorToken)
     QPainterPath Path;
     switch (Icon)
     {
+    case StudioIcon::Copy: Painter.drawRoundedRect(QRectF(5, 5, 9, 9), 1, 1); Path.moveTo(3, 11); Path.lineTo(2, 11); Path.lineTo(2, 2); Path.lineTo(11, 2); Path.lineTo(11, 3); break;
+    case StudioIcon::Trash: Painter.drawLine(2, 4, 14, 4); Path.moveTo(6, 4); Path.lineTo(6, 2); Path.lineTo(10, 2); Path.lineTo(10, 4); Path.moveTo(4, 4); Path.lineTo(4, 14); Path.lineTo(12, 14); Path.lineTo(12, 4); Painter.drawLine(7, 7, 7, 11); Painter.drawLine(9, 7, 9, 11); break;
     case StudioIcon::ExternalLink: Path.moveTo(10, 2); Path.lineTo(14, 2); Path.lineTo(14, 6); Path.moveTo(14, 2); Path.lineTo(7, 9); Path.moveTo(6, 3); Path.lineTo(3, 3); Path.lineTo(3, 13); Path.lineTo(13, 13); Path.lineTo(13, 10); break;
     case StudioIcon::Layers: Path.moveTo(2, 5); Path.lineTo(8, 2); Path.lineTo(14, 5); Path.lineTo(8, 8); Path.closeSubpath(); Path.moveTo(2, 8); Path.lineTo(8, 11); Path.lineTo(14, 8); Path.moveTo(2, 11); Path.lineTo(8, 14); Path.lineTo(14, 11); break;
     case StudioIcon::ChevronDown: Path.moveTo(5, 6); Path.lineTo(8, 9); Path.lineTo(11, 6); break;

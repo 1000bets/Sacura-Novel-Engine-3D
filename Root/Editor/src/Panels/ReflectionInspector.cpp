@@ -1,3 +1,5 @@
+#include "UI/Views/StudioControls.h"
+#include "UI/Presentation/InspectorLabels.h"
 #include "Panels/ReflectionInspector.h"
 #include <limits>
 #include "Panels/ReflectionValueEditor.h"
@@ -24,21 +26,25 @@
 #include <QVBoxLayout>
 #include <cstring>
 #include <algorithm>
+#include "UI/Styles/StudioIcons.h"
 
 ReflectionInspector::ReflectionInspector(QWidget* Parent)
     : QWidget(Parent)
 {
     setObjectName("ReflectionInspector");
     RootLayout = new QVBoxLayout(this);
-    RootLayout->setSizeConstraint(QLayout::SetMinimumSize);
+    RootLayout->setContentsMargins(16, 8, 16, 14);
+    RootLayout->setSpacing(10);
     TypeLabel = new QLabel(this);
     TypeLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
     TypeLabel->setWordWrap(true);
     TypeLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
-    ResetAllButton = new QPushButton(tr("Reset All"), this);
+    ResetAllButton = new QPushButton(tr("Сбросить свойства"), this);
     PropertiesLayout = new QFormLayout();
     PropertiesLayout->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
     PropertiesLayout->setRowWrapPolicy(QFormLayout::WrapAllRows);
+    PropertiesLayout->setVerticalSpacing(8);
+    PropertiesLayout->setHorizontalSpacing(8);
 
     RootLayout->addWidget(TypeLabel);
     RootLayout->addWidget(ResetAllButton);
@@ -358,12 +364,16 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
         return;
     }
 
-    const QString Label = Descriptor.Attributes.DisplayName != nullptr
+    const QString Label = EditorUi::InspectorLabel(Descriptor.Attributes.DisplayName != nullptr
         ? QString::fromUtf8(Descriptor.Attributes.DisplayName)
-        : QString::fromStdString(Descriptor.Id.Value);
+        : QString::fromStdString(Descriptor.Id.Value));
     const bool bEditable = HasPropertyFlag(Descriptor.Attributes.Flags, PropertyFlags::EditorEditable)
         && !Descriptor.bReadOnly;
     const PropertyId Property = Descriptor.Id;
+
+    // An empty read-only diagnostic is absence of a message, not an editable-looking blank field.
+    if (!bEditable && CurrentValue.ValueKind == ReflectedValue::Kind::String && CurrentValue.StringValue.empty())
+    { return; }
 
     QWidget* FieldWidget = new QWidget(this);
     QHBoxLayout* FieldLayout = new QHBoxLayout(FieldWidget);
@@ -419,31 +429,17 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
             }
         }
 
-        QString Display = tr("None");
-        AssetRegistryEntry CurrentEntry{};
-        const SubAssetRecord* CurrentSubAsset = nullptr;
-        if (Registry != nullptr && Registry->TryResolveKey(CurrentKey, CurrentEntry, &CurrentSubAsset))
-        {
-            Display = QString::fromStdString(CurrentEntry.VirtualPath);
-            if (CurrentSubAsset != nullptr)
-            {
-                Display += QString::fromUtf8(" :: ") + QString::fromStdString(CurrentSubAsset->Name);
-            }
-        }
-
-        QPushButton* Picker = new QPushButton(Display, FieldWidget);
-        Picker->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
-        Picker->setMinimumWidth(70);
+        auto* Picker = new EditorUi::StudioSelect(FieldWidget);
         Picker->setEnabled(bEditable && Registry != nullptr);
-        Picker->setToolTip(Display);
-        QMenu* Menu = new QMenu(Picker);
-        QAction* ClearAction = Menu->addAction(tr("None"));
-        connect(ClearAction, &QAction::triggered, this, [this, Descriptor]()
-        {
-            ApplyAssetValue(Descriptor, AssetKey{});
-        });
-        Menu->addSeparator();
-
+        Picker->setAccessibleName(Label);
+        Picker->addItem(tr("Не назначено"));
+        std::vector<AssetKey> Keys{AssetKey{}};
+        int SelectedIndex = 0;
+        auto AddOption = [&](const QString& Caption, const AssetKey& Key) {
+            Picker->addItem(Caption);
+            Keys.push_back(Key);
+            if (Key == CurrentKey) { SelectedIndex = Picker->count() - 1; }
+        };
         AssetType Filter = UnknownAssetType;
         if (Descriptor.Attributes.AssetTypeFilter != nullptr)
         {
@@ -470,11 +466,7 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
             if (AcceptsType(Entry.Metadata.Type))
             {
                 const AssetKey Key{Entry.Metadata.Guid, std::nullopt};
-                QAction* Action = Menu->addAction(QString::fromStdString(Entry.VirtualPath));
-                connect(Action, &QAction::triggered, this, [this, Descriptor, Key]()
-                {
-                    ApplyAssetValue(Descriptor, Key);
-                });
+                AddOption(QString::fromStdString(Entry.VirtualPath), Key);
             }
             for (const SubAssetRecord& SubAsset : Entry.Metadata.SubAssets)
             {
@@ -483,20 +475,23 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
                     continue;
                 }
                 AssetKey Key{Entry.Metadata.Guid, SubAsset.Id};
-                QAction* Action = Menu->addAction(
-                    QString::fromStdString(Entry.VirtualPath + " :: " + SubAsset.Name));
-                connect(Action, &QAction::triggered, this, [this, Descriptor, Key]()
-                {
-                    ApplyAssetValue(Descriptor, Key);
-                });
+                AddOption(QString::fromStdString(Entry.VirtualPath + " :: " + SubAsset.Name), Key);
             }
         }
-        Picker->setMenu(Menu);
+        if (CurrentKey.IsValid() && SelectedIndex == 0)
+        {
+            AddOption(tr("Ресурс недоступен"), CurrentKey);
+        }
+        Picker->setCurrentIndex(SelectedIndex);
+        Picker->setToolTip(Picker->currentText());
+        connect(Picker, &QComboBox::activated, this, [this, Descriptor, Keys](int Index) {
+            if (Index >= 0 && Index < static_cast<int>(Keys.size())) { ApplyAssetValue(Descriptor, Keys[Index]); }
+        });
         FieldLayout->addWidget(Picker, 1);
     }
     else if (Descriptor.ValueTypeId.Value == "engine.bool")
     {
-        QCheckBox* CheckBox = new QCheckBox(Label, FieldWidget);
+        QCheckBox* CheckBox = new EditorUi::StudioCheckBox(Label, FieldWidget);
         if (CheckBox->fontMetrics().horizontalAdvance(Label) > 160)
         {
             const qsizetype BreakPosition = Label.lastIndexOf(' ', Label.size() / 2);
@@ -638,6 +633,13 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
             });
         }
     }
+    else if (Descriptor.ValueTypeId.Value == "engine.string" && !bEditable)
+    {
+        auto* Message = new QLabel(QString::fromStdString(CurrentValue.StringValue), FieldWidget);
+        Message->setWordWrap(true);
+        Message->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        FieldLayout->addWidget(Message, 1);
+    }
     else if (Descriptor.ValueTypeId.Value == "engine.string")
     {
         QLineEdit* LineEdit = new QLineEdit(FieldWidget);
@@ -698,8 +700,9 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
 
     if (bEditable)
     {
-        QPushButton* ResetButton = new QPushButton(QString(QChar(0x21ba)), FieldWidget);
-        ResetButton->setToolTip(tr("Reset property to default"));
+        QPushButton* ResetButton = new QPushButton(EditorUi::MakeStudioIcon(EditorUi::StudioIcon::Rotate), {}, FieldWidget);
+        ResetButton->setProperty("uiRole", "propertyReset");
+        ResetButton->setToolTip(tr("Сбросить свойство"));
         ResetButton->setAccessibleName(tr("Reset property to default"));
         ResetButton->setFixedWidth(24);
         FieldLayout->addWidget(ResetButton);
@@ -720,8 +723,16 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
     }
     else
     {
-        QLabel* PropertyLabel = new QLabel(Label, this);
+        // A spanning property column avoids QFormLayout's narrow label role
+        // wrapping short captions even when WrapAllRows has ample full-row space.
+        auto* Column = new QWidget(this);
+        auto* ColumnLayout = new QVBoxLayout(Column);
+        ColumnLayout->setContentsMargins(0, 0, 0, 0);
+        ColumnLayout->setSpacing(4);
+        QLabel* PropertyLabel = new QLabel(Label, Column);
         PropertyLabel->setWordWrap(true);
-        PropertiesLayout->addRow(PropertyLabel, FieldWidget);
+        ColumnLayout->addWidget(PropertyLabel);
+        ColumnLayout->addWidget(FieldWidget);
+        PropertiesLayout->addRow(Column);
     }
 }

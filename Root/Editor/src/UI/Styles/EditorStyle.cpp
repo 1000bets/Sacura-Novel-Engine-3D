@@ -1,4 +1,5 @@
 #include "UI/Styles/EditorStyle.h"
+#include "UI/Styles/ControlStyle.h"
 
 #include <QFile>
 #include <QJsonDocument>
@@ -48,16 +49,26 @@ QString EditorStyle::LoadStylesheet(const QString& Theme)
         return {};
     }
     Result += QLatin1Char('\n') + QString::fromUtf8(StoryStylesheet.readAll());
+    QFile Controls(QStringLiteral(":/ui/styles/controls.qss"));
+    if (!Controls.open(QIODevice::ReadOnly))
+    {
+        qWarning("EditorStyle: embedded controls stylesheet is missing");
+        return {};
+    }
+    Result += QLatin1Char('\n') + QString::fromUtf8(Controls.readAll());
     const QJsonObject Tokens = QJsonDocument::fromJson(Palette.readAll()).object();
     for (auto Iterator = Tokens.begin(); Iterator != Tokens.end(); ++Iterator)
     {
         Result.replace(QStringLiteral("@") + Iterator.key() + QStringLiteral("@"), Iterator.value().toString());
     }
+    Result.replace(QStringLiteral("\"Inter\", \"Segoe UI\""),
+                   QStringLiteral("\"%1\"").arg(ControlStyle::Font().family()));
     return Result;
 }
 
 void EditorStyle::Apply(QWidget& Root)
 {
+    Root.setFont(ControlStyle::Font());
     Root.setStyleSheet(LoadStylesheet());
 }
 }

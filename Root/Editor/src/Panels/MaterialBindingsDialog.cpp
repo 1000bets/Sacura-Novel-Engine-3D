@@ -1,3 +1,4 @@
+#include "UI/Views/StudioControls.h"
 #include "Panels/MaterialBindingsDialog.h"
 #include <QComboBox>
 #include <QCheckBox>
@@ -83,7 +84,7 @@ void MaterialBindingsDialog::AppendRow(const nlohmann::json& Entry)
     Table->setCellWidget(Row, 0, Picker);
     if (bPostProcess)
     {
-        auto* Enabled = new QCheckBox(Table);
+        auto* Enabled = new EditorUi::StudioCheckBox(Table);
         Enabled->setChecked(Entry.value("enabled", true));
         Table->setCellWidget(Row, 1, Enabled);
         auto* Intensity = new QDoubleSpinBox(Table);

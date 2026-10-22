@@ -2,6 +2,9 @@
 #include "UI/Styles/StudioIcons.h"
 #include "UI/Views/StoryWorkspaceView.h"
 #include "UI/Views/HierarchyPanelView.h"
+#include "UI/Views/ObjectInspectorView.h"
+#include "UI/Views/StudioControls.h"
+#include <QToolButton>
 #include <QStackedWidget>
 
 #include "Actions/BuiltinEditorActions.h"
@@ -315,6 +318,13 @@ void EditorMainWindow::RebuildComponentInspectors()
         return;
     }
 
+    QHash<QString, bool> ExpandedComponents;
+    for (auto* Inspector : ComponentInspectors)
+    {
+        auto* Card = Inspector->parentWidget();
+        if (auto* Toggle = Card->findChild<QToolButton*>())
+        { ExpandedComponents.insert(Card->property("componentIdentity").toString(), Toggle->isChecked()); }
+    }
     while (QLayoutItem* Item = ComponentInspectorLayout->takeAt(0))
     {
         if (QWidget* ItemWidget = Item->widget())
@@ -343,17 +353,13 @@ void EditorMainWindow::RebuildComponentInspectors()
                 ComponentTypes.push_back(ComponentType);
             }
 
-            auto* ComponentCard = new QGroupBox(ComponentType);
-            ComponentCard->setObjectName("ComponentInspectorCard");
-            ComponentCard->setProperty("componentType", ComponentType);
-            auto* ComponentCardLayout = new QVBoxLayout(ComponentCard);
-            ComponentCardLayout->setContentsMargins(6, 8, 6, 6);
-            auto* ComponentInspector = new ReflectionInspector(ComponentCard);
+            auto* ComponentInspector = new ReflectionInspector();
             ConfigureComponentInspector(ComponentInspector);
             ComponentInspector->SetInspectedObject(ComponentInstance);
             ComponentInspector->setEnabled(!BoundEngine.GetPlaySession().IsSimulating());
-            ComponentCardLayout->addWidget(ComponentInspector);
-            ComponentInspectorLayout->addWidget(ComponentCard);
+            const auto Identity = QString::fromStdString(ComponentInstance->GetPersistentId());
+            static_cast<EditorUi::ObjectInspectorView*>(ObjectInspectorContent)->AddComponentSection(
+                Identity, ComponentType, *ComponentInspector, ExpandedComponents.value(Identity, false));
             ComponentInspectors.push_back(ComponentInspector);
         }
     }
@@ -361,10 +367,10 @@ void EditorMainWindow::RebuildComponentInspectors()
 
     QSignalBlocker ComboSignalBlocker(ComponentCombo);
     ComponentCombo->clear();
-    ComponentCombo->addItem(QStringLiteral("All"), QString{});
+    ComponentCombo->addItem(tr("Все компоненты"), QString{});
     for (const QString& ComponentType : ComponentTypes)
     {
-        ComponentCombo->addItem(ComponentType, ComponentType);
+        ComponentCombo->addItem(EditorUi::ObjectInspectorView::ComponentCaption(ComponentType), ComponentType);
     }
     int FilterIndex = ComponentCombo->findData(ComponentFilter);
     if (FilterIndex < 0)
@@ -374,6 +380,7 @@ void EditorMainWindow::RebuildComponentInspectors()
     }
     ComponentCombo->setCurrentIndex(FilterIndex);
     ComponentCombo->setEnabled(Selected != nullptr && !ComponentTypes.isEmpty());
+    ComponentCombo->setVisible(ComponentTypes.size() > 1);
     OnComponentFilterChanged(FilterIndex);
 }
 
@@ -392,6 +399,7 @@ void EditorMainWindow::RefreshSelectionUi()
         }
     }
     const bool bEditableSelection = bHasSelection && !BoundEngine.GetPlaySession().IsSimulating();
+    static_cast<EditorUi::ObjectInspectorView*>(ObjectInspectorContent)->SetEditable(bEditableSelection);
     if (ObjectNameEdit != nullptr)
     {
         ObjectNameEdit->setEnabled(bEditableSelection);
