@@ -21,6 +21,14 @@ void WorkspaceLayoutAdapter::Reset(QSplitter& Workspace, QSplitter& Center, int 
     const WorkspaceLayout Layout = WorkspaceLayout::Initial(WindowHeight);
     const int HandlesWidth = Workspace.handleWidth() * std::max(0, Workspace.count() - 1);
     Workspace.setSizes({Layout.HierarchyWidth, std::max(320, Workspace.width() - Layout.HierarchyWidth - Layout.InspectorWidth - HandlesWidth), Layout.InspectorWidth});
-    Center.setSizes({Layout.ViewportHeight, Layout.ToolsHeight});
+    if (Center.orientation() == Qt::Vertical)
+    { Center.setSizes({Layout.ViewportHeight, Layout.ToolsHeight}); }
+    else
+    {
+        const int ToolsWidth = std::clamp(Center.width() * 2 / 5, 260, 520);
+        const int SceneWidth = std::max(320, Center.width() - ToolsWidth - Center.handleWidth());
+        Center.setSizes(Center.widget(0)->objectName() == "GraphDock"
+                            ? QList<int>{ToolsWidth, SceneWidth} : QList<int>{SceneWidth, ToolsWidth});
+    }
 }
 }

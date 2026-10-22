@@ -94,6 +94,24 @@ void WorkspaceDockController::SetSplitters(QSplitter& InWorkspace, QSplitter& In
     { connect(Splitter, &QSplitter::splitterMoved, this, [this]() { ScheduleSave(); }); }
 }
 
+void WorkspaceDockController::SetWorkspacePosition(const QString& NewPosition)
+{
+    if (!Center || !Areas.contains("scene") || !Areas.contains("workspace") ||
+        (NewPosition != "bottom" && NewPosition != "left" && NewPosition != "right")) { return; }
+    if (Position == NewPosition) { return; }
+    auto* Scene = Areas["scene"].Region.data();
+    auto* Tools = Areas["workspace"].Region.data();
+    Position = NewPosition;
+    Center->setOrientation(Position == "bottom" ? Qt::Vertical : Qt::Horizontal);
+    Center->insertWidget(0, Position == "left" ? Tools : Scene);
+    const int Extent = Position == "bottom" ? Center->height() : Center->width();
+    const int ToolsExtent = Position == "bottom" ? std::clamp(Extent * 2 / 5, 180, 480)
+                                                 : std::clamp(Extent * 2 / 5, 260, 520);
+    Center->setSizes(Position == "left" ? QList<int>{ToolsExtent, std::max(200, Extent - ToolsExtent)}
+                                         : QList<int>{std::max(200, Extent - ToolsExtent), ToolsExtent});
+    ScheduleSave();
+}
+
 QString WorkspaceDockController::PageId(QWidget* Page) const
 {
     if (!Page) { return {}; }
@@ -302,6 +320,7 @@ void WorkspaceDockController::Save()
                                        {"visible", !It->Region->isHidden()}};
     }
     Root["version"] = 1; Root["pages"] = Windows; Root["areas"] = Regions;
+    Root["position"] = Position;
     if (Workspace) { Root["workspace"] = QString::fromLatin1(Workspace->saveState().toBase64()); }
     if (Center) { Root["center"] = QString::fromLatin1(Center->saveState().toBase64()); }
     Settings->setValue(SettingsKey, QJsonDocument(Root).toJson(QJsonDocument::Compact));
@@ -316,6 +335,7 @@ bool WorkspaceDockController::Restore()
     { bRestoring = false; return false; }
     const auto Windows = Root["pages"].toObject();
     const auto Regions = Root["areas"].toObject();
+    SetWorkspacePosition(Root["position"].toString("bottom"));
     // Older layouts represented fixed base tabs with an empty ID and stored
     // their visibility on the area. Resolve those entries without resetting
     // the user's other tool placements or activating a neighbouring tab.
@@ -378,6 +398,7 @@ bool WorkspaceDockController::Restore()
 void WorkspaceDockController::Reset()
 {
     bRestoring = true;
+    SetWorkspacePosition("bottom");
     // Sort by the original index; map-key order is unrelated to the authored default tabs.
     auto Values = Pages.values();
     std::sort(Values.begin(), Values.end(), [](const auto& A, const auto& B) { return A.DefaultIndex < B.DefaultIndex; });

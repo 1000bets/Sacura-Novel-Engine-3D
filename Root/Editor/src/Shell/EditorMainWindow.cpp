@@ -111,6 +111,7 @@ EditorMainWindow::EditorMainWindow(Engine& InEngine, ProjectSession& InSession, 
     BuildUi();
     PopulateHierarchy();
     PopulateDockPages();
+    BuildWindowsMenuView();
     centralWidget()->setProperty("layoutRestored", Docking->Restore());
     RegisterBuiltInAssetEditors();
     RefreshProjectTitle();

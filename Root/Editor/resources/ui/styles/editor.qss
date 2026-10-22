@@ -34,6 +34,11 @@ QTabBar::tab:selected { color: @--text-primary@; font-weight: 500; border-bottom
 QTabBar::tab:hover { background: @--bg-hover@; }
 QTabBar::close-button { image: url(:/ui/styles/close.png); width: 10px; height: 10px; padding: 3px; }
 QTabBar::close-button:hover { background: @--bg-hover@; }
+/* EditorWorkspace.jsx: compact, accented document tabs in the workspace. */
+QTabBar[workspaceArea="workspace"]::tab { height: 28px; padding: 0 6px 0 10px; font-size: 10px; }
+QTabBar[workspaceArea="workspace"]::tab:selected {
+    color: @--accent@; font-weight: normal; border-bottom: 1px solid @--tab-indicator@;
+}
 QWidget#ViewportTabs { min-height: 36px; max-height: 36px; }
 QFrame#ViewportHeader { min-height: 32px; max-height: 32px; border: none; }
 QPushButton, QToolButton { background: @--bg-panel-elevated@; color: @--text-secondary@; border: 1px solid transparent; border-radius: 4px; padding: 5px 9px; min-height: 18px; }

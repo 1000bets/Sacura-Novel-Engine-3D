@@ -117,6 +117,7 @@ private:
     void BuildUi();
     void BindDocumentFromSession();
     void BuildMenus();
+    void BuildWindowsMenuView();
     void BuildToolbar();
     void PopulateCreateMenus(QMenu* ObjectsMenu, QMenu* ComponentsMenu);
     void PopulateHierarchy();

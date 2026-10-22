@@ -1,4 +1,37 @@
 /* EditorSelect.jsx, objectInspector.css, editorTheme.css. Logical CSS pixels. */
+/* EditorWorkspace.jsx windows menu. */
+QWidget#StudioHeader QMenuBar { font-size: 10px; }
+QWidget#StudioHeader QMenuBar::item { padding: 5px 6px; }
+QWidget#StudioHeader QMenuBar::item:selected, QWidget#StudioHeader QMenuBar::item:pressed { background: @--accent-muted@; }
+QMenu#WindowsMenu { background: @--bg-panel-elevated@; border: 1px solid @--border-subtle@; padding: 5px; }
+QMenu#WindowsMenu::item { padding: 0; margin: 0; }
+QScrollArea#WindowsMenuScroll, QWidget#WindowsMenuBody { background: @--bg-panel-elevated@; border: none; }
+QWidget#WindowsMenuFixedGroup, QWidget#WindowsMenuWindowGroup {
+    background: transparent; border-bottom: 1px solid @--border-subtle@;
+}
+QWidget#WindowsMenuSearchBox, QWidget#WindowsMenuFooter { background: transparent; }
+QLineEdit#WindowsMenuSearch { background: transparent; border: none; min-height: 20px; padding: 2px 1px; font-size: 10px; }
+QLineEdit#WindowsMenuSearch:focus { border: none; }
+QPushButton[uiRole="windowsMenuRow"] {
+    background: transparent; border: none; border-radius: 3px;
+    min-height: 24px; max-height: 24px; padding: 0 4px; text-align: left;
+    color: @--text-primary@; font-size: 10px;
+}
+QPushButton[uiRole="windowsMenuRow"]:hover { background: @--bg-hover@; }
+QPushButton[uiRole="windowsMenuRow"]:disabled { background: transparent; color: @--text-secondary@; }
+QPushButton#WindowsMenuToggle_event:disabled { color: @--text-disabled@; }
+QPushButton[uiRole="windowsMenuCheck"] {
+    min-height: 24px; max-height: 24px; padding: 0; border: none; background: transparent;
+}
+QPushButton[uiRole="windowsMenuCheck"]:hover { background: @--bg-hover@; }
+QPushButton[uiRole="windowsMenuReveal"] {
+    min-height: 24px; max-height: 24px; padding: 0; border: none; background: transparent;
+}
+QPushButton[uiRole="windowsMenuReveal"]:hover { background: @--bg-hover@; }
+QWidget#WindowsMenuFooter QLabel { font-size: 10px; color: @--text-secondary@; }
+QComboBox#WindowsMenuPosition { min-height: 23px; font-size: 10px; }
+QPushButton[uiRole="windowsMenuRestore"] { text-align: left; border: none; background: transparent; font-size: 10px; }
+QPushButton[uiRole="windowsMenuRestore"]:hover { background: @--bg-hover@; }
 /* Editor.jsx renderActive / editor.css active-table / editorHelp.css workspace-guide. */
 QWidget#CameraPreviewPanel { background: @--bg-panel@; border: 1px solid @--border-strong@; border-radius: 6px; }
 QWidget#CameraPreviewPanel QLabel { background: transparent; color: @--text-primary@; }

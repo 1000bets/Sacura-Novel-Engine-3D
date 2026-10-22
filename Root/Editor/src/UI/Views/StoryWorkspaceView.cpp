@@ -6,12 +6,15 @@
 #include <QScrollBar>
 #include <QScrollArea>
 #include <QMouseEvent>
+#include <QContextMenuEvent>
 #include <QShowEvent>
 #include "UI/Styles/StoryGraphStyle.h"
 #include "UI/Styles/StudioIcons.h"
 
 #include <QGraphicsItem>
+#include <QApplication>
 #include <QGraphicsScene>
+#include <QGraphicsSceneContextMenuEvent>
 #include <QGraphicsView>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -208,14 +211,85 @@ class StoryCanvas final : public QGraphicsView
     }
     void mousePressEvent(QMouseEvent* Event) override
     {
+        if (Event->button() == Qt::RightButton)
+        {
+            bRightPanning = true;
+            bRightPanMoved = false;
+            RightPanStart = Event->position();
+            RightPanOrigin = viewportTransform().inverted().map(QPointF());
+            Event->accept();
+            return;
+        }
         RestoredOrigin.reset();
         bKeepOriginOnResize = false;
         QGraphicsView::mousePressEvent(Event);
     }
+    void mouseMoveEvent(QMouseEvent* Event) override
+    {
+        if (bRightPanning && Event->buttons().testFlag(Qt::RightButton))
+        {
+            const QPointF Delta = Event->position() - RightPanStart;
+            if (!bRightPanMoved && std::abs(Delta.x()) + std::abs(Delta.y()) > 5)
+            {
+                bRightPanMoved = true;
+                RestoredOrigin.reset();
+                bKeepOriginOnResize = false;
+            }
+            if (bRightPanMoved)
+            {
+                const qreal Scale = transform().m11();
+                // Use the press position so integer scrollbar rounding cannot accumulate between mouse events.
+                const QPointF Origin = RightPanOrigin - Delta / Scale;
+                const QSizeF Size(viewport()->width() / Scale, viewport()->height() / Scale);
+                const QRectF Visible(Origin, Size);
+                if (!scene()->sceneRect().contains(Visible.adjusted(-2, -2, 2, 2)))
+                {
+                    // Leave room for subsequent moves instead of relaying out the scene on every pixel.
+                    const QPointF Margin(Size.width() * 2, Size.height() * 2);
+                    scene()->setSceneRect(scene()->sceneRect().united(
+                        Visible.adjusted(-Margin.x(), -Margin.y(), Margin.x(), Margin.y())));
+                }
+                horizontalScrollBar()->setValue(qRound(Origin.x() * Scale));
+                verticalScrollBar()->setValue(qRound(Origin.y() * Scale));
+            }
+            Event->accept();
+            return;
+        }
+        QGraphicsView::mouseMoveEvent(Event);
+    }
     void mouseReleaseEvent(QMouseEvent* Event) override
     {
+        if (bRightPanning && Event->button() == Qt::RightButton)
+        {
+            bRightPanning = false;
+            if (bRightPanMoved)
+            {
+                if (NavigationChanged) { NavigationChanged(); }
+            }
+            else
+            {
+                // Dispatch the click on release; native context events may arrive before or after it.
+                QGraphicsSceneContextMenuEvent Context(QEvent::GraphicsSceneContextMenu);
+                Context.setScenePos(mapToScene(Event->position().toPoint()));
+                Context.setScreenPos(Event->globalPosition().toPoint());
+                Context.setWidget(viewport());
+                QApplication::sendEvent(scene(), &Context);
+            }
+            bRightPanMoved = false;
+            Event->accept();
+            return;
+        }
         QGraphicsView::mouseReleaseEvent(Event);
         if (NavigationChanged) { NavigationChanged(); }
+    }
+    void contextMenuEvent(QContextMenuEvent* Event) override
+    {
+        if (Event->reason() == QContextMenuEvent::Mouse)
+        {
+            Event->accept();
+            return;
+        }
+        QGraphicsView::contextMenuEvent(Event);
     }
     void showEvent(QShowEvent* Event) override
     {
@@ -240,29 +314,38 @@ class StoryCanvas final : public QGraphicsView
     {
         QGraphicsView::scrollContentsBy(Dx, Dy);
         // QWidget::scroll also moves child widgets. Keep chrome in viewport space.
-        PositionOverlays();
+        PositionOverlays(false);
     }
-    void PositionOverlays()
+    void PositionOverlays(bool Recalculate = true)
     {
         if (Navigation != nullptr)
         {
-            auto* Controls = static_cast<QBoxLayout*>(Navigation->layout());
-            Controls->setDirection(viewport()->height() < 160 ? QBoxLayout::LeftToRight : QBoxLayout::TopToBottom);
-            Navigation->adjustSize();
-            Navigation->setVisible(viewport()->height() >= Navigation->height() + 16
-                                   && viewport()->width() >= Navigation->width() + 16);
+            if (Recalculate)
+            {
+                auto* Controls = static_cast<QBoxLayout*>(Navigation->layout());
+                Controls->setDirection(viewport()->height() < 160 ? QBoxLayout::LeftToRight : QBoxLayout::TopToBottom);
+                Navigation->adjustSize();
+                Navigation->setVisible(viewport()->height() >= Navigation->height() + 16
+                                       && viewport()->width() >= Navigation->width() + 16);
+            }
             Navigation->move(8, std::max(8, viewport()->height() - Navigation->height() - 8));
         }
         if (FocusNavigation)
         {
             const int Left = std::max(69, Navigation->width() + 24);
-            FocusNavigation->setVisible(viewport()->width() >= Left + FocusNavigation->width() + 8
-                                        && viewport()->height() >= FocusNavigation->height() + 28);
+            if (Recalculate)
+            {
+                FocusNavigation->setVisible(viewport()->width() >= Left + FocusNavigation->width() + 8
+                                            && viewport()->height() >= FocusNavigation->height() + 28);
+            }
             FocusNavigation->move(Left, std::max(8, viewport()->height() - FocusNavigation->height() - 14));
         }
         if (Legend)
         {
-            Legend->setVisible(viewport()->height() >= 180 && viewport()->width() >= Legend->width() + 24);
+            if (Recalculate)
+            {
+                Legend->setVisible(viewport()->height() >= 180 && viewport()->width() >= Legend->width() + 24);
+            }
             Legend->move(std::max(0, viewport()->width() - Legend->width() - 12), 10);
         }
     }
@@ -328,6 +411,10 @@ class StoryCanvas final : public QGraphicsView
     }
     std::optional<QPointF> RestoredOrigin;
     bool bKeepOriginOnResize = true;
+    bool bRightPanning = false;
+    bool bRightPanMoved = false;
+    QPointF RightPanStart;
+    QPointF RightPanOrigin;
     QPointF InitialNodePosition;
     QWidget* Navigation = nullptr;
     QWidget* FocusNavigation = nullptr;

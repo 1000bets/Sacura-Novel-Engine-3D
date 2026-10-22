@@ -32,6 +32,8 @@ public:
     void Dock(QWidget& Page, const QString& Area, int Index = -1);
     void RestoreDefault(QWidget& Page);
     void Float(QWidget& Page, QRect Geometry = {});
+    void SetWorkspacePosition(const QString& Position);
+    QString WorkspacePosition() const { return Position; }
     bool Restore();
     void Save();
     void Reset();
@@ -65,6 +67,7 @@ private:
     std::unique_ptr<QSettings> Settings;
     QTimer* SaveTimer = nullptr;
     QString DragId, DragToken;
+    QString Position = "bottom";
     QPoint DragStart;
     bool bRestoring = true;
 };

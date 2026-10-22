@@ -33,8 +33,10 @@ float GridCoverage(float2 Coordinates)
     float2 Footprint = max(fwidth(Coordinates), 0.0001);
     float2 DistanceToLine = abs(frac(Coordinates + 0.5) - 0.5);
     float2 Lines = 1.0 - smoothstep(Footprint * 0.25, Footprint * 1.25, DistanceToLine);
-    // Suppress unresolved lines at grazing angles instead of producing horizon moire.
-    Lines *= 1.0 - smoothstep(0.25, 0.75, Footprint);
+    // A line needs several pixels between neighbouring cells. Fade each axis
+    // before its spacing reaches the pixel grid; otherwise small camera moves
+    // turn the distant grid into alternating bright and dark screen-space bands.
+    Lines *= 1.0 - smoothstep(0.12, 0.30, Footprint);
     return max(Lines.x, Lines.y);
 }
 
@@ -43,6 +45,6 @@ float4 GridPS(GridOutput Input) : SV_TARGET
     float Minor = GridCoverage(Input.WorldXZ);
     float Major = GridCoverage(Input.WorldXZ / 10.0);
     float Distance = length(float3(Input.WorldXZ.x, 0.0, Input.WorldXZ.y) - GridCameraPosition.xyz);
-    float Fade = 1.0 - smoothstep(40.0, 160.0, Distance);
+    float Fade = 1.0 - smoothstep(35.0, 100.0, Distance);
     return float4(0.22, 0.24, 0.27, max(Minor * 0.35, Major * 0.5) * Fade);
 }

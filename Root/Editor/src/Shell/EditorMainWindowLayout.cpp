@@ -1,4 +1,5 @@
 #include "UI/Views/StudioControls.h"
+#include "UI/Views/AudioEnvironmentView.h"
 #include "UI/Views/WidgetWorkspaceView.h"
 #include "UI/Views/ObjectInspectorView.h"
 #include "Shell/EditorMainWindow.h"
@@ -79,6 +80,9 @@
 #include <QProcess>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QScrollBar>
+#include <QGuiApplication>
+#include <QScreen>
 #include <QSignalBlocker>
 #include <QSplitter>
 #include <QStringList>
@@ -343,7 +347,8 @@ void EditorMainWindow::BuildUi()
     {
         if (bMaximized)
         {
-            CenterSplitter->setSizes({height(), 0});
+            const bool bToolsFirst = CenterSplitter->widget(0)->objectName() == "GraphDock";
+            CenterSplitter->setSizes(bToolsFirst ? QList<int>{0, height()} : QList<int>{height(), 0});
         }
         else
         {
@@ -654,7 +659,8 @@ void EditorMainWindow::BuildUi()
     {
         if (bExpanded)
         {
-            CenterSplitter->setSizes({0, height()});
+            const bool bToolsFirst = CenterSplitter->widget(0)->objectName() == "GraphDock";
+            CenterSplitter->setSizes(bToolsFirst ? QList<int>{height(), 0} : QList<int>{0, height()});
         }
         else
         {
@@ -845,6 +851,216 @@ void EditorMainWindow::PopulateDockPages()
     DockTabs->setCurrentWidget(StoryGraph);
 }
 
+void EditorMainWindow::BuildWindowsMenuView()
+{
+    auto* Menu = findChild<QMenu*>("WindowsMenu");
+    for (auto* Action : Menu->actions()) { Action->setVisible(false); }
+
+    auto* Scroll = new QScrollArea(Menu);
+    Scroll->setObjectName("WindowsMenuScroll");
+    Scroll->setFrameShape(QFrame::NoFrame);
+    Scroll->setWidgetResizable(true);
+    Scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    Scroll->setFixedWidth(275);
+    auto* Body = new QWidget(Scroll);
+    Body->setObjectName("WindowsMenuBody");
+    auto* Layout = new QVBoxLayout(Body);
+    Layout->setContentsMargins(6, 4, 6, 4);
+    Layout->setSpacing(0);
+    auto* SearchBox = new QWidget(Body);
+    SearchBox->setObjectName("WindowsMenuSearchBox");
+    auto* SearchLayout = new QHBoxLayout(SearchBox);
+    SearchLayout->setContentsMargins(8, 3, 8, 5);
+    SearchLayout->setSpacing(7);
+    auto* SearchIcon = new QLabel(SearchBox);
+    SearchIcon->setPixmap(EditorUi::MakeFrontendIcon("Search").pixmap(15, 15));
+    SearchLayout->addWidget(SearchIcon);
+    auto* Search = new QLineEdit(SearchBox);
+    Search->setObjectName("WindowsMenuSearch");
+    Search->setPlaceholderText(tr("Найти окно…"));
+    Search->setAccessibleName(tr("Найти окно"));
+    SearchLayout->addWidget(Search, 1);
+    Layout->addWidget(SearchBox);
+
+    auto* FixedGroup = new QWidget(Body);
+    FixedGroup->setObjectName("WindowsMenuFixedGroup");
+    auto* FixedLayout = new QVBoxLayout(FixedGroup);
+    FixedLayout->setContentsMargins(0, 4, 0, 5);
+    FixedLayout->setSpacing(0);
+    Layout->addWidget(FixedGroup);
+    auto* WindowGroup = new QWidget(Body);
+    WindowGroup->setObjectName("WindowsMenuWindowGroup");
+    auto* WindowLayout = new QVBoxLayout(WindowGroup);
+    WindowLayout->setContentsMargins(0, 4, 0, 5);
+    WindowLayout->setSpacing(0);
+    Layout->addWidget(WindowGroup);
+
+    struct MenuRow { QWidget* Container; QPushButton* Check; QPushButton* Reveal; QAction* Visibility; QString Label; bool SearchOnly; bool HasReveal; };
+    auto Rows = std::make_shared<QVector<MenuRow>>();
+    auto AddRow = [this, Body, Rows, Menu](QVBoxLayout* Group, const QString& Id, const QString& Label,
+                                            const QString& Icon, QAction* Visibility, QWidget* Page,
+                                            bool SearchOnly = false)
+    {
+        auto* Row = new QWidget(Body);
+        Row->setObjectName("WindowsMenuRow_" + Id);
+        auto* RowLayout = new QHBoxLayout(Row);
+        RowLayout->setContentsMargins(0, 0, 0, 0);
+        RowLayout->setSpacing(0);
+        auto* Check = new QPushButton(Row);
+        Check->setObjectName("WindowsMenuCheck_" + Id);
+        Check->setProperty("uiRole", "windowsMenuCheck");
+        Check->setFixedWidth(24);
+        Check->setEnabled(Visibility != nullptr);
+        RowLayout->addWidget(Check);
+        QIcon RowIcon = EditorUi::MakeFrontendIcon(Icon);
+        if (!Visibility && Id != "event")
+        {
+            // Keep unavailable future windows visually aligned with the React list.
+            QIcon PassiveIcon;
+            PassiveIcon.addPixmap(RowIcon.pixmap(15, 15), QIcon::Disabled);
+            RowIcon = PassiveIcon;
+        }
+        auto* Toggle = new QPushButton(RowIcon, Label, Row);
+        Toggle->setObjectName("WindowsMenuToggle_" + Id);
+        Toggle->setProperty("uiRole", "windowsMenuRow");
+        Toggle->setFlat(true);
+        Toggle->setEnabled(Visibility != nullptr);
+        Toggle->setAccessibleName(Label);
+        Toggle->setIconSize(QSize(15, 15));
+        if (!Visibility) Toggle->setToolTip(tr("Это окно пока недоступно в нативном редакторе"));
+        RowLayout->addWidget(Toggle, 1);
+        auto* Reveal = new QPushButton(Row);
+        Reveal->setObjectName("WindowsMenuReveal_" + Id);
+        Reveal->setProperty("uiRole", "windowsMenuReveal");
+        Reveal->setIcon(EditorUi::MakeFrontendIcon("ArrowUpRight"));
+        Reveal->setIconSize(QSize(15, 15));
+        Reveal->setFixedWidth(24);
+        Reveal->setToolTip(tr("Перейти к окну «%1»").arg(Label));
+        Reveal->setVisible(Visibility && Visibility->isChecked() && Page);
+        RowLayout->addWidget(Reveal);
+        Group->addWidget(Row);
+        Rows->append({Row, Check, Reveal, Visibility, Label, SearchOnly, Page != nullptr});
+        if (Visibility)
+        {
+            connect(Check, &QPushButton::clicked, this, [Visibility]() { Visibility->trigger(); });
+            connect(Toggle, &QPushButton::clicked, this, [Visibility]() { Visibility->trigger(); });
+            if (Page)
+            {
+                connect(Reveal, &QPushButton::clicked, this, [this, Page, Menu]()
+                { Docking->Open(*Page); Menu->hide(); });
+            }
+        }
+    };
+    auto* HierarchyAction = findChild<QAction*>("HierarchyPanelVisibility");
+    auto* InspectorAction = findChild<QAction*>("InspectorPanelVisibility");
+    auto PageAction = [](QWidget* Page) -> QAction*
+    {
+        return Page ? Page->findChild<QAction*>("WorkspaceVisibility", Qt::FindDirectChildrenOnly) : nullptr;
+    };
+    AddRow(FixedLayout, "hierarchy", tr("Иерархия"), "PanelLeft", HierarchyAction, nullptr);
+    AddRow(FixedLayout, "inspector", tr("Инспектор"), "PanelRight", InspectorAction, nullptr);
+    AddRow(FixedLayout, "history", tr("История · отдельное окно"), "BookOpen", nullptr, nullptr);
+    struct WindowSpec { const char* Id; const char* Label; const char* Icon; QWidget* Page; };
+    const WindowSpec Windows[] = {
+        {"story", "Поток истории", "Workflow", StoryGraph},
+        {"subscenes", "Сабсцены", "PanelsTopLeft", nullptr},
+        {"characters", "Персонажи", "Users", nullptr},
+        {"widgets", "Виджеты UI", "PanelsTopLeft", WidgetWorkspace},
+        {"gameplay", "Игровые механики", "Gamepad2", nullptr},
+        {"scripting", "Скриптинг", "Code2", nullptr},
+        {"cameras", "Камеры", "Video", nullptr},
+        {"input", "Ввод", "Keyboard", nullptr},
+        {"files", "Проводник", "FolderOpen", ContentBrowser},
+        {"active", "Звук и окружение", "CloudSun", AudioEnvironment},
+        {"event", "Событие", "Layers", nullptr},
+        {"create", "Создание", "Plus", nullptr},
+        {"assets", "Проект", "Library", nullptr},
+        {"sound", "Звук", "Music2", nullptr},
+        {"samples", "Эффекты", "Sparkles", nullptr},
+        {"issues", "Проблемы", "TriangleAlert", nullptr}
+    };
+    for (const auto& Window : Windows)
+    {
+        AddRow(WindowLayout, QString::fromLatin1(Window.Id), tr(Window.Label),
+               QString::fromLatin1(Window.Icon), PageAction(Window.Page), Window.Page);
+    }
+    // Older native tools remain searchable so a closed tab can always be reopened.
+    for (int Index = 4; Index < DockTabs->count(); ++Index)
+    {
+        QWidget* Page = DockTabs->widget(Index);
+        AddRow(WindowLayout, "native_" + QString::number(Index), DockTabs->tabText(Index),
+               "PanelsTopLeft", PageAction(Page), Page, true);
+    }
+
+    auto* Footer = new QWidget(Body);
+    Footer->setObjectName("WindowsMenuFooter");
+    auto* FooterLayout = new QVBoxLayout(Footer);
+    FooterLayout->setContentsMargins(8, 8, 8, 4);
+    FooterLayout->setSpacing(5);
+    FooterLayout->addWidget(new QLabel(tr("Рабочая область"), Footer));
+    auto* Position = new QComboBox(Footer);
+    Position->setObjectName("WindowsMenuPosition");
+    Position->setAccessibleName(tr("Расположение рабочей области"));
+    Position->addItem(tr("Снизу от сцены"), "bottom");
+    Position->addItem(tr("Слева от сцены"), "left");
+    Position->addItem(tr("Справа от сцены"), "right");
+    FooterLayout->addWidget(Position);
+    connect(Position, qOverload<int>(&QComboBox::currentIndexChanged), this, [this, Position](int Index)
+    { Docking->SetWorkspacePosition(Position->itemData(Index).toString()); });
+    auto* Restore = new QPushButton(EditorUi::MakeFrontendIcon("RotateCcw"), tr("Восстановить раскладку"), Footer);
+    Restore->setObjectName("WindowsMenuRestore");
+    Restore->setProperty("uiRole", "windowsMenuRestore");
+    FooterLayout->addWidget(Restore);
+    connect(Restore, &QPushButton::clicked, this, [this, Menu]()
+    { findChild<QAction*>("RestoreWorkspaceLayout")->trigger(); Menu->hide(); });
+    Layout->addWidget(Footer);
+    Scroll->setWidget(Body);
+    auto* WidgetAction = new QWidgetAction(Menu);
+    WidgetAction->setDefaultWidget(Scroll);
+    Menu->addAction(WidgetAction);
+    Menu->setObjectName("WindowsMenu");
+    Menu->setStyleSheet(EditorUi::EditorStyle::LoadStylesheet());
+    auto Update = [this, Rows, FixedGroup, Footer, Position, Search, Scroll, Body, Layout]()
+    {
+        const QString Query = Search->text().trimmed();
+        FixedGroup->setVisible(Query.isEmpty());
+        Footer->setVisible(Query.isEmpty());
+        for (auto& Row : *Rows)
+        {
+            Row.Container->setVisible((!Row.SearchOnly || !Query.isEmpty()) &&
+                (Row.Container->parentWidget() == FixedGroup ||
+                 Row.Label.contains(Query, Qt::CaseInsensitive)));
+            if (Row.Visibility)
+            {
+                Row.Check->setIcon(Row.Visibility->isChecked()
+                    ? EditorUi::MakeFrontendIcon("Check", "--accent") : QIcon());
+                Row.Check->setIconSize(QSize(14, 14));
+                Row.Reveal->setVisible(Row.Visibility->isChecked() && Row.HasReveal);
+            }
+        }
+        const QSignalBlocker Block(Position);
+        Position->setCurrentIndex(std::max(0, Position->findData(Docking->WorkspacePosition())));
+        Layout->invalidate();
+        Layout->activate();
+        Body->updateGeometry();
+        const int Available = QGuiApplication::primaryScreen()->availableGeometry().height() - 80;
+        Scroll->setFixedHeight(std::min(Layout->sizeHint().height(), Available));
+    };
+    connect(Search, &QLineEdit::textChanged, this, [Update](const QString&) { Update(); });
+    connect(Menu, &QMenu::aboutToShow, this, [Search, Scroll, Update]()
+    {
+        Search->clear();
+        Update();
+        QTimer::singleShot(0, Search, [Search, Scroll]()
+        { Scroll->verticalScrollBar()->setValue(0); Search->setFocus(); });
+    });
+    for (const auto& Row : *Rows)
+    {
+        if (Row.Visibility)
+        { connect(Row.Visibility, &QAction::toggled, this, [Update](bool) { Update(); }); }
+    }
+}
+
 void EditorMainWindow::OnLayoutModeChanged(int Index)
 {
     if (WorkspaceSplitter == nullptr || CenterSplitter == nullptr)
@@ -853,14 +1069,15 @@ void EditorMainWindow::OnLayoutModeChanged(int Index)
     }
 
     const QString Mode = LayoutCombo->itemData(Index).toString();
+    const bool bToolsFirst = CenterSplitter->widget(0)->objectName() == "GraphDock";
     if (Mode == "graph")
     {
-        CenterSplitter->setSizes({120, 680});
+        CenterSplitter->setSizes(bToolsFirst ? QList<int>{680, 120} : QList<int>{120, 680});
         Docking->Open(*StoryGraph);
     }
     else if (Mode == "scene")
     {
-        CenterSplitter->setSizes({700, 80});
+        CenterSplitter->setSizes(bToolsFirst ? QList<int>{80, 700} : QList<int>{700, 80});
     }
     else if (Mode == "hierarchy")
     {
