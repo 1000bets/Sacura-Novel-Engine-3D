@@ -530,7 +530,7 @@ void EditorMainWindow::RefreshTransformUi()
         const Transform& ObjectTransform = Selected->GetTransform();
         if (PrimaryViewport != nullptr)
         {
-            PrimaryViewport->SetSelectedTransform(ObjectTransform, Selected->GetWorldTransform());
+            PrimaryViewport->SetSelectedTransform(ObjectTransform, Selected->GetWorldTransform(), Selected->GetObjectHandle());
         }
         SetSpinEnabled(PositionXSpin, ObjectTransform.Position.x);
         SetSpinEnabled(PositionYSpin, ObjectTransform.Position.y);
@@ -684,7 +684,7 @@ void EditorMainWindow::BindTransformScrubbing(EditorUi::StudioNumberEdit* Field,
             Field->FinishScrub(true);
             return;
         }
-        PrimaryViewport->SetSelectedTransform(Updated, Selected->GetWorldTransform());
+        PrimaryViewport->SetSelectedTransform(Updated, Selected->GetWorldTransform(), Selected->GetObjectHandle());
         UpdateWindowTitleDirty();
     });
     connect(Field, &EditorUi::StudioNumberEdit::ScrubFinished, this, [this, Field](bool Cancelled)

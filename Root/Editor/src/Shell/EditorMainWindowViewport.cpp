@@ -90,6 +90,15 @@
 
 void EditorMainWindow::OnViewportSurfaceChanged(RenderViewportWidget* Viewport)
 {
+    if (Viewport == CameraPreviewViewport)
+    {
+        if (!Viewport->HasValidNativeHandle())
+        {
+            BoundEngine.UnregisterRenderSurface(RenderSurfaceId{2});
+            bCameraPreviewAttached = false;
+        }
+        return;
+    }
     if (!Viewport->HasValidNativeHandle())
     {
         BoundEngine.UnregisterRenderSurface(RenderSurfaceId{Viewport->GetViewId().Value});
@@ -101,6 +110,10 @@ void EditorMainWindow::OnViewportSurfaceChanged(RenderViewportWidget* Viewport)
 void EditorMainWindow::OnViewportResized(RenderViewportWidget* Viewport)
 {
     if (Viewport == nullptr || !BoundEngine.IsPresenting())
+    {
+        return;
+    }
+    if (Viewport == CameraPreviewViewport && !bCameraPreviewAttached)
     {
         return;
     }
@@ -224,6 +237,66 @@ void EditorMainWindow::ConfigureRenderView()
         RenderSettings EditSettings = RenderConfiguration;
         EditSettings.bGroundGrid = PrimaryViewport->IsGridVisible();
         BoundEngine.ConfigureRenderSurface(RenderSurfaceId{1}, true, Camera, EditSettings);
+    }
+    const GameObject* Selected = BoundEngine.GetPlaySession().IsSimulating() ? nullptr : GetSelectedGameObject();
+    const CameraComponent* SelectedCamera = Selected ? Selected->GetComponent<CameraComponent>() : nullptr;
+    const int PreviewWidth = std::min(300, PrimaryViewport->width() - 24);
+    const int PreviewHeight = std::min(202, PrimaryViewport->height() - 24);
+    const bool bShowCameraPreview = SelectedCamera && SelectedCamera->IsEnabled() && GetEditScene() != nullptr
+        && PrimaryViewport->isVisible() && !isMinimized() && PreviewWidth >= 180 && PreviewHeight >= 140;
+    if (!bShowCameraPreview)
+    {
+        if (bCameraPreviewAttached)
+        {
+            BoundEngine.UnregisterRenderSurface(RenderSurfaceId{2});
+            bCameraPreviewAttached = false;
+        }
+        CameraPreviewPanel->hide();
+    }
+    else
+    {
+        if (CameraPreviewPanel->size() != QSize(PreviewWidth, PreviewHeight))
+        {
+            CameraPreviewViewport->setFixedHeight(PreviewHeight - 44);
+            CameraPreviewPanel->setFixedSize(PreviewWidth, PreviewHeight);
+        }
+        const QPoint PreviewPosition = PrimaryViewport->mapToGlobal(QPoint(
+            PrimaryViewport->width() - PreviewWidth - 12,
+            PrimaryViewport->height() - PreviewHeight - 12));
+        if (CameraPreviewPanel->pos() != PreviewPosition) CameraPreviewPanel->move(PreviewPosition);
+        if (!CameraPreviewPanel->isVisible())
+        {
+            CameraPreviewPanel->show();
+            CameraPreviewPanel->raise();
+        }
+        if (!bCameraPreviewUnavailable && !bCameraPreviewAttached && BoundEngine.IsPresenting()
+            && CameraPreviewViewport->isVisible() && CameraPreviewViewport->HasValidNativeHandle())
+        {
+            bCameraPreviewAttached = BoundEngine.RegisterRenderSurface(RenderSurfaceId{2},
+                CameraPreviewViewport->BuildNativeWindowInfo());
+            if (!bCameraPreviewAttached)
+            {
+                bCameraPreviewUnavailable = true;
+                CameraPreviewViewport->hide();
+                CameraPreviewUnavailableLabel->show();
+            }
+        }
+        if (bCameraPreviewAttached)
+        {
+            RenderViewCamera View;
+            View.Position = Selected->GetWorldPosition();
+            View.Target = View.Position + Selected->GetWorldForward();
+            View.Up = Selected->GetWorldUp();
+            View.FieldOfViewDegrees = std::clamp(SelectedCamera->FieldOfViewDegrees, 1.f, 179.f);
+            View.NearPlane = std::max(.01f, SelectedCamera->NearPlane);
+            View.FarPlane = std::max(View.NearPlane + .01f, SelectedCamera->FarPlane);
+            const NativeWindowInfo Info = CameraPreviewViewport->BuildNativeWindowInfo();
+            RenderCamera Camera;
+            View.BuildRenderCamera(static_cast<float>(qMax(1u, Info.Width)) / static_cast<float>(qMax(1u, Info.Height)), Camera);
+            RenderSettings PreviewSettings = RenderConfiguration;
+            PreviewSettings.bGroundGrid = false;
+            BoundEngine.ConfigureRenderSurface(RenderSurfaceId{2}, true, Camera, PreviewSettings);
+        }
     }
     const RenderStatistics Statistics = BoundEngine.GetRenderStatistics(RenderSurfaceId{1});
     QString Timings = tr("GPU timings pending or unsupported");

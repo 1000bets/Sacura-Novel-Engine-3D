@@ -1,9 +1,13 @@
 #include "UI/StoryWidget.h"
 #include "UI/WidgetSurface.h"
+#include "UI/WidgetLayout.h"
 #include "Story/StoryRuntime.h"
 
+#include <QEvent>
+#include <QJsonArray>
 #include <QLabel>
 #include <QPushButton>
+#include <QRegion>
 #include <QVBoxLayout>
 
 StoryWidget::StoryWidget(StoryRuntime& InRuntime, QWidget* Parent)
@@ -46,6 +50,7 @@ void StoryWidget::Refresh(bool bAllowInput)
         Context.Status = Context.CanAdvance ? tr("Нажмите, чтобы продолжить") : QString();
         for (size_t I=0; I<Runtime.GetChoiceCount(); ++I) Context.Choices.append(QString::fromStdString(Runtime.GetChoice(I).Label));
         Authored->SetContext(std::move(Context));
+        if (OverlayViewport) SyncOverlay();
         return;
     }
     Speaker->setText(QString::fromStdString(Runtime.GetDisplayedSpeaker()));
@@ -91,10 +96,12 @@ void StoryWidget::Refresh(bool bAllowInput)
 void StoryWidget::SetWidgetLayout(const QJsonObject& Layout)
 {
     if (Layout.isEmpty()) return;
+    AuthoredLayout = Layout;
     if (!Authored)
     {
         Speaker->hide(); Line->hide(); Choices->hide(); Advance->hide();
         Authored = new WidgetSurface(this);
+        if (OverlayViewport) Authored->setMinimumHeight(0);
         layout()->addWidget(Authored);
         Authored->Activated = [this](QString Action, int Index)
         {
@@ -105,4 +112,79 @@ void StoryWidget::SetWidgetLayout(const QJsonObject& Layout)
         };
     }
     Authored->SetWidget(Layout);
+    if (OverlayViewport) SyncOverlay();
+}
+
+void StoryWidget::AttachToViewport(QWidget* Viewport)
+{
+    if (!Viewport || OverlayViewport == Viewport) return;
+    if (OverlayViewport)
+    {
+        OverlayViewport->removeEventFilter(this);
+        OverlayViewport->window()->removeEventFilter(this);
+    }
+    OverlayViewport = Viewport;
+    setParent(Viewport->window(), Qt::Tool | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint
+        | Qt::WindowDoesNotAcceptFocus);
+    setAttribute(Qt::WA_TranslucentBackground);
+    setAttribute(Qt::WA_ShowWithoutActivating);
+    layout()->setContentsMargins(0, 0, 0, 0);
+    if (Authored) Authored->setMinimumHeight(0);
+    Viewport->installEventFilter(this);
+    Viewport->window()->installEventFilter(this);
+    hide();
+    SyncOverlay();
+}
+
+void StoryWidget::SetOverlayVisible(bool bVisible)
+{
+    bOverlayRequested = bVisible;
+    SyncOverlay();
+}
+
+bool StoryWidget::eventFilter(QObject* Watched, QEvent* Event)
+{
+    if (OverlayViewport && (Watched == OverlayViewport || Watched == OverlayViewport->window()))
+    {
+        switch (Event->type())
+        {
+        case QEvent::Move:
+        case QEvent::Resize:
+        case QEvent::Show:
+        case QEvent::Hide:
+        case QEvent::WindowStateChange:
+            SyncOverlay();
+            break;
+        default: break;
+        }
+    }
+    return QWidget::eventFilter(Watched, Event);
+}
+
+void StoryWidget::SyncOverlay()
+{
+    if (!OverlayViewport) return;
+    const bool bShouldShow = bOverlayRequested && Runtime.GetPlaybackPhase() != StoryPlaybackPhase::Idle
+        && OverlayViewport->isVisible() && OverlayViewport->window()->isVisible()
+        && !OverlayViewport->window()->isMinimized();
+    if (!bShouldShow) { hide(); return; }
+
+    const QRect ViewportRect(OverlayViewport->mapToGlobal(QPoint()), OverlayViewport->size());
+    if (geometry() != ViewportRect) setGeometry(ViewportRect);
+    if (!AuthoredLayout.isEmpty())
+    {
+        QRegion PaintedRegion;
+        const auto Rects = WidgetLayout::Rects(AuthoredLayout, size());
+        for (const auto& Value : AuthoredLayout["elements"].toArray())
+        {
+            const auto Element = Value.toObject();
+            if (!WidgetPainting::Visible(Element, AuthoredLayout)) continue;
+            if (Element["type"] == "choices" && !Runtime.CanSelectChoice()) continue;
+            if (Element["type"] == "button" && Element["action"] == "advance"
+                && !Runtime.CanAdvanceDialogue()) continue;
+            PaintedRegion += Rects.value(Element["id"].toString()).toAlignedRect();
+        }
+        if (mask() != PaintedRegion) setMask(PaintedRegion);
+    }
+    if (!isVisible()) show();
 }

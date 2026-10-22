@@ -38,7 +38,7 @@ public:
     explicit EditorViewportWidget(QWidget* Parent = nullptr);
 
     void SetEngine(Engine* EngineInstance);
-    void SetSelectedTransform(const Transform& LocalTransform, const Transform& WorldTransform);
+    void SetSelectedTransform(const Transform& LocalTransform, const Transform& WorldTransform, ObjectHandle ObjectIdentity);
     void ClearSelectedTransform();
     void SetTransformCallbacks(TransformPreviewCallback Preview, TransformCommitCallback Commit);
     void SetEditorToolsEnabled(bool bEnabled);

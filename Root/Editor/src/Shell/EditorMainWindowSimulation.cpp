@@ -194,7 +194,7 @@ void EditorMainWindow::OnPlayToggled(bool bChecked)
     if (auto* Grid = findChild<QPushButton*>("ViewportGrid")) { Grid->setEnabled(!bPlaying); }
     LocationTab->setChecked(!bPlaying);
     GameTab->setChecked(bPlaying);
-    GameDialogue->setVisible(bPlaying);
+    GameDialogue->SetOverlayVisible(bPlaying);
     ClearSelection();
     PopulateHierarchy();
     ConfigureRenderView();

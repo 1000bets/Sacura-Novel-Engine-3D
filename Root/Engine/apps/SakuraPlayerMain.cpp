@@ -96,6 +96,7 @@ int main(int ArgumentCount, char** Arguments)
     Layout->setContentsMargins(0, 0, 0, 0);
     auto* Viewport = new RenderViewportWidget(&Window);
     auto* Dialogue = new StoryWidget(EngineInstance.GetStoryRuntime(), &Window);
+    Dialogue->SetWidgetLayout(WidgetLayout::Create("dialogue"));
     const auto WidgetPath = WidgetLayout::ProjectFile(QString::fromStdWString(ProjectPaths::Content().wstring()));
     if (QFileInfo::exists(WidgetPath))
     {
@@ -104,7 +105,7 @@ int main(int ArgumentCount, char** Arguments)
         else PrintString("SakuraPlayer: UI library: " + Error.toStdString());
     }
     Layout->addWidget(Viewport, 1);
-    Layout->addWidget(Dialogue);
+    Dialogue->AttachToViewport(Viewport);
     QObject::connect(Viewport, &RenderViewportWidget::ViewportResized, &Window,
         [&](RenderViewportWidget* Surface)
         {
@@ -127,6 +128,7 @@ int main(int ArgumentCount, char** Arguments)
             }
         });
     Window.show();
+    Dialogue->SetOverlayVisible(true);
     if (!EngineInstance.StartPresenting(Viewport->BuildNativeWindowInfo()))
     {
         QMessageBox::critical(&Window, "SakuraPlayer", "Failed to initialize the renderer.");

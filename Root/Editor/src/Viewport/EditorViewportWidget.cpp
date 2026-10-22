@@ -202,15 +202,17 @@ public:
         }
     }
 
-    void SetSelectedTransform(const Transform& LocalTransform, const Transform& WorldTransform)
+    void SetSelectedTransform(const Transform& LocalTransform, const Transform& WorldTransform, ObjectHandle ObjectIdentity)
     {
         SelectedLocal = LocalTransform;
         SelectedWorld = WorldTransform;
+        SelectedObject = ObjectIdentity;
         bHasSelection = true;
     }
 
     void ClearSelectedTransform()
     {
+        SelectedObject = {};
         bHasSelection = false;
         bManipulating = false;
     }
@@ -650,6 +652,90 @@ private:
                 continue;
             }
             const Matrix World = SceneObject->GetWorldMatrix();
+            if (const auto* CameraComponentInstance = SceneObject->GetComponent<CameraComponent>();
+                CameraComponentInstance && CameraComponentInstance->IsEnabled())
+            {
+                const Transform Pose = SceneObject->GetWorldTransform();
+                const Matrix CameraWorld = Matrix::CreateFromQuaternion(Pose.Rotation)
+                    * Matrix::CreateTranslation(Pose.Position);
+                const bool bSelected = SceneObject->GetObjectHandle() == SelectedObject;
+                EditorArrow CameraShape;
+                CameraShape.Color = bSelected ? QColor(246, 194, 112) : QColor(164, 157, 213);
+                CameraShape.Thickness = bSelected ? 2.3f : 1.8f;
+                auto AddCameraLine = [&](const Vector3& LocalStart, const Vector3& LocalEnd)
+                {
+                    auto Project = [&](const Vector3& Local, QPointF& Screen)
+                    {
+                        const Vector3 Position = Vector3::Transform(Local, CameraWorld);
+                        const Vector4 Clip = Vector4::Transform(
+                            Vector4(Position.x, Position.y, Position.z, 1.f), ViewProjection);
+                        if (Clip.w <= 0.001f || Clip.z < 0.f || Clip.z > Clip.w) return false;
+                        Screen = QPointF((Clip.x / Clip.w * 0.5f + 0.5f) * width(),
+                            (0.5f - Clip.y / Clip.w * 0.5f) * height());
+                        return true;
+                    };
+                    QPointF Start;
+                    QPointF End;
+                    if (Project(LocalStart, Start) && Project(LocalEnd, End))
+                    {
+                        CameraShape.Segments.emplace_back(Start, End);
+                    }
+                };
+                Vector3 Body[8];
+                for (int Index = 0; Index < 8; ++Index)
+                {
+                    Body[Index] = Vector3((Index & 1) ? .24f : -.24f,
+                        (Index & 2) ? .16f : -.16f, (Index & 4) ? .18f : -.18f);
+                }
+                for (int Index = 0; Index < 8; ++Index)
+                {
+                    for (int Axis : {1, 2, 4})
+                    {
+                        if (!(Index & Axis)) AddCameraLine(Body[Index], Body[Index | Axis]);
+                    }
+                }
+                const Vector3 Lens[4] = {Vector3(-.17f, -.11f, -.38f), Vector3(.17f, -.11f, -.38f),
+                    Vector3(.17f, .11f, -.38f), Vector3(-.17f, .11f, -.38f)};
+                for (int Index = 0; Index < 4; ++Index)
+                {
+                    AddCameraLine(Lens[Index], Lens[(Index + 1) % 4]);
+                    AddCameraLine(Lens[Index], Vector3(Lens[Index].x * 1.4f, Lens[Index].y * 1.45f, -.18f));
+                }
+                for (float CenterX : {-.13f, .13f})
+                {
+                    for (int Segment = 0; Segment < 12; ++Segment)
+                    {
+                        const float Start = Segment * 6.2831853f / 12.f;
+                        const float End = (Segment + 1) * 6.2831853f / 12.f;
+                        AddCameraLine(Vector3(CenterX + .105f * std::cos(Start), .23f + .105f * std::sin(Start), .1f),
+                            Vector3(CenterX + .105f * std::cos(End), .23f + .105f * std::sin(End), .1f));
+                    }
+                }
+                if (bSelected)
+                {
+                    const float Field = std::tan(std::clamp(CameraComponentInstance->FieldOfViewDegrees,
+                        1.f, 120.f) * DegreesToRadians * .5f);
+                    const float Aspect = std::clamp(CameraComponentInstance->AspectRatio, .5f, 3.f);
+                    Vector3 Frustum[2][4];
+                    for (int Plane = 0; Plane < 2; ++Plane)
+                    {
+                        const float Depth = Plane == 0 ? .45f : 2.5f;
+                        for (int Corner = 0; Corner < 4; ++Corner)
+                        {
+                            Frustum[Plane][Corner] = Vector3(
+                                (Corner & 1 ? 1.f : -1.f) * Field * Aspect * Depth,
+                                (Corner & 2 ? 1.f : -1.f) * Field * Depth, -Depth);
+                        }
+                    }
+                    for (int Corner = 0; Corner < 4; ++Corner)
+                    {
+                        AddCameraLine(Frustum[0][Corner], Frustum[1][Corner]);
+                        AddCameraLine(Frustum[1][Corner], Frustum[1][Corner ^ 1]);
+                        AddCameraLine(Frustum[1][Corner], Frustum[1][Corner ^ 2]);
+                    }
+                }
+                Arrows.push_back(std::move(CameraShape));
+            }
             for (const Component* Candidate : SceneObject->GetAllComponents())
             {
                 const auto* Arrow = dynamic_cast<const ArrowComponent*>(Candidate);
@@ -773,6 +859,7 @@ private:
     ImGuiContext* ImGuiContextInstance = nullptr;
     Transform SelectedLocal{};
     Transform SelectedWorld{};
+    ObjectHandle SelectedObject;
     Transform DragStartLocal{};
     QPointF MousePosition;
     QPointF PressPosition;
@@ -801,9 +888,9 @@ void EditorViewportWidget::SetEngine(Engine* EngineInstance)
     BoundEngine = EngineInstance;
 }
 
-void EditorViewportWidget::SetSelectedTransform(const Transform& LocalTransform, const Transform& WorldTransform)
+void EditorViewportWidget::SetSelectedTransform(const Transform& LocalTransform, const Transform& WorldTransform, ObjectHandle ObjectIdentity)
 {
-    Gizmo->SetSelectedTransform(LocalTransform, WorldTransform);
+    Gizmo->SetSelectedTransform(LocalTransform, WorldTransform, ObjectIdentity);
 }
 
 void EditorViewportWidget::ClearSelectedTransform()

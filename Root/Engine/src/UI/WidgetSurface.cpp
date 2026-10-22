@@ -199,6 +199,12 @@ void WidgetSurface::mouseReleaseEvent(QMouseEvent *Event)
                 Activated(Action, -1);
             return;
         }
+        if (E["type"] == "panel" && E["parentId"].toString().isEmpty() &&
+            Data["kind"] == "dialogue" && Context.CanAdvance)
+        {
+            Activated("advance", -1);
+            return;
+        }
     }
 }
 void WidgetSurface::keyPressEvent(QKeyEvent *Event)

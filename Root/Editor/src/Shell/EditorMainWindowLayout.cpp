@@ -43,6 +43,7 @@
 #include "Story/StoryRuntime.h"
 #include "Navigation/NavigationWorld.h"
 #include "UI/StoryWidget.h"
+#include "UI/WidgetLayout.h"
 
 #include <QAbstractItemView>
 #include <QAbstractButton>
@@ -249,6 +250,7 @@ void EditorMainWindow::BuildUi()
     HierarchyTree->setDropIndicatorShown(true);
     HierarchyTree->setDefaultDropAction(Qt::CopyAction);
     HierarchyTree->setDragDropMode(QAbstractItemView::DragDrop);
+    HierarchyTree->setEditTriggers(QAbstractItemView::NoEditTriggers);
     HierarchyTree->installEventFilter(this);
     Tree->ReparentRequested = [this](ObjectHandle Target, ObjectHandle NewParent)
     {
@@ -486,9 +488,9 @@ void EditorMainWindow::BuildUi()
     });
     ViewportLayout->addWidget(ViewportHeader);
     ViewportLayout->addWidget(PrimaryViewport, 1);
-    GameDialogue = new StoryWidget(StoryPlayback, ViewportPanel);
-    ViewportLayout->addWidget(GameDialogue);
-    GameDialogue->hide();
+    GameDialogue = new StoryWidget(StoryPlayback, this);
+    GameDialogue->SetWidgetLayout(WidgetLayout::Create("dialogue"));
+    GameDialogue->AttachToViewport(PrimaryViewport);
 
     QWidget* GraphDock = &Root->GetToolsPanel();
     QVBoxLayout* GraphLayout = &Root->GetToolsLayout();
@@ -512,6 +514,32 @@ void EditorMainWindow::BuildUi()
 
     auto* ObjectInspectorPage = new EditorUi::ObjectInspectorView(InspectorPages);
     ObjectInspectorContent = ObjectInspectorPage;
+    CameraPreviewPanel = new QWidget(this, Qt::Tool | Qt::FramelessWindowHint
+        | Qt::NoDropShadowWindowHint | Qt::WindowDoesNotAcceptFocus);
+    CameraPreviewPanel->setObjectName("CameraPreviewPanel");
+    CameraPreviewPanel->setAttribute(Qt::WA_ShowWithoutActivating);
+    auto* CameraPreviewLayout = new QVBoxLayout(CameraPreviewPanel);
+    CameraPreviewLayout->setContentsMargins(12, 10, 12, 10);
+    CameraPreviewLayout->setSpacing(7);
+    auto* CameraPreviewTitle = new QLabel(tr("Вид камеры"), CameraPreviewPanel);
+    CameraPreviewTitle->setProperty("uiRole", "objectSectionTitle");
+    CameraPreviewLayout->addWidget(CameraPreviewTitle);
+    CameraPreviewViewport = new RenderViewportWidget(CameraPreviewPanel);
+    CameraPreviewViewport->setObjectName("CameraPreviewViewport");
+    CameraPreviewViewport->SetViewId(RenderViewId{2});
+    CameraPreviewViewport->setMinimumSize(160, 90);
+    CameraPreviewViewport->setFixedHeight(158);
+    CameraPreviewViewport->setFocusPolicy(Qt::NoFocus);
+    CameraPreviewLayout->addWidget(CameraPreviewViewport);
+    CameraPreviewUnavailableLabel = new QLabel(tr("Предпросмотр требует D3D12 или Vulkan"), CameraPreviewPanel);
+    CameraPreviewUnavailableLabel->setWordWrap(true);
+    CameraPreviewUnavailableLabel->hide();
+    CameraPreviewLayout->addWidget(CameraPreviewUnavailableLabel);
+    CameraPreviewPanel->hide();
+    connect(CameraPreviewViewport, &RenderViewportWidget::NativeSurfaceChanged,
+        this, &EditorMainWindow::OnViewportSurfaceChanged);
+    connect(CameraPreviewViewport, &RenderViewportWidget::ViewportResized,
+        this, &EditorMainWindow::OnViewportResized);
     ObjectNameEdit = ObjectInspectorPage->Name;
     const auto& Fields = ObjectInspectorPage->TransformFields;
     for (int Index = 0; Index < static_cast<int>(Fields.size()); ++Index)
@@ -656,6 +684,13 @@ void EditorMainWindow::BuildUi()
     statusBar()->addPermanentWidget(StatusSelectionLabel);
 
     connect(HierarchyTree, &QTreeWidget::itemSelectionChanged, this, &EditorMainWindow::OnHierarchySelectionChanged);
+    connect(HierarchyTree, &QTreeWidget::itemDoubleClicked, this, [this](QTreeWidgetItem* Item, int)
+    {
+        if (Item == nullptr) { return; }
+        const ObjectHandle Target = LoadObjectHandle(Item);
+        if (Target != GetSelectedObjectHandle()) { SelectObject(Target); }
+        FrameSelectedObject();
+    });
     connect(HierarchyTree, &QTreeWidget::customContextMenuRequested, this, &EditorMainWindow::OnHierarchyContextMenu);
 }
 

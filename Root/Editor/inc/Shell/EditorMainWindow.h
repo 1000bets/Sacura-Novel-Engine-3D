@@ -196,6 +196,11 @@ private:
     QTreeWidget* HierarchyTree = nullptr;
     EditorUi::HierarchyPanelView* HierarchyContent = nullptr;
     EditorViewportWidget* PrimaryViewport = nullptr;
+    QWidget* CameraPreviewPanel = nullptr;
+    RenderViewportWidget* CameraPreviewViewport = nullptr;
+    QLabel* CameraPreviewUnavailableLabel = nullptr;
+    bool bCameraPreviewAttached = false;
+    bool bCameraPreviewUnavailable = false;
     QPushButton* LocationTab = nullptr;
     QPushButton* GameTab = nullptr;
     QDoubleSpinBox* CameraSpeedSpin = nullptr;

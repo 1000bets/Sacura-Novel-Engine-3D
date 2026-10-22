@@ -1,5 +1,7 @@
 /* EditorSelect.jsx, objectInspector.css, editorTheme.css. Logical CSS pixels. */
 /* Editor.jsx renderActive / editor.css active-table / editorHelp.css workspace-guide. */
+QWidget#CameraPreviewPanel { background: @--bg-panel@; border: 1px solid @--border-strong@; border-radius: 6px; }
+QWidget#CameraPreviewPanel QLabel { background: transparent; color: @--text-primary@; }
 QWidget#AudioEnvironment, QWidget#AudioEnvironmentBody { background: @--bg-panel@; }
 QWidget#AudioEnvironmentGuide, QWidget[uiRole="audioTableHeader"], QWidget[uiRole="audioEventRow"] {
     border-bottom: 1px solid @--border-subtle@;
