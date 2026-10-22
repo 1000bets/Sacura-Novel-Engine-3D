@@ -4,6 +4,7 @@
 #include <QFontMetricsF>
 #include <QPainter>
 #include <QPainterPath>
+#include <QImage>
 #include <QTextLayout>
 #include <QLineF>
 #include <algorithm>
@@ -432,17 +433,33 @@ void StoryGraphStyle::PaintGrid(QPainter& Painter, const QRectF& Rect)
     {
         Spacing *= 2;
     }
-    Painter.setPen(Qt::NoPen);
-    Painter.setBrush(EditorStyle::Color("--graph-grid"));
-    const qreal Left = std::floor((Rect.left() - Radius) / Spacing) * Spacing;
-    const qreal Top = std::floor((Rect.top() - Radius) / Spacing) * Spacing;
-    for (qreal X = Left; X < Rect.right() + Radius; X += Spacing)
+    // The canvas repaints on every pan. Reuse one scene-anchored dot tile at
+    // this zoom instead of issuing thousands of ellipse draws per frame.
+    constexpr int TileSize = 64;
+    static qreal CachedScale = 0, CachedSpacing = 0;
+    static QImage Tile;
+    if (Tile.isNull() || CachedScale != Scale || CachedSpacing != Spacing)
     {
-        for (qreal Y = Top; Y < Rect.bottom() + Radius; Y += Spacing)
+        Tile = QImage(TileSize, TileSize, QImage::Format_ARGB32_Premultiplied);
+        Tile.fill(Qt::transparent);
+        QPainter TilePainter(&Tile);
+        TilePainter.setRenderHint(QPainter::Antialiasing);
+        TilePainter.setPen(Qt::NoPen);
+        TilePainter.setBrush(EditorStyle::Color("--graph-grid"));
+        const qreal TileRadius = Radius * TileSize / Spacing;
+        for (int X : {0, TileSize})
         {
-            Painter.drawEllipse(QPointF(X, Y), Radius, Radius);
+            for (int Y : {0, TileSize})
+            {
+                TilePainter.drawEllipse(QPointF(X, Y), TileRadius, TileRadius);
+            }
         }
+        CachedScale = Scale;
+        CachedSpacing = Spacing;
     }
+    QBrush Grid(Tile);
+    Grid.setTransform(QTransform::fromScale(Spacing / TileSize, Spacing / TileSize));
+    Painter.fillRect(Rect, Grid);
     Painter.restore();
 }
 } // namespace EditorUi
