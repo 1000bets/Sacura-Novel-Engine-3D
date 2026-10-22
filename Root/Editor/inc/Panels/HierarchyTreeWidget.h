@@ -11,6 +11,7 @@ public:
     std::function<bool(ObjectHandle, ObjectHandle)> ReparentRequested;
 
 protected:
+    void drawRow(QPainter* Painter, const QStyleOptionViewItem& Option, const QModelIndex& Index) const override;
     void drawBranches(QPainter* Painter, const QRect& Rect, const QModelIndex& Index) const override;
     void dragEnterEvent(QDragEnterEvent* Event) override;
     void dragMoveEvent(QDragMoveEvent* Event) override;

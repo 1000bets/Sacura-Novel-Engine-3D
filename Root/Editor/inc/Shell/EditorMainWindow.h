@@ -50,6 +50,7 @@ class StoryWorkspaceView;
 class StoryInspectorView;
 class HierarchyPanelView;
 class StoryGraphController;
+class WorkspaceDockController;
 }
 
 class EditorMainWindow : public QMainWindow
@@ -74,7 +75,6 @@ private slots:
     void OnPlayToggled(bool bChecked);
     void OnPauseClicked();
     void OnStepClicked();
-    void OnDockTabChanged(int Index);
     void OnLayoutModeChanged(int Index);
     void OnOpenProject();
     void OnNewProject();
@@ -169,6 +169,7 @@ private:
     QPushButton* StepButton = nullptr;
 
     QSplitter* WorkspaceSplitter = nullptr;
+    EditorUi::WorkspaceDockController* Docking = nullptr;
     QSplitter* CenterSplitter = nullptr;
     QTabWidget* HierarchyTabs = nullptr;
     QTreeWidget* HierarchyTree = nullptr;

@@ -1,5 +1,6 @@
 #include "Shell/EditorMainWindow.h"
 #include "UI/Adapters/StoryGraphController.h"
+#include "UI/Adapters/WorkspaceDockController.h"
 #include "UI/Views/StoryWorkspaceView.h"
 #include "UI/Views/StoryInspectorView.h"
 #include "Engine.h"
@@ -33,13 +34,6 @@ void EditorMainWindow::InitializeStoryAuthoring()
     {
         UpdateWindowTitleDirty();
         UpdateStatus();
-        const int Index = DockTabs->indexOf(StoryGraph);
-        if (Index >= 0)
-        {
-            DockTabs->setTabText(Index,
-                                 tr("Поток истории") +
-                                     (StoryAuthoring->GetDocument().IsDirty() ? QStringLiteral(" *") : QString()));
-        }
     };
     StoryAuthoring->ErrorReported = [this](const QString& Error)
     { statusBar()->showMessage(tr("История: ") + Error, 12000); };
@@ -203,9 +197,7 @@ bool EditorMainWindow::OpenStoryAsset(const AssetKey& Asset)
             return false;
         }
     }
-    const int Index = DockTabs->indexOf(StoryGraph);
-    DockTabs->setTabVisible(Index, true);
-    DockTabs->setCurrentIndex(Index);
+    Docking->Open(*StoryGraph);
     bStoryEditingContext = true;
     InspectorPages->setCurrentWidget(StoryInspector);
     return true;
@@ -276,9 +268,7 @@ bool EditorMainWindow::CreateStoryFromDialog()
         QMessageBox::warning(this, tr("Открытие истории"), QString::fromStdString(Error));
         return false;
     }
-    const int Index = DockTabs->indexOf(StoryGraph);
-    DockTabs->setTabVisible(Index, true);
-    DockTabs->setCurrentIndex(Index);
+    Docking->Open(*StoryGraph);
     InspectorPages->setCurrentWidget(StoryInspector);
     bStoryEditingContext = true;
     ContentBrowser->Refresh();

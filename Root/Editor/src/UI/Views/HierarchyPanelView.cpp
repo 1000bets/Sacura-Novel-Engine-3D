@@ -1,5 +1,6 @@
 #include "UI/Views/HierarchyPanelView.h"
 #include "UI/Styles/StudioIcons.h"
+#include "UI/Styles/HierarchyStyle.h"
 
 #include <QHBoxLayout>
 #include <QLabel>
@@ -76,6 +77,10 @@ HierarchyPanelView::HierarchyPanelView(QTreeWidget& InTree, QWidget* Parent) : Q
     Tree.setUniformRowHeights(true);
     Tree.setIndentation(16);
     Tree.setIconSize(QSize(14, 14));
+    Tree.setItemDelegate(new HierarchyStyle(&Tree));
+    Tree.setMouseTracking(true);
+    Tree.setTextElideMode(Qt::ElideRight);
+    Tree.setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     Layout->addWidget(&Tree, 1);
     Footer = new QLabel(this);
     Footer->setObjectName("HierarchyFooter");

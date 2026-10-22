@@ -1,8 +1,10 @@
 #include "UI/Views/StudioControls.h"
 #include "UI/Views/StoryInspectorView.h"
+#include "UI/Presentation/StorySpeakerLabel.h"
 #include "UI/Views/StoryEventInspectorView.h"
 #include "UI/Styles/StoryEventStyle.h"
-#include <QMenu>
+#include "UI/Views/StudioActionMenu.h"
+#include "UI/Adapters/StoryMenuBuilder.h"
 #include "UI/Styles/StudioIcons.h"
 #include "UI/Styles/StoryInspectorStyle.h"
 #include <QApplication>
@@ -237,10 +239,19 @@ void StoryInspectorView::SetPendingStructure()
 void StoryInspectorView::SetNode(const StoryGraphNode& Node, const StoryGraphModel& Model, bool bForce)
 {
     NodeScroll->show(); EventScroll->hide();
-    Context = Model;
     QWidget* Focus = QApplication::focusWidget();
+    // QWidget::isAncestorOf stops at a window boundary. StudioSelect's search
+    // field lives in a Qt::Popup, but still belongs to this inspector. Rebuilding
+    // its model on the focus-out commit would immediately close the open menu.
+    bool bOwnsFocus = false;
+    for (QWidget* Owner = Focus; Owner != nullptr; Owner = Owner->parentWidget())
+    {
+        if (Owner == this) { bOwnsFocus = true; break; }
+    }
+    const bool bSameDocument = Context.DocumentIdentity == Model.DocumentIdentity;
+    Context = Model;
     if (!bForce && !bStructurePending && Current.Identity == Node.Identity && Current.KindId == Node.KindId &&
-        Focus != nullptr && isAncestorOf(Focus) && isEnabled() == !Model.bReadOnly)
+        bSameDocument && bOwnsFocus && isEnabled() == !Model.bReadOnly)
     {
         return;
     }
@@ -261,10 +272,11 @@ void StoryInspectorView::SetNode(const StoryGraphNode& Node, const StoryGraphMod
     Details->show();
     Speaker->clear();
     const QString Narrator = tr("Рассказчик");
-    Speaker->addItem(Narrator, Node.Speaker == Narrator ? Narrator : QString{});
+    // Keep the authored spelling until the user actually chooses another speaker.
+    Speaker->addItem(Narrator, IsNarrator(Node.Speaker) ? Node.Speaker : QString{});
     for (const auto& Candidate : Model.Nodes)
     {
-        if (!Candidate.Speaker.isEmpty() && Candidate.Speaker != Narrator && Speaker->findData(Candidate.Speaker) < 0)
+        if (!IsNarrator(Candidate.Speaker) && Speaker->findData(Candidate.Speaker) < 0)
         {
             Speaker->addItem(Candidate.Speaker, Candidate.Speaker);
         }
@@ -411,13 +423,16 @@ void StoryInspectorView::RebuildDetails()
             connect(Add, &QPushButton::clicked, this, [this, Add, Phase]()
             {
                 Commit();
-                QMenu Menu(Add);
-                auto* New = Menu.addAction(tr("Новое событие"));
-                QMap<QAction*, QString> Events;
-                if (!Context.Events.isEmpty()) { Menu.addSeparator(); }
-                for (const auto& Event : Context.Events) { Events.insert(Menu.addAction(Event.Name), Event.Identity); }
-                auto* Choice = Menu.exec(Add->mapToGlobal(QPoint(0, Add->height())));
-                if (Choice && AddEventRequested) { AddEventRequested(Current.Identity, Phase, Choice == New ? QString{} : Events.value(Choice)); }
+                const QString Identity = Current.Identity;
+                const QString Document = Context.DocumentIdentity;
+                auto Items = BuildStoryEventMenu(Context.Events,
+                    [this, Identity, Document, Phase](QString Source)
+                    {
+                        if (Context.DocumentIdentity == Document && !Context.bReadOnly && !Context.bLocked && AddEventRequested)
+                        { AddEventRequested(Identity, Phase, Source); }
+                    });
+                auto* Menu = new StudioActionMenu(tr("Добавить событие"), std::move(Items), Add);
+                Menu->Open(Add->mapToGlobal(QPoint(0, Add->height())));
             });
             for (const auto& Batch : Current.EventBatches) { if (Batch.Phase == Phase) { for (const auto& Binding : Batch.Bindings)
             {

@@ -221,15 +221,20 @@ void EditorMainWindow::BuildToolbar()
     connect(LayoutCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, &EditorMainWindow::OnLayoutModeChanged);
 }
 
+#include "UI/Adapters/WorkspaceDockController.h"
+
 void EditorMainWindow::BuildUi()
 {
     auto* Root = new EditorUi::WorkspaceView(this);
+    Docking = new EditorUi::WorkspaceDockController(*this, qEnvironmentVariable("SAKURA_EDITOR_LAYOUT_FILE"));
     WorkspaceSplitter = &Root->GetWorkspaceSplitter();
     CenterSplitter = &Root->GetCenterSplitter();
+    Docking->SetSplitters(*WorkspaceSplitter, *CenterSplitter);
     QWidget* HierarchyPanel = &Root->GetHierarchyPanel();
     QVBoxLayout* HierarchyLayout = &Root->GetHierarchyLayout();
 
     HierarchyTabs = new QTabWidget(HierarchyPanel);
+    Docking->AddArea("hierarchy", tr("Иерархия"), *HierarchyTabs, *HierarchyPanel);
     auto* Tree = new HierarchyTreeWidget();
     Tree->setObjectName("SceneHierarchy");
     HierarchyContent = new EditorUi::HierarchyPanelView(*Tree, HierarchyTabs);
@@ -251,7 +256,16 @@ void EditorMainWindow::BuildUi()
     connect(&HierarchyContent->GetAddButton(), &QPushButton::clicked, this, &EditorMainWindow::OnCreateEmptyObject);
 
     QWidget* ViewportPanel = &Root->GetViewportPanel();
-    QVBoxLayout* ViewportLayout = &Root->GetViewportLayout();
+    auto* SceneTabs = new QTabWidget(ViewportPanel);
+    SceneTabs->setObjectName("SceneWorkspaceTabs");
+    SceneTabs->setTabBarAutoHide(true);
+    auto* ScenePage = new QWidget(SceneTabs);
+    auto* ViewportLayout = new QVBoxLayout(ScenePage);
+    ViewportLayout->setContentsMargins(0, 0, 0, 0);
+    ViewportLayout->setSpacing(0);
+    SceneTabs->addTab(ScenePage, tr("Локация и игра"));
+    Root->GetViewportLayout().addWidget(SceneTabs);
+    Docking->AddArea("scene", tr("Локация и игра"), *SceneTabs, *ViewportPanel);
 
     PrimaryViewport = new EditorViewportWidget(ViewportPanel);
     connect(PrimaryViewport, &EditorViewportWidget::NavigationVisibilityChanged, this, [this](bool bVisible)
@@ -293,17 +307,19 @@ void EditorMainWindow::BuildUi()
     auto* ViewportTabs = new QWidget(ViewportPanel);
     ViewportTabs->setObjectName("ViewportTabs");
     auto* TabsLayout = new QHBoxLayout(ViewportTabs);
-    TabsLayout->setContentsMargins(10, 0, 8, 0);
-    TabsLayout->setSpacing(12);
+    TabsLayout->setContentsMargins(8, 0, 8, 0);
+    TabsLayout->setSpacing(22);
     LocationTab = new QPushButton(tr("Локация"), ViewportTabs);
-    LocationTab->setProperty("uiRole", "chromeButton");
+    LocationTab->setObjectName("ViewportLocationTab");
+    LocationTab->setProperty("uiRole", "viewportTab");
     LocationTab->setCheckable(true);
     LocationTab->setChecked(true);
     LocationTab->setAutoExclusive(true);
     connect(LocationTab, &QPushButton::clicked, this, [this]() { PlayButton->setChecked(false); });
     TabsLayout->addWidget(LocationTab);
     GameTab = new QPushButton(tr("Игра"), ViewportTabs);
-    GameTab->setProperty("uiRole", "chromeButton");
+    GameTab->setObjectName("ViewportGameTab");
+    GameTab->setProperty("uiRole", "viewportTab");
     GameTab->setCheckable(true);
     GameTab->setAutoExclusive(true);
     GameTab->setToolTip(tr("Запустить игровую сцену"));
@@ -330,41 +346,34 @@ void EditorMainWindow::BuildUi()
     auto* ViewportHeader = new QFrame(ViewportPanel);
     ViewportHeader->setObjectName("ViewportHeader");
     auto* ViewportHeaderLayout = new QHBoxLayout(ViewportHeader);
-    ViewportHeaderLayout->setContentsMargins(8, 0, 8, 0);
-    ViewportHeaderLayout->setSpacing(4);
+    ViewportHeaderLayout->setContentsMargins(4, 3, 8, 3);
+    ViewportHeaderLayout->setSpacing(2);
     GizmoModeButtons = new QButtonGroup(ViewportHeader);
     GizmoModeButtons->setExclusive(true);
-    auto MakeGizmoModeButton = [&](const QString& Label, const QString& ToolTip, int ModeId)
+    auto MakeGizmoModeButton = [&](EditorUi::StudioIcon Icon, const char* Name, const QString& ToolTip,
+                                    EditorViewportWidget::GizmoOperation Operation)
     {
-        auto* Button = new QPushButton(Label, ViewportHeader);
-        Button->setObjectName("ViewportGizmoButton");
+        auto* Button = new QPushButton(EditorUi::MakeStudioIcon(Icon, "--text-secondary", "--text-primary"), {}, ViewportHeader);
+        Button->setObjectName(Name);
+        Button->setProperty("uiRole", "viewportTool");
         Button->setCheckable(true);
-        Button->setFixedHeight(24);
-        Button->setFixedWidth(28);
+        Button->setFixedSize(28, 26);
+        Button->setIconSize(QSize(14, 14));
         Button->setToolTip(ToolTip);
-        GizmoModeButtons->addButton(Button, ModeId);
+        Button->setAccessibleName(ToolTip);
+        GizmoModeButtons->addButton(Button, static_cast<int>(Operation));
         ViewportHeaderLayout->addWidget(Button);
         return Button;
     };
-    TranslateGizmoButton = MakeGizmoModeButton(
-        QStringLiteral("W"),
-        tr("Translate gizmo (W)"),
-        static_cast<int>(EditorViewportWidget::GizmoOperation::Translate));
-    RotateGizmoButton = MakeGizmoModeButton(
-        QStringLiteral("E"),
-        tr("Rotate gizmo (E)"),
-        static_cast<int>(EditorViewportWidget::GizmoOperation::Rotate));
-    ScaleGizmoButton = MakeGizmoModeButton(
-        QStringLiteral("R"),
-        tr("Scale gizmo (R)"),
-        static_cast<int>(EditorViewportWidget::GizmoOperation::Scale));
-    TranslateGizmoButton->setText({});
-    RotateGizmoButton->setText({});
-    ScaleGizmoButton->setText({});
-    TranslateGizmoButton->setIcon(EditorUi::MakeStudioIcon(EditorUi::StudioIcon::Move));
-    RotateGizmoButton->setIcon(EditorUi::MakeStudioIcon(EditorUi::StudioIcon::Rotate));
-    ScaleGizmoButton->setIcon(EditorUi::MakeStudioIcon(EditorUi::StudioIcon::Scale));
-    TranslateGizmoButton->setChecked(true);
+    auto* Select = MakeGizmoModeButton(EditorUi::StudioIcon::Select, "ViewportSelect", tr("Выбор · Q"),
+        EditorViewportWidget::GizmoOperation::Select);
+    TranslateGizmoButton = MakeGizmoModeButton(EditorUi::StudioIcon::Move, "ViewportTranslate", tr("Сдвиг · W"),
+        EditorViewportWidget::GizmoOperation::Translate);
+    RotateGizmoButton = MakeGizmoModeButton(EditorUi::StudioIcon::Rotate, "ViewportRotate", tr("Поворот · E"),
+        EditorViewportWidget::GizmoOperation::Rotate);
+    ScaleGizmoButton = MakeGizmoModeButton(EditorUi::StudioIcon::Scale, "ViewportScale", tr("Масштаб · R"),
+        EditorViewportWidget::GizmoOperation::Scale);
+    Select->setChecked(true);
     connect(GizmoModeButtons, &QButtonGroup::idClicked, this, [this](int ModeId)
     {
         if (PrimaryViewport != nullptr)
@@ -378,7 +387,51 @@ void EditorMainWindow::BuildUi()
         SyncGizmoModeButtons();
     });
 
-    ViewportHeaderLayout->addSpacing(8);
+    auto MakeToggle = [&](EditorUi::StudioIcon Icon, const char* Name, const QString& Tip, bool Checked)
+    {
+        auto* Button = new QPushButton(EditorUi::MakeStudioIcon(Icon, "--text-secondary"), {}, ViewportHeader);
+        Button->setObjectName(Name);
+        Button->setProperty("uiRole", "viewportToggle");
+        Button->setFixedSize(28, 26);
+        Button->setIconSize(QSize(14, 14));
+        Button->setToolTip(Tip);
+        Button->setAccessibleName(Tip);
+        Button->setCheckable(true);
+        Button->setChecked(Checked);
+        ViewportHeaderLayout->addWidget(Button);
+        return Button;
+    };
+    auto* Snap = MakeToggle(EditorUi::StudioIcon::Magnet, "ViewportSnap",
+        tr("Привязка: 0,25 м / 15° / 0,1×"), PrimaryViewport->IsSnapEnabled());
+    connect(Snap, &QPushButton::toggled, PrimaryViewport, &EditorViewportWidget::SetSnapEnabled);
+    auto* Grid = MakeToggle(EditorUi::StudioIcon::Grid, "ViewportGrid", tr("Сетка сцены"), PrimaryViewport->IsGridVisible());
+    connect(Grid, &QPushButton::toggled, PrimaryViewport, &EditorViewportWidget::SetGridVisible);
+    ViewportHeaderLayout->addSpacing(6);
+    auto* Help = new QToolButton(ViewportHeader);
+    Help->setObjectName("ViewportHelp");
+    Help->setProperty("uiRole", "viewportUtility");
+    Help->setIcon(EditorUi::MakeStudioIcon(EditorUi::StudioIcon::Help));
+    Help->setIconSize(QSize(15, 15));
+    Help->setFixedSize(26, 26);
+    Help->setToolTip(tr("Управление сценой"));
+    Help->setAccessibleName(Help->toolTip());
+    Help->setPopupMode(QToolButton::InstantPopup);
+    auto* HelpMenu = new QMenu(Help);
+    auto* HelpAction = new QWidgetAction(HelpMenu);
+    auto* HelpText = new QLabel(tr("W — перемещение · E — вращение\n"
+        "R — масштаб · Q — выбор\n"
+        "Работают и в русской раскладке\n"
+        "Alt + ЛКМ — орбита · СКМ — панорама\n"
+        "ПКМ + WASD / QE — полёт\n"
+        "Колесо — приближение\n"
+        "Delete — удалить выделенный объект\n"
+        "Ctrl+Z — отменить изменение"), HelpMenu);
+    HelpText->setObjectName("ViewportHelpText");
+    HelpText->setMargin(12);
+    HelpAction->setDefaultWidget(HelpText);
+    HelpMenu->addAction(HelpAction);
+    Help->setMenu(HelpMenu);
+    ViewportHeaderLayout->addWidget(Help);
     ViewportHeaderLayout->addStretch();
     CameraSpeedSpin = new QDoubleSpinBox(ViewportHeader);
     CameraSpeedSpin->setRange(0.25, 250.0);
@@ -389,6 +442,9 @@ void EditorMainWindow::BuildUi()
     CameraSpeedSpin->setFixedWidth(88);
     CameraSpeedSpin->setToolTip(tr("Editor camera fly speed. Shift multiplies, Ctrl divides, RMB+wheel adjusts."));
     auto* CameraOptions = new QToolButton(ViewportHeader);
+    CameraOptions->setProperty("uiRole", "viewportUtility");
+    CameraOptions->setFixedSize(26, 26);
+    CameraOptions->setIconSize(QSize(14, 14));
     CameraOptions->setIcon(EditorUi::MakeStudioIcon(EditorUi::StudioIcon::Camera));
     CameraOptions->setToolTip(tr("Настройки камеры и отображения"));
     CameraOptions->setPopupMode(QToolButton::InstantPopup);
@@ -429,11 +485,13 @@ void EditorMainWindow::BuildUi()
     QWidget* GraphDock = &Root->GetToolsPanel();
     QVBoxLayout* GraphLayout = &Root->GetToolsLayout();
     DockTabs = new QTabWidget(GraphDock);
+    Docking->AddArea("workspace", tr("Рабочая область"), *DockTabs, *GraphDock);
     GraphLayout->addWidget(DockTabs);
 
     QWidget* InspectorPanel = &Root->GetInspectorPanel();
     QVBoxLayout* InspectorLayout = &Root->GetInspectorLayout();
     InspectorTabs = new QTabWidget(InspectorPanel);
+    Docking->AddArea("inspector", tr("Инспектор"), *InspectorTabs, *InspectorPanel);
     InspectorPages = new QStackedWidget(InspectorTabs);
     EmptyInspectorPage = new QWidget(InspectorPages);
     auto* EmptyLayout = new QVBoxLayout(EmptyInspectorPage);
@@ -453,6 +511,39 @@ void EditorMainWindow::BuildUi()
     ScaleXSpin = Fields[6]; ScaleYSpin = Fields[7]; ScaleZSpin = Fields[8];
     ComponentCombo = ObjectInspectorPage->ComponentFilter;
     ComponentInspectorLayout = ObjectInspectorPage->Components;
+    connect(ObjectInspectorPage->Active, &QCheckBox::toggled, this, [this](bool Active) {
+        auto* Selected = GetSelectedGameObject();
+        if (!bUpdatingSelectionUi && Selected && !BoundEngine.GetPlaySession().IsSimulating())
+        { ExecuteCommand(MakeSetObjectActiveCommand(GetEditScene(), Selected->GetObjectHandle(), Active)); }
+    });
+    ObjectInspectorPage->AddComponentRequested = [this, ObjectInspectorPage](int Index) {
+        if (BoundEngine.GetPlaySession().IsSimulating() || Index < 0) { return; }
+        const auto Type = ObjectInspectorPage->AddComponentType->itemData(Index).toString().toStdString();
+        if (!Type.empty()) { RunEditorActionByTypeId(Type.c_str()); }
+    };
+    connect(ObjectInspectorPage->ParentObject, &QComboBox::activated, this, [this, ObjectInspectorPage](int Index) {
+        auto* Selected = GetSelectedGameObject();
+        if (!Selected || !GetEditScene() || BoundEngine.GetPlaySession().IsSimulating()) { return; }
+        const auto Identity = ObjectInspectorPage->ParentObject->itemData(Index).toString().toStdString();
+        auto* Parent = GetEditScene()->FindByPersistentId(Identity);
+        if (!Identity.empty() && !Parent) { RefreshSelectionUi(); return; }
+        ReparentHierarchyObject(Selected->GetObjectHandle(), Parent ? Parent->GetObjectHandle() : ObjectHandle{});
+    });
+    connect(ObjectInspectorPage->AnchorObject, &QComboBox::activated, this, [this, ObjectInspectorPage](int Index) {
+        auto* Selected = GetSelectedGameObject();
+        if (!Selected || !GetEditScene() || BoundEngine.GetPlaySession().IsSimulating()) { return; }
+        auto* Anchor = GetEditScene()->FindByPersistentId(ObjectInspectorPage->AnchorObject->itemData(Index).toString().toStdString());
+        if (!Anchor) { return; }
+        auto Updated = Selected->GetTransform();
+        Updated.Position = Anchor->GetWorldTransform().Position;
+        if (auto* Parent = Selected->GetParent())
+        {
+            const auto Matrix = Parent->GetWorldMatrix();
+            if (std::abs(Matrix.Determinant()) < 1.e-8f) { RefreshSelectionUi(); return; }
+            Updated.Position = Vector3::Transform(Updated.Position, Matrix.Invert());
+        }
+        ExecuteCommand(MakeSetTransformCommand(GetEditScene(), Selected->GetObjectHandle(), Updated));
+    });
     ObjectInspectorPage->ResetRequested = [this]() {
         if (auto* Selected = GetSelectedGameObject(); Selected && !BoundEngine.GetPlaySession().IsSimulating())
         { ExecuteCommand(MakeSetTransformCommand(GetEditScene(), Selected->GetObjectHandle(), Transform{})); }
@@ -493,6 +584,7 @@ void EditorMainWindow::BuildUi()
         Visibility->setObjectName(Panel->objectName() + "Visibility");
         Visibility->setCheckable(true);
         Visibility->setChecked(true);
+        Docking->BindAreaVisibility(Tabs->property("workspaceArea").toString(), *Visibility);
         connect(Visibility, &QAction::toggled, Panel, &QWidget::setVisible);
         auto* Controls = new QWidget(Tabs);
         auto* ControlLayout = new QHBoxLayout(Controls);
@@ -565,7 +657,6 @@ void EditorMainWindow::BuildUi()
     statusBar()->addWidget(StatusIssuesLabel);
     statusBar()->addPermanentWidget(StatusSelectionLabel);
 
-    connect(DockTabs, &QTabWidget::currentChanged, this, &EditorMainWindow::OnDockTabChanged);
     connect(HierarchyTree, &QTreeWidget::itemSelectionChanged, this, &EditorMainWindow::OnHierarchySelectionChanged);
     connect(HierarchyTree, &QTreeWidget::customContextMenuRequested, this, &EditorMainWindow::OnHierarchyContextMenu);
 }
@@ -690,6 +781,7 @@ void EditorMainWindow::PopulateDockPages()
 
     auto* WindowMenu = findChild<QMenu*>("WindowsMenu");
     WindowMenu->addSeparator();
+    const QStringList PageIds = {"story", "content", "playback", "statistics", "postprocess"};
     for (int Index = 0; Index < DockTabs->count(); ++Index)
     {
         QWidget* Page = DockTabs->widget(Index);
@@ -702,38 +794,17 @@ void EditorMainWindow::PopulateDockPages()
         Action->setCheckable(true);
         Action->setChecked(Index == 0);
         DockTabs->setTabVisible(Index, Index == 0);
-        connect(Action, &QAction::toggled, this, [this, Page](bool bVisible)
-        {
-            const int TabIndex = DockTabs->indexOf(Page);
-            DockTabs->setTabVisible(TabIndex, bVisible);
-            if (bVisible)
-            {
-                DockTabs->setCurrentIndex(TabIndex);
-            }
-        });
-        connect(DockTabs, &QTabWidget::tabCloseRequested, Action, [this, Action, Page](int TabIndex)
-        {
-            if (DockTabs->widget(TabIndex) == Page)
-            {
-                Action->setChecked(false);
-            }
-        });
+        Docking->AddPage(PageIds.value(Index), *Page, "workspace", *Action);
     }
     DockTabs->setTabsClosable(true);
     DockTabs->setCurrentWidget(StoryGraph);
-}
-
-void EditorMainWindow::OnDockTabChanged(int Index)
-{
-    for (int TabIndex = 0; TabIndex < DockTabs->count(); ++TabIndex)
+    WindowMenu->addSeparator();
+    WindowMenu->addAction(tr("Сбросить расположение окон"), this, [this]()
     {
-        if (auto* Action = DockTabs->widget(TabIndex)->findChild<QAction*>("WorkspaceVisibility", Qt::FindDirectChildrenOnly))
-        {
-            const QSignalBlocker Blocker(Action);
-            Action->setChecked(DockTabs->isTabVisible(TabIndex));
-        }
-    }
-    Q_UNUSED(Index);
+        Docking->Reset();
+        EditorUi::WorkspaceLayoutAdapter::Reset(*WorkspaceSplitter, *CenterSplitter, height());
+        Docking->Save();
+    });
 }
 
 void EditorMainWindow::OnLayoutModeChanged(int Index)
@@ -747,15 +818,7 @@ void EditorMainWindow::OnLayoutModeChanged(int Index)
     if (Mode == "graph")
     {
         CenterSplitter->setSizes({120, 680});
-        for (int TabIndex = 0; TabIndex < DockTabs->count(); ++TabIndex)
-        {
-            if (DockTabs->widget(TabIndex) == StoryGraph)
-            {
-                DockTabs->setTabVisible(TabIndex, true);
-                DockTabs->setCurrentIndex(TabIndex);
-                break;
-            }
-        }
+        Docking->Open(*StoryGraph);
     }
     else if (Mode == "scene")
     {
@@ -773,5 +836,6 @@ void EditorMainWindow::OnLayoutModeChanged(int Index)
     {
         EditorUi::WorkspaceLayoutAdapter::Reset(*WorkspaceSplitter, *CenterSplitter, height());
     }
+    Docking->Save();
 }
 

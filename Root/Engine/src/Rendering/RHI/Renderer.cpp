@@ -330,7 +330,7 @@ bool Renderer::CreatePipeline(const std::string& ShaderDirectory)
             BindTexture(Target, "BrdfImage", Pipeline->Environment.IntegratedBrdf->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE));
         }
     };
-    Pipeline->CreateState = [this, GraphicsDevice, Vertex, FullscreenVertex, Layout](ForwardPipeline& Target, IShader* Pixel, uint32_t Kind, bool bDoubleSided, IShader* MaterialVertex, const ResolvedMaterial* Material, bool bAsync)
+    Pipeline->CreateState = [this, GraphicsDevice, Vertex, FullscreenVertex, CompositePixel, Layout](ForwardPipeline& Target, IShader* Pixel, uint32_t Kind, bool bDoubleSided, IShader* MaterialVertex, const ResolvedMaterial* Material, bool bAsync)
     {
         GraphicsPipelineStateCreateInfo Description;
         if (bAsync)
@@ -438,7 +438,9 @@ bool Renderer::CreatePipeline(const std::string& ShaderDirectory)
         else
         {
             Samplers.emplace_back(SHADER_TYPE_PIXEL, "SceneImage", Linear);
-            if (Kind == 3)
+            // Composite and tone mapping share HDR pipeline settings, but only
+            // the transparency composite shader samples the OIT attachments.
+            if (Pixel == CompositePixel.RawPtr())
             {
                 Samplers.emplace_back(SHADER_TYPE_PIXEL, "AccumulationImage", Linear);
                 Samplers.emplace_back(SHADER_TYPE_PIXEL, "RevealageImage", Linear);

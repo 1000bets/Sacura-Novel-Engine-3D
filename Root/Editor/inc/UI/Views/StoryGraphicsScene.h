@@ -3,10 +3,12 @@
 #include <QGraphicsScene>
 #include <QHash>
 #include <QMap>
+#include <QPointer>
 #include <functional>
 
 namespace EditorUi
 {
+class StudioActionMenu;
 class StoryCardItem;
 class StoryEdgeItem;
 class StoryGraphicsScene final : public QGraphicsScene
@@ -14,12 +16,16 @@ class StoryGraphicsScene final : public QGraphicsScene
   public:
     explicit StoryGraphicsScene(QObject* Parent = nullptr);
     void SetGraph(const StoryGraphModel& Model);
-    void UpdateConnections();
+    void UpdateConnections(const QString& MovedNode = {});
+    bool IsInteracting() const { return bPointerInteraction; }
+    void CancelInteraction();
+    std::function<void()> InteractionFinished;
     QStringList SelectedNodes() const;
     bool DeleteSelection();
     void SelectNode(const QString& Identity);
     void SelectEvent(const QString& Node, const QString& Binding);
-    std::function<void(int, QPointF)> AddRequested;
+    std::function<void(QPointF, QPoint)> AddMenuRequested;
+    void ShowEventMenu(const QString& Node, int Phase, const QString& Batch, QPoint Screen);
     std::function<void(QStringList)> DeleteRequested;
     std::function<void(QString, int, QString)> ConnectRequested;
     std::function<void(QMap<QString, QPointF>)> MoveRequested;
@@ -40,13 +46,16 @@ class StoryGraphicsScene final : public QGraphicsScene
     void CancelConnection();
     QHash<QString, StoryCardItem*> Cards;
     QVector<StoryEdgeItem*> Edges;
+    QHash<QString, QVector<StoryEdgeItem*>> IncidentEdges;
     QMap<QString, QPointF> BeforeMove;
     bool bEditable = false;
+    bool bPointerInteraction = false;
     QString ConnectionSource;
     int ConnectionPort = -1;
     QGraphicsPathItem* Preview = nullptr;
     QVector<StoryGraphEvent> EventLibrary;
-    void ShowEventMenu(const QString& Node, int Phase, const QString& Batch, QPoint Screen);
+    QPointer<StudioActionMenu> ActionMenu;
+    QString MenuDocumentIdentity;
     QString DragEventNode, DragBinding;
     QPointF DragOrigin;
     bool bEventDragging = false;

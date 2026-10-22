@@ -30,8 +30,29 @@ QWidget#HierarchySearchBox[searchFocused="true"] { border-color: @--accent@; }
 QWidget#SceneObjectsHeading { margin: 0; min-height: 38px; max-height: 38px; }
 QLabel#SceneObjectCount { min-height: 20px; max-height: 20px; padding: 0 4px; }
 QWidget#ObjectInspectorBody { background: @--bg-panel@; }
-QWidget#ObjectIdentity { min-height: 60px; border-bottom: 1px solid @--border-subtle@; }
+QWidget#ObjectIdentity { min-height: 64px; border-bottom: 1px solid @--border-subtle@; }
 QLineEdit#ObjectName { background: transparent; font-size: 14px; font-weight: 600; padding: 3px 0; }
+QLabel#ObjectKind, QLabel#ObjectComponentCount, QLabel#ObjectComponentEmpty { font-size: 11px; color: @--text-muted@; }
+QWidget#ObjectComponents { border-bottom: 1px solid @--border-subtle@; }
+QWidget#ObjectComponents QToolButton { min-width: 26px; min-height: 26px; padding: 0; background: transparent; border: 0; }
+QWidget#ObjectComponents QPushButton[uiRole="componentInstance"] {
+    min-height: 40px; padding: 0 8px; text-align: left; border: 0;
+    background: transparent; font-size: 12px; font-weight: 500;
+}
+QWidget#ObjectComponents QPushButton[uiRole="componentInstance"]:hover { background: @--bg-hover@; }
+QPushButton#ObjectAddComponent { min-height: 32px; padding: 0 8px; border: 1px solid @--border-strong@;
+    background: @--accent-muted@; font-size: 12px; font-weight: 600; color: @--text-primary@; }
+QPushButton#ObjectAddComponent:hover { border-color: @--accent@; background: @--bg-hover@; }
+QLabel#ObjectSelectionFooter { min-height: 24px; max-height: 24px; padding: 0 8px;
+    font-size: 11px; color: @--text-muted@; background: @--bg-panel@; border-top: 1px solid @--border-subtle@; }
+QGroupBox#MeshInspectorCard { margin-top: 16px; margin-bottom: 12px; padding: 0;
+    border: 1px solid @--border-subtle@; border-radius: 8px; font-size: 12px; font-weight: 600;
+    color: @--text-primary@; background: transparent; }
+QGroupBox#MeshInspectorCard::title { subcontrol-origin: margin; subcontrol-position: top left; left: 12px; top: 8px; padding: 0 5px; }
+QGroupBox#MeshInspectorCard QWidget#ReflectionInspector { background: transparent; }
+QLabel#MeshInspectorNote { font-size: 11px; color: @--text-muted@; }
+QPushButton#MeshUpload { background: transparent; min-height: 30px; font-size: 12px; }
+QToolButton#MeshDetails { background: transparent; min-height: 30px; text-align: left; padding: 0; }
 QWidget#ObjectTransform { border-bottom: 1px solid @--border-subtle@; }
 QLabel[uiRole="objectSectionTitle"] { font-size: 12px; font-weight: 600; color: @--text-primary@; }
 QLabel[uiRole="transformCaption"], QLabel#TransformUnit { font-size: 11px; }
@@ -53,3 +74,31 @@ QWidget#ComponentInspectorCard { border-bottom: 1px solid @--border-subtle@; }
 QPushButton[uiRole="propertyReset"] { min-height: 26px; padding: 0; max-width: 24px; }
 QWidget#ReflectionInspector QPushButton { min-height: 24px; }
 QCheckBox { spacing: 8px; min-height: 24px; }
+
+/* EditorContextMenu: shared by story creation, card actions and event pickers. */
+QMenu#StudioActionMenu {
+    background: @--bg-panel@; color: @--text-primary@;
+    border: 1px solid @--border-subtle@; border-radius: 6px;
+    padding: 8px; font-size: 12px; menu-scrollable: 1;
+}
+QMenu#StudioActionMenu::item {
+    padding: 7px 7px; min-height: 18px; border-radius: 3px;
+    background: transparent;
+}
+QMenu#StudioActionMenu::item:selected { background: @--bg-hover@; }
+QMenu#StudioActionMenu::item:disabled { color: @--text-disabled@; }
+QMenu#StudioActionMenu::icon { padding-left: 7px; }
+QLabel#StudioMenuTitle { padding: 5px 7px 10px; font-size: 12px; font-weight: 600; color: @--text-primary@; }
+QWidget#StudioMenuSearchBox {
+    border: 1px solid @--border-subtle@; border-radius: 3px; background: transparent;
+}
+QLineEdit#StudioMenuSearch {
+    background: transparent; color: @--text-primary@; font-size: 12px;
+    padding: 3px; min-height: 18px; max-height: 16777215px; border: 1px solid transparent;
+}
+QLineEdit#StudioMenuSearch:focus { border-color: @--accent@; }
+QLabel#StudioMenuGroup {
+    margin-top: 6px; margin-bottom: 3px; padding: 6px 7px 3px;
+    border-top: 1px solid @--border-subtle@; color: @--text-muted@; font-size: 10px;
+}
+QLabel#StudioMenuEmpty { padding: 10px 7px; color: @--text-muted@; font-size: 11px; }

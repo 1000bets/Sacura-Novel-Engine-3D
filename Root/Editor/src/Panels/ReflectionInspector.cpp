@@ -141,6 +141,12 @@ void ReflectionInspector::Rebuild()
     ResetAllButton->setEnabled(true);
     ResetAllButton->setVisible(true);
 
+    if (bMeshPresentation && BuildMeshPresentation())
+    {
+        ResetAllButton->hide();
+        return;
+    }
+
     for (const PropertyDescriptor* Descriptor : ListEditableProperties(InspectedObject))
     {
         if (Descriptor != nullptr)
@@ -376,6 +382,7 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
     { return; }
 
     QWidget* FieldWidget = new QWidget(this);
+    FieldWidget->setObjectName("Property_" + QString::fromStdString(Property.Value));
     QHBoxLayout* FieldLayout = new QHBoxLayout(FieldWidget);
     FieldLayout->setContentsMargins(0, 0, 0, 0);
 

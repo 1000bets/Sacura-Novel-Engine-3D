@@ -4,6 +4,10 @@
 #include <functional>
 
 class QComboBox;
+class QCheckBox;
+class QLabel;
+class QPushButton;
+class QScrollArea;
 class QDoubleSpinBox;
 class QLineEdit;
 class QVBoxLayout;
@@ -15,7 +19,15 @@ public:
     explicit ObjectInspectorView(QWidget* Parent = nullptr);
     static QString ComponentCaption(const QString& Type);
     void AddComponentSection(const QString& Identity, const QString& Type, QWidget& Fields, bool Expanded);
+    void ClearComponentOverview();
+    void SetIdentity(const QString& Caption, const QString& Kind, bool Active);
     QLineEdit* Name = nullptr;
+    QCheckBox* Active = nullptr;
+    QComboBox* AddComponentType = nullptr;
+    QComboBox* ParentObject = nullptr;
+    QComboBox* AnchorObject = nullptr;
+    QPushButton* AddComponent = nullptr;
+    std::function<void(int)> AddComponentRequested;
     std::array<QDoubleSpinBox*, 9> TransformFields{};
     QComboBox* ComponentFilter = nullptr;
     QVBoxLayout* Components = nullptr;
@@ -26,5 +38,13 @@ public:
     void SetEditable(bool Editable);
 private:
     QWidget* Actions = nullptr;
+    QWidget* ComponentTools = nullptr;
+    QVBoxLayout* ComponentRows = nullptr;
+    QLabel* ComponentCount = nullptr;
+    QLabel* EmptyComponents = nullptr;
+    QLabel* ObjectKind = nullptr;
+    QLabel* Selection = nullptr;
+    QLineEdit* ComponentSearch = nullptr;
+    QScrollArea* Scroll = nullptr;
 };
 }

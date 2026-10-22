@@ -38,6 +38,8 @@ private:
     QPointer<QWidget> Popup;
     QPointer<QListWidget> Options;
     QPointer<QLineEdit> Search;
+    QPoint PopupPosition;
+    QPoint PopupRestPosition;
     bool bClosing = false;
 };
 

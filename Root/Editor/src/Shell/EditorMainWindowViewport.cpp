@@ -294,7 +294,12 @@ bool EditorMainWindow::HandleGizmoModeHotkey(QEvent* Event)
     const quint32 ScanCode = KeyEvent->nativeScanCode();
     EditorViewportWidget::GizmoOperation Operation = PrimaryViewport->GetGizmoOperation();
     bool bMatched = false;
-    if (ScanCode == 0x11)
+    if (ScanCode == 0x10)
+    {
+        Operation = EditorViewportWidget::GizmoOperation::Select;
+        bMatched = true;
+    }
+    else if (ScanCode == 0x11)
     {
         Operation = EditorViewportWidget::GizmoOperation::Translate;
         bMatched = true;

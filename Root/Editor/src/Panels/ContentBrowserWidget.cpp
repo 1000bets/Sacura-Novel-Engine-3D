@@ -1,4 +1,5 @@
 #include "Panels/ContentBrowserWidget.h"
+#include "UI/Styles/StudioIcons.h"
 
 #include "Panels/AssetImportDialog.h"
 #include "Assets/MaterialAssetCreation.h"
@@ -31,7 +32,6 @@
 #include <QMimeData>
 #include <QMessageBox>
 #include <QMenu>
-#include <QPainter>
 #include <QSplitter>
 #include <QToolButton>
 #include <QTreeWidget>
@@ -245,33 +245,20 @@ protected:
 
 QIcon MakeAssetIcon(AssetType Type)
 {
-    QPixmap Image(72, 72);
-    Image.fill(QColor(38, 39, 48));
-    QPainter Painter(&Image);
-    Painter.setRenderHint(QPainter::Antialiasing, true);
-    const QColor Accent = Type == TextureAssetType ? QColor(92, 151, 188)
-        : Type == MaterialAssetType ? QColor(182, 112, 145)
-        : Type == ModelAssetType || Type == StaticMeshAssetType ? QColor(113, 164, 125)
-        : QColor(145, 132, 171);
-    Painter.setPen(QPen(Accent.lighter(130), 2.0));
-    Painter.setBrush(Accent.darker(145));
-    Painter.drawRoundedRect(QRectF(10, 10, 52, 52), 6, 6);
-    Painter.setPen(QColor(235, 230, 238));
-    Painter.drawText(Image.rect(), Qt::AlignCenter, QString::fromUtf8(AssetTypeToString(Type)).left(3).toUpper());
-    return QIcon(Image);
+    const char* Name = Type == TextureAssetType ? "Image"
+        : Type == MaterialAssetType || Type == MaterialInstanceAssetType ? "Palette"
+        : Type == ModelAssetType || Type == StaticMeshAssetType ? "Box"
+        : Type == SkeletalMeshAssetType || Type == SkeletonAssetType || Type == SkinBindingAssetType ? "PersonStanding"
+        : Type == AnimationClipAssetType ? "Clapperboard"
+        : Type == SceneAssetType ? "Layers"
+        : Type == StoryAssetType ? "MessageSquare"
+        : Type == ShaderSourceAssetType ? "Code2" : "File";
+    return EditorUi::MakeFrontendIcon(QString::fromLatin1(Name), "--text-secondary");
 }
 
 QIcon MakeFolderIcon()
 {
-    QPixmap Image(72, 72);
-    Image.fill(QColor(38, 39, 48));
-    QPainter Painter(&Image);
-    Painter.setRenderHint(QPainter::Antialiasing, true);
-    Painter.setPen(QPen(QColor(204, 162, 104), 2.0));
-    Painter.setBrush(QColor(117, 85, 52));
-    Painter.drawRoundedRect(QRectF(8, 22, 56, 38), 5, 5);
-    Painter.drawRoundedRect(QRectF(12, 14, 24, 14), 4, 4);
-    return QIcon(Image);
+    return EditorUi::MakeFrontendIcon(QStringLiteral("FolderOpen"), "--text-secondary");
 }
 
 ContentBrowserWidget::ContentBrowserWidget(QWidget* Parent)

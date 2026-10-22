@@ -29,10 +29,18 @@ QWidget#StoryInspector QPushButton { min-height: 18px; padding: 5px 8px; font-si
 QWidget#StoryInspector QCheckBox { min-height: 28px; spacing: 8px; font-size: 12px; }
 QWidget#StoryInspector QCheckBox::indicator { width: 14px; height: 14px; }
 QWidget#BlueprintSidebar { border-right: 1px solid @--border-subtle@; }
-QLabel#BlueprintHeading { min-height: 36px; max-height: 36px; font-size: 14px; font-weight: 600; }
-QWidget#BlueprintSidebar QLineEdit { padding: 7px; border: 1px solid @--border-subtle@; }
+QLabel#BlueprintHeading { min-height: 53px; max-height: 53px; font-size: 18px; font-weight: 600; }
+QLabel#BlueprintVariablesTitle { font-size: 16px; font-weight: 600; }
+QWidget#BlueprintSidebar QLabel[uiRole="graphHint"] { border-top: 1px solid @--border-subtle@; padding-top: 14px; }
+QWidget#GraphToolbar { min-height: 43px; max-height: 43px; }
+QWidget#GraphToolbar QLabel, QWidget#GraphToolbar QPushButton { font-size: 13px; }
+QWidget#BlueprintSidebar QLabel#MutedLabel { font-size: 13px; }
+QWidget#BlueprintSidebar QLineEdit { min-height: 40px; max-height: 40px; padding: 0 9px; font-size: 14px; border: 1px solid @--border-subtle@; }
 QWidget#GraphNavigation { background: @--bg-panel@; border: 1px solid @--border-subtle@; border-radius: 3px; }
-QWidget#GraphNavigation QPushButton { min-height: 24px; max-height: 24px; min-width: 24px; max-width: 24px; padding: 0; }
+QWidget#GraphFocusNavigation { background: @--bg-panel@; border: 1px solid @--border-subtle@; border-radius: 4px; }
+QWidget#GraphFocusNavigation QPushButton { padding: 0; border: none; background: transparent; }
+QWidget#GraphFocusNavigation QPushButton:hover { background: @--bg-hover@; }
+QWidget#GraphNavigation QPushButton { min-height: 30px; max-height: 30px; min-width: 30px; max-width: 30px; padding: 0; font-size: 24px; }
 /* EventSelectionInspector / eventInspector.css, finite native action profile. */
 QWidget#StoryEventInspector { background: @--bg-panel@; }
 QWidget#StoryEventGroup { border: 1px solid @--border-subtle@; border-radius: 4px; }

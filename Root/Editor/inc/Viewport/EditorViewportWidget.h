@@ -28,7 +28,8 @@ public:
     {
         Translate,
         Rotate,
-        Scale
+        Scale,
+        Select
     };
 
     using TransformPreviewCallback = std::function<void(const Transform& Value)>;
@@ -48,6 +49,11 @@ public:
     float GetCameraMoveSpeed() const;
     void SetGizmoOperation(GizmoOperation Operation);
     GizmoOperation GetGizmoOperation() const;
+    void SetSnapEnabled(bool bEnabled) { bSnapEnabled = bEnabled; }
+    bool IsSnapEnabled() const { return bSnapEnabled; }
+    void SetGridVisible(bool bVisible) { bGridVisible = bVisible; }
+    bool IsGridVisible() const { return bGridVisible; }
+    Vector3 GetGizmoSnap() const;
     void SetNavigationVisible(bool bVisible);
     void SetCollisionVisible(bool bVisible);
     bool IsNavigationVisible() const { return bNavigationVisible; }
@@ -115,10 +121,12 @@ private:
     QPointF LastMousePosition;
     QSet<int> HeldKeys;
     CameraMode ActiveCameraMode = CameraMode::None;
-    GizmoOperation ActiveGizmoOperation = GizmoOperation::Translate;
+    GizmoOperation ActiveGizmoOperation = GizmoOperation::Select;
     float MoveSpeed = 8.0f;
     bool bEditorToolsEnabled = false;
     bool bKeyboardCaptured = false;
+    bool bSnapEnabled = false;
+    bool bGridVisible = true;
     bool bNavigationVisible = false;
     bool bCollisionVisible = false;
 };

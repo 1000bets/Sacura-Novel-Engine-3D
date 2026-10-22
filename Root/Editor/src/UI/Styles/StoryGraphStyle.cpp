@@ -1,4 +1,5 @@
 #include "UI/Styles/StoryGraphStyle.h"
+#include "UI/Presentation/StorySpeakerLabel.h"
 #include "UI/Styles/StoryEventStyle.h"
 #include <QFontMetricsF>
 #include <QPainter>
@@ -171,7 +172,7 @@ StoryGraphStyle::CardLayout StoryGraphStyle::Layout(const StoryGraphNode& Node)
         }
         Y += 2;
     }
-    Result.Height = Y + 11;
+    Result.Height = Y + 1;
     return Result;
 }
 
@@ -227,30 +228,20 @@ QPen StoryGraphStyle::ConnectionPen(bool bSelected)
 QPainterPath StoryGraphStyle::ConnectionPath(QPointF Start, QPointF Finish)
 {
     QPainterPath Path(Start);
-    if (Finish.x() - Start.x() >= 70)
-    {
-        const qreal Reach = (Finish.x() - Start.x()) * .5;
-        Path.cubicTo(Start + QPointF(Reach, 0), Finish - QPointF(Reach, 0), Finish);
-        return Path;
-    }
-    // BlueprintEdge's backwards routes are orthogonal with rounded corners.
-    const qreal MiddleY = std::abs(Start.y() - Finish.y()) < 72 ? std::min(Start.y(), Finish.y()) - 72
-                                                               : (Start.y() + Finish.y()) / 2;
-    const qreal MiddleX = (Start.x() + Finish.x()) / 2;
-    const QVector<QPointF> Points = Finish.x() >= Start.x()
-        ? QVector<QPointF>{Start, {MiddleX, Start.y()}, {MiddleX, Finish.y()}, Finish}
-        : QVector<QPointF>{Start, Start + QPointF(36, 0), {Start.x() + 36, MiddleY},
-                           {Finish.x() - 36, MiddleY}, Finish - QPointF(36, 0), Finish};
-    for (int Index = 1; Index < Points.size() - 1; ++Index)
-    {
-        const QPointF Previous = Points[Index - 1], Corner = Points[Index], Next = Points[Index + 1];
-        const qreal Before = QLineF(Previous, Corner).length(), After = QLineF(Corner, Next).length();
-        const qreal Radius = std::min({24.0, Before / 2, After / 2});
-        if (Radius <= 0) { Path.lineTo(Corner); continue; }
-        Path.lineTo(Corner + (Previous - Corner) * (Radius / Before));
-        Path.quadTo(Corner, Corner + (Next - Corner) * (Radius / After));
-    }
-    Path.lineTo(Finish);
+    const qreal Dx = Finish.x() - Start.x();
+    const qreal Dy = Finish.y() - Start.y();
+    // A continuous family of curves: crossing a routing threshold while dragging
+    // must not replace a Bezier by a completely different orthogonal path.
+    const qreal Reach = std::max(36.0, std::abs(Dx) * .5);
+    const qreal Backward = std::clamp(-Dx / 140.0, 0.0, 1.0);
+    const qreal Lift = -72.0 * Backward * std::exp(-Dy * Dy / (144.0 * 144.0));
+    const QPointF Middle((Start.x() + Finish.x()) / 2, (Start.y() + Finish.y()) / 2 + Lift);
+    // Split the ordinary cubic at t=.5; the same controls also form a soft loop
+    // for a return connection whose endpoints share a row.
+    const QPointF A = Start + QPointF(Reach, 0), B = Finish - QPointF(Reach, 0);
+    const QPointF Tangent = (B - A + Finish - Start) / 8;
+    Path.cubicTo((Start + A) / 2, Middle - Tangent, Middle);
+    Path.cubicTo(Middle + Tangent, (B + Finish) / 2, Finish);
     return Path;
 }
 
@@ -336,7 +327,7 @@ void StoryGraphStyle::PaintCard(QPainter& Painter, const StoryGraphNode& Node, c
         SpeakerFont.setWeight(QFont::Bold);
         Painter.setFont(SpeakerFont);
         Painter.setPen(EditorStyle::Color("--accent"));
-        const QString Speaker = Node.Speaker.isEmpty() ? (Node.KindId == 1 ? QString::fromUtf8("Выбор игрока")
+        const QString Speaker = IsNarrator(Node.Speaker) ? (Node.KindId == 1 ? QString::fromUtf8("Выбор игрока")
                                                                          : QString::fromUtf8("Рассказчик")) : Node.Speaker;
         Painter.drawText(G.Speaker, Qt::AlignVCenter,
                          QFontMetricsF(SpeakerFont).elidedText(Speaker, Qt::ElideRight, G.Speaker.width()));
@@ -431,7 +422,7 @@ void StoryGraphStyle::PaintGrid(QPainter& Painter, const QRectF& Rect)
     const qreal Top = std::floor(Rect.top() / GridSpacing) * GridSpacing;
     for (qreal X = Left; X < Rect.right(); X += GridSpacing)
     {
-        for (qreal Y = Top; Y < Rect.bottom(); Y += GridSpacing) { Painter.drawEllipse(QPointF(X, Y), .35, .35); }
+        for (qreal Y = Top; Y < Rect.bottom(); Y += GridSpacing) { Painter.drawEllipse(QPointF(X, Y), .7, .7); }
     }
 }
 } // namespace EditorUi

@@ -91,6 +91,14 @@ unset(DILIGENT_SOURCE_DIRECTORY)
 # Do not add a top-level target named "imgui" — leave Tools' bundled ImGui alone.
 FetchContent_MakeAvailable(DiligentTools DiligentFX)
 
+# Editor builds ImGui draw snapshots on Game Thread while the RHI consumes
+# snapshots using its own context on Render Thread. ImGui's default GImGui is
+# process-global; configure TLS consistently for the library AND every consumer
+# (including ImGuizmo's inline imgui_internal.h calls).
+target_sources(Diligent-Imgui PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/ImGuiConfig/SakuraImGuiContext.cpp")
+target_include_directories(Diligent-Imgui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/ImGuiConfig")
+target_compile_definitions(Diligent-Imgui PUBLIC IMGUI_USER_CONFIG="SakuraImGuiConfig.h")
+
 if(SAKURA_BUILD_DILIGENT_SAMPLES)
     FetchContent_MakeAvailable(DiligentSamples)
 else()

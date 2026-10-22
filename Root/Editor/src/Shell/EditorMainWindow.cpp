@@ -88,6 +88,8 @@
 #include "Shell/EditorMainWindowSupport.h"
 #include "Panels/HierarchyTreeWidget.h"
 
+#include "UI/Adapters/WorkspaceDockController.h"
+
 EditorMainWindow::EditorMainWindow(Engine& InEngine, ProjectSession& InSession, QWidget* Parent)
     : QMainWindow(Parent)
     , BoundEngine(InEngine)
@@ -109,6 +111,7 @@ EditorMainWindow::EditorMainWindow(Engine& InEngine, ProjectSession& InSession, 
     BuildUi();
     PopulateHierarchy();
     PopulateDockPages();
+    centralWidget()->setProperty("layoutRestored", Docking->Restore());
     RegisterBuiltInAssetEditors();
     RefreshProjectTitle();
     UpdateStatus();
@@ -122,6 +125,7 @@ EditorMainWindow::EditorMainWindow(Engine& InEngine, ProjectSession& InSession, 
 
 EditorMainWindow::~EditorMainWindow()
 {
+    Docking->Save();
     MaintenanceTimer->stop();
     StoryAuthoring.reset();
     disconnect(PrimaryViewport, nullptr, this, nullptr);

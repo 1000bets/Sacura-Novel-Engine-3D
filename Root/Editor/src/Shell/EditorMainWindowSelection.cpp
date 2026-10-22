@@ -2,6 +2,7 @@
 #include "UI/Styles/StudioIcons.h"
 #include "UI/Views/StoryWorkspaceView.h"
 #include "UI/Views/HierarchyPanelView.h"
+#include "UI/Styles/HierarchyStyle.h"
 #include "UI/Views/ObjectInspectorView.h"
 #include "UI/Views/StudioControls.h"
 #include <QToolButton>
@@ -94,6 +95,23 @@
 #include "Shell/EditorMainWindowSupport.h"
 #include "Panels/HierarchyTreeWidget.h"
 
+namespace
+{
+void RefreshPrimaryCameraBadge(QTreeWidget& Tree, Scene* World)
+{
+    const auto* Camera = World ? World->FindPrimaryCamera() : nullptr;
+    const auto* Owner = Camera ? Camera->GetGameObject() : nullptr;
+    const auto Primary = Owner ? Owner->GetObjectHandle() : ObjectHandle{};
+    QTreeWidgetItemIterator Iterator(&Tree);
+    while (*Iterator)
+    {
+        (*Iterator)->setData(0, EditorUi::HierarchyPrimaryCameraRole,
+                            Primary.IsValid() && LoadObjectHandle(*Iterator) == Primary);
+        ++Iterator;
+    }
+}
+}
+
 void EditorMainWindow::PopulateHierarchy()
 {
     HierarchyTree->blockSignals(true);
@@ -108,6 +126,7 @@ void EditorMainWindow::PopulateHierarchy()
         }
     }
 
+    RefreshPrimaryCameraBadge(*HierarchyTree, HierarchyScene);
     HierarchyContent->Refresh();
     RefreshStoryTargets();
     HierarchyTree->expandAll();
@@ -178,6 +197,7 @@ void EditorMainWindow::AddHierarchyItem(QTreeWidgetItem* ParentItem, GameObject*
     if (ObjectInstance->GetComponent<CameraComponent>() != nullptr)
     {
         Icon = EditorUi::StudioIcon::Camera;
+        Item->setData(0, EditorUi::HierarchyCameraRole, true);
     }
     else if (ObjectInstance->GetComponent<LightComponent>() != nullptr)
     {
@@ -307,6 +327,7 @@ void EditorMainWindow::ConfigureComponentInspector(ReflectionInspector* Componen
     });
     connect(ComponentInspector, &ReflectionInspector::PropertyChanged, this, [this]()
     {
+        RefreshPrimaryCameraBadge(*HierarchyTree, GetHierarchyScene());
         UpdateWindowTitleDirty();
     });
 }
@@ -334,6 +355,8 @@ void EditorMainWindow::RebuildComponentInspectors()
         delete Item;
     }
     ComponentInspectors.clear();
+    auto* ObjectView = static_cast<EditorUi::ObjectInspectorView*>(ObjectInspectorContent);
+    ObjectView->ClearComponentOverview();
 
     GameObject* Selected = GetSelectedGameObject();
     QStringList ComponentTypes;
@@ -356,10 +379,12 @@ void EditorMainWindow::RebuildComponentInspectors()
             auto* ComponentInspector = new ReflectionInspector();
             ConfigureComponentInspector(ComponentInspector);
             ComponentInspector->SetInspectedObject(ComponentInstance);
+            ComponentInspector->SetMeshPresentation(ComponentType == "engine.MeshRendererComponent");
             ComponentInspector->setEnabled(!BoundEngine.GetPlaySession().IsSimulating());
             const auto Identity = QString::fromStdString(ComponentInstance->GetPersistentId());
             static_cast<EditorUi::ObjectInspectorView*>(ObjectInspectorContent)->AddComponentSection(
-                Identity, ComponentType, *ComponentInspector, ExpandedComponents.value(Identity, false));
+                Identity, ComponentType, *ComponentInspector,
+                ExpandedComponents.value(Identity, ComponentType == "engine.MeshRendererComponent"));
             ComponentInspectors.push_back(ComponentInspector);
         }
     }
@@ -380,7 +405,8 @@ void EditorMainWindow::RebuildComponentInspectors()
     }
     ComponentCombo->setCurrentIndex(FilterIndex);
     ComponentCombo->setEnabled(Selected != nullptr && !ComponentTypes.isEmpty());
-    ComponentCombo->setVisible(ComponentTypes.size() > 1);
+    // The frontend uses a searchable component overview instead of a second filter select.
+    ComponentCombo->hide();
     OnComponentFilterChanged(FilterIndex);
 }
 
@@ -400,6 +426,48 @@ void EditorMainWindow::RefreshSelectionUi()
     }
     const bool bEditableSelection = bHasSelection && !BoundEngine.GetPlaySession().IsSimulating();
     static_cast<EditorUi::ObjectInspectorView*>(ObjectInspectorContent)->SetEditable(bEditableSelection);
+    auto* ObjectView = static_cast<EditorUi::ObjectInspectorView*>(ObjectInspectorContent);
+    const QString Kind = !Selected ? QString{} : Selected->GetComponent<CameraComponent>() ? tr("Камера") :
+        Selected->GetComponent<LightComponent>() ? tr("Источник света") :
+        Selected->GetComponent<MeshRendererComponent>() ? tr("Активный меш") : tr("Объект сцены");
+    ObjectView->SetIdentity(Selected ? QString::fromStdString(Selected->GetName()) : QString{}, Kind,
+                            Selected && Selected->IsActive());
+    const auto PreviousType = ObjectView->AddComponentType->currentData();
+    ObjectView->AddComponentType->clear();
+    auto ActionContext = MakeEditorActionContext();
+    for (auto* Action : EditorAction::CollectPublishedActions())
+    {
+        if (Action && QString::fromUtf8(Action->GetMenuCategory()) == EditorAction::ComponentsCategory &&
+            Action->CanExecute(ActionContext))
+        {
+            ObjectView->AddComponentType->addItem(QString::fromUtf8(Action->GetDisplayName()),
+                QString::fromStdString(Action->GetClass()->GetTypeId().Value));
+        }
+    }
+    const int PreviousIndex = ObjectView->AddComponentType->findData(PreviousType);
+    if (PreviousIndex >= 0) { ObjectView->AddComponentType->setCurrentIndex(PreviousIndex); }
+    ObjectView->AddComponent->setEnabled(bEditableSelection && ObjectView->AddComponentType->count() > 0);
+    ObjectView->ParentObject->clear();
+    ObjectView->AnchorObject->clear();
+    ObjectView->ParentObject->addItem(tr("Объекты сцены · корень"), QString{});
+    ObjectView->AnchorObject->addItem(tr("Переместить к точке…"), QString{});
+    if (Selected && Selected->GetScene())
+    {
+        for (auto* Candidate : Selected->GetScene()->GetAllObjects())
+        {
+            if (!Candidate || Candidate == Selected) { continue; }
+            bool Descendant = false;
+            for (auto* Parent = Candidate->GetParent(); Parent; Parent = Parent->GetParent())
+            { if (Parent == Selected) { Descendant = true; break; } }
+            if (Descendant) { continue; }
+            const auto Label = QString::fromStdString(Candidate->GetName());
+            const auto Identity = QString::fromStdString(Candidate->GetPersistentId());
+            ObjectView->ParentObject->addItem(Label, Identity);
+            ObjectView->AnchorObject->addItem(Label, Identity);
+        }
+        if (Selected->GetParent())
+        { ObjectView->ParentObject->setCurrentIndex(ObjectView->ParentObject->findData(QString::fromStdString(Selected->GetParent()->GetPersistentId()))); }
+    }
     if (ObjectNameEdit != nullptr)
     {
         ObjectNameEdit->setEnabled(bEditableSelection);

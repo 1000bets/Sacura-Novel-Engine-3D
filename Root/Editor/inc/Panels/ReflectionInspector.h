@@ -39,6 +39,7 @@ public:
     void SetAssetRegistry(AssetRegistry* Registry);
     void SetAssetCommitCallback(AssetCommitCallback Callback);
     void SetTypeLabelVisible(bool bVisible);
+    void SetMeshPresentation(bool Enabled) { bMeshPresentation = Enabled; Rebuild(); }
 
     void Rebuild();
 
@@ -52,6 +53,7 @@ signals:
 private:
     void ClearPropertyEditors();
     void AddPropertyEditor(const PropertyDescriptor& Descriptor);
+    bool BuildMeshPresentation();
     void ApplyBoolValue(const PropertyId& Property, bool Value);
     void ApplyFloatValue(const PropertyId& Property, double Value);
     void ApplyStringValue(const PropertyId& Property, const QString& Value);
@@ -71,4 +73,7 @@ private:
     QPushButton* ResetAllButton = nullptr;
     QFormLayout* PropertiesLayout = nullptr;
     QVBoxLayout* RootLayout = nullptr;
+    bool bMeshPresentation = false;
+    bool bMeshDetailsExpanded = false;
+    int SelectedMaterialSlot = -1;
 };

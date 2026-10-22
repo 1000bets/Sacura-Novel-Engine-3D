@@ -10,9 +10,15 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
 set(EDITOR_SRC
+    src/UI/Adapters/WorkspaceDockController.cpp
+    src/UI/Styles/ActionMenuStyle.cpp
+    src/UI/Views/StudioActionMenu.cpp
+    src/UI/Adapters/StoryMenuBuilder.cpp
+    src/UI/Styles/HierarchyStyle.cpp
     src/UI/Styles/ControlStyle.cpp
     src/UI/Views/StudioControls.cpp
     src/UI/Views/ObjectInspectorView.cpp
+    src/UI/Adapters/MeshInspectorAdapter.cpp
     src/UI/Adapters/StoryEventAdapter.cpp
     src/UI/Adapters/StoryGraphControllerEvents.cpp
     src/UI/Adapters/StoryGraphControllerPackages.cpp
@@ -58,6 +64,13 @@ set(EDITOR_SRC
 )
 
 set(EDITOR_HDR
+    inc/UI/Adapters/WorkspaceDockController.h
+    inc/UI/Presentation/StorySpeakerLabel.h
+    inc/UI/Styles/ActionMenuStyle.h
+    inc/UI/Views/StudioActionMenu.h
+    inc/UI/Presentation/StudioMenuItem.h
+    inc/UI/Adapters/StoryMenuBuilder.h
+    inc/UI/Styles/HierarchyStyle.h
     inc/UI/Presentation/InspectorLabels.h
     inc/UI/Styles/ControlStyle.h
     inc/UI/Views/StudioControls.h

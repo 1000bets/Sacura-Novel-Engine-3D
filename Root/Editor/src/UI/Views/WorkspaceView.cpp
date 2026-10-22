@@ -61,7 +61,8 @@ void WorkspaceView::showEvent(QShowEvent* Event)
     {
         QTimer::singleShot(0, this, [this]()
         {
-            WorkspaceLayoutAdapter::Reset(*Workspace, *Center, window()->height());
+            if (!property("layoutRestored").toBool())
+            { WorkspaceLayoutAdapter::Reset(*Workspace, *Center, window()->height()); }
         });
         bInitialLayoutApplied = true;
     }

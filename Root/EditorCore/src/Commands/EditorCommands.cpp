@@ -114,6 +114,33 @@ public:
     const char* GetDisplayName() const override { return "Set Transform"; }
 };
 
+class SetObjectActiveCommand final : public EditorCommand
+{
+public:
+    Scene* TargetScene = nullptr;
+    ObjectHandle Target;
+    bool NewActive = true;
+    bool OldActive = true;
+    bool bCapturedOld = false;
+
+    bool Do() override
+    {
+        auto* Instance = ResolveObject(TargetScene, Target);
+        if (!Instance) { return false; }
+        if (!bCapturedOld) { OldActive = Instance->IsActive(); bCapturedOld = true; }
+        Instance->SetActive(NewActive);
+        return true;
+    }
+    bool Undo() override
+    {
+        auto* Instance = ResolveObject(TargetScene, Target);
+        if (!Instance) { return false; }
+        Instance->SetActive(OldActive);
+        return true;
+    }
+    const char* GetDisplayName() const override { return "Set Object Active"; }
+};
+
 class CreateObjectCommand : public EditorCommand
 {
 public:
@@ -765,6 +792,15 @@ std::unique_ptr<EditorCommand> MakeSetTransformCommand(Scene* TargetScene, Objec
     Command->TargetScene = TargetScene;
     Command->Target = Target;
     Command->NewTransform = NewTransform;
+    return Command;
+}
+
+std::unique_ptr<EditorCommand> MakeSetObjectActiveCommand(Scene* TargetScene, ObjectHandle Target, bool Active)
+{
+    auto Command = std::make_unique<SetObjectActiveCommand>();
+    Command->TargetScene = TargetScene;
+    Command->Target = Target;
+    Command->NewActive = Active;
     return Command;
 }
 

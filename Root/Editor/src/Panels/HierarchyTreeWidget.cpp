@@ -4,13 +4,31 @@
 #include <QDragMoveEvent>
 #include <QDropEvent>
 #include "UI/Styles/StudioIcons.h"
+#include "UI/Styles/HierarchyStyle.h"
+#include <QCursor>
+
+void HierarchyTreeWidget::drawRow(QPainter* Painter, const QStyleOptionViewItem& Option, const QModelIndex& Index) const
+{
+    QStyleOptionViewItem Row = Option;
+    Row.rect = visualRect(Index);
+    Row.rect.setRight(viewport()->width() - 1);
+    Row.state.setFlag(QStyle::State_Selected, selectionModel()->isSelected(Index));
+    Row.state.setFlag(QStyle::State_Enabled, isEnabled() && (Index.flags() & Qt::ItemIsEnabled));
+    const QPoint Cursor = viewport()->mapFromGlobal(QCursor::pos());
+    Row.state.setFlag(QStyle::State_MouseOver, viewport()->underMouse() && Row.rect.contains(Cursor));
+    // Own the whole row: the native drawRow fills ancestor branches with the
+    // platform's selection colour even when the item stylesheet is transparent.
+    EditorUi::HierarchyStyle::PaintBackground(*Painter, Row.rect, Row.state);
+    itemDelegateForIndex(Index)->paint(Painter, Row, Index);
+    drawBranches(Painter, QRect(0, Row.rect.top(), Row.rect.left(), Row.rect.height()), Index);
+}
 
 void HierarchyTreeWidget::drawBranches(QPainter* Painter, const QRect& Rect, const QModelIndex& Index) const
 {
     if (!model()->hasChildren(Index)) { return; }
     const auto Icon = isExpanded(Index) ? EditorUi::StudioIcon::ChevronDown : EditorUi::StudioIcon::ChevronRight;
-    const QRect Indicator(Rect.right() - indentation() + (indentation() - 14) / 2,
-                          Rect.center().y() - 7, 14, 14);
+    const QRect Indicator(Rect.right() - indentation() + 1 + (indentation() - 13) / 2,
+                          Rect.top() + (Rect.height() - 13) / 2, 13, 13);
     EditorUi::MakeStudioIcon(Icon).paint(Painter, Indicator);
 }
 

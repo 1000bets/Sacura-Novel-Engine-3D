@@ -2,7 +2,6 @@
 #include "UI/Styles/ControlStyle.h"
 #include "UI/Styles/EditorStyle.h"
 #include <QApplication>
-#include <QGraphicsOpacityEffect>
 #include <QKeyEvent>
 #include <QLineEdit>
 #include <QListWidget>
@@ -34,6 +33,18 @@ QString StudioNumberEdit::textFromValue(double Value) const
 
 namespace
 {
+class SelectPopupSurface final : public QWidget
+{
+public:
+    explicit SelectPopupSurface(QWidget* Parent) : QWidget(Parent, Qt::Popup | Qt::FramelessWindowHint) {}
+protected:
+    void paintEvent(QPaintEvent*) override
+    {
+        QPainter Painter(this);
+        ControlStyle::PopupSurface(Painter, rect());
+    }
+};
+
 class OptionDelegate final : public QStyledItemDelegate
 {
 public:
@@ -86,16 +97,18 @@ void StudioSelect::showPopup()
     }
     bClosing = false;
     SetPopupOpen(true);
-    Popup = new QWidget(this, Qt::Popup | Qt::FramelessWindowHint);
+    Popup = new SelectPopupSurface(this);
     Popup->setObjectName("StudioSelectPopup");
     Popup->setAttribute(Qt::WA_DeleteOnClose);
-    Popup->setAttribute(Qt::WA_StyledBackground);
+    // Alpha belongs to the native surface, not an effect on its backing store.
+    // Fading only the widget's pixels leaves an opaque black HWND on Windows.
+    Popup->setAttribute(Qt::WA_TranslucentBackground);
     Popup->setFont(ControlStyle::Font(13));
     // A popup is a top-level surface; explicitly inherit the same resolved stylesheet.
     Popup->setStyleSheet(EditorStyle::LoadStylesheet());
     Popup->installEventFilter(this);
     auto* Layout = new QVBoxLayout(Popup);
-    Layout->setContentsMargins(5, 5, 5, 5);
+    Layout->setContentsMargins(9, 9, 9, 9);
     Layout->setSpacing(4);
     Search = new QLineEdit(Popup);
     Search->setObjectName("StudioSelectSearch");
@@ -142,16 +155,19 @@ void StudioSelect::showPopup()
     });
     connect(Options, &QListWidget::itemClicked, this, [this]() { Choose(); });
     const QRect Available = screen()->availableGeometry().adjusted(8, 8, -8, -8);
-    const int Width = std::min(std::max(width(), 280), Available.width());
-    const int Height = std::min(10 + 34 + std::min(count(), 8) * ControlStyle::OptionHeight, Available.height());
-    QPoint Position = mapToGlobal(QPoint(0, height() + 4));
+    const int Width = std::min(std::max(width() + 8, 280), Available.width());
+    const int Height = std::min(18 + 34 + std::min(count(), 8) * ControlStyle::OptionHeight, Available.height());
+    QPoint Position = mapToGlobal(QPoint(-4, height()));
     Position.setX(std::clamp(Position.x(), Available.left(), Available.right() - Width + 1));
     if (Position.y() + Height > Available.bottom()) { Position.setY(mapToGlobal(QPoint()).y() - Height - 4); }
     Position.setY(std::clamp(Position.y(), Available.top(), Available.bottom() - Height + 1));
     Popup->setGeometry(QRect(Position, QSize(Width, Height)));
-    auto* Fade = new QGraphicsOpacityEffect(Popup);
-    Fade->setOpacity(0);
-    Popup->setGraphicsEffect(Fade);
+    PopupPosition = Position;
+    PopupRestPosition = Position + QPoint(0, Position.y() > mapToGlobal(QPoint()).y() ? -4 : 4);
+    Popup->move(PopupRestPosition);
+    Popup->setWindowOpacity(0);
+    Popup->ensurePolished();
+    Layout->activate();
     Popup->show();
     TransitionPopup(true);
     Search->setFocus(Qt::PopupFocusReason);
@@ -205,16 +221,21 @@ void StudioSelect::hidePopup()
 
 void StudioSelect::TransitionPopup(bool Opening)
 {
-    auto* Fade = qobject_cast<QGraphicsOpacityEffect*>(Popup->graphicsEffect());
     const auto Animations = Popup->findChildren<QPropertyAnimation*>();
     for (auto* Animation : Animations)
     {
         Animation->stop();
         disconnect(Animation, nullptr, this, nullptr);
     }
-    auto* Animation = new QPropertyAnimation(Fade, "opacity", Popup);
-    Animation->setDuration(Opening ? ControlStyle::MotionDuration : 90);
-    Animation->setStartValue(Fade->opacity());
+    auto* Motion = new QPropertyAnimation(Popup, "pos", Popup);
+    Motion->setDuration(Opening ? 180 : 100);
+    Motion->setStartValue(Popup->pos());
+    Motion->setEndValue(Opening ? PopupPosition : PopupRestPosition);
+    Motion->setEasingCurve(Opening ? QEasingCurve::OutCubic : QEasingCurve::InCubic);
+    Motion->start(QAbstractAnimation::DeleteWhenStopped);
+    auto* Animation = new QPropertyAnimation(Popup, "windowOpacity", Popup);
+    Animation->setDuration(Opening ? 180 : 100);
+    Animation->setStartValue(Popup->windowOpacity());
     Animation->setEndValue(Opening ? 1.0 : 0.0);
     Animation->setEasingCurve(QEasingCurve::OutCubic);
     if (!Opening) { connect(Animation, &QPropertyAnimation::finished, this, &StudioSelect::ClosePopup); }

@@ -10,6 +10,7 @@ namespace EditorUi
 struct ControlStyle
 {
     static QFont Font(int Pixels = 12, bool Strong = false);
+    static void PopupSurface(QPainter& Painter, const QRect& Bounds);
     static void Check(QPainter& Painter, const QRectF& Box, qreal Progress, bool Enabled, bool Focused);
     static void Option(QPainter& Painter, const QRect& Rect, const QString& Text, bool Selected,
                        bool Active, bool Enabled, const QFont& Font);

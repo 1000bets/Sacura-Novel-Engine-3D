@@ -229,7 +229,18 @@ public:
         ImGuizmo::BeginFrame();
         ImGuizmo::SetRect(0.0f, 0.0f, DisplayWidth, DisplayHeight);
 
-        if (Owner->bEditorToolsEnabled && bHasSelection && !Owner->IsCameraNavigationActive() && DisplayWidth > 0.0f && DisplayHeight > 0.0f)
+        if (Owner->bEditorToolsEnabled && Owner->IsGridVisible() && DisplayWidth > 0.0f && DisplayHeight > 0.0f)
+        {
+            const auto& Camera = Owner->GetViewCamera();
+            const Matrix View = Matrix::CreateLookAt(Camera.Position, Camera.Target, Camera.Up);
+            const Matrix Projection = Matrix::CreatePerspectiveFieldOfView(Camera.FieldOfViewDegrees * DegreesToRadians,
+                DisplayWidth / DisplayHeight, Camera.NearPlane, Camera.FarPlane);
+            const Matrix Ground = Matrix::Identity;
+            ImGuizmo::DrawGrid(&View._11, &Projection._11, &Ground._11, 100.f);
+        }
+
+        if (Owner->bEditorToolsEnabled && bHasSelection && Owner->GetGizmoOperation() != EditorViewportWidget::GizmoOperation::Select
+            && !Owner->IsCameraNavigationActive() && DisplayWidth > 0.0f && DisplayHeight > 0.0f)
         {
             Matrix ViewMatrix = Matrix::CreateLookAt(
                 Owner->GetViewCamera().Position,
@@ -250,12 +261,13 @@ public:
             {
                 OperationMask = ImGuizmo::SCALE;
             }
+            const Vector3 Snap = Owner->GetGizmoSnap();
             const bool bChanged = ImGuizmo::Manipulate(
                 &ViewMatrix._11,
                 &ProjectionMatrix._11,
                 OperationMask,
                 ImGuizmo::LOCAL,
-                &WorldMatrix._11);
+                &WorldMatrix._11, nullptr, Owner->IsSnapEnabled() ? &Snap.x : nullptr);
             if (ImGuizmo::IsUsing() && !bManipulating)
             {
                 DragStartLocal = SelectedLocal;
@@ -294,7 +306,7 @@ public:
         {
             ImGui::SetCurrentContext(ImGuiContextInstance);
             bLeftMouseDown = true;
-            bPressedOverGizmo = bHasSelection && ImGuizmo::IsOver();
+            bPressedOverGizmo = bHasSelection && Owner->GetGizmoOperation() != EditorViewportWidget::GizmoOperation::Select && ImGuizmo::IsOver();
             bSelectionClickCandidate =
                 !bPressedOverGizmo
                 && Owner->bEditorToolsEnabled
@@ -855,6 +867,13 @@ float EditorViewportWidget::GetCameraMoveSpeed() const
     return MoveSpeed;
 }
 
+Vector3 EditorViewportWidget::GetGizmoSnap() const
+{
+    const float Step = ActiveGizmoOperation == GizmoOperation::Rotate ? 15.f
+        : ActiveGizmoOperation == GizmoOperation::Scale ? 0.1f : 0.25f;
+    return Vector3(Step, Step, Step);
+}
+
 void EditorViewportWidget::SetGizmoOperation(GizmoOperation Operation)
 {
     if (ActiveGizmoOperation == Operation)
@@ -1108,8 +1127,14 @@ void EditorViewportWidget::HandleCameraKeyPress(QKeyEvent* Event)
         Event->accept();
         return;
     }
-    if (ActiveCameraMode != CameraMode::FlyLook)
+    if (ActiveCameraMode != CameraMode::FlyLook && Event->modifiers() == Qt::NoModifier)
     {
+        if (ScanCode == DownKeyScanCode)
+        {
+            SetGizmoOperation(GizmoOperation::Select);
+            Event->accept();
+            return;
+        }
         if (ScanCode == ForwardKeyScanCode)
         {
             SetGizmoOperation(GizmoOperation::Translate);

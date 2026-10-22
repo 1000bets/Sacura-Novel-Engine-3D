@@ -68,6 +68,12 @@ QTreeWidget { padding: 2px 8px 12px 8px; }
 QTreeWidget::item { height: 28px; padding: 0 4px; border: none; border-radius: 4px; }
 QTreeWidget::item:selected { background: @--bg-active@; color: @--text-primary@; }
 QTreeWidget::item:hover { background: @--bg-hover@; }
+/* HierarchyTree.jsx / .scene-objects-children. The delegate owns row painting. */
+QTreeWidget#SceneHierarchy { padding: 2px 8px 12px 4px; }
+QTreeWidget#SceneHierarchy::item,
+QTreeWidget#SceneHierarchy::item:selected,
+QTreeWidget#SceneHierarchy::item:hover { height: 30px; padding: 0; background: transparent; border: none; }
+QTreeWidget#SceneHierarchy::branch { background: transparent; }
 QWidget#SceneObjectsHeading { background: @--bg-panel-elevated@; margin: 0 8px 4px; min-height: 38px; border-radius: 4px; }
 QWidget#SceneObjectsHeading QLabel { font-size: 12px; font-weight: 600; color: @--text-primary@; }
 QLabel#SceneObjectCount { background: @--accent-muted@; color: @--accent@; font-size: 11px; padding: 2px 5px; border-radius: 3px; }
@@ -105,3 +111,25 @@ QPushButton#StoryAddNode::menu-indicator { image: none; }
 QComboBox::down-arrow { image: url(:/ui/styles/chevron-down.png); width: 10px; height: 10px; }
 
 QWidget#StoryInspector QTextEdit { font-size: 13px; padding: 8px; }
+
+/* React viewport tabs and commandbar: 36 + 32 logical pixels. */
+QPushButton[uiRole="viewportTab"] {
+    min-height: 35px; max-height: 35px; padding: 0 2px; margin: 0;
+    background: transparent; border: none; border-bottom: 1px solid transparent;
+    border-radius: 0; color: @--text-muted@; font-size: 12px;
+}
+QPushButton[uiRole="viewportTab"]:checked {
+    color: @--text-primary@; font-weight: 600; border-bottom-color: @--tab-indicator@;
+}
+QPushButton[uiRole="viewportTab"]:hover { color: @--text-primary@; }
+QPushButton[uiRole="viewportTool"], QPushButton[uiRole="viewportToggle"], QToolButton[uiRole="viewportUtility"] {
+    background: transparent; border: none; padding: 0; min-height: 0; border-radius: 4px;
+}
+QPushButton[uiRole="viewportTool"]:hover, QPushButton[uiRole="viewportToggle"]:hover,
+QToolButton[uiRole="viewportUtility"]:hover { background: @--bg-hover@; }
+QPushButton[uiRole="viewportTool"]:checked { background: @--bg-active@; }
+QPushButton[uiRole="viewportToggle"]:checked { background: transparent; }
+QPushButton[uiRole="viewportTool"]:focus, QPushButton[uiRole="viewportToggle"]:focus,
+QToolButton[uiRole="viewportUtility"]:focus { border: 1px solid @--border-strong@; }
+/* Tool windows share the editor surface when detached from the main shell. */
+QWidget[uiRole="workspaceFloating"] { background: @--bg-panel@; color: @--text-primary@; }

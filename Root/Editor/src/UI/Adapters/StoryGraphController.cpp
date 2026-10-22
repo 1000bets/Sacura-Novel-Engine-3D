@@ -230,6 +230,7 @@ void StoryGraphController::SetLocked(bool bValue)
 }
 void StoryGraphController::SetObjects(QVector<QPair<QString, QString>> Values)
 {
+    if (Objects == Values) { return; }
     Objects = std::move(Values);
     Refresh();
 }

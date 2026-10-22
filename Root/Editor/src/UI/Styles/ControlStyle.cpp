@@ -24,6 +24,21 @@ QFont ControlStyle::Font(int Pixels, bool Strong)
     return Result;
 }
 
+void ControlStyle::PopupSurface(QPainter& Painter, const QRect& Bounds)
+{
+    Painter.setRenderHint(QPainter::Antialiasing);
+    const QRectF Panel = QRectF(Bounds).adjusted(4.5, 4.5, -4.5, -4.5);
+    Painter.setPen(Qt::NoPen);
+    for (int Spread = 4; Spread > 0; --Spread)
+    {
+        Painter.setBrush(QColor(0, 0, 0, 10));
+        Painter.drawRoundedRect(Panel.adjusted(-Spread, -Spread + 1, Spread, Spread + 1), 6 + Spread, 6 + Spread);
+    }
+    Painter.setBrush(EditorStyle::Color("--bg-panel-elevated"));
+    Painter.setPen(QPen(EditorStyle::Color("--border-subtle"), 1));
+    Painter.drawRoundedRect(Panel, 6, 6);
+}
+
 void ControlStyle::Check(QPainter& Painter, const QRectF& Box, qreal Progress, bool Enabled, bool Focused)
 {
     Painter.save();

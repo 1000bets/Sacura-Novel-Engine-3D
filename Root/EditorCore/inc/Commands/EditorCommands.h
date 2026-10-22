@@ -10,6 +10,7 @@ class Scene;
 
 std::unique_ptr<EditorCommand> MakeRenameObjectCommand(Scene* TargetScene, ObjectHandle Target, std::string NewName);
 std::unique_ptr<EditorCommand> MakeSetTransformCommand(Scene* TargetScene, ObjectHandle Target, Transform NewTransform);
+std::unique_ptr<EditorCommand> MakeSetObjectActiveCommand(Scene* TargetScene, ObjectHandle Target, bool Active);
 std::unique_ptr<EditorCommand> MakeCreateObjectCommand(
     Scene* TargetScene,
     std::string Name,

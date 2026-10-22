@@ -170,24 +170,16 @@ void EditorMainWindow::OnPlayToggled(bool bChecked)
         ? QString::fromUtf8("\xD0\x9F\xD1\x80\xD0\xB5\xD0\xB4\xD0\xBF\xD1\x80\xD0\xBE\xD1\x81\xD0\xBC\xD0\xBE\xD1\x82\xD1\x80")
         : QString::fromUtf8("\xD0\xA0\xD0\xB5\xD0\xB4\xD0\xB0\xD0\xBA\xD1\x82\xD0\xB8\xD1\x80\xD0\xBE\xD0\xB2\xD0\xB0\xD0\xBD\xD0\xB8\xD0\xB5"));
     PlayButton->setText(bPlaying ? tr("Стоп") : tr("Запуск"));
+    PlayButton->setIcon(EditorUi::MakeFrontendIcon(bPlaying ? QStringLiteral("Square") : QStringLiteral("Play"), "--success"));
     ModeLabel->setVisible(bPlaying);
     PrimaryViewport->SetEditorToolsEnabled(!bPlaying);
     if (CameraSpeedSpin != nullptr)
     {
         CameraSpeedSpin->setEnabled(!bPlaying);
     }
-    if (TranslateGizmoButton != nullptr)
-    {
-        TranslateGizmoButton->setEnabled(!bPlaying);
-    }
-    if (RotateGizmoButton != nullptr)
-    {
-        RotateGizmoButton->setEnabled(!bPlaying);
-    }
-    if (ScaleGizmoButton != nullptr)
-    {
-        ScaleGizmoButton->setEnabled(!bPlaying);
-    }
+    for (auto* Button : GizmoModeButtons->buttons()) { Button->setEnabled(!bPlaying); }
+    if (auto* Snap = findChild<QPushButton*>("ViewportSnap")) { Snap->setEnabled(!bPlaying); }
+    if (auto* Grid = findChild<QPushButton*>("ViewportGrid")) { Grid->setEnabled(!bPlaying); }
     LocationTab->setChecked(!bPlaying);
     GameTab->setChecked(bPlaying);
     GameDialogue->setVisible(bPlaying);
