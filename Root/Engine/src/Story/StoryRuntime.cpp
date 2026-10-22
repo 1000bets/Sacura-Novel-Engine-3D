@@ -7,6 +7,8 @@
 #include "World/Components/CameraComponent.h"
 #include "World/GameObject.h"
 #include "Story/StoryDocumentIO.h"
+#include "Story/StoryEvents.h"
+#include "StoryEventPlayer.h"
 
 #include <algorithm>
 #include <cmath>
@@ -37,6 +39,7 @@ Quaternion SlerpQuaternion(const Quaternion& Start, const Quaternion& End, float
 }
 }
 
+StoryRuntime::StoryRuntime() = default;
 StoryRuntime::~StoryRuntime()
 {
     Stop();
@@ -67,6 +70,7 @@ bool StoryRuntime::LoadFromFile(const std::filesystem::path& AbsolutePath)
 
 bool StoryRuntime::LoadDocument(const StoryDocument& InDocument)
 {
+    if (!ValidateStoryEvents(InDocument, LastError)) { return false; }
     StoryDocument ResolvedDocument = InDocument;
     for (StoryNode& Node : ResolvedDocument.Nodes)
     {
@@ -111,6 +115,8 @@ bool StoryRuntime::LoadDocument(const StoryDocument& InDocument)
 
 void StoryRuntime::Reset()
 {
+    Events.reset();
+    StagingPhase = 0;
     LastError.clear();
     CancelAllActions();
     Phase = StoryPlaybackPhase::Idle;
@@ -134,6 +140,8 @@ void StoryRuntime::Reset()
 
 void StoryRuntime::Stop()
 {
+    Events.reset();
+    StagingPhase = 0;
     LastError.clear();
     CancelAllActions();
     Phase = StoryPlaybackPhase::Idle;
@@ -156,7 +164,13 @@ bool StoryRuntime::IsFinished() const
 
 bool StoryRuntime::CanAdvanceDialogue() const
 {
-    return Phase == StoryPlaybackPhase::Line && !bActionSequenceRunning;
+    return Phase == StoryPlaybackPhase::Line && !bActionSequenceRunning &&
+        StagingPhase != 3 && (!Events || Events->IsReady());
+}
+
+bool StoryRuntime::CanSelectChoice() const
+{
+    return Phase == StoryPlaybackPhase::Choice && StagingPhase != 3 && (!Events || Events->IsReady());
 }
 
 bool StoryRuntime::AdvanceDialogue()
@@ -172,19 +186,13 @@ bool StoryRuntime::AdvanceDialogue()
         return false;
     }
 
-    if (Node->NextNodeId.empty())
-    {
-        Phase = StoryPlaybackPhase::End;
-        return true;
-    }
-
-    EnterNode(Node->NextNodeId);
+    FinishDialogue(Node->NextNodeId);
     return true;
 }
 
 bool StoryRuntime::SelectChoice(size_t ChoiceIndex)
 {
-    if (Phase != StoryPlaybackPhase::Choice || ChoiceIndex >= PendingChoices.size())
+    if (!CanSelectChoice() || ChoiceIndex >= PendingChoices.size())
     {
         return false;
     }
@@ -192,12 +200,36 @@ bool StoryRuntime::SelectChoice(size_t ChoiceIndex)
     const StoryNodeId NextNodeId = PendingChoices[ChoiceIndex].NextNodeId;
     PendingChoices.clear();
     ChoicePrompt.clear();
-    EnterNode(NextNodeId);
+    FinishDialogue(NextNodeId);
     return true;
 }
 
 void StoryRuntime::Tick(float DeltaTime)
 {
+    if (!std::isfinite(DeltaTime) || DeltaTime < 0) { return; }
+    if (Events)
+    {
+        Events->Tick(DeltaTime);
+        if (!Events->GetError().empty())
+        {
+            const auto Error = Events->GetError();
+            Events.reset();
+            FailAction(Error);
+            return;
+        }
+        if (Events->IsReady())
+        {
+            if (StagingPhase == 1) { DisplayNode(); }
+            else if (StagingPhase == 3)
+            {
+                const auto Next = StagedNext;
+                StagingPhase = 0;
+                if (Next.empty()) { Phase = StoryPlaybackPhase::End; Events.reset(); }
+                else { EnterNode(Next); }
+                return;
+            }
+        }
+    }
     if (Phase != StoryPlaybackPhase::Action || !bActionSequenceRunning)
     {
         return;
@@ -214,6 +246,7 @@ void StoryRuntime::Tick(float DeltaTime)
         else
         {
             Phase = StoryPlaybackPhase::End;
+            Events.reset();
         }
         return;
     }
@@ -267,6 +300,40 @@ void StoryRuntime::EnterNode(const StoryNodeId& NodeId)
 
     CurrentNodeId = NodeId;
 
+    if (Node->Kind == StoryNodeKind::Line || Node->Kind == StoryNodeKind::Choice)
+    {
+        if (!Events && !Node->EventBatches.empty()) { Events = std::make_unique<StoryEventPlayer>(BoundScene); }
+        if (Events)
+        {
+            StagingPhase = 1;
+            Phase = StoryPlaybackPhase::Action;
+            DisplayedSpeaker.clear(); DisplayedLine.clear(); PendingChoices.clear(); ChoicePrompt.clear();
+            Events->BeginPhase(Document, *Node, StoryEventPhase::Before);
+            if (!Events->IsReady()) { return; }
+        }
+    }
+    DisplayNode();
+}
+
+void StoryRuntime::FinishDialogue(const StoryNodeId& Next)
+{
+    if (Events)
+    {
+        StagedNext = Next;
+        StagingPhase = 3;
+        Events->BeginPhase(Document, *FindNode(CurrentNodeId), StoryEventPhase::After);
+        if (!Events->IsReady()) { return; }
+    }
+    StagingPhase = 0;
+    if (Next.empty()) { Phase = StoryPlaybackPhase::End; Events.reset(); }
+    else { EnterNode(Next); }
+}
+
+void StoryRuntime::DisplayNode()
+{
+    const auto* Node = FindNode(CurrentNodeId);
+    if (!Node) { return; }
+
     switch (Node->Kind)
     {
     case StoryNodeKind::Line:
@@ -292,10 +359,17 @@ void StoryRuntime::EnterNode(const StoryNodeId& NodeId)
         BeginActionSequence();
         break;
     case StoryNodeKind::End:
+        Events.reset();
+        StagingPhase = 0;
         Phase = StoryPlaybackPhase::End;
         DisplayedSpeaker.clear();
         DisplayedLine.clear();
         break;
+    }
+    if (Events && StagingPhase == 1)
+    {
+        StagingPhase = 2;
+        Events->BeginPhase(Document, *Node, StoryEventPhase::OnStart);
     }
 }
 
@@ -340,6 +414,7 @@ Scene* StoryRuntime::GetScene() const
 
 void StoryRuntime::FailAction(const std::string& Error)
 {
+    Events.reset();
     LastError = Error;
     CancelAllActions();
     Phase = StoryPlaybackPhase::Failed;
@@ -387,7 +462,9 @@ void StoryRuntime::PrepareActiveAction()
             FailAction("MoveTo target not found: " + Action.Definition.TargetObjectId);
             return;
         }
+        if (Target->bStoryControllingTransform) { FailAction("MoveTo target is already controlled by another story action"); return; }
         Target->bStoryControllingTransform = true;
+        Action.bOwnsTransform = true;
         Action.StartPosition = Target->GetTransform().Position;
         return;
     }
@@ -398,7 +475,9 @@ void StoryRuntime::PrepareActiveAction()
         return;
     }
     Action.PrimaryCameraObject = Camera->GetObjectHandle();
+    if (Camera->bStoryControllingTransform) { FailAction("Camera is already controlled by another story action"); return; }
     Camera->bStoryControllingTransform = true;
+    Action.bOwnsTransform = true;
     Action.StartPosition = Camera->GetTransform().Position;
     Action.StartRotation = Camera->GetTransform().Rotation;
     if (Action.Definition.bUseTargetObjectTransform)
@@ -603,9 +682,10 @@ void StoryRuntime::ReleaseActionTransform(ActiveAction& Action)
         Identity = Action.PrimaryCameraObject;
     }
     GameObject* ControlledObject = World->FindByHandle(Identity);
-    if (ControlledObject != nullptr)
+    if (ControlledObject != nullptr && Action.bOwnsTransform)
     {
         ControlledObject->bStoryControllingTransform = false;
+        Action.bOwnsTransform = false;
     }
 }
 

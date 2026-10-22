@@ -51,6 +51,42 @@ struct StoryActionDefinition
     std::string Id;
 };
 
+enum class StoryEventPhase { Before, OnStart, After };
+enum class StoryEventJoin { None, Started, FlowEnd, EventEnd };
+
+struct StoryEventGroup
+{
+    std::string Id;
+    std::string Name;
+    // Groups run in order; actions within a group run together, as in the web editor.
+    std::vector<StoryActionDefinition> Actions;
+};
+
+struct StoryEventDefinition
+{
+    std::string Id;
+    std::string Name;
+    std::string Description;
+    std::vector<StoryEventGroup> Groups;
+};
+
+struct StoryEventBinding
+{
+    std::string Id;
+    std::string EventId;
+    StoryEventJoin Join = StoryEventJoin::EventEnd;
+    // Complete action values, keyed by stable action ID. Only this placement changes.
+    std::vector<StoryActionDefinition> ActionOverrides;
+};
+
+struct StoryEventBatch
+{
+    std::string Id;
+    StoryEventPhase Phase = StoryEventPhase::OnStart;
+    bool bParallel = false;
+    std::vector<StoryEventBinding> Bindings;
+};
+
 struct StoryNode
 {
     StoryNodeId Id;
@@ -61,6 +97,7 @@ struct StoryNode
     std::vector<StoryChoice> Choices;
     std::vector<StoryActionDefinition> Actions;
     StoryNodeId NextNodeId;
+    std::vector<StoryEventBatch> EventBatches;
 };
 
 struct StoryDocument
@@ -68,6 +105,7 @@ struct StoryDocument
     std::string Name;
     StoryNodeId StartNodeId;
     std::vector<StoryNode> Nodes;
+    std::vector<StoryEventDefinition> Events;
 };
 
 struct StorySerializeResult

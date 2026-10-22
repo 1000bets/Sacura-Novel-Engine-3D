@@ -74,6 +74,11 @@ ObjectHandle OperationContext::GetOwner() const
     return IsActive() ? Lifetime->Owner : ObjectHandle{};
 }
 
+ObjectHandle OperationContext::GetWorld() const
+{
+    return IsActive() ? State.lock()->World : ObjectHandle{};
+}
+
 Diagnostic OperationContext::ReadVariable(const std::string& Id, ReflectedValue& OutValue) const
 {
     if (!IsActive())

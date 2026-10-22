@@ -45,6 +45,7 @@ void StoryWidget::Refresh(bool bAllowInput)
     }
     Line->setText(Text);
     Advance->setVisible(Runtime.CanAdvanceDialogue());
+    Choices->setEnabled(Runtime.CanSelectChoice());
     QStringList ChoiceLabels;
     for (size_t ChoiceIndex = 0; ChoiceIndex < Runtime.GetChoiceCount(); ++ChoiceIndex)
     {

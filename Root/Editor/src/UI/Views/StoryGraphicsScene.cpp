@@ -1,5 +1,6 @@
 #include "UI/Views/StoryGraphicsScene.h"
 #include "UI/Styles/StoryGraphStyle.h"
+#include "UI/Styles/StoryEventStyle.h"
 #include <QGraphicsPathItem>
 #include <QGraphicsSceneContextMenuEvent>
 #include <QGraphicsSceneMouseEvent>
@@ -22,10 +23,7 @@ constexpr int EdgeItemType = QGraphicsItem::UserType + 3;
 
 QPainterPath ConnectionPath(QPointF Start, QPointF Finish)
 {
-    QPainterPath Path(Start);
-    const qreal Reach = std::max(55.0, std::abs(Finish.x() - Start.x()) * 0.45);
-    Path.cubicTo(Start + QPointF(Reach, 0), Finish - QPointF(Reach, 0), Finish);
-    return Path;
+    return StoryGraphStyle::ConnectionPath(Start, Finish);
 }
 
 class StoryPortItem final : public QGraphicsItem
@@ -36,6 +34,7 @@ class StoryPortItem final : public QGraphicsItem
     {
         setZValue(3);
         setCursor(Qt::CrossCursor);
+        setAcceptHoverEvents(true);
         setToolTip(bOutput ? QObject::tr("Перетащите к входу другой ноды") : QObject::tr("Вход перехода"));
     }
     int type() const override
@@ -44,15 +43,18 @@ class StoryPortItem final : public QGraphicsItem
     }
     QRectF boundingRect() const override
     {
-        return {-12, -12, 24, 24};
+        return {-14, -14, 28, 28};
     }
     void paint(QPainter* Painter, const QStyleOptionGraphicsItem*, QWidget*) override
     {
-        StoryGraphStyle::PaintPort(*Painter, bOutput);
+        StoryGraphStyle::PaintPort(*Painter, bOutput, bHovered);
     }
+    void hoverEnterEvent(QGraphicsSceneHoverEvent*) override { bHovered = true; update(); }
+    void hoverLeaveEvent(QGraphicsSceneHoverEvent*) override { bHovered = false; update(); }
     QString Identity;
     int Port = -1;
     bool bOutput = false;
+    bool bHovered = false;
 };
 } // namespace
 
@@ -66,6 +68,7 @@ class StoryCardItem final : public QGraphicsItem
         setFlag(ItemIsMovable, bEditable);
         setFlag(ItemSendsGeometryChanges);
         setData(0, Node.Identity);
+        Geometry = StoryGraphStyle::Layout(Node);
         setToolTip(Node.Text);
         auto* Input = new StoryPortItem(Node.Identity, -2, false, this);
         Input->setPos(StoryGraphStyle::InputAnchor());
@@ -73,7 +76,7 @@ class StoryCardItem final : public QGraphicsItem
         {
             const int Port = Node.KindId == 1 ? Index : -1;
             auto* Output = new StoryPortItem(Node.Identity, Port, true, this);
-            Output->setPos(StoryGraphStyle::OutputAnchor(Node, Port));
+            Output->setPos(StoryGraphStyle::OutputAnchor(Node, Port, &Geometry));
         }
     }
     int type() const override
@@ -82,11 +85,11 @@ class StoryCardItem final : public QGraphicsItem
     }
     QRectF boundingRect() const override
     {
-        return {0, 0, StoryGraphStyle::NodeWidth, StoryGraphStyle::Height(Node)};
+        return {0, 0, StoryGraphStyle::NodeWidth, Geometry.Height};
     }
     void paint(QPainter* Painter, const QStyleOptionGraphicsItem*, QWidget*) override
     {
-        StoryGraphStyle::PaintCard(*Painter, Node, Title, isSelected());
+        StoryGraphStyle::PaintCard(*Painter, Node, Title, isSelected(), &Geometry);
     }
     QVariant itemChange(GraphicsItemChange Change, const QVariant& Value) override
     {
@@ -98,6 +101,7 @@ class StoryCardItem final : public QGraphicsItem
     }
     StoryGraphNode Node;
     QString Title;
+    StoryGraphStyle::CardLayout Geometry;
 };
 
 class StoryEdgeItem final : public QGraphicsPathItem
@@ -108,6 +112,7 @@ class StoryEdgeItem final : public QGraphicsPathItem
     {
         setFlag(ItemIsSelectable);
         setZValue(-1);
+        setAcceptHoverEvents(true);
         setToolTip(QObject::tr("Переход. Delete — удалить связь"));
     }
     int type() const override
@@ -122,11 +127,14 @@ class StoryEdgeItem final : public QGraphicsPathItem
     }
     void paint(QPainter* Painter, const QStyleOptionGraphicsItem*, QWidget*) override
     {
-        StoryGraphStyle::PaintConnection(*Painter, path(), isSelected());
+        StoryGraphStyle::PaintConnection(*Painter, path(), isSelected() || bHovered);
     }
+    void hoverEnterEvent(QGraphicsSceneHoverEvent*) override { bHovered = true; update(); }
+    void hoverLeaveEvent(QGraphicsSceneHoverEvent*) override { bHovered = false; update(); }
     QString Source;
     int Port = -1;
     QString Target;
+    bool bHovered = false;
 };
 
 StoryGraphicsScene::StoryGraphicsScene(QObject* Parent) : QGraphicsScene(Parent) {}
@@ -138,8 +146,14 @@ void StoryGraphicsScene::SetGraph(const StoryGraphModel& Model)
     Cards.clear();
     Edges.clear();
     BeforeMove.clear();
+    bEventDragging = false; EventDragPreview = nullptr;
+    bool KeepEventDrag = !Model.bReadOnly;
+    bool HasDraggedNode = false;
+    for (const auto& Node : Model.Nodes) { HasDraggedNode |= Node.Identity == DragEventNode; }
+    if (!KeepEventDrag || !HasDraggedNode) { DragEventNode.clear(); DragBinding.clear(); }
     clear();
     bEditable = Model.bOpen && !Model.bReadOnly;
+    EventLibrary = Model.Events;
     int FallbackIndex = 0;
     for (const auto& Node : Model.Nodes)
     {
@@ -149,6 +163,7 @@ void StoryGraphicsScene::SetGraph(const StoryGraphModel& Model)
                                        : QPointF(40 + FallbackIndex++ * StoryGraphStyle::ColumnSpacing, 30));
         Cards.insert(Node.Identity, Card);
     }
+    SelectEvent(SelectedEventNode, SelectedEventBinding);
     for (const auto& Node : Model.Nodes)
     {
         for (int Index = 0; Index < Node.Targets.size(); ++Index)
@@ -184,8 +199,8 @@ void StoryGraphicsScene::UpdateConnections()
         const auto* Target = Cards.value(Edge->Target);
         if (Source != nullptr && Target != nullptr)
         {
-            Edge->setPath(ConnectionPath(Source->pos() + StoryGraphStyle::OutputAnchor(Source->Node, Edge->Port),
-                                         Target->pos() + StoryGraphStyle::InputAnchor()));
+            const QPointF From = Source->pos() + StoryGraphStyle::OutputAnchor(Source->Node, Edge->Port, &Source->Geometry);
+            Edge->setPath(ConnectionPath(From, Target->pos() + StoryGraphStyle::InputAnchor()));
         }
     }
 }
@@ -205,6 +220,7 @@ QStringList StoryGraphicsScene::SelectedNodes() const
 
 void StoryGraphicsScene::SelectNode(const QString& Identity)
 {
+    SelectEvent({}, {});
     clearSelection();
     if (auto* Card = Cards.value(Identity))
     {
@@ -218,6 +234,8 @@ bool StoryGraphicsScene::DeleteSelection()
     {
         return false;
     }
+    if (!SelectedEventBinding.isEmpty() && RemoveEventRequested)
+    { RemoveEventRequested(SelectedEventNode, SelectedEventBinding); return true; }
     const auto Nodes = SelectedNodes();
     if (!Nodes.isEmpty() && DeleteRequested)
     {
@@ -245,6 +263,51 @@ void StoryGraphicsScene::CancelConnection()
 
 void StoryGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* Event)
 {
+    BeforeMove.clear();
+    if (Event->button() == Qt::LeftButton)
+    {
+        for (auto* Item : items(Event->scenePos()))
+        {
+            if (Item->type() != CardItemType) { continue; }
+            auto* Card = static_cast<StoryCardItem*>(Item);
+            if (Card->Node.KindId != 0 && Card->Node.KindId != 1) { break; }
+            const auto Local = Card->mapFromScene(Event->scenePos());
+            const auto& G = Card->Geometry;
+            const QRectF Phases[] = {G.Before, G.During, G.After};
+            for (int Phase = 0; Phase < 3; ++Phase)
+            {
+                if (bEditable && QRectF(StoryGraphStyle::NodeWidth - 35, Phases[Phase].top() + 5, 28, 30).contains(Local))
+                { ShowEventMenu(Card->Node.Identity, Phase, {}, Event->screenPos()); Event->accept(); return; }
+            }
+            for (const auto& Batch : G.Batches)
+            {
+                if (bEditable && Batch.Order.contains(Local))
+                {
+                    if (Local.x() > Batch.Order.right() - 28) { ShowEventMenu(Card->Node.Identity, Batch.Phase, Batch.Identity, Event->screenPos()); }
+                    else if (EventModeRequested) { EventModeRequested(Card->Node.Identity, Batch.Identity, !Batch.bParallel); }
+                    Event->accept(); return;
+                }
+                for (const auto& Row : Batch.Events)
+                {
+                    if (!Row.Rect.contains(Local)) { continue; }
+                    const auto Node = Card->Node.Identity;
+                    const auto Binding = Row.Binding;
+                    clearSelection(); Card->setSelected(true);
+                    SelectEvent(Node, Binding);
+                    if (bEditable && Local.x() > Row.Rect.right() - 27 && Local.y() < Row.Rect.top() + 28)
+                    { if (RemoveEventRequested) { RemoveEventRequested(Node, Binding); } }
+                    else
+                    {
+                        if (EventSelected) { EventSelected(Node, Binding); }
+                        if (bEditable) { DragEventNode = Node; DragBinding = Binding; DragOrigin = Event->scenePos(); }
+                    }
+                    Event->accept(); return;
+                }
+            }
+            break;
+        }
+    }
+    SelectEvent({}, {});
     if (bEditable && Event->button() == Qt::LeftButton)
     {
         for (auto* Item : items(Event->scenePos()))
@@ -275,13 +338,53 @@ void StoryGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* Event)
     QGraphicsScene::mousePressEvent(Event);
 }
 
+void StoryGraphicsScene::SelectEvent(const QString& Node, const QString& Binding)
+{
+    const QString RequestedNode = Node, RequestedBinding = Binding;
+    SelectedEventNode.clear(); SelectedEventBinding.clear();
+    for (auto* Card : Cards)
+    {
+        for (auto& Batch : Card->Node.EventBatches) { for (auto& Placement : Batch.Bindings)
+        {
+            Placement.bSelected = Card->Node.Identity == RequestedNode && Placement.Identity == RequestedBinding;
+            if (Placement.bSelected) { SelectedEventNode = RequestedNode; SelectedEventBinding = RequestedBinding; }
+        } }
+        Card->update();
+    }
+}
+
+void StoryGraphicsScene::ShowEventMenu(const QString& Node, int Phase, const QString& Batch, QPoint Screen)
+{
+    QMenu Menu;
+    auto* New = Menu.addAction(tr("Новое событие"));
+    auto* Import = Menu.addAction(tr("Импорт события…"));
+    QMap<QAction*, QString> Sources;
+    if (!EventLibrary.isEmpty()) { Menu.addSeparator(); }
+    for (const auto& Event : EventLibrary) { Sources.insert(Menu.addAction(Event.Name), Event.Identity); }
+    auto* Selected = Menu.exec(Screen);
+    if (Selected == Import && ImportEventRequested) { ImportEventRequested(Node, Phase); }
+    else if (Selected && AddEventRequested) { AddEventRequested(Node, Phase, Batch, Selected == New ? QString{} : Sources.value(Selected)); }
+}
+
 void StoryGraphicsScene::mouseMoveEvent(QGraphicsSceneMouseEvent* Event)
 {
+    if (!DragBinding.isEmpty())
+    {
+        if (!bEventDragging && QLineF(DragOrigin, Event->scenePos()).length() > 8)
+        {
+            bEventDragging = true;
+            auto* Label = addText(tr("Переместить событие"), StoryGraphStyle::Font(12));
+            Label->setDefaultTextColor(EditorStyle::Color("--accent"));
+            Label->setZValue(10); Label->setAcceptedMouseButtons(Qt::NoButton); EventDragPreview = Label;
+        }
+        if (EventDragPreview) { EventDragPreview->setPos(Event->scenePos() + QPointF(12, 12)); }
+        Event->accept(); return;
+    }
     if (Preview != nullptr)
     {
         auto* Source = Cards.value(ConnectionSource);
-        Preview->setPath(ConnectionPath(Source->pos() + StoryGraphStyle::OutputAnchor(Source->Node, ConnectionPort),
-                                        Event->scenePos()));
+        const QPointF From = Source->pos() + StoryGraphStyle::OutputAnchor(Source->Node, ConnectionPort, &Source->Geometry);
+        Preview->setPath(ConnectionPath(From, Event->scenePos()));
         Event->accept();
         return;
     }
@@ -290,6 +393,35 @@ void StoryGraphicsScene::mouseMoveEvent(QGraphicsSceneMouseEvent* Event)
 
 void StoryGraphicsScene::mouseReleaseEvent(QGraphicsSceneMouseEvent* Event)
 {
+    if (!DragBinding.isEmpty())
+    {
+        const auto Node = DragEventNode, Binding = DragBinding;
+        auto* Card = Cards.value(Node);
+        const bool Dragged = bEventDragging;
+        delete EventDragPreview; EventDragPreview = nullptr; DragBinding.clear(); DragEventNode.clear(); bEventDragging = false;
+        if (Dragged && Card && MoveEventRequested)
+        {
+            const auto Local = Card->mapFromScene(Event->scenePos());
+            const QRectF Phases[] = {Card->Geometry.Before, Card->Geometry.During, Card->Geometry.After};
+            for (int Phase = 0; Phase < 3; ++Phase)
+            {
+                if (!Phases[Phase].contains(Local)) { continue; }
+                QString Destination, Before;
+                for (const auto& Batch : Card->Geometry.Batches)
+                {
+                    if (Batch.Phase != Phase) { continue; }
+                    if (Batch.Order.contains(Local)) { Destination = Batch.Identity; break; }
+                    for (const auto& Row : Batch.Events)
+                    {
+                        if (Row.Rect.contains(Local)) { Destination = Batch.Identity; Before = Row.Binding; break; }
+                    }
+                    if (!Destination.isEmpty()) { break; }
+                }
+                MoveEventRequested(Node, Binding, Phase, Destination, Before); break;
+            }
+        }
+        Event->accept(); return;
+    }
     if (Preview != nullptr)
     {
         QString Target;

@@ -39,11 +39,17 @@ class StoryGraphController final : public QObject
     void Select(const QString& Identity);
     void Finish(bool bSuccess, const std::string& Error);
     void RefreshNow();
+    void ConfigureEvents();
+    void ClearEventCallbacks();
+    bool ShowEventInspector(const StoryGraphNode& Node, const StoryGraphModel& Model);
+    void ExportSelectedEvent();
+    void ImportEvent(int Phase = -1);
     StoryGraphDocument Document;
     StoryWorkspaceView& View;
     StoryInspectorView& Inspector;
     QVector<QPair<QString, QString>> Objects;
     QString Selected;
+    QString SelectedBinding;
     bool bLocked = false;
     bool bRefreshPending = false;
     bool bForceInspector = false;

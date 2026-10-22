@@ -10,6 +10,14 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
 set(EDITOR_SRC
+    src/UI/Adapters/StoryEventAdapter.cpp
+    src/UI/Adapters/StoryGraphControllerEvents.cpp
+    src/UI/Adapters/StoryGraphControllerPackages.cpp
+    src/UI/Views/StoryEventPackageDialog.cpp
+    src/UI/Styles/StoryEventStyle.cpp
+    src/UI/Views/StoryActionFieldsView.cpp
+    src/UI/Views/StoryEventInspectorView.cpp
+    src/UI/Styles/StoryInspectorStyle.cpp
     src/UI/Styles/StoryGraphStyle.cpp
     src/UI/Styles/StudioIcons.cpp
     src/UI/Adapters/StoryGraphController.cpp
@@ -47,6 +55,12 @@ set(EDITOR_SRC
 )
 
 set(EDITOR_HDR
+    inc/UI/Adapters/StoryEventAdapter.h
+    inc/UI/Styles/StoryEventStyle.h
+    inc/UI/Views/StoryActionFieldsView.h
+    inc/UI/Views/StoryEventInspectorView.h
+    inc/UI/Views/StoryEventPackageDialog.h
+    inc/UI/Styles/StoryInspectorStyle.h
     inc/UI/Styles/StudioIcons.h
     inc/UI/Styles/StoryGraphStyle.h
     inc/UI/Presentation/StoryGraphModel.h

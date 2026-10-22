@@ -3,6 +3,7 @@
 #include "Assets/AssetRegistry.h"
 #include "Assets/ContentHash.h"
 #include "Story/StoryTypes.h"
+#include "Documents/StoryEventPackage.h"
 #include <functional>
 #include <map>
 #include <nlohmann/json.hpp>
@@ -68,6 +69,22 @@ class StoryGraphDocument
     bool MoveNodes(const std::map<StoryNodeId, StoryGraphPosition>& Positions, std::string& Error);
     bool SetStart(const StoryNodeId& Identity, std::string& Error);
     bool ValidateForPlayback(std::string& Error) const;
+    bool AddEvent(const StoryNodeId& Node, StoryEventPhase Phase, const std::string& SourceEvent,
+                  std::string& Binding, std::string& Error, const std::string& Batch = {});
+    bool RemoveEventBinding(const StoryNodeId& Node, const std::string& Binding, std::string& Error);
+    bool SetEventPlacement(const StoryNodeId& Node, const std::string& Binding, StoryEventPhase Phase,
+                           StoryEventJoin Join, std::string& Error, const std::string& Batch = {}, const std::string& BeforeBinding = {});
+    bool SetEventBatchMode(const StoryNodeId& Node, const std::string& Batch, bool bParallel, std::string& Error);
+    bool MoveEventBinding(const StoryNodeId& Node, const std::string& Binding, int Offset, std::string& Error);
+    bool ReplaceEvent(StoryEventDefinition Event, std::string& Error);
+    bool SetEventOverrides(const StoryNodeId& Node, const std::string& Binding,
+                           const std::vector<StoryActionDefinition>& Actions, std::string& Error);
+    bool ExportEventPackage(const std::string& Event, const std::vector<StoryActionDefinition>& Overrides,
+        const StoryEventPackageMetadata& Metadata, const std::map<std::string, std::string>& ObjectNames,
+        std::string& Text, std::string& Error) const;
+    bool ImportEventPackage(const std::string& Text, const std::map<std::string, std::string>& Bindings,
+        const std::vector<std::string>& AvailableObjects, const StoryNodeId& Node, StoryEventPhase Phase,
+        std::string& CreatedBinding, std::string& Error);
 
   private:
     struct Revision
@@ -76,6 +93,7 @@ class StoryGraphDocument
         std::string Label;
     };
     bool Apply(const char* Label, const std::function<bool(nlohmann::json&, std::string&)>& Edit, std::string& Error);
+    bool EditStaging(const char* Label, const std::function<bool(StoryDocument&, std::string&)>& Edit, std::string& Error);
     static bool Decode(const nlohmann::json& Data, StoryDocument& Story, std::string& Error);
     const nlohmann::json& Data() const
     {

@@ -1,4 +1,6 @@
 #include "Story/StoryDocumentIO.h"
+#include "StoryJson.h"
+#include "Story/StoryEvents.h"
 
 #include "Core/IO/AtomicFileWriter.h"
 
@@ -110,7 +112,8 @@ bool TryParseActionKind(const std::string& KindText, StoryActionKind& OutKind, s
     return false;
 }
 
-bool TryReadAction(const nlohmann::json& JsonValue, StoryActionDefinition& OutAction, std::string& OutError)
+} // namespace
+bool StoryJson::ReadAction(const nlohmann::json& JsonValue, StoryActionDefinition& OutAction, std::string& OutError)
 {
     if (!JsonValue.is_object())
     {
@@ -136,8 +139,9 @@ bool TryReadAction(const nlohmann::json& JsonValue, StoryActionDefinition& OutAc
         OutAction.Id = JsonValue.at("id").get<std::string>();
     }
 
-    if (JsonValue.contains("durationSeconds") && JsonValue.at("durationSeconds").is_number())
+    if (JsonValue.contains("durationSeconds"))
     {
+        if (!JsonValue.at("durationSeconds").is_number()) { OutError = "durationSeconds must be a number"; return false; }
         OutAction.DurationSeconds = JsonValue.at("durationSeconds").get<float>();
     }
 
@@ -151,8 +155,9 @@ bool TryReadAction(const nlohmann::json& JsonValue, StoryActionDefinition& OutAc
         OutAction.TargetObjectId = JsonValue.at("targetObjectId").get<std::string>();
     }
 
-    if (JsonValue.contains("targetObjectName") && JsonValue.at("targetObjectName").is_string())
+    if (JsonValue.contains("targetObjectName"))
     {
+        if (!JsonValue.at("targetObjectName").is_string()) { OutError = "targetObjectName must be a string"; return false; }
         OutAction.TargetObjectName = JsonValue.at("targetObjectName").get<std::string>();
     }
 
@@ -173,14 +178,17 @@ bool TryReadAction(const nlohmann::json& JsonValue, StoryActionDefinition& OutAc
         OutAction.bHasTargetRotation = true;
     }
 
-    if (JsonValue.contains("useTargetObjectTransform") && JsonValue.at("useTargetObjectTransform").is_boolean())
+    if (JsonValue.contains("useTargetObjectTransform"))
     {
+        if (!JsonValue.at("useTargetObjectTransform").is_boolean()) { OutError = "useTargetObjectTransform must be a boolean"; return false; }
         OutAction.bUseTargetObjectTransform = JsonValue.at("useTargetObjectTransform").get<bool>();
     }
 
     return true;
 }
 
+namespace
+{
 bool TryReadNode(const nlohmann::json& JsonValue, StoryNode& OutNode, std::string& OutError)
 {
     if (!JsonValue.is_object())
@@ -262,7 +270,7 @@ bool TryReadNode(const nlohmann::json& JsonValue, StoryNode& OutNode, std::strin
         for (const nlohmann::json& ActionJson : JsonValue.at("actions"))
         {
             StoryActionDefinition Action{};
-            if (!TryReadAction(ActionJson, Action, OutError))
+            if (!StoryJson::ReadAction(ActionJson, Action, OutError))
             {
                 return false;
             }
@@ -273,7 +281,8 @@ bool TryReadNode(const nlohmann::json& JsonValue, StoryNode& OutNode, std::strin
     return true;
 }
 
-nlohmann::json ActionToJson(const StoryActionDefinition& Action)
+} // namespace
+nlohmann::json StoryJson::WriteAction(const StoryActionDefinition& Action)
 {
     nlohmann::json Document = nlohmann::json::object();
     switch (Action.Kind)
@@ -320,6 +329,8 @@ nlohmann::json ActionToJson(const StoryActionDefinition& Action)
     return Document;
 }
 
+namespace
+{
 nlohmann::json NodeToJson(const StoryNode& Node)
 {
     nlohmann::json Document = nlohmann::json::object();
@@ -376,7 +387,7 @@ nlohmann::json NodeToJson(const StoryNode& Node)
         nlohmann::json ActionsJson = nlohmann::json::array();
         for (const StoryActionDefinition& Action : Node.Actions)
         {
-            ActionsJson.push_back(ActionToJson(Action));
+            ActionsJson.push_back(StoryJson::WriteAction(Action));
         }
         Document["actions"] = std::move(ActionsJson);
     }
@@ -458,6 +469,10 @@ StorySerializeResult StoryDocumentIO::LoadFromJson(const std::string& JsonText, 
         return Result;
     }
 
+    if (!StoryJson::ReadEvents(Root, OutDocument, Result.Error))
+    {
+        return Result;
+    }
     Result.bOk = true;
     return Result;
 }
@@ -485,6 +500,7 @@ StorySerializeResult StoryDocumentIO::LoadFromFile(const std::filesystem::path& 
 StorySerializeResult StoryDocumentIO::SaveToJson(const StoryDocument& Document, std::string& OutJsonText)
 {
     StorySerializeResult Result{};
+    if (!ValidateStoryEvents(Document, Result.Error)) { return Result; }
     nlohmann::json Root = nlohmann::json::object();
     Root["format"] = FormatId;
     Root["formatVersion"] = FormatVersion;
@@ -497,6 +513,7 @@ StorySerializeResult StoryDocumentIO::SaveToJson(const StoryDocument& Document, 
         NodesJson.push_back(NodeToJson(Node));
     }
     Root["nodes"] = std::move(NodesJson);
+    StoryJson::WriteEvents(Root, Document);
 
     OutJsonText = Root.dump(2);
     Result.bOk = true;

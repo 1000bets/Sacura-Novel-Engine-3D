@@ -4,11 +4,13 @@
 #include "Core/Object/ObjectHandle.h"
 
 #include <filesystem>
+#include <memory>
 #include <string>
 #include <vector>
 
 class GameObject;
 class Scene;
+class StoryEventPlayer;
 
 enum class StoryPlaybackPhase
 {
@@ -23,7 +25,7 @@ enum class StoryPlaybackPhase
 class StoryRuntime
 {
 public:
-    StoryRuntime() = default;
+    StoryRuntime();
     ~StoryRuntime();
     StoryRuntime(const StoryRuntime&) = delete;
     StoryRuntime& operator=(const StoryRuntime&) = delete;
@@ -40,6 +42,7 @@ public:
     StoryPlaybackPhase GetPlaybackPhase() const { return Phase; }
 
     bool CanAdvanceDialogue() const;
+    bool CanSelectChoice() const;
     bool AdvanceDialogue();
     bool SelectChoice(size_t ChoiceIndex);
     void Tick(float DeltaTime);
@@ -64,10 +67,13 @@ private:
         ObjectHandle PrimaryCameraObject;
         ObjectHandle NavigationAgent;
         uint64_t NavigationRequest = 0;
+        bool bOwnsTransform = false;
     };
 
     const StoryNode* FindNode(const StoryNodeId& NodeId) const;
     void EnterNode(const StoryNodeId& NodeId);
+    void DisplayNode();
+    void FinishDialogue(const StoryNodeId& Next);
     void BeginActionSequence();
     void PrepareActiveAction();
     void FailAction(const std::string& Error);
@@ -91,6 +97,10 @@ private:
     std::vector<ActiveAction> ActionQueue;
     size_t ActiveActionIndex = 0;
     bool bActionSequenceRunning = false;
+    std::unique_ptr<StoryEventPlayer> Events;
+    // 0: legacy/no staging, 1: before text, 2: text visible, 3: after answer.
+    int StagingPhase = 0;
+    StoryNodeId StagedNext;
 
     std::string LastError;
 };

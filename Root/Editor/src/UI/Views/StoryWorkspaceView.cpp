@@ -68,13 +68,19 @@ class StoryCanvas final : public QGraphicsView
         bKeepOriginOnResize = false;
         fitInView(scene()->itemsBoundingRect().adjusted(-30, -30, 30, 30), Qt::KeepAspectRatio);
     }
-    void ResetNavigation()
+    void ResetNavigation(QPointF NodePosition)
     {
         bKeepOriginOnResize = true;
+        InitialNodePosition = NodePosition;
         resetTransform();
         scale(0.8, 0.8);
-        horizontalScrollBar()->setValue(0);
-        verticalScrollBar()->setValue(0);
+        RestoreInitialView();
+    }
+    void EnsureVisibleExtent(QPointF Center)
+    {
+        const QSizeF Size(viewport()->width() / transform().m11(), viewport()->height() / transform().m11());
+        const QRectF Visible(Center - QPointF(Size.width() / 2, Size.height() / 2), Size);
+        scene()->setSceneRect(scene()->sceneRect().united(Visible.adjusted(-2, -2, 2, 2)));
     }
 
   protected:
@@ -132,8 +138,7 @@ class StoryCanvas final : public QGraphicsView
         QGraphicsView::showEvent(Event);
         if (bKeepOriginOnResize)
         {
-            horizontalScrollBar()->setValue(0);
-            verticalScrollBar()->setValue(0);
+            RestoreInitialView();
         }
     }
     void resizeEvent(QResizeEvent* Event) override
@@ -141,8 +146,7 @@ class StoryCanvas final : public QGraphicsView
         QGraphicsView::resizeEvent(Event);
         if (bKeepOriginOnResize)
         {
-            horizontalScrollBar()->setValue(0);
-            verticalScrollBar()->setValue(0);
+            RestoreInitialView();
         }
         if (Navigation != nullptr)
         {
@@ -174,6 +178,18 @@ class StoryCanvas final : public QGraphicsView
     }
 
   private:
+    void RestoreInitialView()
+    {
+        // StoryFlow focuses the selected entry at (40,30), zoom .8. Extend the
+        // scrollable scene before setting offsets: tall/wide viewports otherwise
+        // clamp a requested origin and center the cards in empty space.
+        const qreal Scale = transform().m11();
+        const QSizeF Size(viewport()->width() / Scale, viewport()->height() / Scale);
+        const QPointF TopLeft = InitialNodePosition - QPointF(40, 30) / Scale;
+        scene()->setSceneRect(scene()->sceneRect().united(QRectF(TopLeft, Size).adjusted(-2, -2, 2, 2)));
+        horizontalScrollBar()->setValue(qRound(TopLeft.x() * Scale));
+        verticalScrollBar()->setValue(qRound(TopLeft.y() * Scale));
+    }
     void Zoom(qreal Factor)
     {
         bKeepOriginOnResize = false;
@@ -190,6 +206,7 @@ class StoryCanvas final : public QGraphicsView
         }
     }
     bool bKeepOriginOnResize = true;
+    QPointF InitialNodePosition;
     QWidget* Navigation = nullptr;
     StoryWorkspaceView& Workspace;
 };
@@ -282,11 +299,11 @@ StoryWorkspaceView::StoryWorkspaceView(QWidget* Parent) : QWidget(Parent)
     Body->setSpacing(0);
     auto* Variables = new QWidget(this);
     Variables->setObjectName("BlueprintSidebar");
-    Variables->setFixedWidth(240);
+    Variables->setFixedWidth(244);
     auto* Sidebar = new QVBoxLayout(Variables);
-    Sidebar->setContentsMargins(12, 0, 12, 12);
-    Sidebar->setSpacing(12);
-    auto* Heading = new QLabel(tr("Мои Blueprint"), Variables);
+    Sidebar->setContentsMargins(12, 12, 12, 12);
+    Sidebar->setSpacing(10);
+    auto* Heading = new QLabel(tr("Мой Blueprint"), Variables);
     Heading->setObjectName("BlueprintHeading");
     Sidebar->addWidget(Heading);
     Sidebar->addWidget(new QLabel(tr("Переменные"), Variables));
@@ -304,6 +321,13 @@ StoryWorkspaceView::StoryWorkspaceView(QWidget* Parent) : QWidget(Parent)
     Sidebar->addWidget(Hint);
     Body->addWidget(Variables);
     Graphics = new StoryGraphicsScene(this);
+    Graphics->AddEventRequested = [this](QString Node, int Phase, QString Batch, QString Source)
+    { if (AddEventRequested) { AddEventRequested(Node, Phase, Batch, Source); } };
+    Graphics->EventSelected = [this](QString Node, QString Binding) { if (EventSelected) { EventSelected(Node, Binding); } };
+    Graphics->RemoveEventRequested = [this](QString Node, QString Binding) { if (RemoveEventRequested) { RemoveEventRequested(Node, Binding); } };
+    Graphics->EventModeRequested = [this](QString Node, QString Batch, bool Parallel) { if (EventModeRequested) { EventModeRequested(Node, Batch, Parallel); } };
+    Graphics->ImportEventRequested = [this](QString Node, int Phase) { if (ImportEventRequested) { ImportEventRequested(Node, Phase); } };
+    Graphics->MoveEventRequested = [this](QString Node, QString Binding, int Phase, QString Batch, QString Before) { if (MoveEventRequested) { MoveEventRequested(Node, Binding, Phase, Batch, Before); } };
     Graphics->AddRequested = [this](int Kind, QPointF Position)
     {
         if (AddNodeRequested)
@@ -406,11 +430,18 @@ void StoryWorkspaceView::SetModel(StoryGraphModel InModel)
     OpenButton->setEnabled(!Model.bLocked);
     if (bReset)
     {
-        static_cast<StoryCanvas*>(Canvas)->ResetNavigation();
+        QPointF InitialPosition;
+        if (!Model.Nodes.isEmpty()) { InitialPosition = Model.Nodes.front().Position; }
+        for (const auto& Node : Model.Nodes)
+        {
+            if (Node.Identity == Model.Start) { InitialPosition = Node.Position; break; }
+        }
+        static_cast<StoryCanvas*>(Canvas)->ResetNavigation(InitialPosition);
     }
     else
     {
         Canvas->setTransform(Transform);
+        static_cast<StoryCanvas*>(Canvas)->EnsureVisibleExtent(Center);
         Canvas->centerOn(Center);
     }
 }
@@ -429,5 +460,10 @@ void StoryWorkspaceView::SelectNode(const QString& Identity)
 bool StoryWorkspaceView::DeleteSelection()
 {
     return Graphics->DeleteSelection();
+}
+
+void StoryWorkspaceView::SelectEvent(const QString& Node, const QString& Binding)
+{
+    Graphics->SelectEvent(Node, Binding);
 }
 } // namespace EditorUi

@@ -4,11 +4,65 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QPixmap>
+#include <QIconEngine>
+#include <algorithm>
+#include <utility>
+
+namespace
+{
+// Vector geometry from the frontend's lucide-react 0.468.0 Flower2 icon.
+// ISC attribution: resources/ui/icons/LUCIDE-LICENSE. Draw at the destination
+// scale instead of caching a small bitmap, including after a screen/DPI change.
+class FlowerIconEngine final : public QIconEngine
+{
+public:
+    explicit FlowerIconEngine(QColor InColor) : Color(std::move(InColor)) {}
+    QIconEngine* clone() const override { return new FlowerIconEngine(Color); }
+    void paint(QPainter* Painter, const QRect& Rect, QIcon::Mode, QIcon::State) override
+    {
+        Painter->save();
+        Painter->setRenderHint(QPainter::Antialiasing);
+        const qreal Side = std::min(Rect.width(), Rect.height());
+        Painter->translate(Rect.x() + (Rect.width() - Side) / 2, Rect.y() + (Rect.height() - Side) / 2);
+        Painter->scale(Side / 24, Side / 24);
+        Painter->setPen(QPen(Color, 1.65, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        Painter->setBrush(Qt::NoBrush);
+        QPainterPath Path;
+        Path.moveTo(12, 5); Path.arcTo(QRectF(12, 2, 6, 6), 180, -270);
+        Path.moveTo(12, 5); Path.arcTo(QRectF(6, 2, 6, 6), 0, 270);
+        Path.moveTo(12, 5); Path.lineTo(12, 6);
+        Path.moveTo(9, 8); Path.arcTo(QRectF(6, 8, 6, 6), 90, 270);
+        Path.moveTo(9, 8); Path.lineTo(10, 8);
+        Path.moveTo(15, 8); Path.arcTo(QRectF(12, 8, 6, 6), 90, -270);
+        Path.moveTo(15, 8); Path.lineTo(14, 8);
+        Path.moveTo(12, 11); Path.lineTo(12, 10);
+        Path.moveTo(12, 10); Path.lineTo(12, 22);
+        Path.moveTo(12, 22); Path.cubicTo(16.2, 22, 19, 20.333, 19, 17);
+        Path.cubicTo(14.8, 17, 12, 18.667, 12, 22); Path.closeSubpath();
+        Path.moveTo(12, 22); Path.cubicTo(7.8, 22, 5, 20.333, 5, 17);
+        Path.cubicTo(9.2, 17, 12, 18.667, 12, 22); Path.closeSubpath();
+        Painter->drawPath(Path);
+        Painter->drawEllipse(QPointF(12, 8), 2, 2);
+        Painter->restore();
+    }
+    QPixmap pixmap(const QSize& Size, QIcon::Mode Mode, QIcon::State State) override
+    {
+        QPixmap Image(Size);
+        Image.fill(Qt::transparent);
+        QPainter Painter(&Image);
+        paint(&Painter, QRect(QPoint(), Size), Mode, State);
+        return Image;
+    }
+private:
+    QColor Color;
+};
+}
 
 namespace EditorUi
 {
 QIcon MakeStudioIcon(StudioIcon Icon, const char* ColorToken)
 {
+    if (Icon == StudioIcon::Flower) { return QIcon(new FlowerIconEngine(EditorStyle::Color(ColorToken))); }
     // A two-times raster preserves thin strokes on high-DPI Qt hosts without QtSvg.
     QPixmap Image(32, 32);
     Image.fill(Qt::transparent);
@@ -19,6 +73,8 @@ QIcon MakeStudioIcon(StudioIcon Icon, const char* ColorToken)
     QPainterPath Path;
     switch (Icon)
     {
+    case StudioIcon::ExternalLink: Path.moveTo(10, 2); Path.lineTo(14, 2); Path.lineTo(14, 6); Path.moveTo(14, 2); Path.lineTo(7, 9); Path.moveTo(6, 3); Path.lineTo(3, 3); Path.lineTo(3, 13); Path.lineTo(13, 13); Path.lineTo(13, 10); break;
+    case StudioIcon::Layers: Path.moveTo(2, 5); Path.lineTo(8, 2); Path.lineTo(14, 5); Path.lineTo(8, 8); Path.closeSubpath(); Path.moveTo(2, 8); Path.lineTo(8, 11); Path.lineTo(14, 8); Path.moveTo(2, 11); Path.lineTo(8, 14); Path.lineTo(14, 11); break;
     case StudioIcon::ChevronDown: Path.moveTo(5, 6); Path.lineTo(8, 9); Path.lineTo(11, 6); break;
     case StudioIcon::ChevronRight: Path.moveTo(6, 5); Path.lineTo(9, 8); Path.lineTo(6, 11); break;
     case StudioIcon::Play: Path.moveTo(5, 3); Path.lineTo(12, 8); Path.lineTo(5, 13); Path.closeSubpath(); break;
@@ -37,12 +93,10 @@ QIcon MakeStudioIcon(StudioIcon Icon, const char* ColorToken)
     case StudioIcon::Grid: Painter.drawRect(QRectF(2, 2, 12, 12)); Painter.drawLine(6, 2, 6, 14); Painter.drawLine(10, 2, 10, 14); Painter.drawLine(2, 6, 14, 6); Painter.drawLine(2, 10, 14, 10); break;
     case StudioIcon::Plus: Painter.drawLine(8, 3, 8, 13); Painter.drawLine(3, 8, 13, 8); break;
     case StudioIcon::Fit: Painter.drawRect(QRectF(5, 5, 6, 6)); Path.moveTo(2, 5); Path.lineTo(2, 2); Path.lineTo(5, 2); Path.moveTo(11, 2); Path.lineTo(14, 2); Path.lineTo(14, 5); Path.moveTo(14, 11); Path.lineTo(14, 14); Path.lineTo(11, 14); Path.moveTo(5, 14); Path.lineTo(2, 14); Path.lineTo(2, 11); break;
-    case StudioIcon::Flower:
-        for (int Petal = 0; Petal < 5; ++Petal)
-        {
-            Painter.save(); Painter.translate(8, 7); Painter.rotate(Petal * 72); Painter.drawEllipse(QRectF(-2, -5, 4, 5)); Painter.restore();
-        }
-        Painter.drawEllipse(QRectF(6.5, 5.5, 3, 3)); Painter.drawLine(8, 11, 8, 15); break;
+    case StudioIcon::Flower: break; // Scalable frontend vector handled above.
+    case StudioIcon::Message:
+        Path.moveTo(3, 2); Path.lineTo(13, 2); Path.lineTo(14, 3); Path.lineTo(14, 11);
+        Path.lineTo(13, 12); Path.lineTo(5, 12); Path.lineTo(2, 15); Path.lineTo(2, 3); Path.closeSubpath(); break;
     }
     Painter.drawPath(Path);
     Painter.end();

@@ -12,9 +12,12 @@ set(EDITOR_CORE_SRC
     src/Documents/SceneDocument.cpp
     src/Documents/SceneWorkspace.cpp
     src/Documents/StoryGraphDocument.cpp
+    src/Documents/StoryEventCommands.cpp
+    src/Documents/StoryEventPackage.cpp
 )
 
 set(EDITOR_CORE_HDR
+    inc/Documents/StoryEventPackage.h
     inc/Assets/StoryAssetCreation.h
     inc/Assets/AssetOperations.h
     inc/Assets/AssetImporter.h

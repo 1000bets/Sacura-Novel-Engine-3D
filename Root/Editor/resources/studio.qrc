@@ -1,9 +1,13 @@
 <!DOCTYPE RCC>
 <RCC version="1.0">
+    <qresource prefix="/ui/icons">
+        <file alias="LUCIDE-LICENSE">ui/icons/LUCIDE-LICENSE</file>
+    </qresource>
     <qresource prefix="/ui/styles">
         <file alias="chevron-down.png">ui/styles/chevron-down.png</file>
         <file alias="close.png">ui/styles/close.png</file>
         <file alias="editor.qss">ui/styles/editor.qss</file>
+        <file alias="story.qss">ui/styles/story.qss</file>
         <file alias="classic.json">ui/styles/classic.json</file>
         <file alias="sakura.json">ui/styles/sakura.json</file>
     </qresource>

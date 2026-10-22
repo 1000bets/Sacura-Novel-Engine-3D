@@ -23,6 +23,7 @@ class StoryWorkspaceView final : public QWidget
     }
     void ClearSelection();
     void SelectNode(const QString& Identity);
+    void SelectEvent(const QString& Node, const QString& Binding);
     bool DeleteSelection();
     std::function<void(const StoryGraphNode&)> NodeSelected;
     std::function<void(int, QPointF)> AddNodeRequested;
@@ -34,6 +35,11 @@ class StoryWorkspaceView final : public QWidget
     std::function<void()> RedoRequested;
     std::function<void()> SaveRequested;
     std::function<void()> OpenRequested;
+    std::function<void(QString, int, QString, QString)> AddEventRequested;
+    std::function<void(QString, QString)> EventSelected, RemoveEventRequested;
+    std::function<void(QString, QString, bool)> EventModeRequested;
+    std::function<void(QString, int)> ImportEventRequested;
+    std::function<void(QString, QString, int, QString, QString)> MoveEventRequested;
 
   private:
     StoryGraphModel Model;

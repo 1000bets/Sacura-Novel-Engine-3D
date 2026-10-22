@@ -1,6 +1,7 @@
 #pragma once
 #include "UI/Presentation/StoryGraphModel.h"
 #include <QWidget>
+#include <QMap>
 #include <functional>
 
 class QLabel;
@@ -10,9 +11,11 @@ class QComboBox;
 class QCheckBox;
 class QTimer;
 class QVBoxLayout;
+class QScrollArea;
 
 namespace EditorUi
 {
+class StoryEventInspectorView;
 class StoryInspectorView final : public QWidget
 {
   public:
@@ -20,6 +23,12 @@ class StoryInspectorView final : public QWidget
     void SetNode(const StoryGraphNode& Node, const StoryGraphModel& Model, bool bForce = false);
     void Commit();
     void Clear();
+    void SetEvent(const StoryGraphNode& Node, const StoryGraphEventBatch& Batch, const StoryGraphEventBinding& Binding,
+                  const StoryGraphEvent& Event, const StoryGraphModel& Model, bool bForce = false);
+    StoryEventInspectorView& EventInspector() { return *EventView; }
+    std::function<void(QString, int, QString)> AddEventRequested;
+    std::function<void(QString, QString)> EventSelected;
+    std::function<void()> ImportEventRequested;
     std::function<void(StoryGraphNode)> NodeChanged;
     std::function<void(QString)> StartRequested;
     std::function<void()> UndoRequested;
@@ -28,10 +37,12 @@ class StoryInspectorView final : public QWidget
 
   protected:
     bool eventFilter(QObject* Watched, QEvent* Event) override;
+    void resizeEvent(QResizeEvent* Event) override;
 
   private:
     void RebuildDetails();
     void SetPendingStructure();
+    QWidget* MakeSection(const QString& Key, const QString& Caption, bool bOpen = true);
     QComboBox* MakeTargetPicker(QWidget* Parent, const QString& Target);
     StoryGraphNode Current;
     StoryGraphModel Context;
@@ -39,6 +50,9 @@ class StoryInspectorView final : public QWidget
     bool bStructurePending = false;
     bool bCollecting = false;
     QLabel* Title = nullptr;
+    QLabel* ContextTitle = nullptr;
+    QWidget* Options = nullptr;
+    QMap<QString, bool> SectionStates;
     QComboBox* Kind = nullptr;
     QWidget* KindCaption = nullptr;
     QComboBox* Speaker = nullptr;
@@ -48,5 +62,8 @@ class StoryInspectorView final : public QWidget
     QVBoxLayout* DetailsLayout = nullptr;
     QCheckBox* Start = nullptr;
     QTimer* TextTimer = nullptr;
+    QScrollArea* NodeScroll = nullptr;
+    QScrollArea* EventScroll = nullptr;
+    StoryEventInspectorView* EventView = nullptr;
 };
 } // namespace EditorUi

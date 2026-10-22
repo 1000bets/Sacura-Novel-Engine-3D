@@ -16,6 +16,7 @@ public:
     bool IsActive() const;
     double GetGameTime() const;
     ObjectHandle GetOwner() const;
+    ObjectHandle GetWorld() const;
     Diagnostic ReadVariable(const std::string& Id, ReflectedValue& OutValue) const;
     Diagnostic WriteVariable(const std::string& Id, const ReflectedValue& Value);
     Diagnostic PublishSignal(const std::string& Id, uint32_t Version, const ReflectedValue& Payload);

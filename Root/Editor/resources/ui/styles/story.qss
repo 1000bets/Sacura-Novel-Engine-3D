@@ -1,0 +1,52 @@
+/* Native StoryFlow / storyInspector.css. Sizes are logical CSS pixels. */
+QWidget#StoryInspectorHeading { min-height: 47px; max-height: 47px; border-bottom: 1px solid @--border-subtle@; }
+QLabel#StoryInspectorTitle { font-size: 13px; font-weight: 600; color: @--text-primary@; }
+QLabel#StoryInspectorContext { font-size: 11px; color: @--text-muted@; }
+QWidget#StoryInspectorBody, QWidget#StoryInspectorPrimary, QWidget#StoryInspectorSection { background: @--bg-panel@; }
+QWidget#StoryInspectorSection { border-bottom: 1px solid @--border-subtle@; }
+QWidget#StoryInspector QComboBox, QWidget#StoryInspector QLineEdit, QWidget#StoryInspector QDoubleSpinBox {
+    min-height: 18px; max-height: 18px; padding: 5px 8px; border: 1px solid transparent;
+    border-radius: 4px; font-size: 12px; background: @--bg-input@; color: @--text-primary@;
+}
+QWidget#StoryInspector QComboBox QLineEdit { min-height: 0; max-height: 16777215px; padding: 0; border: none; }
+QWidget#StoryInspector QComboBox::drop-down { width: 20px; border: none; }
+QWidget#StoryInspector QTextEdit#StoryText {
+    min-height: 102px; max-height: 102px;
+    font-size: 13px; padding: 9px 10px; border: none; border-radius: 4px;
+    background: @--bg-input@; color: @--text-primary@;
+}
+QWidget#StoryInspector QToolButton[uiRole="storySection"] {
+    min-height: 18px; max-height: 18px; padding: 10px 16px; border: none; border-radius: 0;
+    background: transparent; color: @--text-primary@; font-size: 12px; font-weight: 500; text-align: left;
+}
+QWidget#StoryInspector QToolButton[uiRole="storySection"]:hover { background: @--bg-hover@; }
+QWidget#StoryInspector QGroupBox {
+    border: 1px solid @--border-subtle@; border-radius: 6px; margin-top: 0; padding-top: 0;
+    background: @--bg-panel@; font-size: 12px; color: @--text-secondary@;
+}
+QWidget#StoryInspector QGroupBox::title { subcontrol-origin: padding; top: 6px; left: 10px; padding: 0; }
+QWidget#StoryInspector QPushButton { min-height: 18px; padding: 5px 8px; font-size: 12px; }
+QWidget#StoryInspector QCheckBox { min-height: 28px; spacing: 8px; font-size: 12px; }
+QWidget#StoryInspector QCheckBox::indicator { width: 14px; height: 14px; }
+QWidget#BlueprintSidebar { border-right: 1px solid @--border-subtle@; }
+QLabel#BlueprintHeading { min-height: 36px; max-height: 36px; font-size: 14px; font-weight: 600; }
+QWidget#BlueprintSidebar QLineEdit { padding: 7px; border: 1px solid @--border-subtle@; }
+QWidget#GraphNavigation { background: @--bg-panel@; border: 1px solid @--border-subtle@; border-radius: 3px; }
+QWidget#GraphNavigation QPushButton { min-height: 24px; max-height: 24px; min-width: 24px; max-width: 24px; padding: 0; }
+/* EventSelectionInspector / eventInspector.css, finite native action profile. */
+QWidget#StoryEventInspector { background: @--bg-panel@; }
+QWidget#StoryEventGroup { border: 1px solid @--border-subtle@; border-radius: 4px; }
+QWidget#StoryEventGroupHeading { background: @--bg-input@; border: none; }
+QWidget#StoryEventContext { border-bottom: 1px solid @--border-subtle@; }
+QWidget#StoryEventContext QLabel { font-size: 12px; color: @--text-secondary@; border: none; }
+QToolButton#StoryEventSource { min-width: 16px; max-width: 16px; min-height: 18px; max-height: 18px; padding: 4px; border: none; }
+QWidget#StoryEventGroup QLineEdit#StoryEventGroupName { background: transparent; font-size: 12px; font-weight: 500; padding: 4px; }
+QWidget#StoryEventGroup QToolButton { min-width: 16px; max-width: 16px; min-height: 18px; max-height: 18px; padding: 4px; border: none; }
+QWidget#StoryEventGroup QPushButton#StoryEventAction { padding: 10px 8px; text-align: left; border: none; border-top: 1px solid @--border-subtle@; border-radius: 0; font-size: 12px; }
+QPushButton#StoryEventBack { padding: 10px 16px; text-align: left; border: none; border-bottom: 1px solid @--border-subtle@; border-radius: 0; font-size: 12px; }
+QTextEdit#StoryEventDescription { font-size: 12px; color: @--text-secondary@; background: @--bg-input@; border: none; border-radius: 4px; padding: 9px 10px; }
+QPushButton#StoryEventRemove { color: @--text-muted@; }
+QDialog#StoryEventPackageDialog { min-width: 430px; }
+QDialog#StoryEventPackageDialog QLabel { font-size: 12px; }
+QWidget#StoryEventActionFields QLabel[uiRole="coordinateAxis"] { font-size: 11px; color: @--text-secondary@; }
+QWidget#StoryEventActionFields QDoubleSpinBox { min-width: 0; }

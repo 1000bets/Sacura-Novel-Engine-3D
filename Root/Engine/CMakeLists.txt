@@ -88,9 +88,14 @@ set(ENGINE_SRC
     src/Scripting/ScriptingSubsystem.cpp
     src/Story/StoryDocumentIO.cpp
     src/Story/StoryRuntime.cpp
+    src/Story/StoryEventPlayer.cpp
+    src/Story/StoryEventSerialization.cpp
 )
 
 set(ENGINE_HDR
+    inc/Story/StoryEvents.h
+    src/Story/StoryEventPlayer.h
+    src/Story/StoryJson.h
     inc/Authoring/AuthoringTypes.h
     inc/Authoring/OperationRegistry.h
     inc/Authoring/OperationTask.h

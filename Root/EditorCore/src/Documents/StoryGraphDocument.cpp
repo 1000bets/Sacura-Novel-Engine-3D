@@ -1,6 +1,8 @@
 #include "Documents/StoryGraphDocument.h"
 #include "Core/IO/AtomicFileWriter.h"
 #include "Story/StoryDocumentIO.h"
+#include "Story/StoryEvents.h"
+#include "StoryDocumentSchema.h"
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -21,18 +23,19 @@ Json* FindNodeJson(Json& Data, const StoryNodeId& Identity)
     return nullptr;
 }
 
-Json EncodeNode(const StoryNode& Node)
+Json EncodeNode(const StoryNode& Node, const std::vector<StoryEventDefinition>& Events = {})
 {
     StoryDocument Container;
     Container.StartNodeId = Node.Id;
     Container.Nodes = {Node};
+    Container.Events = Events;
     std::string Text;
     StoryDocumentIO::SaveToJson(Container, Text);
     return Json::parse(Text).at("nodes").at(0);
 }
 
 // Preserve extension fields while replacing the runtime-owned schema fields.
-void MergeNode(Json& Original, const Json& Replacement)
+void MergeNode(Json& Original, const Json& Replacement, const Json& Before)
 {
     for (const char* Array : {"choices", "actions"})
     {
@@ -75,6 +78,14 @@ void MergeNode(Json& Original, const Json& Replacement)
             Updated.at(Index) = std::move(Preserved);
         }
         Original[Array] = std::move(Updated);
+    }
+    for (const char* Field : {"bindings", "batches"})
+    {
+        if (Before.value(Field, Json{}) == Replacement.value(Field, Json{})) { continue; }
+        if (!Replacement.contains(Field)) { Original.erase(Field); }
+        else if (Original.contains(Field) && Before.contains(Field))
+        { StoryDocumentSchema::Merge(Original[Field], Before.at(Field), Replacement.at(Field)); }
+        else { Original[Field] = Replacement.at(Field); }
     }
     for (const char* Field : {"id", "kind", "speaker", "text", "prompt", "nextNodeId"})
     {
@@ -533,8 +544,12 @@ bool StoryGraphDocument::ReplaceNode(const StoryNode& Node, std::string& Error)
             return false;
         }
     }
+    StoryDocument Validation;
+    Validation.Nodes = {Normalized};
+    Validation.Events = Story.Events;
+    if (!ValidateStoryEvents(Validation, Error)) { return false; }
     if (const auto* Previous = FindNode(Node.Id);
-        Previous != nullptr && EncodeNode(*Previous) == EncodeNode(Normalized))
+        Previous != nullptr && EncodeNode(*Previous, Story.Events) == EncodeNode(Normalized, Story.Events))
     {
         Error.clear();
         return true;
@@ -562,7 +577,7 @@ bool StoryGraphDocument::ReplaceNode(const StoryNode& Node, std::string& Error)
                 Failure = "The continuation target no longer exists";
                 return false;
             }
-            MergeNode(*Existing, EncodeNode(Normalized));
+            MergeNode(*Existing, EncodeNode(Normalized, Story.Events), EncodeNode(*FindNode(Node.Id), Story.Events));
             return true;
         },
         Error);

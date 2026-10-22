@@ -1,8 +1,12 @@
 #include "UI/Adapters/StoryGraphAdapter.h"
+#include "UI/Adapters/StoryEventAdapter.h"
+#include "UI/Styles/StoryEventStyle.h"
+#include "Story/StoryEvents.h"
 #include "Documents/StoryGraphDocument.h"
 #include "UI/Styles/StoryGraphStyle.h"
 #include <QHash>
 #include <QQueue>
+#include <algorithm>
 
 namespace EditorUi
 {
@@ -37,6 +41,7 @@ StoryGraphModel StoryGraphAdapter::Build(const StoryGraphDocument& Document)
     Model.Title = QString::fromStdString(Document.GetStory().Name);
     Model.Start = QString::fromStdString(Document.GetStory().StartNodeId);
     const auto Positions = Document.GetPositions();
+    for (const auto& Event : Document.GetStory().Events) { Model.Events.push_back(StoryEventAdapter::ToView(Event)); }
     for (const auto& Node : Document.GetStory().Nodes)
     {
         StoryGraphNode Item;
@@ -45,6 +50,26 @@ StoryGraphModel StoryGraphAdapter::Build(const StoryGraphDocument& Document)
         Item.Speaker = QString::fromStdString(Node.Speaker);
         Item.Text = QString::fromStdString(Node.Kind == StoryNodeKind::Choice ? Node.Prompt : Node.Text);
         Item.bStart = Node.Id == Document.GetStory().StartNodeId;
+        for (const auto& Batch : Node.EventBatches)
+        {
+            StoryGraphEventBatch Group{QString::fromStdString(Batch.Id), static_cast<int>(Batch.Phase), Batch.bParallel};
+            for (const auto& Binding : Batch.Bindings)
+            {
+                StoryGraphEventBinding Placement;
+                Placement.Identity = QString::fromStdString(Binding.Id);
+                Placement.EventId = QString::fromStdString(Binding.EventId);
+                Placement.Join = static_cast<int>(Binding.Join);
+                for (const auto& Action : Binding.ActionOverrides) { Placement.Overrides.push_back(StoryEventAdapter::ToView(Action)); }
+                if (const auto* Event = FindStoryEvent(Document.GetStory(), Binding.EventId))
+                {
+                    auto Effective = StoryEventAdapter::ToView(ResolveStoryEvent(*Event, Binding));
+                    Placement.Name = Effective.Name;
+                    Placement.Summary = StoryEventStyle::Summary(Effective);
+                }
+                Group.Bindings.push_back(std::move(Placement));
+            }
+            Item.EventBatches.push_back(std::move(Group));
+        }
         switch (Node.Kind)
         {
         case StoryNodeKind::Line:
@@ -124,17 +149,16 @@ StoryGraphModel StoryGraphAdapter::Build(const StoryGraphDocument& Document)
             }
         }
     }
-    QHash<int, int> Rows;
+    QHash<int, qreal> NextRow;
     for (auto& Node : Model.Nodes)
     {
         const int Depth = Depths.value(Node.Identity, 0);
         if (!Node.bHasPosition)
         {
-            Node.Position =
-                QPointF(40 + Depth * StoryGraphStyle::ColumnSpacing, 30 + Rows[Depth] * StoryGraphStyle::RowSpacing);
+            Node.Position = QPointF(40 + Depth * StoryGraphStyle::ColumnSpacing, NextRow.value(Depth, 30));
             Node.bHasPosition = true;
         }
-        ++Rows[Depth];
+        NextRow[Depth] = std::max(NextRow.value(Depth, 30), Node.Position.y() + StoryGraphStyle::Height(Node) + 90);
     }
     return Model;
 }

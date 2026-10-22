@@ -7,16 +7,36 @@ palette; Classic is retained as a source-checked resource.
 - Presentation contains owned view data and layout metrics, without Engine/world pointers.
 - Adapters load story documents into view data or apply workspace arrangement.
   Scene mutations still use SceneWorkspace and EditorCommandStack.
-- Views own Qt widgets: one-row StudioHeaderView, HierarchyPanelView,
+- Views own Qt widgets: responsive StudioHeaderView, HierarchyPanelView,
   WorkspaceView regions, StoryWorkspaceView and StoryInspectorView.
 - Styles own the QSS, palette resources, vector icon strokes, graph painting and fonts.
   Views never embed stylesheets. Runtime game UI remains in Engine/UI.
 
-The base layout has a 44 px header, 36 px tabs, 32 px viewport/graph command bars,
+The header centers menu item content with the brand and command buttons. It uses
+Qt height-for-width layout: navigation and commands share one row when they fit,
+and wrap to two rows otherwise, using font metrics and logical pixels. Its minimum
+single-row height is 44 px. The Flower2 brand mark uses the frontend's Lucide
+vector geometry, painted at the current device scale; attribution is embedded in
+`resources/ui/icons/LUCIDE-LICENSE`.
+
+The base layout has 36 px tabs, 32 px viewport/graph command bars,
 210/280 px side rails and 6 px splitters. Rail sizes are applied after the final
 host layout so DPI and initial widget size cannot shrink them.
 
 The story canvas edits the native story v1 profile (Line / Choice / Action / End).
+Its reference is `StoryFlow.jsx` / `storyFlow.css`, rather than the older `enode`
+canvas. Moment cards are 360 logical pixels wide. `StoryGraphStyle::Layout`
+measures pre-wrapped dialogue and answer text with the painting font; card bounds,
+choice output anchors and initial unsaved layout use those same measurements.
+Execution ports are 16 px squares with triangular glyphs and a separate hover/hit
+area. The grid uses 28 px spacing. Authored node positions are preserved.
+
+`story.qss` maps `storyInspector.css`: a 48 px heading, 30 px controls, 38 px
+section summaries, 120 px dialogue input and 16 px horizontal padding. Document
+typography lives in StoryInspectorStyle; widgets own layout and field bindings.
+Only the final spacer absorbs extra height. Collapsing sections never writes a
+document revision. The native entry checkbox lives in “Параметры истории”.
+
 StoryGraphController translates view intents into StoryGraphDocument commands in
 EditorCore; that document owns revision snapshots, persistent data and atomic IO.
 SceneWorkspace and its history remain separate. Global Save/Undo/Redo route to the
@@ -28,8 +48,17 @@ outputs. The inspector edits type, text, speaker, continuations, choices and
 Wait/MoveTo/CameraCut/NavigateTo parameters, including persistent scene-object
 pickers. Positions survive save/reopen. Pan/zoom survive commands within a session.
 The canvas uses wheel panning, Ctrl+wheel zoom, context menus and the compact JS
-layout. The code does not implement the additional JS Event/function/value-node
-families, variable authoring, persisted viewport zoom or play-from-line.
+layout. The code does not implement JS function/value-node families, variable
+authoring, persisted viewport zoom or play-from-line.
+
+Finite Events use the three StoryFlow phases, sequential/parallel batches and
+reusable definitions with sequential steps and parallel actions. The event
+inspector edits placement overrides separately from the source definition.
+Event drag/drop and Delete share document history with node and wire edits.
+StoryEventStyle owns event metrics; action fields and package dialogs are separate
+views. Local event packages externalize scene objects as named inputs and apply
+as one undoable import after preview. See docs/NATIVE-STORY-EVENTS.md for supported
+actions, the declared package profile and remaining JS functionality.
 
 Play freezes authoring and loads the in-memory draft into the Engine-owned
 StoryRuntime bound to PlayWorld. It does not save implicitly. Engine Content is

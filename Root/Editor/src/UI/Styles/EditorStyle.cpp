@@ -41,6 +41,13 @@ QString EditorStyle::LoadStylesheet(const QString& Theme)
         return {};
     }
     QString Result = QString::fromUtf8(Stylesheet.readAll());
+    QFile StoryStylesheet(QStringLiteral(":/ui/styles/story.qss"));
+    if (!StoryStylesheet.open(QIODevice::ReadOnly))
+    {
+        qWarning("EditorStyle: embedded story stylesheet is missing");
+        return {};
+    }
+    Result += QLatin1Char('\n') + QString::fromUtf8(StoryStylesheet.readAll());
     const QJsonObject Tokens = QJsonDocument::fromJson(Palette.readAll()).object();
     for (auto Iterator = Tokens.begin(); Iterator != Tokens.end(); ++Iterator)
     {

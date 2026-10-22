@@ -116,10 +116,12 @@ StoryGraphController::StoryGraphController(StoryWorkspaceView& InView, StoryInsp
     Inspector.UndoRequested = View.UndoRequested;
     Inspector.RedoRequested = View.RedoRequested;
     Inspector.SaveRequested = View.SaveRequested;
+    ConfigureEvents();
 }
 
 StoryGraphController::~StoryGraphController()
 {
+    ClearEventCallbacks();
     View.NodeSelected = {};
     View.AddNodeRequested = {};
     View.DeleteNodesRequested = {};
@@ -157,6 +159,7 @@ bool StoryGraphController::Open(AssetRegistry& Registry, const AssetKey& Asset, 
     }
     Document.SetInitialPositions(std::move(Positions));
     Selected = Model.Start;
+    SelectedBinding.clear();
     bSelectRequested = true;
     bForceInspector = true;
     RefreshNow();
@@ -244,6 +247,7 @@ void StoryGraphController::EditNode(const StoryGraphNode& Value)
     }
     StoryNode Node = *Previous;
     Node.Kind = static_cast<StoryNodeKind>(Value.KindId);
+    if (Node.Kind != StoryNodeKind::Line && Node.Kind != StoryNodeKind::Choice) { Node.EventBatches.clear(); }
     Node.Speaker = Value.Speaker.toStdString();
     if (Node.Kind == StoryNodeKind::Choice)
     {
@@ -297,6 +301,7 @@ void StoryGraphController::EditNode(const StoryGraphNode& Value)
 void StoryGraphController::Select(const QString& Identity)
 {
     FlushEdits();
+    SelectedBinding.clear();
     Selected = Identity;
     auto Model = StoryGraphAdapter::Build(Document);
     Model.Objects = Objects;
@@ -355,12 +360,13 @@ void StoryGraphController::RefreshNow()
         View.SelectNode(Selected);
     }
     bSelectRequested = false;
+    if (!SelectedBinding.isEmpty()) { View.SelectEvent(Selected, SelectedBinding); }
     bool bFound = false;
     for (const auto& Node : Model.Nodes)
     {
         if (Node.Identity == Selected)
         {
-            Inspector.SetNode(Node, Model, bForceInspector);
+            if (!ShowEventInspector(Node, Model)) { Inspector.SetNode(Node, Model, bForceInspector); }
             bFound = true;
             break;
         }

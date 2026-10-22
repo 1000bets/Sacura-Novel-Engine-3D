@@ -26,6 +26,30 @@ struct StoryGraphAction
     bool bRotationEdited = false;
     QString Identity;
 };
+struct StoryGraphEventGroup
+{
+    QString Identity, Name;
+    QVector<StoryGraphAction> Actions;
+};
+struct StoryGraphEvent
+{
+    QString Identity, Name, Description;
+    QVector<StoryGraphEventGroup> Groups;
+};
+struct StoryGraphEventBinding
+{
+    QString Identity, EventId, Name, Summary;
+    int Join = 3;
+    QVector<StoryGraphAction> Overrides;
+    bool bSelected = false;
+};
+struct StoryGraphEventBatch
+{
+    QString Identity;
+    int Phase = 1;
+    bool bParallel = false;
+    QVector<StoryGraphEventBinding> Bindings;
+};
 struct StoryGraphNode
 {
     QString Identity;
@@ -40,6 +64,7 @@ struct StoryGraphNode
     bool bHasPosition = false;
     bool bStart = false;
     QString Label;
+    QVector<StoryGraphEventBatch> EventBatches;
 };
 
 // Owned presentation data; graphics items never retain a runtime/world pointer.
@@ -49,6 +74,7 @@ struct StoryGraphModel
     QString Start;
     QString Diagnostic;
     QVector<StoryGraphNode> Nodes;
+    QVector<StoryGraphEvent> Events;
     QVector<QPair<QString, QString>> Objects;
     bool bOpen = false;
     bool bReadOnly = true;

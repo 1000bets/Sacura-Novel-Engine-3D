@@ -1,11 +1,16 @@
 #include "UI/Views/StoryInspectorView.h"
+#include "UI/Views/StoryEventInspectorView.h"
+#include "UI/Styles/StoryEventStyle.h"
+#include <QMenu>
 #include "UI/Styles/StudioIcons.h"
+#include "UI/Styles/StoryInspectorStyle.h"
 #include <QApplication>
 #include <QAbstractSpinBox>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
+#include <QFontMetrics>
 #include <QGroupBox>
 #include <QKeyEvent>
 #include <QLabel>
@@ -17,9 +22,53 @@
 #include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
+#include <QResizeEvent>
+#include <algorithm>
 
 namespace EditorUi
 {
+QWidget* StoryInspectorView::MakeSection(const QString& Key, const QString& Caption, bool bOpen)
+{
+    auto* Section = new QWidget(Details);
+    Section->setObjectName("StoryInspectorSection");
+    auto* Layout = new QVBoxLayout(Section);
+    Layout->setContentsMargins(0, 0, 0, 0);
+    Layout->setSpacing(0);
+    auto* Toggle = new QToolButton(Section);
+    Toggle->setObjectName(QStringLiteral("StorySection_%1").arg(Key));
+    Toggle->setProperty("uiRole", "storySection");
+    Toggle->setText(Caption);
+    Toggle->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    Toggle->setCheckable(true);
+    Toggle->setChecked(SectionStates.value(Key, bOpen));
+    Toggle->setIcon(MakeStudioIcon(Toggle->isChecked() ? StudioIcon::ChevronDown : StudioIcon::ChevronRight));
+    Toggle->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    Layout->addWidget(Toggle);
+    auto* Fields = new QWidget(Section);
+    Fields->setVisible(Toggle->isChecked());
+    Layout->addWidget(Fields);
+    connect(Toggle, &QToolButton::toggled, this, [this, Key, Toggle, Fields](bool bExpanded)
+    {
+        SectionStates[Key] = bExpanded;
+        Fields->setVisible(bExpanded);
+        Toggle->setIcon(MakeStudioIcon(bExpanded ? StudioIcon::ChevronDown : StudioIcon::ChevronRight));
+    });
+    DetailsLayout->addWidget(Section);
+    return Fields;
+}
+
+void StoryInspectorView::resizeEvent(QResizeEvent* Event)
+{
+    QWidget::resizeEvent(Event);
+    // CSS grid: minmax(76px,.8fr) minmax(0,1.4fr), with an 8px gap.
+    const int LabelWidth = std::max(StoryInspectorStyle::LabelMinimum,
+                                   qRound((width() - 32 - 8) * StoryInspectorStyle::LabelFraction));
+    KindCaption->setFixedWidth(LabelWidth);
+    SpeakerCaption->setFixedWidth(LabelWidth);
+    ContextTitle->setMaximumWidth(qRound((width() - 32) * .55));
+    ContextTitle->setText(ContextTitle->fontMetrics().elidedText(Context.Title, Qt::ElideRight, ContextTitle->maximumWidth()));
+}
+
 StoryInspectorView::StoryInspectorView(QWidget* Parent) : QWidget(Parent)
 {
     setObjectName("StoryInspector");
@@ -31,14 +80,35 @@ StoryInspectorView::StoryInspectorView(QWidget* Parent) : QWidget(Parent)
     auto* Body = new QWidget(Scroll);
     Body->setObjectName("StoryInspectorBody");
     auto* Layout = new QVBoxLayout(Body);
-    Layout->setContentsMargins(16, 0, 16, 16);
-    Layout->setSpacing(12);
-    Title = new QLabel(Body);
-    Title->setObjectName("InspectorIdentity");
-    Title->setWordWrap(true);
-    Layout->addWidget(Title);
+    Layout->setContentsMargins(0, 0, 0, 0);
+    Layout->setSpacing(0);
+    auto* Heading = new QWidget(Body);
+    Heading->setObjectName("StoryInspectorHeading");
+    auto* HeadingLayout = new QHBoxLayout(Heading);
+    HeadingLayout->setContentsMargins(StoryInspectorStyle::HeadingMargins());
+    HeadingLayout->setSpacing(8);
+    auto* Icon = new QLabel(Heading);
+    Icon->setPixmap(MakeStudioIcon(StudioIcon::Message).pixmap(16, 16));
+    Icon->setFixedSize(16, 16);
+    HeadingLayout->addWidget(Icon);
+    Title = new QLabel(Heading);
+    Title->setObjectName("StoryInspectorTitle");
+    HeadingLayout->addWidget(Title);
+    HeadingLayout->addStretch();
+    ContextTitle = new QLabel(Heading);
+    ContextTitle->setObjectName("StoryInspectorContext");
+    ContextTitle->setMinimumWidth(1);
+    HeadingLayout->addWidget(ContextTitle);
+    Layout->addWidget(Heading);
+    auto* Primary = new QWidget(Body);
+    Primary->setObjectName("StoryInspectorPrimary");
+    auto* PrimaryLayout = new QVBoxLayout(Primary);
+    PrimaryLayout->setContentsMargins(StoryInspectorStyle::PrimaryMargins());
+    PrimaryLayout->setSpacing(StoryInspectorStyle::FieldGap);
     auto* Form = new QFormLayout();
-    Form->setHorizontalSpacing(12);
+    Form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+    Form->setContentsMargins(0, 0, 0, 0);
+    Form->setHorizontalSpacing(8);
     Form->setVerticalSpacing(10);
     Kind = new QComboBox(Body);
     Kind->setObjectName("StoryNodeKind");
@@ -51,24 +121,59 @@ StoryInspectorView::StoryInspectorView(QWidget* Parent) : QWidget(Parent)
     KindCaption = Form->labelForField(Kind);
     Form->addRow(tr("Говорит"), Speaker);
     SpeakerCaption = Form->labelForField(Speaker);
-    Layout->addLayout(Form);
-    Text = new QTextEdit(Body);
+    PrimaryLayout->addLayout(Form);
+    Text = new QTextEdit(Primary);
     Text->setObjectName("StoryText");
     Text->setAcceptRichText(false);
     Text->setUndoRedoEnabled(false);
-    Text->setFixedHeight(136);
-    Layout->addWidget(Text);
-    Start = new QCheckBox(tr("Начало истории"), Body);
-    Start->setObjectName("StoryStart");
-    Layout->addWidget(Start);
+    Text->setFixedHeight(StoryInspectorStyle::DialogueHeight);
+    StoryInspectorStyle::ApplyDialogueTypography(*Text);
+    PrimaryLayout->addWidget(Text);
+    Layout->addWidget(Primary);
     Details = new QWidget(Body);
     DetailsLayout = new QVBoxLayout(Details);
     DetailsLayout->setContentsMargins(0, 0, 0, 0);
-    DetailsLayout->setSpacing(12);
+    DetailsLayout->setSpacing(0);
     Layout->addWidget(Details);
-    Layout->addStretch();
+    // Native-only entry selection stays available without displacing the JS form.
+    Options = new QWidget(Body);
+    auto* OptionsLayout = new QVBoxLayout(Options);
+    OptionsLayout->setContentsMargins(0, 0, 0, 0);
+    OptionsLayout->setSpacing(0);
+    auto* Toggle = new QToolButton(Options);
+    Toggle->setObjectName("StoryOptionsToggle");
+    Toggle->setProperty("uiRole", "storySection");
+    Toggle->setText(tr("Параметры истории"));
+    Toggle->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    Toggle->setIcon(MakeStudioIcon(StudioIcon::ChevronRight));
+    Toggle->setCheckable(true);
+    Toggle->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    OptionsLayout->addWidget(Toggle);
+    auto* OptionFields = new QWidget(Options);
+    auto* OptionLayout = new QVBoxLayout(OptionFields);
+    OptionLayout->setContentsMargins(StoryInspectorStyle::SectionMargins());
+    Start = new QCheckBox(tr("Начало истории"), OptionFields);
+    Start->setObjectName("StoryStart");
+    OptionLayout->addWidget(Start);
+    OptionFields->hide();
+    OptionsLayout->addWidget(OptionFields);
+    connect(Toggle, &QToolButton::toggled, OptionFields, &QWidget::setVisible);
+    connect(Toggle, &QToolButton::toggled, this, [Toggle](bool bOpen)
+    {
+        Toggle->setIcon(MakeStudioIcon(bOpen ? StudioIcon::ChevronDown : StudioIcon::ChevronRight));
+    });
+    Layout->addWidget(Options);
+    Layout->addStretch(1);
     Scroll->setWidget(Body);
     Outer->addWidget(Scroll);
+    NodeScroll = Scroll;
+    EventScroll = new QScrollArea(this);
+    EventScroll->setWidgetResizable(true);
+    EventScroll->setFrameShape(QFrame::NoFrame);
+    EventView = new StoryEventInspectorView(EventScroll);
+    EventScroll->setWidget(EventView);
+    Outer->addWidget(EventScroll);
+    EventScroll->hide();
     TextTimer = new QTimer(this);
     TextTimer->setSingleShot(true);
     TextTimer->setInterval(400);
@@ -132,6 +237,7 @@ void StoryInspectorView::SetPendingStructure()
 
 void StoryInspectorView::SetNode(const StoryGraphNode& Node, const StoryGraphModel& Model, bool bForce)
 {
+    NodeScroll->show(); EventScroll->hide();
     Context = Model;
     QWidget* Focus = QApplication::focusWidget();
     if (!bForce && !bStructurePending && Current.Identity == Node.Identity && Current.KindId == Node.KindId &&
@@ -145,10 +251,13 @@ void StoryInspectorView::SetNode(const StoryGraphNode& Node, const StoryGraphMod
     TextTimer->stop();
     Current = Node;
     Current.bStart = Node.Identity == Model.Start;
-    Title->setText(Node.Kind + QStringLiteral("     ") + Model.Title);
+    Title->setText(Node.Kind);
+    ContextTitle->setText(ContextTitle->fontMetrics().elidedText(Model.Title, Qt::ElideRight, ContextTitle->maximumWidth()));
+    ContextTitle->setToolTip(Model.Title);
     Kind->setCurrentIndex(Node.KindId);
     Kind->show();
     KindCaption->show();
+    Options->show();
     Start->show();
     Details->show();
     Speaker->clear();
@@ -184,6 +293,7 @@ void StoryInspectorView::SetNode(const StoryGraphNode& Node, const StoryGraphMod
 
 void StoryInspectorView::Commit()
 {
+    if (!EventScroll->isHidden()) { EventView->Commit(); return; }
     TextTimer->stop();
     if (bUpdating || bCollecting || Current.Identity.isEmpty() || Context.bReadOnly || !Context.bOpen)
     {
@@ -227,10 +337,13 @@ void StoryInspectorView::Commit()
 
 void StoryInspectorView::Clear()
 {
+    EventScroll->hide(); NodeScroll->show();
     bUpdating = true;
     TextTimer->stop();
     Current = {};
     Title->setText(tr("Выберите ноду истории"));
+    ContextTitle->clear();
+    Options->hide();
     Text->clear();
     for (auto* Field : {static_cast<QWidget*>(Kind), KindCaption, static_cast<QWidget*>(Speaker), SpeakerCaption,
                         static_cast<QWidget*>(Text), static_cast<QWidget*>(Start), Details})
@@ -262,6 +375,15 @@ QComboBox* StoryInspectorView::MakeTargetPicker(QWidget* Parent, const QString& 
     return Picker;
 }
 
+void StoryInspectorView::SetEvent(const StoryGraphNode& Node, const StoryGraphEventBatch& Batch,
+    const StoryGraphEventBinding& Binding, const StoryGraphEvent& Event, const StoryGraphModel& Model, bool bForce)
+{
+    TextTimer->stop();
+    NodeScroll->hide(); EventScroll->show();
+    setEnabled(Model.bOpen && !Model.bReadOnly);
+    EventView->SetEvent(Node, Batch, Binding, Event, Model, bForce);
+}
+
 void StoryInspectorView::RebuildDetails()
 {
     while (auto* Item = DetailsLayout->takeAt(0))
@@ -273,20 +395,48 @@ void StoryInspectorView::RebuildDetails()
         }
         delete Item;
     }
+    if (Current.KindId == 0 || Current.KindId == 1)
+    {
+        auto* Staging = MakeSection("staging", tr("Постановка реплики"), false);
+        auto* StagingLayout = new QVBoxLayout(Staging);
+        StagingLayout->setContentsMargins(StoryInspectorStyle::SectionMargins());
+        StagingLayout->setSpacing(8);
+        for (int Phase = 0; Phase < 3; ++Phase)
+        {
+            int Count = 0;
+            for (const auto& Batch : Current.EventBatches) { if (Batch.Phase == Phase) { Count += Batch.Bindings.size(); } }
+            auto* Add = new QPushButton(StoryEventStyle::Phases()[Phase] + QStringLiteral(" · %1   +").arg(Count), Staging);
+            Add->setObjectName(QStringLiteral("StoryStagePhase%1").arg(Phase));
+            StagingLayout->addWidget(Add);
+            connect(Add, &QPushButton::clicked, this, [this, Add, Phase]()
+            {
+                Commit();
+                QMenu Menu(Add);
+                auto* New = Menu.addAction(tr("Новое событие"));
+                QMap<QAction*, QString> Events;
+                if (!Context.Events.isEmpty()) { Menu.addSeparator(); }
+                for (const auto& Event : Context.Events) { Events.insert(Menu.addAction(Event.Name), Event.Identity); }
+                auto* Choice = Menu.exec(Add->mapToGlobal(QPoint(0, Add->height())));
+                if (Choice && AddEventRequested) { AddEventRequested(Current.Identity, Phase, Choice == New ? QString{} : Events.value(Choice)); }
+            });
+            for (const auto& Batch : Current.EventBatches) { if (Batch.Phase == Phase) { for (const auto& Binding : Batch.Bindings)
+            {
+                auto* Select = new QPushButton(Binding.Name, Staging); Select->setProperty("uiRole", "eventPlacement"); StagingLayout->addWidget(Select);
+                connect(Select, &QPushButton::clicked, this, [this, Id = Binding.Identity]() { Commit(); if (EventSelected) { EventSelected(Current.Identity, Id); } });
+            } } }
+        }
+        auto* Import = new QPushButton(tr("Импорт события…"), Staging);
+        StagingLayout->addWidget(Import);
+        connect(Import, &QPushButton::clicked, this, [this]() { Commit(); if (ImportEventRequested) { ImportEventRequested(); } });
+    }
     if (Current.KindId == 0 || Current.KindId == 2)
     {
-        auto* Section = new QToolButton(Details);
-        Section->setObjectName("InspectorSection");
-        Section->setText(tr("Продолжение"));
-        Section->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-        Section->setIcon(MakeStudioIcon(StudioIcon::ChevronDown));
-        Section->setCheckable(true);
-        Section->setChecked(true);
-        DetailsLayout->addWidget(Section);
-        auto* Target = MakeTargetPicker(Details, Current.Targets.value(0));
+        auto* Section = MakeSection("continuation", tr("Продолжение"));
+        auto* Fields = new QVBoxLayout(Section);
+        Fields->setContentsMargins(StoryInspectorStyle::SectionMargins());
+        auto* Target = MakeTargetPicker(Section, Current.Targets.value(0));
         Target->setObjectName("StoryContinuation");
-        DetailsLayout->addWidget(Target);
-        connect(Section, &QToolButton::toggled, Target, &QWidget::setVisible);
+        Fields->addWidget(Target);
         connect(Target, &QComboBox::currentIndexChanged, this,
                 [this, Target]()
                 {
@@ -300,10 +450,16 @@ void StoryInspectorView::RebuildDetails()
     }
     if (Current.KindId == 1)
     {
+        auto* Section = MakeSection("choices", tr("Ответы игрока"));
+        auto* ChoicesLayout = new QVBoxLayout(Section);
+        ChoicesLayout->setContentsMargins(StoryInspectorStyle::SectionMargins());
+        ChoicesLayout->setSpacing(StoryInspectorStyle::FieldGap);
         for (int Index = 0; Index < Current.Choices.size(); ++Index)
         {
-            auto* Group = new QGroupBox(tr("Вариант %1").arg(Index + 1), Details);
+            auto* Group = new QGroupBox(tr("Ответ %1").arg(Index + 1), Section);
             auto* Layout = new QVBoxLayout(Group);
+            Layout->setContentsMargins(10, 20, 10, 10);
+            Layout->setSpacing(10);
             auto* Label = new QLineEdit(Current.Choices[Index].Label, Group);
             Label->setObjectName(QStringLiteral("StoryChoiceLabel%1").arg(Index));
             Label->installEventFilter(this);
@@ -345,11 +501,11 @@ void StoryInspectorView::RebuildDetails()
                         SetPendingStructure();
                         Commit();
                     });
-            DetailsLayout->addWidget(Group);
+            ChoicesLayout->addWidget(Group);
         }
         auto* Add = new QPushButton(tr("+ Вариант ответа"), Details);
         Add->setObjectName("StoryAddChoice");
-        DetailsLayout->addWidget(Add);
+        ChoicesLayout->addWidget(Add);
         connect(Add, &QPushButton::clicked, this,
                 [this]()
                 {
@@ -366,17 +522,27 @@ void StoryInspectorView::RebuildDetails()
     {
         return;
     }
+    auto* ActionsSection = MakeSection("actions", tr("Действия"));
+    auto* ActionsLayout = new QVBoxLayout(ActionsSection);
+    ActionsLayout->setContentsMargins(StoryInspectorStyle::SectionMargins());
+    ActionsLayout->setSpacing(StoryInspectorStyle::FieldGap);
     for (int Index = 0; Index < Current.Actions.size(); ++Index)
     {
         const auto Value = Current.Actions[Index];
-        auto* Group = new QGroupBox(tr("Действие %1").arg(Index + 1), Details);
+        auto* Group = new QGroupBox(tr("Действие %1").arg(Index + 1), ActionsSection);
         auto* Layout = new QVBoxLayout(Group);
+        Layout->setContentsMargins(10, 20, 10, 10);
+        Layout->setSpacing(10);
         auto* Type = new QComboBox(Group);
         Type->addItems({tr("Ожидание"), tr("Переместить объект"), tr("Смена камеры"), tr("Движение по маршруту")});
         Type->setCurrentIndex(Value.Kind);
         Type->setObjectName(QStringLiteral("StoryActionKind%1").arg(Index));
         Layout->addWidget(Type);
         auto* Form = new QFormLayout();
+        Form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+        Form->setRowWrapPolicy(QFormLayout::WrapLongRows);
+        Form->setHorizontalSpacing(8);
+        Form->setVerticalSpacing(10);
         auto MakeSpin = [&](double Initial)
         {
             auto* Spin = new QDoubleSpinBox(Group);
@@ -543,11 +709,11 @@ void StoryInspectorView::RebuildDetails()
                     SetPendingStructure();
                     Commit();
                 });
-        DetailsLayout->addWidget(Group);
+        ActionsLayout->addWidget(Group);
     }
     auto* Add = new QPushButton(tr("+ Действие"), Details);
     Add->setObjectName("StoryAddAction");
-    DetailsLayout->addWidget(Add);
+    ActionsLayout->addWidget(Add);
     connect(Add, &QPushButton::clicked, this,
             [this]()
             {
