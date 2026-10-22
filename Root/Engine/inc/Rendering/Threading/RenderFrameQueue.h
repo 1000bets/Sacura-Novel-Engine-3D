@@ -14,7 +14,9 @@ class RenderFrameQueue
 public:
     explicit RenderFrameQueue(std::size_t MaximumQueuedFrames = 2);
 
-    bool Submit(std::unique_ptr<RenderFrameData> Frame);
+    // Resize snapshots replace obsolete queued frames instead of blocking the
+    // UI behind the GPU. Simulation ticks retain normal bounded backpressure.
+    bool Submit(std::unique_ptr<RenderFrameData> Frame, bool bReplacePending = false);
     std::unique_ptr<RenderFrameData> WaitForFrame();
     std::unique_ptr<RenderFrameData> WaitForFrameFor(std::chrono::milliseconds Timeout);
     void ReleaseConsumedFrame();

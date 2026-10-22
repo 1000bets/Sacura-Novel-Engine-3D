@@ -1,6 +1,11 @@
 #include "UI/Views/StudioControls.h"
 #include "UI/Presentation/InspectorLabels.h"
 #include "Panels/ReflectionInspector.h"
+#include "UI/Adapters/InspectorUpdateGuard.h"
+#include "UI/Presentation/InspectorValue.h"
+#include "Core/Object/MemorySubsystem.h"
+#include <QSignalBlocker>
+#include <QTimer>
 #include <limits>
 #include "Panels/ReflectionValueEditor.h"
 
@@ -28,6 +33,103 @@
 #include <algorithm>
 #include "UI/Styles/StudioIcons.h"
 
+namespace
+{
+bool RefreshSimpleField(QWidget* Field, const PropertyDescriptor& Descriptor, const ReflectedValue& Value)
+{
+    if (Descriptor.Attributes.AssetTypeFilter || !Descriptor.Attributes.AllowedAssetTypes.empty()) { return false; }
+    if (Value.ValueKind == ReflectedValue::Kind::Bool)
+    {
+        auto* Check = Field->findChild<QCheckBox*>();
+        if (!Check) { return false; }
+        const QSignalBlocker Blocker(Check);
+        Check->setChecked(Value.BoolValue);
+        return true;
+    }
+    if (Value.ValueKind == ReflectedValue::Kind::Int64)
+    {
+        if (auto* Spin = Field->findChild<QSpinBox*>())
+        {
+            if (Value.Int64Value < Spin->minimum() || Value.Int64Value > Spin->maximum()) { return false; }
+            const QSignalBlocker Blocker(Spin);
+            Spin->setValue(static_cast<int>(Value.Int64Value));
+            return true;
+        }
+        if (auto* Edit = Field->findChild<QLineEdit*>())
+        {
+            const QSignalBlocker Blocker(Edit);
+            const auto Text = QString::number(Value.Int64Value);
+            if (Edit->text() != Text) { Edit->setText(Text); }
+            return true;
+        }
+    }
+    if (Value.ValueKind == ReflectedValue::Kind::Float64)
+    {
+        auto* Spin = Field->findChild<QDoubleSpinBox*>();
+        if (!Spin) { return false; }
+        const QSignalBlocker Blocker(Spin);
+        Spin->setValue(Value.Float64Value);
+        if (auto* Slider = Field->findChild<QSlider*>())
+        {
+            const QSignalBlocker SliderBlocker(Slider);
+            const double Range = Descriptor.Attributes.RangeMaximum - Descriptor.Attributes.RangeMinimum;
+            Slider->setValue(Range > 0 ? static_cast<int>((Value.Float64Value - Descriptor.Attributes.RangeMinimum) / Range * 1000) : 0);
+        }
+        return true;
+    }
+    if (Value.ValueKind == ReflectedValue::Kind::String)
+    {
+        const auto Text = QString::fromStdString(Value.StringValue);
+        if (auto* Edit = Field->findChild<QLineEdit*>())
+        {
+            const QSignalBlocker Blocker(Edit);
+            if (Edit->text() != Text) { Edit->setText(Text); }
+            return true;
+        }
+        if (auto* Label = Field->findChild<QLabel*>())
+        {
+            if (Text.isEmpty()) { return false; }
+            Label->setText(Text);
+            return true;
+        }
+    }
+    if (Descriptor.ValueTypeId.Value == "engine.Vector3" && Value.BytesValue.size() == 3 * sizeof(float))
+    {
+        const auto Spins = Field->findChildren<QDoubleSpinBox*>();
+        if (Spins.size() != 3) { return false; }
+        float Channels[3];
+        std::memcpy(Channels, Value.BytesValue.data(), sizeof(Channels));
+        for (int Index = 0; Index < 3; ++Index)
+        {
+            const QSignalBlocker Blocker(Spins[Index]);
+            Spins[Index]->setValue(Channels[Index]);
+        }
+        return true;
+    }
+    return false;
+}
+
+void RetirePropertyEditor(QLayoutItem* Item)
+{
+    if (!Item) { return; }
+    if (auto* Widget = Item->widget())
+    {
+        // Rebuild may run inside activated/valueChanged. Qt still uses the
+        // sender after our callback returns (e.g. to emit textActivated).
+        // Silence and hide the old controls now, destroy after dispatch ends.
+        Widget->blockSignals(true);
+        for (auto* Child : Widget->findChildren<QWidget*>()) { Child->blockSignals(true); }
+        Widget->hide();
+        Widget->deleteLater();
+    }
+    else if (auto* Layout = Item->layout())
+    {
+        while (auto* Child = Layout->takeAt(0)) { RetirePropertyEditor(Child); }
+    }
+    delete Item;
+}
+}
+
 ReflectionInspector::ReflectionInspector(QWidget* Parent)
     : QWidget(Parent)
 {
@@ -54,17 +156,24 @@ ReflectionInspector::ReflectionInspector(QWidget* Parent)
     connect(ResetAllButton, &QPushButton::clicked, this, &ReflectionInspector::OnResetAllClicked);
     ResetAllButton->setEnabled(false);
     ResetAllButton->setVisible(false);
+    connect(this, &ReflectionInspector::PropertyChanged, this, [this]()
+    {
+        if (bRefreshQueued) { return; }
+        bRefreshQueued = true;
+        QTimer::singleShot(0, this, [this]() { bRefreshQueued = false; RefreshValues(); });
+    });
 }
 
 void ReflectionInspector::SetInspectedObject(Object* Instance)
 {
-    InspectedObject = Instance;
+    InspectedIdentity = Instance ? Instance->GetObjectHandle() : ObjectHandle{};
     Rebuild();
 }
 
 Object* ReflectionInspector::GetInspectedObject() const
 {
-    return InspectedObject;
+    auto* Memory = MemorySubsystem::Get();
+    return Memory ? Memory->ResolveHandle(InspectedIdentity) : nullptr;
 }
 
 void ReflectionInspector::SetPropertyCommitCallback(PropertyCommitCallback Callback)
@@ -95,16 +204,17 @@ void ReflectionInspector::SetTypeLabelVisible(bool bVisible)
 
 bool ReflectionInspector::CommitProperty(const PropertyId& Property, const ReflectedValue& NewValue)
 {
-    if (InspectedObject == nullptr)
+    if (GetInspectedObject() == nullptr)
     {
         return false;
     }
+    bValuesDirty = true;
     if (CommitCallback)
     {
-        return CommitCallback(InspectedObject, Property, NewValue);
+        return CommitCallback(GetInspectedObject(), Property, NewValue);
     }
     ReflectionDiagnostic SetResult = PropertyAccess::SetProperty(
-        InspectedObject,
+        GetInspectedObject(),
         Property,
         NewValue,
         PropertyAccessContext::Inspector);
@@ -113,23 +223,27 @@ bool ReflectionInspector::CommitProperty(const PropertyId& Property, const Refle
 
 bool ReflectionInspector::CommitReset(const PropertyId& Property)
 {
-    if (InspectedObject == nullptr)
+    if (GetInspectedObject() == nullptr)
     {
         return false;
     }
+    bValuesDirty = true;
     if (ResetCallback)
     {
-        return ResetCallback(InspectedObject, Property);
+        return ResetCallback(GetInspectedObject(), Property);
     }
-    ReflectionDiagnostic Reset = ResetPropertyToDefault(InspectedObject, Property);
+    ReflectionDiagnostic Reset = ResetPropertyToDefault(GetInspectedObject(), Property);
     return Reset.bOk;
 }
 
 void ReflectionInspector::Rebuild()
 {
+    const EditorUi::InspectorUpdateGuard Guard(this);
     ClearPropertyEditors();
+    DisplayedValues.clear();
+    bValuesDirty = false;
 
-    if (InspectedObject == nullptr || InspectedObject->GetClass() == nullptr)
+    if (GetInspectedObject() == nullptr || GetInspectedObject()->GetClass() == nullptr)
     {
         TypeLabel->setText(tr("Select an object in Hierarchy"));
         ResetAllButton->setEnabled(false);
@@ -137,7 +251,15 @@ void ReflectionInspector::Rebuild()
         return;
     }
 
-    TypeLabel->setText(QString::fromStdString(InspectedObject->GetClass()->GetTypeId().Value));
+    for (const auto* Property : GetInspectedObject()->GetClass()->GetAllProperties())
+    {
+        ReflectedValue Value;
+        if (PropertyAccess::GetProperty(GetInspectedObject(), *Property, Value).bOk)
+        {
+            DisplayedValues.emplace_back(Property->Id, std::move(Value));
+        }
+    }
+    TypeLabel->setText(QString::fromStdString(GetInspectedObject()->GetClass()->GetTypeId().Value));
     ResetAllButton->setEnabled(true);
     ResetAllButton->setVisible(true);
 
@@ -147,7 +269,7 @@ void ReflectionInspector::Rebuild()
         return;
     }
 
-    for (const PropertyDescriptor* Descriptor : ListEditableProperties(InspectedObject))
+    for (const PropertyDescriptor* Descriptor : ListEditableProperties(GetInspectedObject()))
     {
         if (Descriptor != nullptr)
         {
@@ -156,11 +278,56 @@ void ReflectionInspector::Rebuild()
     }
 }
 
+void ReflectionInspector::RefreshValues()
+{
+    auto* Instance = GetInspectedObject();
+    if (!Instance || !Instance->GetClass())
+    {
+        if (!DisplayedValues.empty()) { Rebuild(); }
+        return;
+    }
+    std::vector<std::pair<PropertyId, ReflectedValue>> Current;
+    bool Changed = bValuesDirty;
+    for (const auto* Property : Instance->GetClass()->GetAllProperties())
+    {
+        ReflectedValue Value;
+        if (PropertyAccess::GetProperty(Instance, *Property, Value).bOk)
+        {
+            const size_t Index = Current.size();
+            Changed = Changed || Index >= DisplayedValues.size() || DisplayedValues[Index].first != Property->Id
+                || !EditorUi::SameInspectorValue(DisplayedValues[Index].second, Value);
+            Current.emplace_back(Property->Id, std::move(Value));
+        }
+    }
+    Changed = Changed || Current.size() != DisplayedValues.size();
+    if (!Changed) { return; }
+    if (bMeshPresentation) { Rebuild(); return; }
+    const EditorUi::InspectorUpdateGuard Guard(this);
+    for (const auto* Descriptor : ListEditableProperties(Instance))
+    {
+        ReflectedValue Value;
+        if (!PropertyAccess::GetProperty(Instance, *Descriptor, Value).bOk) { continue; }
+        const auto Refresh = PropertyRefreshers.find(Descriptor->Id.Value);
+        if (Refresh == PropertyRefreshers.end())
+        {
+            if (Value.ValueKind == ReflectedValue::Kind::String && Value.StringValue.empty()) { continue; }
+            Rebuild();
+            return;
+        }
+        if (!Refresh->second(Value)) { Rebuild(); return; }
+    }
+    DisplayedValues = std::move(Current);
+    bValuesDirty = false;
+}
+
 void ReflectionInspector::ClearPropertyEditors()
 {
+    PropertyRefreshers.clear();
     while (PropertiesLayout->rowCount() > 0)
     {
-        PropertiesLayout->removeRow(0);
+        const auto Row = PropertiesLayout->takeRow(0);
+        RetirePropertyEditor(Row.labelItem);
+        RetirePropertyEditor(Row.fieldItem);
     }
 }
 
@@ -298,7 +465,7 @@ void ReflectionInspector::ApplyAssetValue(const PropertyDescriptor& Descriptor, 
     bool bCommitted = false;
     if (AssetCallback)
     {
-        bCommitted = AssetCallback(InspectedObject, Descriptor.Id, Companion, Key);
+        bCommitted = AssetCallback(GetInspectedObject(), Descriptor.Id, Companion, Key);
     }
     else
     {
@@ -321,20 +488,20 @@ void ReflectionInspector::OnResetPropertyClicked(const PropertyId Property)
 {
     if (CommitReset(Property))
     {
-        Rebuild();
+        RefreshValues();
         emit PropertyChanged();
     }
 }
 
 void ReflectionInspector::OnResetAllClicked()
 {
-    if (InspectedObject == nullptr)
+    if (GetInspectedObject() == nullptr)
     {
         return;
     }
 
     bool bAny = false;
-    for (const PropertyDescriptor* Descriptor : ListEditableProperties(InspectedObject))
+    for (const PropertyDescriptor* Descriptor : ListEditableProperties(GetInspectedObject()))
     {
         if (Descriptor == nullptr || Descriptor->bReadOnly)
         {
@@ -352,7 +519,7 @@ void ReflectionInspector::OnResetAllClicked()
 
     if (bAny)
     {
-        Rebuild();
+        RefreshValues();
         emit PropertyChanged();
     }
 }
@@ -361,7 +528,7 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
 {
     ReflectedValue CurrentValue;
     ReflectionDiagnostic Got = PropertyAccess::GetProperty(
-        InspectedObject,
+        GetInspectedObject(),
         Descriptor,
         CurrentValue,
         PropertyAccessContext::Inspector);
@@ -396,7 +563,7 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
         || Descriptor.ValueTypeId.Value == "engine.EulerAngles")
     {
         Scene* World = nullptr;
-        if (Component* InspectedComponent = dynamic_cast<Component*>(InspectedObject))
+        if (Component* InspectedComponent = dynamic_cast<Component*>(GetInspectedObject()))
         {
             if (GameObject* Owner = InspectedComponent->GetGameObject())
             {
@@ -413,6 +580,11 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
                 }
                 return bCommitted;
             }, FieldWidget);
+        PropertyRefreshers[Property.Value] = [Editor](const ReflectedValue& Updated)
+        {
+            Editor->SetValue(Updated);
+            return true;
+        };
         Editor->setObjectName(QString::fromStdString(Property.Value));
         FieldLayout->addWidget(Editor);
     }
@@ -420,13 +592,13 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
     {
         AssetKey CurrentKey{};
         Guid::TryParse(CurrentValue.StringValue, CurrentKey.Asset);
-        if (Descriptor.Attributes.CompanionProperty != nullptr && InspectedObject->GetClass() != nullptr)
+        if (Descriptor.Attributes.CompanionProperty != nullptr && GetInspectedObject()->GetClass() != nullptr)
         {
             ReflectedValue CompanionValue;
-            const PropertyDescriptor* Companion = InspectedObject->GetClass()->FindProperty(
+            const PropertyDescriptor* Companion = GetInspectedObject()->GetClass()->FindProperty(
                 PropertyId{Descriptor.Attributes.CompanionProperty});
             if (Companion != nullptr
-                && PropertyAccess::GetProperty(InspectedObject, *Companion, CompanionValue, PropertyAccessContext::Inspector).bOk)
+                && PropertyAccess::GetProperty(GetInspectedObject(), *Companion, CompanionValue, PropertyAccessContext::Inspector).bOk)
             {
                 SubAssetId SubAsset{};
                 if (Guid::TryParse(CompanionValue.StringValue, SubAsset) && SubAsset.IsValid())
@@ -719,6 +891,13 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
         });
     }
 
+    if (PropertyRefreshers.find(Property.Value) == PropertyRefreshers.end())
+    {
+        PropertyRefreshers[Property.Value] = [FieldWidget, Descriptor](const ReflectedValue& Updated)
+        {
+            return RefreshSimpleField(FieldWidget, Descriptor, Updated);
+        };
+    }
     for (QAbstractSpinBox* NumericEditor : FieldWidget->findChildren<QAbstractSpinBox*>())
     {
         NumericEditor->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);

@@ -480,10 +480,10 @@ void Engine::UseGameRenderCamera()
     ConfigureRenderSurface(RenderSurfaceId{1}, false, RenderCamera{});
 }
 
-void Engine::ResizePresentation(uint32_t Width, uint32_t Height)
+void Engine::ResizePresentation(uint32_t Width, uint32_t Height, bool bInteractive)
 {
     AssertGameThread();
-    ResizeRenderSurface(RenderSurfaceId{1}, Width, Height);
+    ResizeRenderSurface(RenderSurfaceId{1}, Width, Height, bInteractive);
 }
 
 bool Engine::RegisterRenderSurface(RenderSurfaceId Surface, const NativeWindowInfo& WindowInfo)
@@ -523,11 +523,20 @@ void Engine::UnregisterRenderSurface(RenderSurfaceId Surface)
     }
 }
 
-void Engine::ResizeRenderSurface(RenderSurfaceId Surface, uint32_t Width, uint32_t Height)
+void Engine::ResizeRenderSurface(RenderSurfaceId Surface, uint32_t Width, uint32_t Height, bool bInteractive)
 {
     AssertGameThread();
     Presentation.Resize(Surface, Width, Height);
-    Render.ResizeSurface(Surface, Width, Height);
+    Render.ResizeSurface(Surface, Width, Height, bInteractive);
+    // Native resize loops can delay the host's normal tick. Resizing the
+    // swapchain alone leaves its new area unpainted until that tick returns.
+    // Publish a fresh snapshot now, without advancing simulation or materials.
+    // A resize during Tick is already covered by its upcoming EndFrame.
+    if (Width != 0 && Height != 0 && Render.IsReady() && !bFrameInProgress)
+    {
+        BeginFrame();
+        EndFrame(true);
+    }
 }
 
 void Engine::ConfigureRenderSurface(RenderSurfaceId Surface, bool bEditScene, const RenderCamera& Camera, const RenderSettings& Settings)
@@ -592,19 +601,22 @@ void Engine::Tick(float DeltaTime)
 
 void Engine::BeginFrame()
 {
+    bFrameInProgress = true;
     SetGameFrameIndex(NextFrameIndex);
 }
 
-void Engine::EndFrame()
+void Engine::EndFrame(bool bReplacePending)
 {
     if (bHeadless)
     {
         ++NextFrameIndex;
+        bFrameInProgress = false;
         return;
     }
 
-    Render.SubmitFrame(Presentation.BuildFrame(NextFrameIndex, GetActiveScene(), OwnedScene.get(), MaterialTime));
+    Render.SubmitFrame(Presentation.BuildFrame(NextFrameIndex, GetActiveScene(), OwnedScene.get(), MaterialTime), bReplacePending);
     ++NextFrameIndex;
+    bFrameInProgress = false;
 }
 
 void Engine::Shutdown()

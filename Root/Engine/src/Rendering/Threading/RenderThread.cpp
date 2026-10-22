@@ -127,10 +127,10 @@ RenderCommandEnqueueResult RenderThread::Enqueue(RenderCommandQueue::Command Wor
     return Result;
 }
 
-bool RenderThread::SubmitFrame(std::unique_ptr<RenderFrameData> Frame)
+bool RenderThread::SubmitFrame(std::unique_ptr<RenderFrameData> Frame, bool bReplacePending)
 {
     LastSubmittedFrame.store(Frame->FrameIndex, std::memory_order_release);
-    return FrameQueue.Submit(std::move(Frame));
+    return FrameQueue.Submit(std::move(Frame), bReplacePending);
 }
 
 void RenderThread::ResizeRenderer(uint32_t Width, uint32_t Height)
@@ -189,6 +189,10 @@ void RenderThread::ThreadMain()
         std::unique_ptr<RenderFrameData> Frame = FrameQueue.WaitForFrameFor(std::chrono::milliseconds(4));
         if (Frame)
         {
+            // Commands and frames have separate queues. A resize/upload may
+            // arrive while we wait, immediately followed by the frame that
+            // needs it. Apply those commands before rendering that frame.
+            ProcessPendingCommands();
             RenderFrame(*Frame);
             FrameQueue.ReleaseConsumedFrame();
             continue;
@@ -289,14 +293,14 @@ void RenderThread::DetachSurface(RenderSurfaceId Surface)
     }
 }
 
-void RenderThread::ResizeSurface(RenderSurfaceId Surface, uint32_t Width, uint32_t Height)
+void RenderThread::ResizeSurface(RenderSurfaceId Surface, uint32_t Width, uint32_t Height, bool bInteractive)
 {
     AssertGameThread();
     if (IsReady())
     {
-        Enqueue([this, Surface, Width, Height]()
+        Enqueue([this, Surface, Width, Height, bInteractive]()
         {
-            OwnedRenderer->ResizeSurface(Surface, Width, Height);
+            OwnedRenderer->ResizeSurface(Surface, Width, Height, bInteractive);
         });
     }
 }

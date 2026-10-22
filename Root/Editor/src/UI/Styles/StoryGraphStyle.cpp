@@ -415,14 +415,34 @@ void StoryGraphStyle::PaintCard(QPainter& Painter, const StoryGraphNode& Node, c
 
 void StoryGraphStyle::PaintGrid(QPainter& Painter, const QRectF& Rect)
 {
+    Painter.save();
     Painter.fillRect(Rect, EditorStyle::Color("--bg-app"));
+    const auto ViewTransform = Painter.worldTransform();
+    const qreal Scale = std::hypot(ViewTransform.m11(), ViewTransform.m12());
+    if (Scale <= 0)
+    {
+        Painter.restore();
+        return;
+    }
+    // Keep dots visible in logical screen pixels. Thin the scene-anchored grid
+    // at distant zoom levels instead of shrinking the dots into subpixel noise.
+    const qreal Radius = .7 / Scale;
+    qreal Spacing = GridSpacing;
+    while (Spacing * Scale < GridSpacing / 2.0)
+    {
+        Spacing *= 2;
+    }
     Painter.setPen(Qt::NoPen);
     Painter.setBrush(EditorStyle::Color("--graph-grid"));
-    const qreal Left = std::floor(Rect.left() / GridSpacing) * GridSpacing;
-    const qreal Top = std::floor(Rect.top() / GridSpacing) * GridSpacing;
-    for (qreal X = Left; X < Rect.right(); X += GridSpacing)
+    const qreal Left = std::floor((Rect.left() - Radius) / Spacing) * Spacing;
+    const qreal Top = std::floor((Rect.top() - Radius) / Spacing) * Spacing;
+    for (qreal X = Left; X < Rect.right() + Radius; X += Spacing)
     {
-        for (qreal Y = Top; Y < Rect.bottom(); Y += GridSpacing) { Painter.drawEllipse(QPointF(X, Y), .7, .7); }
+        for (qreal Y = Top; Y < Rect.bottom() + Radius; Y += Spacing)
+        {
+            Painter.drawEllipse(QPointF(X, Y), Radius, Radius);
+        }
     }
+    Painter.restore();
 }
 } // namespace EditorUi

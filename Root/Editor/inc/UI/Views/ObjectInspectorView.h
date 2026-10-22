@@ -20,6 +20,8 @@ public:
     static QString ComponentCaption(const QString& Type);
     void AddComponentSection(const QString& Identity, const QString& Type, QWidget& Fields, bool Expanded);
     void ClearComponentOverview();
+    void RemoveComponentSection(const QString& Identity);
+    void MoveComponentSection(const QString& Identity, int Index);
     void SetIdentity(const QString& Caption, const QString& Kind, bool Active);
     QLineEdit* Name = nullptr;
     QCheckBox* Active = nullptr;

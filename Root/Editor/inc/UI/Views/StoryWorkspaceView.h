@@ -5,12 +5,16 @@
 #include <functional>
 #include <QMap>
 #include <optional>
+#include <memory>
+#include <QVariant>
 
 class QGraphicsView;
 class QGraphicsScene;
 class QLabel;
 class QPushButton;
 class QScrollArea;
+class QSettings;
+class QTimer;
 
 namespace EditorUi
 {
@@ -21,6 +25,7 @@ class StoryWorkspaceView final : public QWidget
   public:
     explicit StoryWorkspaceView(QWidget* Parent = nullptr);
     ~StoryWorkspaceView() override;
+    void SetNavigationSettings(const QString& ProjectIdentity, const QString& SettingsFile = {});
     void SetModel(StoryGraphModel Model);
     const StoryGraphModel& GetModel() const
     {
@@ -52,6 +57,15 @@ class StoryWorkspaceView final : public QWidget
 
   private:
     void ShowAddMenu(QPointF Position, QPoint ScreenPosition);
+    QString NavigationSettingsKey() const;
+    void RememberNavigation();
+    void SaveNavigation();
+    bool RestoreNavigation();
+    std::unique_ptr<QSettings> NavigationSettings;
+    QString NavigationProject, PendingNavigationKey;
+    QVariantList PendingNavigation;
+    QTimer* NavigationSaveTimer = nullptr;
+    bool bUpdatingModel = false;
     QPointer<StudioActionMenu> ActionMenu;
     StoryGraphModel Model;
     std::optional<StoryGraphModel> PendingModel;

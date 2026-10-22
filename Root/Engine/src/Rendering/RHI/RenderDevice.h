@@ -33,6 +33,7 @@ public:
     Diligent::IEngineFactory* GetEngineFactory() const;
 
     GraphicsBackend GetActiveBackend() const { return ActiveBackend; }
+    bool SupportsLiveResizeScaling() const { return bLiveResizeScaling; }
     const std::string& GetAdapterName() const { return AdapterName; }
     uint32_t GetWidth() const { return Width; }
     uint32_t GetHeight() const { return Height; }
@@ -44,6 +45,7 @@ private:
     bool InitializeBackend(GraphicsBackend Backend, const NativeWindowInfo& WindowInfo);
 
     bool bInitialized = false;
+    bool bLiveResizeScaling = false;
     GraphicsBackend ActiveBackend = GraphicsBackend::Auto;
     std::string AdapterName = "Unknown";
     uint32_t Width = 0;

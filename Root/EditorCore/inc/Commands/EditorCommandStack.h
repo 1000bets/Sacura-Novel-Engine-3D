@@ -17,6 +17,9 @@ public:
     virtual bool Do() = 0;
     virtual bool Undo() = 0;
     virtual const char* GetDisplayName() const = 0;
+    // Conservative by default: only commands that preserve scene structure and
+    // component properties may opt in, including groups of such commands.
+    virtual bool IsTransformOnly() const { return false; }
 
 private:
     friend class EditorCommandStack;
@@ -40,6 +43,8 @@ public:
 
     bool CanUndo() const;
     bool CanRedo() const;
+    bool IsUndoTransformOnly() const;
+    bool IsRedoTransformOnly() const;
     const std::string& GetUndoDisplayName() const;
     const std::string& GetRedoDisplayName() const;
 
@@ -53,6 +58,7 @@ private:
 
         bool Do() override;
         bool Undo() override;
+        bool IsTransformOnly() const override;
         const char* GetDisplayName() const override { return DisplayName.c_str(); }
     };
 

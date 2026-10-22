@@ -281,6 +281,8 @@ void EditorMainWindow::BuildUi()
     PrimaryViewport->installEventFilter(this);
     connect(PrimaryViewport, &EditorViewportWidget::NativeSurfaceChanged, this, &EditorMainWindow::OnViewportSurfaceChanged);
     connect(PrimaryViewport, &EditorViewportWidget::ViewportResized, this, &EditorMainWindow::OnViewportResized);
+    connect(PrimaryViewport, &EditorViewportWidget::SceneContextMenuRequested, this, &EditorMainWindow::OnViewportContextMenu);
+    connect(PrimaryViewport, &EditorViewportWidget::EditorToolsDisabled, this, &EditorMainWindow::CloseSceneContextMenu);
     connect(PrimaryViewport, &EditorViewportWidget::ObjectSelectionRequested, this, &EditorMainWindow::OnViewportSelectionRequested);
     connect(PrimaryViewport, &EditorViewportWidget::AssetDropped, this, &EditorMainWindow::OnAssetDropped);
     connect(PrimaryViewport, &EditorViewportWidget::CameraChanged, this, &EditorMainWindow::ConfigureRenderView);
@@ -290,6 +292,7 @@ void EditorMainWindow::BuildUi()
             if (GameObject* Selected = GetSelectedGameObject())
             {
                 Selected->SetTransform(Value);
+                RefreshTransformUi();
             }
         },
         [this](const Transform& OldValue, const Transform& NewValue)
@@ -301,7 +304,7 @@ void EditorMainWindow::BuildUi()
                 return;
             }
             Selected->SetTransform(OldValue);
-            ExecuteCommand(MakeSetTransformCommand(EditScene, Selected->GetObjectHandle(), NewValue));
+            ExecuteSelectedTransform(NewValue);
         });
 
     auto* ViewportTabs = new QWidget(ViewportPanel);
@@ -365,7 +368,7 @@ void EditorMainWindow::BuildUi()
         ViewportHeaderLayout->addWidget(Button);
         return Button;
     };
-    auto* Select = MakeGizmoModeButton(EditorUi::StudioIcon::Select, "ViewportSelect", tr("Выбор · Q"),
+    MakeGizmoModeButton(EditorUi::StudioIcon::Select, "ViewportSelect", tr("Выбор · Q"),
         EditorViewportWidget::GizmoOperation::Select);
     TranslateGizmoButton = MakeGizmoModeButton(EditorUi::StudioIcon::Move, "ViewportTranslate", tr("Сдвиг · W"),
         EditorViewportWidget::GizmoOperation::Translate);
@@ -373,7 +376,7 @@ void EditorMainWindow::BuildUi()
         EditorViewportWidget::GizmoOperation::Rotate);
     ScaleGizmoButton = MakeGizmoModeButton(EditorUi::StudioIcon::Scale, "ViewportScale", tr("Масштаб · R"),
         EditorViewportWidget::GizmoOperation::Scale);
-    Select->setChecked(true);
+    SyncGizmoModeButtons();
     connect(GizmoModeButtons, &QButtonGroup::idClicked, this, [this](int ModeId)
     {
         if (PrimaryViewport != nullptr)
@@ -406,6 +409,7 @@ void EditorMainWindow::BuildUi()
     connect(Snap, &QPushButton::toggled, PrimaryViewport, &EditorViewportWidget::SetSnapEnabled);
     auto* Grid = MakeToggle(EditorUi::StudioIcon::Grid, "ViewportGrid", tr("Сетка сцены"), PrimaryViewport->IsGridVisible());
     connect(Grid, &QPushButton::toggled, PrimaryViewport, &EditorViewportWidget::SetGridVisible);
+    connect(PrimaryViewport, &EditorViewportWidget::GridVisibilityChanged, Grid, &QPushButton::setChecked);
     ViewportHeaderLayout->addSpacing(6);
     auto* Help = new QToolButton(ViewportHeader);
     Help->setObjectName("ViewportHelp");
@@ -506,6 +510,10 @@ void EditorMainWindow::BuildUi()
     ObjectInspectorContent = ObjectInspectorPage;
     ObjectNameEdit = ObjectInspectorPage->Name;
     const auto& Fields = ObjectInspectorPage->TransformFields;
+    for (int Index = 0; Index < static_cast<int>(Fields.size()); ++Index)
+    {
+        BindTransformScrubbing(static_cast<EditorUi::StudioNumberEdit*>(Fields[Index]), Index);
+    }
     PositionXSpin = Fields[0]; PositionYSpin = Fields[1]; PositionZSpin = Fields[2];
     RotationXSpin = Fields[3]; RotationYSpin = Fields[4]; RotationZSpin = Fields[5];
     ScaleXSpin = Fields[6]; ScaleYSpin = Fields[7]; ScaleZSpin = Fields[8];
@@ -542,35 +550,17 @@ void EditorMainWindow::BuildUi()
             if (std::abs(Matrix.Determinant()) < 1.e-8f) { RefreshSelectionUi(); return; }
             Updated.Position = Vector3::Transform(Updated.Position, Matrix.Invert());
         }
-        ExecuteCommand(MakeSetTransformCommand(GetEditScene(), Selected->GetObjectHandle(), Updated));
+        ExecuteSelectedTransform(Updated);
+        const QSignalBlocker Blocker(ObjectInspectorPage->AnchorObject);
+        ObjectInspectorPage->AnchorObject->setCurrentIndex(0);
     });
     ObjectInspectorPage->ResetRequested = [this]() {
         if (auto* Selected = GetSelectedGameObject(); Selected && !BoundEngine.GetPlaySession().IsSimulating())
-        { ExecuteCommand(MakeSetTransformCommand(GetEditScene(), Selected->GetObjectHandle(), Transform{})); }
+        { ExecuteSelectedTransform(Transform{}); }
     };
     ObjectInspectorPage->DeleteRequested = [this]() { OnDeleteSelectedObject(); };
-    ObjectInspectorPage->DuplicateRequested = [this]() {
-        auto* Selected = GetSelectedGameObject();
-        if (!Selected || BoundEngine.GetPlaySession().IsSimulating()) { return; }
-        std::string Json;
-        if (!SceneSerializer::SerializeSubtreeToJson(*Selected, Json).bOk) { return; }
-        const ObjectHandle Parent = Selected->GetParent() ? Selected->GetParent()->GetObjectHandle() : ObjectHandle{};
-        ObjectHandle Created;
-        if (ExecuteCommand(MakePasteSubtreeCommand(GetEditScene(), std::move(Json), Parent, &Created)))
-        { SelectObject(Created); }
-    };
-    ObjectInspectorPage->FrameRequested = [this]() {
-        auto* Selected = GetSelectedGameObject();
-        if (!Selected || !PrimaryViewport || BoundEngine.GetPlaySession().IsSimulating()) { return; }
-        auto Camera = PrimaryViewport->GetViewCamera();
-        Vector3 Direction = Camera.Position - Camera.Target;
-        if (Direction.LengthSquared() < .001f) { Direction = Vector3(1, 1, -1); }
-        Direction.Normalize();
-        const auto World = Selected->GetWorldTransform();
-        Camera.Target = World.Position;
-        Camera.Position = Camera.Target + Direction * std::max(2.0f, World.Scale.Length() * 3.0f);
-        PrimaryViewport->SetViewCamera(Camera);
-    };
+    ObjectInspectorPage->DuplicateRequested = [this]() { DuplicateSelectedObject(); };
+    ObjectInspectorPage->FrameRequested = [this]() { FrameSelectedObject(); };
 
     InspectorPages->addWidget(ObjectInspectorPage);
     StoryInspector = new EditorUi::StoryInspectorView(InspectorPages);
@@ -584,8 +574,9 @@ void EditorMainWindow::BuildUi()
         Visibility->setObjectName(Panel->objectName() + "Visibility");
         Visibility->setCheckable(true);
         Visibility->setChecked(true);
-        Docking->BindAreaVisibility(Tabs->property("workspaceArea").toString(), *Visibility);
-        connect(Visibility, &QAction::toggled, Panel, &QWidget::setVisible);
+        const QString Area = Tabs->property("workspaceArea").toString();
+        Docking->AddPage(Area, *Tabs->widget(0), Area, *Visibility, true);
+        Tabs->setTabsClosable(true);
         auto* Controls = new QWidget(Tabs);
         auto* ControlLayout = new QHBoxLayout(Controls);
         ControlLayout->setContentsMargins(0, 0, 4, 0);
@@ -609,9 +600,10 @@ void EditorMainWindow::BuildUi()
         });
         auto* Collapse = new QPushButton(EditorUi::MakeStudioIcon(EditorUi::StudioIcon::Panel), {}, Controls);
         Collapse->setProperty("uiRole", "chromeButton");
-        Collapse->setToolTip(tr("Скрыть панель; вернуть через меню «Окна»"));
+        Collapse->setToolTip(tr("Закрыть текущую вкладку; вернуть через меню «Окна»"));
         ControlLayout->addWidget(Collapse);
-        connect(Collapse, &QPushButton::clicked, Visibility, [Visibility]() { Visibility->setChecked(false); });
+        connect(Collapse, &QPushButton::clicked, this, [this, Tabs]()
+        { if (auto* Page = Tabs->currentWidget()) { Docking->SetOpen(*Page, false); } });
         Tabs->setCornerWidget(Controls);
     };
     AddPanelControls(HierarchyTabs, HierarchyPanel, tr("Иерархия"));

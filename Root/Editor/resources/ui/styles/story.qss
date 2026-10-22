@@ -29,6 +29,7 @@ QWidget#StoryInspector QPushButton { min-height: 18px; padding: 5px 8px; font-si
 QWidget#StoryInspector QCheckBox { min-height: 28px; spacing: 8px; font-size: 12px; }
 QWidget#StoryInspector QCheckBox::indicator { width: 14px; height: 14px; }
 QWidget#BlueprintSidebar { border-right: 1px solid @--border-subtle@; }
+QWidget#BlueprintSidebarContent { background: @--bg-panel@; }
 QLabel#BlueprintHeading { min-height: 53px; max-height: 53px; font-size: 18px; font-weight: 600; }
 QLabel#BlueprintVariablesTitle { font-size: 16px; font-weight: 600; }
 QWidget#BlueprintSidebar QLabel[uiRole="graphHint"] { border-top: 1px solid @--border-subtle@; padding-top: 14px; }

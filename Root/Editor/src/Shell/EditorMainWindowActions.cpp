@@ -123,16 +123,24 @@ void EditorMainWindow::OnUndo()
         StoryAuthoring->Undo();
         return;
     }
+    const bool bTransformOnly = CommandStack.IsUndoTransformOnly();
     if (!CommandStack.Undo())
     {
         return;
     }
-    if (GetSelectedGameObject() == nullptr)
+    if (bTransformOnly)
     {
-        ClearSelection();
+        RefreshTransformUi();
     }
-    PopulateHierarchy();
-    RefreshSelectionUi();
+    else
+    {
+        if (GetSelectedGameObject() == nullptr)
+        {
+            ClearSelection();
+        }
+        PopulateHierarchy();
+        RefreshSelectionUi();
+    }
     UpdateWindowTitleDirty();
     UpdateStatus();
 }
@@ -148,12 +156,20 @@ void EditorMainWindow::OnRedo()
         StoryAuthoring->Redo();
         return;
     }
+    const bool bTransformOnly = CommandStack.IsRedoTransformOnly();
     if (!CommandStack.Redo())
     {
         return;
     }
-    PopulateHierarchy();
-    RefreshSelectionUi();
+    if (bTransformOnly)
+    {
+        RefreshTransformUi();
+    }
+    else
+    {
+        PopulateHierarchy();
+        RefreshSelectionUi();
+    }
     UpdateWindowTitleDirty();
     UpdateStatus();
 }

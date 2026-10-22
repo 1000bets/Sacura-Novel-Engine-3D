@@ -106,7 +106,13 @@ void EditorMainWindow::OnViewportResized(RenderViewportWidget* Viewport)
     }
 
     const NativeWindowInfo Info = Viewport->BuildNativeWindowInfo();
-    BoundEngine.ResizeRenderSurface(RenderSurfaceId{Viewport->GetViewId().Value}, Info.Width, Info.Height);
+    if (Viewport == PrimaryViewport && Info.Width != 0 && Info.Height != 0)
+    {
+        // Resize publishes immediately, so refresh the overlay before the
+        // Engine consumes it rather than waiting for the maintenance timer.
+        PrimaryViewport->SyncGizmoOverlay();
+    }
+    BoundEngine.ResizeRenderSurface(RenderSurfaceId{Viewport->GetViewId().Value}, Info.Width, Info.Height, Viewport->IsInteractiveResize());
 }
 
 void EditorMainWindow::OnViewportSelectionRequested(QPoint Position)
@@ -215,7 +221,9 @@ void EditorMainWindow::ConfigureRenderView()
         RenderCamera Camera;
         PrimaryViewport->GetViewCamera().BuildRenderCamera(
             static_cast<float>(qMax(1u, Info.Width)) / static_cast<float>(qMax(1u, Info.Height)), Camera);
-        BoundEngine.ConfigureRenderSurface(RenderSurfaceId{1}, true, Camera, RenderConfiguration);
+        RenderSettings EditSettings = RenderConfiguration;
+        EditSettings.bGroundGrid = PrimaryViewport->IsGridVisible();
+        BoundEngine.ConfigureRenderSurface(RenderSurfaceId{1}, true, Camera, EditSettings);
     }
     const RenderStatistics Statistics = BoundEngine.GetRenderStatistics(RenderSurfaceId{1});
     QString Timings = tr("GPU timings pending or unsupported");
@@ -291,6 +299,12 @@ bool EditorMainWindow::HandleGizmoModeHotkey(QEvent* Event)
         return false;
     }
 
+    if (KeyEvent->nativeScanCode() == 0x21 || (KeyEvent->nativeScanCode() == 0 && KeyEvent->key() == Qt::Key_F))
+    {
+        if (Event->type() == QEvent::KeyPress) { FrameSelectedObject(); }
+        KeyEvent->accept();
+        return true;
+    }
     const quint32 ScanCode = KeyEvent->nativeScanCode();
     EditorViewportWidget::GizmoOperation Operation = PrimaryViewport->GetGizmoOperation();
     bool bMatched = false;

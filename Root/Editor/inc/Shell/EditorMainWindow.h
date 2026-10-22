@@ -13,6 +13,8 @@
 #include "Story/StoryRuntime.h"
 
 #include <QMainWindow>
+#include <QHash>
+#include <QPointer>
 #include <QString>
 
 #include <filesystem>
@@ -51,6 +53,8 @@ class StoryInspectorView;
 class HierarchyPanelView;
 class StoryGraphController;
 class WorkspaceDockController;
+class StudioActionMenu;
+class StudioNumberEdit;
 }
 
 class EditorMainWindow : public QMainWindow
@@ -84,6 +88,7 @@ private slots:
     void OnViewportSurfaceChanged(RenderViewportWidget* Viewport);
     void OnViewportResized(RenderViewportWidget* Viewport);
     void OnViewportSelectionRequested(QPoint Position);
+    void OnViewportContextMenu(QPoint Position);
     void OnHierarchySelectionChanged();
     void OnHierarchyContextMenu(const QPoint& Position);
     void OnUndo();
@@ -99,6 +104,13 @@ private slots:
     void OnAssetDropped(QString AssetId, QString SubAssetIdentifier, QString AssetTypeIdentifier, QString VirtualPath, QPoint Position);
 
 private:
+    void BindTransformScrubbing(EditorUi::StudioNumberEdit* Field, int Index);
+    QPointer<EditorUi::StudioNumberEdit> ScrubbingTransformField;
+    ObjectHandle ScrubbingTransformObject;
+    void FrameSelectedObject();
+    void DuplicateSelectedObject();
+    void CloseSceneContextMenu();
+    QPointer<EditorUi::StudioActionMenu> SceneContextMenu;
     void BuildUi();
     void BindDocumentFromSession();
     void BuildMenus();
@@ -123,6 +135,8 @@ private:
     void StartStoryPlayback();
     void StopStoryPlayback();
     void RefreshSelectionUi();
+    void RefreshTransformUi();
+    bool ExecuteSelectedTransform(const Transform& Updated);
     void ClearSelection();
     void SelectObject(ObjectHandle Target);
     ObjectHandle GetSelectedObjectHandle() const;
@@ -211,6 +225,8 @@ private:
     QComboBox* ComponentCombo = nullptr;
     QVBoxLayout* ComponentInspectorLayout = nullptr;
     std::vector<ReflectionInspector*> ComponentInspectors;
+    ObjectHandle InspectorSelection;
+    QHash<QString, bool> ComponentExpansion;
     ContentBrowserWidget* ContentBrowser = nullptr;
     std::unordered_map<AssetType, AssetEditorHandler, AssetTypeHash> AssetEditors;
 

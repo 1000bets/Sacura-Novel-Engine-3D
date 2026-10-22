@@ -57,6 +57,7 @@ void ObjectInspectorView::AddComponentSection(const QString& Identity, const QSt
     Components->addWidget(Card);
     auto* Row = new QPushButton(MakeStudioIcon(StudioIcon::ChevronRight), ComponentCaption(Type), this);
     Row->setProperty("uiRole", "componentInstance");
+    Row->setProperty("componentIdentity", Identity);
     Row->setProperty("searchText", ComponentCaption(Type) + " " + Type);
     Row->setToolTip(Type);
     Row->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
@@ -80,6 +81,43 @@ void ObjectInspectorView::ClearComponentOverview()
     }
     ComponentCount->setText("0");
     EmptyComponents->show();
+}
+
+void ObjectInspectorView::RemoveComponentSection(const QString& Identity)
+{
+    for (auto* Layout : {Components, ComponentRows})
+    {
+        for (int Index = Layout->count() - 1; Index >= 0; --Index)
+        {
+            auto* Widget = Layout->itemAt(Index)->widget();
+            if (Widget && Widget->property("componentIdentity").toString() == Identity)
+            {
+                delete Layout->takeAt(Index);
+                Widget->blockSignals(true);
+                for (auto* Child : Widget->findChildren<QWidget*>()) { Child->blockSignals(true); }
+                Widget->hide();
+                Widget->deleteLater();
+            }
+        }
+    }
+    ComponentCount->setText(QString::number(ComponentRows->count()));
+    EmptyComponents->setVisible(ComponentRows->count() == 0);
+}
+
+void ObjectInspectorView::MoveComponentSection(const QString& Identity, int Index)
+{
+    for (auto* Layout : {Components, ComponentRows})
+    {
+        for (int Current = 0; Current < Layout->count(); ++Current)
+        {
+            auto* Widget = Layout->itemAt(Current)->widget();
+            if (Widget && Widget->property("componentIdentity").toString() == Identity)
+            {
+                if (Current != Index) { Layout->insertWidget(Index, Widget); }
+                break;
+            }
+        }
+    }
 }
 
 void ObjectInspectorView::SetIdentity(const QString& Caption, const QString& Kind, bool Enabled)
@@ -251,6 +289,8 @@ ObjectInspectorView::ObjectInspectorView(QWidget* Parent) : QWidget(Parent)
             Spin->setDecimals(3);
             Spin->setRange(-1.0e6, 1.0e6);
             Spin->setSingleStep(Row == 1 ? 1 : .1);
+            Spin->SetScrubStep(Row == 1 ? 1.0 : Row == 2 ? 0.01 : 0.1);
+            Spin->setToolTip(tr("Тяните влево/вправо для изменения. Shift — точнее, Ctrl — быстрее.\nЩелчок — ввод числа. Esc — отмена перетягивания."));
             AxisLayout->addWidget(Spin, 1);
             Label->setBuddy(Spin);
             TransformFields[Row * 3 + Axis] = Spin;

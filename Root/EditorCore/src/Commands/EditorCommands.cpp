@@ -112,6 +112,7 @@ public:
     }
 
     const char* GetDisplayName() const override { return "Set Transform"; }
+    bool IsTransformOnly() const override { return true; }
 };
 
 class SetObjectActiveCommand final : public EditorCommand

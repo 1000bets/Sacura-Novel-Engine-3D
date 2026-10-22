@@ -1,6 +1,7 @@
 #include "UI/RenderViewportWidget.h"
 
 #include <QHideEvent>
+#include <QCoreApplication>
 #include <QPaintEngine>
 #include <QPlatformSurfaceEvent>
 #include <QResizeEvent>
@@ -14,12 +15,20 @@
 RenderViewportWidget::RenderViewportWidget(QWidget* Parent)
     : QWidget(Parent)
 {
+    // Only the GPU surface needs a native window. Making the entire splitter
+    // hierarchy native leaves independently resized child surfaces over Qt UI.
+    // Qt otherwise also promotes siblings, which in turn promote their parents.
+    QCoreApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings, true);
+    setAttribute(Qt::WA_DontCreateNativeAncestors, true);
     setAttribute(Qt::WA_NativeWindow, true);
     setAttribute(Qt::WA_PaintOnScreen, true);
     setAttribute(Qt::WA_NoSystemBackground, true);
     setAutoFillBackground(false);
     setMinimumSize(160, 120);
     setFocusPolicy(Qt::ClickFocus);
+    ResizeSettleTimer.setSingleShot(true);
+    ResizeSettleTimer.setInterval(120);
+    connect(&ResizeSettleTimer, &QTimer::timeout, this, [this]() { emit ViewportResized(this); });
 
     ViewCamera.Position = Vector3(0.f, 1.6f, 4.f);
     ViewCamera.Target = Vector3::Zero;
@@ -34,11 +43,19 @@ NativeWindowInfo RenderViewportWidget::BuildNativeWindowInfo() const
 {
     NativeWindowInfo Info{};
     const qreal PixelRatio = devicePixelRatioF();
-    Info.Width = static_cast<uint32_t>(qMax(1, static_cast<int>(width() * PixelRatio)));
-    Info.Height = static_cast<uint32_t>(qMax(1, static_cast<int>(height() * PixelRatio)));
+    Info.Width = static_cast<uint32_t>(qMax(1, qRound(width() * PixelRatio)));
+    Info.Height = static_cast<uint32_t>(qMax(1, qRound(height() * PixelRatio)));
     if (CachedNativeHandle != 0)
     {
         Info.WindowHandle = reinterpret_cast<void*>(CachedNativeHandle);
+#ifdef Q_OS_WIN
+        RECT Client{};
+        if (GetClientRect(reinterpret_cast<HWND>(CachedNativeHandle), &Client))
+        {
+            Info.Width = static_cast<uint32_t>(qMax(0L, Client.right - Client.left));
+            Info.Height = static_cast<uint32_t>(qMax(0L, Client.bottom - Client.top));
+        }
+#endif
     }
     if (!isVisible() || window()->isMinimized())
     {
@@ -75,6 +92,7 @@ void RenderViewportWidget::RefreshNativeHandle()
 
 void RenderViewportWidget::showEvent(QShowEvent* Event)
 {
+    ResizeSettleTimer.stop();
     QWidget::showEvent(Event);
     RefreshNativeHandle();
     emit ViewportResized(this);
@@ -84,11 +102,15 @@ void RenderViewportWidget::resizeEvent(QResizeEvent* Event)
 {
     QWidget::resizeEvent(Event);
     RefreshNativeHandle();
+    // Keep presenting during the drag; expensive buffer reallocation happens
+    // once the size settles. Restarting this timer never delays frame updates.
+    ResizeSettleTimer.start();
     emit ViewportResized(this);
 }
 
 void RenderViewportWidget::hideEvent(QHideEvent* Event)
 {
+    ResizeSettleTimer.stop();
     QWidget::hideEvent(Event);
     emit ViewportResized(this);
 }

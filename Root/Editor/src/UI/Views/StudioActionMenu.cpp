@@ -22,9 +22,9 @@ class MenuRow final : public QWidget
 {
 public:
     MenuRow(const StudioMenuItem& Item, int Width, QWidget* Parent)
-        : QWidget(Parent), Text(Item.Label), Icon(Item.Icon), bSubmenu(!Item.Children.isEmpty())
+        : QWidget(Parent), Text(Item.Label), Shortcut(Item.Shortcut), Icon(Item.Icon), bSubmenu(!Item.Children.isEmpty())
     {
-        setFixedSize(ActionMenuStyle::RowSize(Text, Width, bSubmenu));
+        setFixedSize(ActionMenuStyle::RowSize(Text, Width, bSubmenu, Shortcut));
         setAccessibleName(Text.simplified());
         setAttribute(Qt::WA_TransparentForMouseEvents);
         setFocusPolicy(Qt::NoFocus);
@@ -34,10 +34,10 @@ protected:
     void paintEvent(QPaintEvent*) override
     {
         QPainter Painter(this);
-        ActionMenuStyle::PaintRow(Painter, rect(), Text, Icon, bSubmenu, bActive, isEnabled());
+        ActionMenuStyle::PaintRow(Painter, rect(), Text, Icon, bSubmenu, bActive, isEnabled(), Shortcut);
     }
 private:
-    QString Text;
+    QString Text, Shortcut;
     QIcon Icon;
     bool bSubmenu = false, bActive = false;
 };

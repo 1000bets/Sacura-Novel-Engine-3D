@@ -117,6 +117,7 @@ void EditorMainWindow::RegisterBuiltInAssetEditors()
         }
 
         std::string Error;
+        CloseSceneContextMenu();
         if (!Document.Open(Entry.AbsolutePath, Error))
         {
             QMessageBox::warning(

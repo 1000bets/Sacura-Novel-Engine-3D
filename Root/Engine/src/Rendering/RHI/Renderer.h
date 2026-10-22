@@ -40,7 +40,7 @@ public:
     void Shutdown();
     bool AddSurface(RenderSurfaceId Surface, const NativeWindowInfo& WindowInfo);
     void RemoveSurface(RenderSurfaceId Surface);
-    void ResizeSurface(RenderSurfaceId Surface, uint32_t Width, uint32_t Height);
+    void ResizeSurface(RenderSurfaceId Surface, uint32_t Width, uint32_t Height, bool bInteractive = false);
     std::unordered_map<uint32_t, RenderStatistics> GetStatistics() const;
     void PrepareMaterial(const ResolvedMaterial& Material, std::shared_ptr<MaterialCompilation> Compilation);
     void QueueMaterialImage(std::shared_ptr<MaterialImageRequest> Request);

@@ -53,6 +53,7 @@ set(EDITOR_SRC
     src/Shell/EditorMainWindowClipboard.cpp
     src/Shell/EditorMainWindowActions.cpp
     src/Shell/EditorMainWindowSimulation.cpp
+    src/Shell/EditorMainWindowSceneMenu.cpp
     src/Shell/EditorMainWindowViewport.cpp
     src/Shell/EditorMainWindowAssets.cpp
     src/Panels/HierarchyTreeWidget.cpp

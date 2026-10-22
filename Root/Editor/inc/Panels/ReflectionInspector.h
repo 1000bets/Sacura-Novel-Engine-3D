@@ -8,6 +8,7 @@
 #include <QWidget>
 #include <functional>
 #include <vector>
+#include <unordered_map>
 
 class Object;
 class AssetRegistry;
@@ -39,9 +40,10 @@ public:
     void SetAssetRegistry(AssetRegistry* Registry);
     void SetAssetCommitCallback(AssetCommitCallback Callback);
     void SetTypeLabelVisible(bool bVisible);
-    void SetMeshPresentation(bool Enabled) { bMeshPresentation = Enabled; Rebuild(); }
+    void SetMeshPresentation(bool Enabled) { if (bMeshPresentation != Enabled) { bMeshPresentation = Enabled; Rebuild(); } }
 
     void Rebuild();
+    void RefreshValues();
 
     static ReflectionDiagnostic ResetPropertyToDefault(Object* Instance, const PropertyId& Property);
     static ReflectionDiagnostic ResetAllToDefault(Object* Instance);
@@ -64,7 +66,11 @@ private:
     bool CommitProperty(const PropertyId& Property, const ReflectedValue& NewValue);
     bool CommitReset(const PropertyId& Property);
 
-    Object* InspectedObject = nullptr;
+    ObjectHandle InspectedIdentity;
+    std::vector<std::pair<PropertyId, ReflectedValue>> DisplayedValues;
+    std::unordered_map<std::string, std::function<bool(const ReflectedValue&)>> PropertyRefreshers;
+    bool bValuesDirty = false;
+    bool bRefreshQueued = false;
     PropertyCommitCallback CommitCallback;
     PropertyResetCallback ResetCallback;
     AssetCommitCallback AssetCallback;

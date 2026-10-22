@@ -72,7 +72,9 @@ void Renderer::RenderImGuiOverlay(
     DrawData.Valid = true;
     DrawData.DisplayPos = ImVec2(0.0f, 0.0f);
     DrawData.DisplaySize = ImVec2(Overlay.DisplayWidth, Overlay.DisplayHeight);
-    DrawData.FramebufferScale = ImVec2(Overlay.FramebufferScaleX, Overlay.FramebufferScaleY);
+    // During a native live resize the swapchain can temporarily retain its
+    // previous resolution. Map logical overlay coordinates into that buffer.
+    DrawData.FramebufferScale = ImVec2(Description.Width / Overlay.DisplayWidth, Description.Height / Overlay.DisplayHeight);
 
     for (const ImGuiOverlayDrawList& SourceList : Overlay.Lists)
     {

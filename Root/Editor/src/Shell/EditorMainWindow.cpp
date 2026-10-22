@@ -125,6 +125,7 @@ EditorMainWindow::EditorMainWindow(Engine& InEngine, ProjectSession& InSession, 
 
 EditorMainWindow::~EditorMainWindow()
 {
+    CloseSceneContextMenu();
     Docking->Save();
     MaintenanceTimer->stop();
     StoryAuthoring.reset();

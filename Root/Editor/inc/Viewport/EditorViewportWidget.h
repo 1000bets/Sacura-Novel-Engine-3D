@@ -51,7 +51,9 @@ public:
     GizmoOperation GetGizmoOperation() const;
     void SetSnapEnabled(bool bEnabled) { bSnapEnabled = bEnabled; }
     bool IsSnapEnabled() const { return bSnapEnabled; }
-    void SetGridVisible(bool bVisible) { bGridVisible = bVisible; }
+    void SetGridVisible(bool bVisible);
+    void SetWorldAxes(bool bWorld) { bWorldAxes = bWorld; }
+    bool HasWorldAxes() const { return bWorldAxes; }
     bool IsGridVisible() const { return bGridVisible; }
     Vector3 GetGizmoSnap() const;
     void SetNavigationVisible(bool bVisible);
@@ -63,6 +65,9 @@ signals:
     void AssetDropped(QString AssetId, QString SubAssetId, QString AssetTypeIdentifier, QString VirtualPath, QPoint Position);
     void ObjectSelectionRequested(QPoint Position);
     void CameraChanged();
+    void SceneContextMenuRequested(QPoint Position);
+    void EditorToolsDisabled();
+    void GridVisibilityChanged(bool bVisible);
     void CameraMoveSpeedChanged(float Speed);
     void GizmoOperationChanged(EditorViewportWidget::GizmoOperation Operation);
     void NavigationVisibilityChanged(bool bVisible);
@@ -119,9 +124,12 @@ private:
     TransformCommitCallback CommitCallback;
     QTimer* NavigationTimer = nullptr;
     QPointF LastMousePosition;
+    QPointF ContextPressPosition;
+    bool bContextClickCandidate = false;
+    bool bWorldAxes = false;
     QSet<int> HeldKeys;
     CameraMode ActiveCameraMode = CameraMode::None;
-    GizmoOperation ActiveGizmoOperation = GizmoOperation::Select;
+    GizmoOperation ActiveGizmoOperation = GizmoOperation::Translate;
     float MoveSpeed = 8.0f;
     bool bEditorToolsEnabled = false;
     bool bKeyboardCaptured = false;

@@ -50,13 +50,13 @@ public:
     bool WaitUntilReady() const;
 
     RenderCommandEnqueueResult Enqueue(RenderCommandQueue::Command Work);
-    bool SubmitFrame(std::unique_ptr<RenderFrameData> Frame);
+    bool SubmitFrame(std::unique_ptr<RenderFrameData> Frame, bool bReplacePending = false);
     uint64_t GetRetirementValue() const { return LastSubmittedFrame.load(std::memory_order_acquire) + 1; }
     RenderStatistics GetStatistics(RenderSurfaceId Surface) const;
     void ResizeRenderer(uint32_t Width, uint32_t Height);
     bool AttachSurface(RenderSurfaceId Surface, const NativeWindowInfo& WindowInfo);
     void DetachSurface(RenderSurfaceId Surface);
-    void ResizeSurface(RenderSurfaceId Surface, uint32_t Width, uint32_t Height);
+    void ResizeSurface(RenderSurfaceId Surface, uint32_t Width, uint32_t Height, bool bInteractive = false);
 
     MeshHandle GetDefaultMesh() const { return DefaultMesh; }
 

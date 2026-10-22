@@ -47,6 +47,7 @@ FetchContent_Declare(
     GIT_SHALLOW    TRUE
     SOURCE_DIR     ${CMAKE_CURRENT_SOURCE_DIR}/DiligentCore
     PATCH_COMMAND ${CMAKE_COMMAND} -DDILIGENT_SOURCE_DIRECTORY=<SOURCE_DIR> -P ${CMAKE_CURRENT_SOURCE_DIR}/PatchDiligentOpenGLQuery.cmake
+          COMMAND ${CMAKE_COMMAND} -DDILIGENT_SOURCE_DIRECTORY=<SOURCE_DIR> -P ${CMAKE_CURRENT_SOURCE_DIR}/PatchDiligentWindowResize.cmake
 )
 
 FetchContent_Declare(
@@ -63,6 +64,7 @@ FetchContent_Declare(
     GIT_TAG        ${SAKURA_DILIGENT_FX_GIT_TAG}
     GIT_SHALLOW    TRUE
     SOURCE_DIR     ${CMAKE_CURRENT_SOURCE_DIR}/DiligentFX
+    PATCH_COMMAND ${CMAKE_COMMAND} -DDILIGENT_FX_SOURCE_DIRECTORY=<SOURCE_DIR> -P ${CMAKE_CURRENT_SOURCE_DIR}/PatchDiligentFXShaderList.cmake
 )
 
 FetchContent_Declare(
@@ -85,10 +87,18 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(SDL3 DiligentCore)
 set(DILIGENT_SOURCE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/DiligentCore")
 include("${CMAKE_CURRENT_SOURCE_DIR}/PatchDiligentOpenGLQuery.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/PatchDiligentWindowResize.cmake")
 unset(DILIGENT_SOURCE_DIRECTORY)
 
 # DiligentTools embeds its own ImGui into Diligent-Imgui when target "imgui" is absent.
 # Do not add a top-level target named "imgui" — leave Tools' bundled ImGui alone.
+# Apply to already-populated checkouts too, before their CMakeLists is evaluated.
+# Fresh downloads receive the same reproducible patch through FetchContent.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/DiligentFX/BuildUtils.cmake")
+    set(DILIGENT_FX_SOURCE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/DiligentFX")
+    include("${CMAKE_CURRENT_SOURCE_DIR}/PatchDiligentFXShaderList.cmake")
+    unset(DILIGENT_FX_SOURCE_DIRECTORY)
+endif()
 FetchContent_MakeAvailable(DiligentTools DiligentFX)
 
 # Editor builds ImGui draw snapshots on Game Thread while the RHI consumes

@@ -4,6 +4,8 @@
 #include <QApplication>
 #include <QKeyEvent>
 #include <QLineEdit>
+#include <QMouseEvent>
+#include <QSignalBlocker>
 #include <QListWidget>
 #include <QLocale>
 #include <QLabel>
@@ -15,9 +17,123 @@
 #include <QStyle>
 #include <QVBoxLayout>
 #include <algorithm>
+#include <cmath>
 
 namespace EditorUi
 {
+StudioNumberEdit::StudioNumberEdit(QWidget* Parent) : QDoubleSpinBox(Parent)
+{
+    lineEdit()->installEventFilter(this);
+}
+
+void StudioNumberEdit::SetScrubStep(double Step)
+{
+    ScrubStep = std::max(0.0, Step);
+    lineEdit()->setCursor(ScrubStep > 0 ? Qt::SizeHorCursor : Qt::IBeamCursor);
+}
+
+void StudioNumberEdit::FinishScrub(bool Cancel)
+{
+    bPressed = false;
+    if (!bScrubbing)
+    {
+        return;
+    }
+    if (Cancel)
+    {
+        const QSignalBlocker Blocker(this);
+        setValue(StartValue);
+    }
+    bScrubbing = false;
+    emit ScrubFinished(Cancel);
+}
+
+bool StudioNumberEdit::HandleScrubEvent(QEvent* Event)
+{
+    if (Event->type() == QEvent::FocusOut || Event->type() == QEvent::WindowDeactivate)
+    {
+        FinishScrub();
+    }
+    else if (Event->type() == QEvent::Hide || (Event->type() == QEvent::EnabledChange && !isEnabled()))
+    {
+        FinishScrub(true);
+    }
+    if (ScrubStep <= 0 || !isEnabled() || isReadOnly())
+    {
+        return false;
+    }
+    if (Event->type() == QEvent::KeyPress && bPressed
+        && static_cast<QKeyEvent*>(Event)->key() == Qt::Key_Escape)
+    {
+        FinishScrub(true);
+        Event->accept();
+        return true;
+    }
+    if (Event->type() == QEvent::MouseButtonPress)
+    {
+        auto* Mouse = static_cast<QMouseEvent*>(Event);
+        if (Mouse->button() == Qt::LeftButton)
+        {
+            setFocus(Qt::MouseFocusReason);
+            interpretText();
+            StartValue = DragValue = value();
+            PressPosition = LastPosition = Mouse->globalPosition();
+            bPressed = true;
+            return true;
+        }
+    }
+    else if (Event->type() == QEvent::MouseMove && bPressed)
+    {
+        auto* Mouse = static_cast<QMouseEvent*>(Event);
+        const QPointF Position = Mouse->globalPosition();
+        if (!bScrubbing && std::abs(Position.x() - PressPosition.x()) >= QApplication::startDragDistance())
+        {
+            bScrubbing = true;
+            lineEdit()->deselect();
+            emit ScrubStarted();
+        }
+        if (bScrubbing)
+        {
+            const double Speed = Mouse->modifiers().testFlag(Qt::ShiftModifier) ? 0.1
+                : Mouse->modifiers().testFlag(Qt::ControlModifier) ? 10.0 : 1.0;
+            DragValue = std::clamp(DragValue + (Position.x() - LastPosition.x()) * ScrubStep * Speed, minimum(), maximum());
+            LastPosition = Position;
+            setValue(DragValue);
+        }
+        return true;
+    }
+    else if (Event->type() == QEvent::MouseButtonRelease && bPressed
+        && static_cast<QMouseEvent*>(Event)->button() == Qt::LeftButton)
+    {
+        const bool WasScrubbing = bScrubbing;
+        FinishScrub();
+        if (!WasScrubbing)
+        {
+            selectAll();
+        }
+        return true;
+    }
+    return false;
+}
+
+bool StudioNumberEdit::eventFilter(QObject* Watched, QEvent* Event)
+{
+    if (Watched == lineEdit() && HandleScrubEvent(Event))
+    {
+        return true;
+    }
+    return QDoubleSpinBox::eventFilter(Watched, Event);
+}
+
+bool StudioNumberEdit::event(QEvent* Event)
+{
+    if (HandleScrubEvent(Event))
+    {
+        return true;
+    }
+    return QDoubleSpinBox::event(Event);
+}
+
 QString StudioNumberEdit::textFromValue(double Value) const
 {
     QString Text = QDoubleSpinBox::textFromValue(Value);

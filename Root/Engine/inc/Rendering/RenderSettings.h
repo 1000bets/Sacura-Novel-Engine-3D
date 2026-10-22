@@ -9,11 +9,17 @@ struct RenderSettings
     float ShadowDistance = 80.f;
     bool bAntialiasing = true;
     bool bMaterialPostProcess = true;
+    // Per-view editor aid; runtime views leave this disabled.
+    bool bGroundGrid = false;
 };
 
 struct RenderStatistics
 {
     unsigned long long FrameIndex = 0;
+    unsigned int SurfaceWidth = 0;
+    unsigned int SurfaceHeight = 0;
+    unsigned long long SurfaceResizeCount = 0;
+    bool bLiveResizeScaling = false;
     unsigned int SubmittedObjects = 0;
     unsigned int VisibleObjects = 0;
     unsigned int CulledObjects = 0;

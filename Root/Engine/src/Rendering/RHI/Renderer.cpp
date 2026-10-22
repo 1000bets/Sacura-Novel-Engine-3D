@@ -73,6 +73,14 @@ struct PostprocessConstants
     Vector4 Resolution;
 };
 
+struct GroundGridConstants
+{
+    Matrix ViewProjection;
+    Vector4 CameraPosition;
+    Vector4 Options;
+};
+static_assert(sizeof(GroundGridConstants) == 96);
+
 static_assert(sizeof(ForwardLightConstants) == 64);
 static_assert(sizeof(ForwardFrameConstants) == 3184);
 static_assert(sizeof(ForwardObjectConstants) == 176);
@@ -105,6 +113,9 @@ struct Renderer::PipelineState
         RenderStatistics Statistics;
         uint32_t Width = 0;
         uint32_t Height = 0;
+        uint64_t ResizeCount = 0;
+        uint32_t PendingWidth = 0;
+        uint32_t PendingHeight = 0;
         bool bSuspended = false;
     };
     ForwardPipeline Opaque[2];
@@ -115,6 +126,8 @@ struct Renderer::PipelineState
     std::chrono::steady_clock::time_point StartTime = std::chrono::steady_clock::now();
     ForwardPipeline Antialias;
     ForwardPipeline PreviewAntialias;
+    ForwardPipeline GroundGrid;
+    GpuBuffer GroundGridBuffer;
     GpuBuffer FrameBuffer;
     GpuBuffer ObjectBuffer;
     GpuBuffer PostBuffer;
@@ -220,6 +233,7 @@ bool Renderer::CreatePipeline(const std::string& ShaderDirectory)
 {
     auto* GraphicsDevice = Device.GetDevice();
     if (!Pipeline->FrameBuffer.Create(GraphicsDevice, GpuBufferUsage::Uniform, nullptr, sizeof(ForwardFrameConstants), "Forward frame", true)
+        || !Pipeline->GroundGridBuffer.Create(GraphicsDevice, GpuBufferUsage::Uniform, nullptr, sizeof(GroundGridConstants), "Ground grid", true)
         || !Pipeline->ObjectBuffer.Create(GraphicsDevice, GpuBufferUsage::Uniform, nullptr, sizeof(ForwardObjectConstants), "Forward object", true)
         || !Pipeline->PostBuffer.Create(GraphicsDevice, GpuBufferUsage::Uniform, nullptr, sizeof(PostprocessConstants), "Postprocess", true)
         || !Pipeline->MaterialBuffer.Create(GraphicsDevice, GpuBufferUsage::Uniform, nullptr, 4096, "Material parameters", true)
@@ -503,6 +517,51 @@ bool Renderer::CreatePipeline(const std::string& ShaderDirectory)
             || !Pipeline->CreateState(Pipeline->Shadow[SideIndex], ShadowPixel, 2, SideIndex != 0, nullptr, nullptr, false))
         {
             return false;
+        }
+    }
+    // The grid is world geometry, separate from the always-on-top ImGui tools.
+    const auto GridVertex = CreateShader("GroundGrid.hlsl", "GridVS", SHADER_TYPE_VERTEX);
+    const auto GridPixel = CreateShader("GroundGrid.hlsl", "GridPS", SHADER_TYPE_PIXEL);
+    if (!GridVertex || !GridPixel)
+    {
+        return false;
+    }
+    GraphicsPipelineStateCreateInfo GridDescription;
+    GridDescription.PSODesc.Name = "Depth-tested ground grid";
+    GridDescription.PSODesc.PipelineType = PIPELINE_TYPE_GRAPHICS;
+    GridDescription.PSODesc.ResourceLayout.DefaultVariableType = SHADER_RESOURCE_VARIABLE_TYPE_DYNAMIC;
+    GridDescription.pVS = GridVertex;
+    GridDescription.pPS = GridPixel;
+    auto& GridGraphics = GridDescription.GraphicsPipeline;
+    GridGraphics.PrimitiveTopology = PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    GridGraphics.RasterizerDesc.CullMode = CULL_MODE_NONE;
+    GridGraphics.NumRenderTargets = 1;
+    GridGraphics.RTVFormats[0] = TEX_FORMAT_RGBA16_FLOAT;
+    GridGraphics.DSVFormat = TEX_FORMAT_D32_FLOAT;
+    GridGraphics.DepthStencilDesc.DepthEnable = True;
+    GridGraphics.DepthStencilDesc.DepthWriteEnable = False;
+    GridGraphics.DepthStencilDesc.DepthFunc = COMPARISON_FUNC_LESS;
+    auto& GridBlend = GridGraphics.BlendDesc.RenderTargets[0];
+    GridBlend.BlendEnable = True;
+    GridBlend.SrcBlend = BLEND_FACTOR_SRC_ALPHA;
+    GridBlend.DestBlend = BLEND_FACTOR_INV_SRC_ALPHA;
+    GridBlend.SrcBlendAlpha = BLEND_FACTOR_ZERO;
+    GridBlend.DestBlendAlpha = BLEND_FACTOR_ONE;
+    GraphicsDevice->CreateGraphicsPipelineState(GridDescription, &Pipeline->GroundGrid.State);
+    if (!Pipeline->GroundGrid.State)
+    {
+        return false;
+    }
+    Pipeline->GroundGrid.State->CreateShaderResourceBinding(&Pipeline->GroundGrid.Binding, true);
+    if (!Pipeline->GroundGrid.Binding)
+    {
+        return false;
+    }
+    for (SHADER_TYPE Stage : {SHADER_TYPE_VERTEX, SHADER_TYPE_PIXEL})
+    {
+        if (auto* Variable = Pipeline->GroundGrid.Binding->GetVariableByName(Stage, "GroundGridConstants"))
+        {
+            Variable->Set(Pipeline->GroundGridBuffer.GetBuffer());
         }
     }
     return Pipeline->CreateState(Pipeline->Composite, CompositePixel, 3, true, nullptr, nullptr, false)
@@ -963,11 +1022,20 @@ void Renderer::RenderView(const RenderViewFrame& View, uint64_t FrameIndex, ITex
     {
         return;
     }
-    const auto CpuStart = std::chrono::steady_clock::now();
     auto& Target = Iterator->second;
+    if (Target.PendingWidth != 0 && Target.PendingHeight != 0)
+    {
+        ResizeSurface(View.Surface, Target.PendingWidth, Target.PendingHeight);
+        if (Target.bSuspended) { return; }
+    }
+    const auto CpuStart = std::chrono::steady_clock::now();
     auto* Context = Device.GetImmediateContext();
     RenderStatistics Statistics;
     Statistics.FrameIndex = FrameIndex;
+    Statistics.SurfaceWidth = Target.Width;
+    Statistics.SurfaceHeight = Target.Height;
+    Statistics.SurfaceResizeCount = Target.ResizeCount;
+    Statistics.bLiveResizeScaling = Device.SupportsLiveResizeScaling();
     Statistics.SubmittedObjects = static_cast<uint32_t>(View.Scene.Objects.size());
     PipelineState::QueryFrame* ActiveTiming = nullptr;
     for (auto& Timing : Target.Timings)
@@ -1311,6 +1379,21 @@ void Renderer::RenderView(const RenderViewFrame& View, uint64_t FrameIndex, ITex
             DrawObject(*Object, Pipeline->Opaque[Object->MaterialSnapshot && Object->MaterialSnapshot->Material->Definition.bDoubleSided]);
         }
     }
+    if (View.Settings.bGroundGrid && View.Scene.Camera.bValid)
+    {
+        // Keep the opaque/masked scene depth bound, but never write grid depth.
+        // Transparent surfaces are composited over this editor aid afterwards.
+        const GroundGridConstants Grid{Frame.ViewProjection, Frame.CameraPosition, Frame.OutputParameters};
+        Pipeline->GroundGridBuffer.Update(Context, &Grid, sizeof(Grid));
+        Context->SetPipelineState(Pipeline->GroundGrid.State);
+        Context->CommitShaderResources(Pipeline->GroundGrid.Binding, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+        DrawAttribs GridDraw;
+        GridDraw.NumVertices = 6;
+        GridDraw.Flags = DRAW_FLAG_VERIFY_ALL;
+        Context->Draw(GridDraw);
+        ++Statistics.DrawCalls;
+        Statistics.Triangles += 2;
+    }
     EndPass(1);
     BeginPass(2);
     ITextureView* TransparencyTargets[] = {Target.Accumulation->GetDefaultView(TEXTURE_VIEW_RENDER_TARGET), Target.Revealage->GetDefaultView(TEXTURE_VIEW_RENDER_TARGET)};
@@ -1476,7 +1559,7 @@ void Renderer::RemoveSurface(RenderSurfaceId Surface)
     Device.RemoveSurface(Surface);
 }
 
-void Renderer::ResizeSurface(RenderSurfaceId Surface, uint32_t Width, uint32_t Height)
+void Renderer::ResizeSurface(RenderSurfaceId Surface, uint32_t Width, uint32_t Height, bool bInteractive)
 {
     AssertRenderThread();
     auto Iterator = Pipeline->Surfaces.find(Surface.Value);
@@ -1486,12 +1569,29 @@ void Renderer::ResizeSurface(RenderSurfaceId Surface, uint32_t Width, uint32_t H
     }
     auto& Target = Iterator->second;
     Target.bSuspended = Width == 0 || Height == 0;
+    Target.PendingWidth = 0;
+    Target.PendingHeight = 0;
+    // DXGI stretches the continuously rendered image to the current HWND.
+    // Recreating its buffers on every mouse move drains the GPU and discards
+    // the presented contents. Keep them until the host reports a settled size.
+    // Backends requiring a native resize coalesce mouse updates and apply only
+    // the latest extent immediately before drawing, once per rendered frame.
+    if (bInteractive && !Target.bSuspended && Target.Radiance && Target.Depth)
+    {
+        if (!Device.SupportsLiveResizeScaling())
+        {
+            Target.PendingWidth = Width;
+            Target.PendingHeight = Height;
+        }
+        return;
+    }
     if (Target.bSuspended || (Width == Target.Width && Height == Target.Height
         && Target.Radiance && Target.Depth && Target.Accumulation && Target.Revealage && Target.ToneMapped))
     {
         return;
     }
     Device.ResizeSurface(Surface, Width, Height);
+    ++Target.ResizeCount;
     if (!CreateSurfaceResources(Surface))
     {
         Target.bSuspended = true;

@@ -24,6 +24,10 @@
 #include <QWheelEvent>
 #include <QResizeEvent>
 #include <QTimer>
+#include <QSettings>
+#include <QCryptographicHash>
+#include <QFileInfo>
+#include <QScopedValueRollback>
 #include <algorithm>
 #include <cmath>
 
@@ -36,6 +40,7 @@ class StoryWireLegend final : public QWidget
   public:
     explicit StoryWireLegend(QWidget* Parent) : QWidget(Parent)
     {
+        setObjectName("StoryWireLegend");
         setAttribute(Qt::WA_TransparentForMouseEvents);
         setFixedSize(240, 28);
     }
@@ -59,6 +64,7 @@ class StoryWireLegend final : public QWidget
 class StoryCanvas final : public QGraphicsView
 {
   public:
+    std::function<void()> NavigationChanged;
     explicit StoryCanvas(QGraphicsScene* Scene, StoryWorkspaceView* Parent)
         : QGraphicsView(Scene, Parent), Workspace(*Parent)
     {
@@ -109,25 +115,40 @@ class StoryCanvas final : public QGraphicsView
 
     void FitGraph()
     {
+        RestoredOrigin.reset();
         bKeepOriginOnResize = false;
         fitInView(scene()->itemsBoundingRect().adjusted(-30, -30, 30, 30), Qt::KeepAspectRatio);
         const qreal Scale = std::clamp(transform().m11(), .25, 1.0);
         setTransform(QTransform::fromScale(Scale, Scale));
         centerOn(scene()->itemsBoundingRect().center());
+        if (NavigationChanged) { NavigationChanged(); }
     }
     void FocusSelection()
     {
         for (auto* Item : scene()->selectedItems())
         {
-            if (!Item->data(0).toString().isEmpty()) { ResetNavigation(Item->pos()); return; }
+            if (!Item->data(0).toString().isEmpty())
+            {
+                ResetNavigation(Item->pos());
+                if (NavigationChanged) { NavigationChanged(); }
+                return;
+            }
         }
     }
     void ResetNavigation(QPointF NodePosition)
     {
+        RestoredOrigin.reset();
         bKeepOriginOnResize = true;
         InitialNodePosition = NodePosition;
         resetTransform();
         RestoreInitialView();
+    }
+    void RestoreNavigation(QPointF Origin, double Scale)
+    {
+        bKeepOriginOnResize = false;
+        RestoredOrigin = Origin;
+        setTransform(QTransform::fromScale(Scale, Scale));
+        RestoreOrigin(Origin);
     }
     void EnsureVisibleExtent(QPointF Center)
     {
@@ -177,15 +198,24 @@ class StoryCanvas final : public QGraphicsView
         }
         else
         {
+            RestoredOrigin.reset();
+            bKeepOriginOnResize = false;
             QGraphicsView::keyPressEvent(Event);
+            if (NavigationChanged) { NavigationChanged(); }
             return;
         }
         Event->accept();
     }
     void mousePressEvent(QMouseEvent* Event) override
     {
+        RestoredOrigin.reset();
         bKeepOriginOnResize = false;
         QGraphicsView::mousePressEvent(Event);
+    }
+    void mouseReleaseEvent(QMouseEvent* Event) override
+    {
+        QGraphicsView::mouseReleaseEvent(Event);
+        if (NavigationChanged) { NavigationChanged(); }
     }
     void showEvent(QShowEvent* Event) override
     {
@@ -194,6 +224,7 @@ class StoryCanvas final : public QGraphicsView
         {
             RestoreInitialView();
         }
+        else if (RestoredOrigin) { RestoreOrigin(*RestoredOrigin); }
     }
     void resizeEvent(QResizeEvent* Event) override
     {
@@ -202,6 +233,7 @@ class StoryCanvas final : public QGraphicsView
         {
             RestoreInitialView();
         }
+        else if (RestoredOrigin) { RestoreOrigin(*RestoredOrigin); }
         PositionOverlays();
     }
     void scrollContentsBy(int Dx, int Dy) override
@@ -214,13 +246,25 @@ class StoryCanvas final : public QGraphicsView
     {
         if (Navigation != nullptr)
         {
+            auto* Controls = static_cast<QBoxLayout*>(Navigation->layout());
+            Controls->setDirection(viewport()->height() < 160 ? QBoxLayout::LeftToRight : QBoxLayout::TopToBottom);
+            Navigation->adjustSize();
+            Navigation->setVisible(viewport()->height() >= Navigation->height() + 16
+                                   && viewport()->width() >= Navigation->width() + 16);
             Navigation->move(8, std::max(8, viewport()->height() - Navigation->height() - 8));
         }
         if (FocusNavigation)
         {
-            FocusNavigation->move(69, std::max(8, viewport()->height() - FocusNavigation->height() - 14));
+            const int Left = std::max(69, Navigation->width() + 24);
+            FocusNavigation->setVisible(viewport()->width() >= Left + FocusNavigation->width() + 8
+                                        && viewport()->height() >= FocusNavigation->height() + 28);
+            FocusNavigation->move(Left, std::max(8, viewport()->height() - FocusNavigation->height() - 14));
         }
-        if (Legend) { Legend->move(std::max(0, viewport()->width() - Legend->width() - 12), 10); }
+        if (Legend)
+        {
+            Legend->setVisible(viewport()->height() >= 180 && viewport()->width() >= Legend->width() + 24);
+            Legend->move(std::max(0, viewport()->width() - Legend->width() - 12), 10);
+        }
     }
     void drawBackground(QPainter* Painter, const QRectF& Rect) override
     {
@@ -228,6 +272,7 @@ class StoryCanvas final : public QGraphicsView
     }
     void wheelEvent(QWheelEvent* Event) override
     {
+        RestoredOrigin.reset();
         bKeepOriginOnResize = false;
         if (Event->modifiers().testFlag(Qt::ControlModifier))
         {
@@ -244,6 +289,7 @@ class StoryCanvas final : public QGraphicsView
             verticalScrollBar()->setValue(verticalScrollBar()->value() - Delta.y());
         }
         Event->accept();
+        if (NavigationChanged) { NavigationChanged(); }
     }
 
   private:
@@ -253,15 +299,19 @@ class StoryCanvas final : public QGraphicsView
         // Extend the
         // scrollable scene before setting offsets: tall/wide viewports otherwise
         // clamp a requested origin and center the cards in empty space.
+        RestoreOrigin(InitialNodePosition - QPointF(40, 30) / transform().m11());
+    }
+    void RestoreOrigin(QPointF TopLeft)
+    {
         const qreal Scale = transform().m11();
         const QSizeF Size(viewport()->width() / Scale, viewport()->height() / Scale);
-        const QPointF TopLeft = InitialNodePosition - QPointF(40, 30) / Scale;
         scene()->setSceneRect(scene()->sceneRect().united(QRectF(TopLeft, Size).adjusted(-2, -2, 2, 2)));
         horizontalScrollBar()->setValue(qRound(TopLeft.x() * Scale));
         verticalScrollBar()->setValue(qRound(TopLeft.y() * Scale));
     }
     void Zoom(qreal Factor)
     {
+        RestoredOrigin.reset();
         bKeepOriginOnResize = false;
         const qreal CurrentScale = transform().m11();
         if (Factor > 1 && CurrentScale < 1.8)
@@ -274,7 +324,9 @@ class StoryCanvas final : public QGraphicsView
             const qreal LimitedFactor = std::max(Factor, 0.25 / CurrentScale);
             scale(LimitedFactor, LimitedFactor);
         }
+        if (NavigationChanged) { NavigationChanged(); }
     }
+    std::optional<QPointF> RestoredOrigin;
     bool bKeepOriginOnResize = true;
     QPointF InitialNodePosition;
     QWidget* Navigation = nullptr;
@@ -377,11 +429,19 @@ StoryWorkspaceView::StoryWorkspaceView(QWidget* Parent) : QWidget(Parent)
     auto* Body = new QHBoxLayout();
     Body->setContentsMargins(0, 0, 0, 0);
     Body->setSpacing(0);
-    auto* Variables = new QWidget(this);
-    VariablesPanel = Variables;
-    Variables->setObjectName("BlueprintSidebar");
-    Variables->setFixedWidth(302);
+    auto* VariablesScroll = new QScrollArea(this);
+    VariablesPanel = VariablesScroll;
+    VariablesScroll->setObjectName("BlueprintSidebar");
+    VariablesScroll->setFixedWidth(302);
+    VariablesScroll->setFrameShape(QFrame::NoFrame);
+    VariablesScroll->setWidgetResizable(true);
+    VariablesScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    auto* Variables = new QWidget;
+    Variables->setObjectName("BlueprintSidebarContent");
     auto* Sidebar = new QVBoxLayout(Variables);
+    // A short dock scrolls the sidebar instead of compressing fixed-height
+    // labels and search controls into overlapping layout rows.
+    Sidebar->setSizeConstraint(QLayout::SetMinimumSize);
     Sidebar->setContentsMargins(13, 8, 15, 12);
     Sidebar->setSpacing(16);
     auto* Heading = new QLabel(tr("Мой Blueprint"), Variables);
@@ -404,7 +464,8 @@ StoryWorkspaceView::StoryWorkspaceView(QWidget* Parent) : QWidget(Parent)
     Hint->setObjectName("MutedLabel");
     Hint->setProperty("uiRole", "graphHint");
     Sidebar->addWidget(Hint);
-    Body->addWidget(Variables);
+    VariablesScroll->setWidget(Variables);
+    Body->addWidget(VariablesScroll);
     Graphics = new StoryGraphicsScene(this);
     Graphics->InteractionFinished = [this]()
     {
@@ -457,6 +518,11 @@ StoryWorkspaceView::StoryWorkspaceView(QWidget* Parent) : QWidget(Parent)
         }
     };
     Canvas = new StoryCanvas(Graphics, this);
+    NavigationSaveTimer = new QTimer(this);
+    NavigationSaveTimer->setSingleShot(true);
+    NavigationSaveTimer->setInterval(250);
+    connect(NavigationSaveTimer, &QTimer::timeout, this, &StoryWorkspaceView::SaveNavigation);
+    static_cast<StoryCanvas*>(Canvas)->NavigationChanged = [this]() { RememberNavigation(); };
     connect(Focus, &QPushButton::clicked, this, [this]() { static_cast<StoryCanvas*>(Canvas)->FocusSelection(); });
     Body->addWidget(Canvas, 1);
     Layout->addLayout(Body, 1);
@@ -515,8 +581,74 @@ void StoryWorkspaceView::ShowAddMenu(QPointF Position, QPoint ScreenPosition)
     ActionMenu->Open(ScreenPosition);
 }
 
+void StoryWorkspaceView::SetNavigationSettings(const QString& ProjectIdentity, const QString& SettingsFile)
+{
+    SaveNavigation();
+    const QFileInfo ProjectFile(ProjectIdentity);
+    NavigationProject = ProjectFile.canonicalFilePath();
+    if (NavigationProject.isEmpty()) { NavigationProject = ProjectFile.absoluteFilePath(); }
+#ifdef _WIN32
+    NavigationProject = NavigationProject.toCaseFolded();
+#endif
+    NavigationSettings = SettingsFile.isEmpty()
+        ? std::make_unique<QSettings>(QSettings::IniFormat, QSettings::UserScope, "Sacura", "Editor")
+        : std::make_unique<QSettings>(SettingsFile, QSettings::IniFormat);
+    RestoreNavigation();
+}
+
+QString StoryWorkspaceView::NavigationSettingsKey() const
+{
+    if (!NavigationSettings || !Model.bOpen || Model.DocumentIdentity.isEmpty()) { return {}; }
+    const auto Identity = NavigationProject.toUtf8() + '\0' + Model.DocumentIdentity.toUtf8();
+    return "story/navigation-v1/" + QString::fromLatin1(QCryptographicHash::hash(Identity, QCryptographicHash::Sha256).toHex());
+}
+
+void StoryWorkspaceView::RememberNavigation()
+{
+    if (bUpdatingModel) { return; }
+    const auto Key = NavigationSettingsKey();
+    if (Key.isEmpty()) { return; }
+    // Cache only explicit navigation, so hidden tabs and shutdown/layout events
+    // cannot overwrite a user's view with temporary viewport dimensions.
+    const QPointF Origin = Canvas->viewportTransform().inverted().map(QPointF(0, 0));
+    PendingNavigationKey = Key;
+    PendingNavigation = {Origin.x(), Origin.y(), Canvas->transform().m11()};
+    NavigationSaveTimer->start();
+}
+
+void StoryWorkspaceView::SaveNavigation()
+{
+    if (NavigationSaveTimer) { NavigationSaveTimer->stop(); }
+    if (!NavigationSettings || PendingNavigationKey.isEmpty()) { return; }
+    NavigationSettings->setValue(PendingNavigationKey, PendingNavigation);
+    NavigationSettings->sync();
+    PendingNavigationKey.clear();
+    PendingNavigation.clear();
+}
+
+bool StoryWorkspaceView::RestoreNavigation()
+{
+    const auto Key = NavigationSettingsKey();
+    if (Key.isEmpty()) { return false; }
+    const auto Values = NavigationSettings->value(Key).toList();
+    if (Values.size() != 3) { return false; }
+    double Numbers[3];
+    for (int Index = 0; Index < 3; ++Index)
+    {
+        bool Ok = false;
+        Numbers[Index] = Values[Index].toDouble(&Ok);
+        if (!Ok || !std::isfinite(Numbers[Index])) { return false; }
+    }
+    // QGraphicsView scroll offsets are integers; reject corrupt/out-of-range
+    // settings before converting scene coordinates into scrollbar positions.
+    if (Numbers[2] < .25 - 1e-9 || Numbers[2] > 1.8 + 1e-9 || std::abs(Numbers[0]) > 1e8 || std::abs(Numbers[1]) > 1e8) { return false; }
+    static_cast<StoryCanvas*>(Canvas)->RestoreNavigation({Numbers[0], Numbers[1]}, std::clamp(Numbers[2], .25, 1.8));
+    return true;
+}
+
 StoryWorkspaceView::~StoryWorkspaceView()
 {
+    SaveNavigation();
     // The scene emits selectionChanged while deleting its items. Disconnect
     // while Model and the derived workspace are still alive.
     Graphics->disconnect(this);
@@ -527,6 +659,7 @@ StoryWorkspaceView::~StoryWorkspaceView()
 
 void StoryWorkspaceView::SetModel(StoryGraphModel InModel)
 {
+    const QScopedValueRollback<bool> UpdatingModel(bUpdatingModel, true);
     const bool bReset = Model.DocumentIdentity != InModel.DocumentIdentity || (!Model.bOpen && InModel.bOpen);
     if (!bReset && InModel.bOpen && !InModel.bReadOnly && Graphics->IsInteracting())
     {
@@ -534,6 +667,7 @@ void StoryWorkspaceView::SetModel(StoryGraphModel InModel)
         return;
     }
     PendingModel.reset();
+    if (bReset || !InModel.bOpen) { SaveNavigation(); }
     if (ActionMenu && (bReset || !InModel.bOpen || InModel.bReadOnly != Model.bReadOnly ||
                        InModel.bLocked != Model.bLocked)) { ActionMenu->close(); }
     const auto Selected = Graphics->SelectedNodes();
@@ -579,6 +713,7 @@ void StoryWorkspaceView::SetModel(StoryGraphModel InModel)
             if (Node.Identity == Model.Start) { InitialPosition = Node.Position; break; }
         }
         static_cast<StoryCanvas*>(Canvas)->ResetNavigation(InitialPosition);
+        RestoreNavigation();
     }
     else
     {

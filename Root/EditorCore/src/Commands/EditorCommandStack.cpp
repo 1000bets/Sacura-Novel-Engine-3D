@@ -79,6 +79,22 @@ bool EditorCommandStack::GroupCommand::Do()
     return true;
 }
 
+bool EditorCommandStack::GroupCommand::IsTransformOnly() const
+{
+    if (Children.empty())
+    {
+        return false;
+    }
+    for (const auto& Child : Children)
+    {
+        if (!Child->IsTransformOnly())
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 bool EditorCommandStack::GroupCommand::Undo()
 {
     size_t RemainingCount = Children.size();
@@ -220,6 +236,16 @@ bool EditorCommandStack::CanUndo() const
 bool EditorCommandStack::CanRedo() const
 {
     return OpenGroup == nullptr && !RedoCommands.empty();
+}
+
+bool EditorCommandStack::IsUndoTransformOnly() const
+{
+    return CanUndo() && UndoCommands.back()->IsTransformOnly();
+}
+
+bool EditorCommandStack::IsRedoTransformOnly() const
+{
+    return CanRedo() && RedoCommands.back()->IsTransformOnly();
 }
 
 const std::string& EditorCommandStack::GetUndoDisplayName() const

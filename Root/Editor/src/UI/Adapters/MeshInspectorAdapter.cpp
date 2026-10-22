@@ -21,7 +21,7 @@
 // Mesh/material identities, slot serialization and runtime loading stay in Engine.
 bool ReflectionInspector::BuildMeshPresentation()
 {
-    auto* Mesh = dynamic_cast<MeshRendererComponent*>(InspectedObject);
+    auto* Mesh = dynamic_cast<MeshRendererComponent*>(GetInspectedObject());
     if (!Mesh) { return false; }
     auto AddNote = [this](const QString& Text) {
         auto* Note = new QLabel(Text, this);
@@ -58,7 +58,7 @@ bool ReflectionInspector::BuildMeshPresentation()
         {
             if (SubAsset.Type == StaticMeshAssetType)
             {
-                const auto* Property = InspectedObject->GetClass()->FindProperty(PropertyId{"mesh_asset_id"});
+                const auto* Property = GetInspectedObject()->GetClass()->FindProperty(PropertyId{"mesh_asset_id"});
                 if (Property) { ApplyAssetValue(*Property, {Result.Metadata.Guid, SubAsset.Id}); }
                 return;
             }
@@ -120,7 +120,7 @@ bool ReflectionInspector::BuildMeshPresentation()
     PropertiesLayout->addRow(Material);
     connect(Material, &QComboBox::activated, this, [this, Keys](int Index) {
         if (Index < 0 || Index >= static_cast<int>(Keys.size())) { return; }
-        auto* CurrentMesh = dynamic_cast<MeshRendererComponent*>(InspectedObject);
+        auto* CurrentMesh = dynamic_cast<MeshRendererComponent*>(GetInspectedObject());
         if (!CurrentMesh) { return; }
         if (SelectedMaterialSlot < 0)
         {

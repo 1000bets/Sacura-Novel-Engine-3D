@@ -5,12 +5,12 @@ RenderFrameQueue::RenderFrameQueue(std::size_t InMaximumQueuedFrames)
 {
 }
 
-bool RenderFrameQueue::Submit(std::unique_ptr<RenderFrameData> Frame)
+bool RenderFrameQueue::Submit(std::unique_ptr<RenderFrameData> Frame, bool bReplacePending)
 {
     std::unique_lock<std::mutex> Lock(Mutex);
-    ProducerCondition.wait(Lock, [this]()
+    ProducerCondition.wait(Lock, [this, bReplacePending]()
     {
-        return bShutdownRequested || Frames.size() < MaximumQueuedFrames;
+        return bShutdownRequested || bReplacePending || Frames.size() < MaximumQueuedFrames;
     });
 
     if (bShutdownRequested)
@@ -18,6 +18,11 @@ bool RenderFrameQueue::Submit(std::unique_ptr<RenderFrameData> Frame)
         return false;
     }
 
+    if (bReplacePending)
+    {
+        while (!Frames.empty()) { Frames.pop(); }
+        ProducerCondition.notify_all();
+    }
     Frames.push(std::move(Frame));
     ConsumerCondition.notify_one();
     return true;

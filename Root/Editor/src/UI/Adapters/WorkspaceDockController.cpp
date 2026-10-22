@@ -17,6 +17,7 @@
 #include <QMouseEvent>
 #include <QScreen>
 #include <QSettings>
+#include <QRubberBand>
 #include <QSignalBlocker>
 #include <QSplitter>
 #include <QTabBar>
@@ -67,12 +68,8 @@ void WorkspaceDockController::AddArea(const QString& Id, const QString& Title, Q
     });
 }
 
-void WorkspaceDockController::BindAreaVisibility(const QString& Id, QAction& Visibility)
-{
-    if (Areas.contains(Id)) { Areas[Id].Visibility = &Visibility; }
-}
-
-void WorkspaceDockController::AddPage(const QString& Id, QWidget& Page, const QString& Area, QAction& Visibility)
+void WorkspaceDockController::AddPage(const QString& Id, QWidget& Page, const QString& Area, QAction& Visibility,
+                                      bool bPreviouslyFixed)
 {
     auto* Tabs = Areas.value(Area).Tabs.data();
     if (!Tabs || Tabs->indexOf(&Page) < 0) { return; }
@@ -84,6 +81,7 @@ void WorkspaceDockController::AddPage(const QString& Id, QWidget& Page, const QS
     State.Area = State.DefaultArea = Area;
     State.DefaultIndex = Index;
     State.Open = State.DefaultOpen = Tabs->isTabVisible(Index);
+    State.bPreviouslyFixed = bPreviouslyFixed;
     Pages.insert(Id, State);
     Tabs->setTabToolTip(Index, tr("Перетащите вкладку в другую область или за её пределы. Двойной щелчок — отдельное окно."));
     connect(&Visibility, &QAction::toggled, this, [this, &Page](bool Open) { SetOpen(Page, Open); });
@@ -300,10 +298,28 @@ bool WorkspaceDockController::Restore()
     { bRestoring = false; return false; }
     const auto Windows = Root["pages"].toObject();
     const auto Regions = Root["areas"].toObject();
+    // Older layouts represented fixed base tabs with an empty ID and stored
+    // their visibility on the area. Resolve those entries without resetting
+    // the user's other tool placements or activating a neighbouring tab.
+    auto ResolveSavedId = [&](const QString& Area, const QString& Id)
+    {
+        if (!Id.isEmpty()) { return Id; }
+        for (auto It = Pages.cbegin(); It != Pages.cend(); ++It)
+        {
+            if (It->bPreviouslyFixed && It->DefaultArea == Area && !Windows.contains(It.key()))
+            { return It.key(); }
+        }
+        return QString{};
+    };
     for (auto It = Pages.begin(); It != Pages.end(); ++It)
     {
         const auto Value = Windows[It.key()].toObject();
-        if (Value.isEmpty()) { continue; }
+        if (Value.isEmpty())
+        {
+            if (It->bPreviouslyFixed)
+            { SetOpen(*It->Page, Regions[It->DefaultArea].toObject()["visible"].toBool(true)); }
+            continue;
+        }
         const QString Area = Value["area"].toString();
         if (!Areas.contains(Area)) { continue; }
         Dock(*It->Page, Area);
@@ -320,12 +336,12 @@ bool WorkspaceDockController::Restore()
         int Position = 0;
         for (const auto& Id : Region["order"].toArray())
         {
-            auto* Page = Pages.value(Id.toString()).Page.data();
+            auto* Page = Pages.value(ResolveSavedId(It.key(), Id.toString())).Page.data();
             int Index = Page ? It->Tabs->indexOf(Page) : -1;
             if (Index >= 0) { It->Tabs->tabBar()->moveTab(Index, Position++); }
             else if (Id.toString().isEmpty()) { ++Position; }
         }
-        auto* Active = Pages.value(Region["active"].toString()).Page.data();
+        auto* Active = Pages.value(ResolveSavedId(It.key(), Region["active"].toString())).Page.data();
         if (Active && It->Tabs->indexOf(Active) >= 0 && It->Tabs->isTabVisible(It->Tabs->indexOf(Active)))
         { It->Tabs->setCurrentWidget(Active); }
         else if (Region["active"].toString().isEmpty())
@@ -369,14 +385,6 @@ bool WorkspaceDockController::eventFilter(QObject* Watched, QEvent* Event)
     }
     if (Event->type() == QEvent::Show || Event->type() == QEvent::Hide)
     {
-        for (const auto& Area : Areas)
-        {
-            if (Area.Region == Watched && Area.Visibility)
-            {
-                const QSignalBlocker Block(Area.Visibility);
-                Area.Visibility->setChecked(!Area.Region->isHidden());
-            }
-        }
         ScheduleSave();
     }
     const QString Area = Watched->property("workspaceArea").toString();
@@ -414,6 +422,7 @@ bool WorkspaceDockController::eventFilter(QObject* Watched, QEvent* Event)
             Drag->setMimeData(Mime);
             Drag->setPixmap(Bar->grab(Bar->tabRect(Tabs->indexOf(Pages[Id].Page))));
             const auto Result = Drag->exec(Qt::MoveAction);
+            if (BottomDropIndicator) { BottomDropIndicator->hide(); }
             // Escape cancels with the mouse still held; only an actual outside release floats.
             if (Result == Qt::IgnoreAction && !QApplication::mouseButtons().testFlag(Qt::LeftButton))
             { Float(*Pages[Id].Page, QRect(QCursor::pos(), QSize(800, 520))); }
@@ -422,6 +431,7 @@ bool WorkspaceDockController::eventFilter(QObject* Watched, QEvent* Event)
         }
     }
     if (Event->type() == QEvent::MouseButtonRelease) { DragId.clear(); }
+    if (Event->type() == QEvent::DragLeave && BottomDropIndicator) { BottomDropIndicator->hide(); }
     if (Event->type() == QEvent::DragEnter || Event->type() == QEvent::DragMove || Event->type() == QEvent::Drop)
     {
         auto* Drop = static_cast<QDropEvent*>(Event);
@@ -430,9 +440,33 @@ bool WorkspaceDockController::eventFilter(QObject* Watched, QEvent* Event)
         const QString Id = Payload.startsWith(Prefix) ? Payload.mid(Prefix.size()) : QString{};
         if (Pages.contains(Id))
         {
+            // The bottom workspace can be hidden when its last tab is moved out.
+            // Dropping at the scene's lower edge must recreate that split, rather
+            // than tabifying the page with the viewport and hiding the scene.
+            const int EdgeHeight = std::min(Tabs->height(), std::clamp(Tabs->height() / 4, 48, 96));
+            const QRect BottomEdge(0, Tabs->height() - EdgeHeight, Tabs->width(), EdgeHeight);
+            const bool Bottom = !Bar && Area == "scene" && Areas.contains("workspace")
+                && BottomEdge.contains(Drop->position().toPoint());
+            if (Bottom)
+            {
+                if (!BottomDropIndicator)
+                {
+                    BottomDropIndicator = new QRubberBand(QRubberBand::Rectangle, Tabs);
+                    BottomDropIndicator->setObjectName("WorkspaceBottomDropIndicator");
+                    BottomDropIndicator->setAttribute(Qt::WA_TransparentForMouseEvents);
+                }
+                BottomDropIndicator->setGeometry(BottomEdge);
+                BottomDropIndicator->show();
+                BottomDropIndicator->raise();
+            }
+            else if (BottomDropIndicator) { BottomDropIndicator->hide(); }
             Drop->setDropAction(Qt::MoveAction); Drop->accept();
             if (Event->type() == QEvent::Drop)
-            { Dock(*Pages[Id].Page, Area, Bar ? Bar->tabAt(Drop->position().toPoint()) : -1); }
+            {
+                if (BottomDropIndicator) { BottomDropIndicator->hide(); }
+                Dock(*Pages[Id].Page, Bottom ? QStringLiteral("workspace") : Area,
+                     Bar ? Bar->tabAt(Drop->position().toPoint()) : -1);
+            }
             return true;
         }
     }

@@ -9,6 +9,7 @@
 class QAction;
 class QMenu;
 class QSettings;
+class QRubberBand;
 class QSplitter;
 class QTabWidget;
 class QTimer;
@@ -23,8 +24,8 @@ public:
     explicit WorkspaceDockController(QWidget& Owner, const QString& SettingsFile = {});
     ~WorkspaceDockController() override;
     void AddArea(const QString& Id, const QString& Title, QTabWidget& Tabs, QWidget& Region);
-    void AddPage(const QString& Id, QWidget& Page, const QString& Area, QAction& Visibility);
-    void BindAreaVisibility(const QString& Id, QAction& Visibility);
+    void AddPage(const QString& Id, QWidget& Page, const QString& Area, QAction& Visibility,
+                 bool bPreviouslyFixed = false);
     void SetSplitters(QSplitter& Workspace, QSplitter& Center);
     void Open(QWidget& Page);
     void SetOpen(QWidget& Page, bool Open);
@@ -38,7 +39,7 @@ protected:
     bool eventFilter(QObject* Watched, QEvent* Event) override;
 
 private:
-    struct AreaState { QString Title; QPointer<QTabWidget> Tabs; QPointer<QWidget> Region; QPointer<QAction> Visibility; };
+    struct AreaState { QString Title; QPointer<QTabWidget> Tabs; QPointer<QWidget> Region; };
     struct PageState
     {
         QPointer<QWidget> Page, Floating;
@@ -46,6 +47,7 @@ private:
         QString Title, Area, DefaultArea;
         int DefaultIndex = 0;
         bool Open = true, DefaultOpen = true;
+        bool bPreviouslyFixed = false;
     };
     QString PageId(QWidget* Page) const;
     QTabWidget* Host(QWidget* Page) const;
@@ -58,6 +60,7 @@ private:
     QMap<QString, AreaState> Areas;
     QMap<QString, PageState> Pages;
     QPointer<QSplitter> Workspace, Center;
+    QPointer<QRubberBand> BottomDropIndicator;
     std::unique_ptr<QSettings> Settings;
     QTimer* SaveTimer = nullptr;
     QString DragId, DragToken;

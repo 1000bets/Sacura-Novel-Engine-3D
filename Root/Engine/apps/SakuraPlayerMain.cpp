@@ -101,7 +101,7 @@ int main(int ArgumentCount, char** Arguments)
             if (EngineInstance.IsPresenting())
             {
                 const NativeWindowInfo Info = Surface->BuildNativeWindowInfo();
-                EngineInstance.ResizePresentation(Info.Width, Info.Height);
+                EngineInstance.ResizePresentation(Info.Width, Info.Height, Surface->IsInteractiveResize());
             }
         });
     QObject::connect(Viewport, &RenderViewportWidget::NativeSurfaceChanged, &Window,

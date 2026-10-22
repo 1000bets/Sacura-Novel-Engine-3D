@@ -10,6 +10,7 @@ namespace EditorUi
 struct StudioMenuItem
 {
     QString Identity, Label, Group, SearchText, Description;
+    QString Shortcut;
     QIcon Icon;
     bool bEnabled = true;
     QVector<StudioMenuItem> Children;

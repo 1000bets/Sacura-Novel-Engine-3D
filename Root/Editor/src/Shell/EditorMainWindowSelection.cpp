@@ -7,6 +7,8 @@
 #include "UI/Views/StudioControls.h"
 #include <QToolButton>
 #include <QStackedWidget>
+#include <QScopedValueRollback>
+#include "UI/Adapters/InspectorUpdateGuard.h"
 
 #include "Actions/BuiltinEditorActions.h"
 #include "Actions/EditorAction.h"
@@ -319,7 +321,6 @@ void EditorMainWindow::ConfigureComponentInspector(ReflectionInspector* Componen
         CommandStack.EndGroup();
         if (bResult)
         {
-            RefreshSelectionUi();
             UpdateWindowTitleDirty();
             UpdateStatus();
         }
@@ -339,54 +340,73 @@ void EditorMainWindow::RebuildComponentInspectors()
         return;
     }
 
-    QHash<QString, bool> ExpandedComponents;
-    for (auto* Inspector : ComponentInspectors)
+    auto* ObjectView = static_cast<EditorUi::ObjectInspectorView*>(ObjectInspectorContent);
+    GameObject* Selected = GetSelectedGameObject();
+    const ObjectHandle Selection = Selected ? Selected->GetObjectHandle() : ObjectHandle{};
+    const bool SameSelection = InspectorSelection == Selection;
+    if (!SameSelection) { ComponentExpansion.clear(); }
+    auto Previous = std::move(ComponentInspectors);
+    ComponentInspectors.clear();
+    std::vector<Component*> Components;
+    if (Selected)
+    {
+        for (auto* Component : Selected->GetAllComponents())
+        {
+            if (Component) { Components.push_back(Component); }
+        }
+    }
+    for (auto* Inspector : Previous)
     {
         auto* Card = Inspector->parentWidget();
-        if (auto* Toggle = Card->findChild<QToolButton*>())
-        { ExpandedComponents.insert(Card->property("componentIdentity").toString(), Toggle->isChecked()); }
-    }
-    while (QLayoutItem* Item = ComponentInspectorLayout->takeAt(0))
-    {
-        if (QWidget* ItemWidget = Item->widget())
+        const auto Identity = Card->property("componentIdentity").toString();
+        if (SameSelection)
         {
-            ItemWidget->deleteLater();
+            if (auto* Toggle = Card->findChild<QToolButton*>()) { ComponentExpansion[Identity] = Toggle->isChecked(); }
         }
-        delete Item;
+        const auto* Instance = Inspector->GetInspectedObject();
+        const bool Retain = SameSelection && Instance
+            && std::find(Components.begin(), Components.end(), Instance) != Components.end();
+        if (!Retain)
+        {
+            Inspector->SetInspectedObject(nullptr);
+            ObjectView->RemoveComponentSection(Identity);
+        }
     }
-    ComponentInspectors.clear();
-    auto* ObjectView = static_cast<EditorUi::ObjectInspectorView*>(ObjectInspectorContent);
-    ObjectView->ClearComponentOverview();
-
-    GameObject* Selected = GetSelectedGameObject();
     QStringList ComponentTypes;
-    if (Selected != nullptr)
+    for (auto* ComponentInstance : Components)
     {
-        for (Component* ComponentInstance : Selected->GetAllComponents())
+        const QString ComponentType = ComponentInstance->GetClass()
+            ? QString::fromStdString(ComponentInstance->GetClass()->GetTypeId().Value)
+            : QString::fromStdString(ComponentInstance->GetName());
+        if (!ComponentTypes.contains(ComponentType)) { ComponentTypes.push_back(ComponentType); }
+        ReflectionInspector* Inspector = nullptr;
+        for (auto* Existing : Previous)
         {
-            if (ComponentInstance == nullptr)
-            {
-                continue;
-            }
-            const QString ComponentType = ComponentInstance->GetClass() != nullptr
-                ? QString::fromStdString(ComponentInstance->GetClass()->GetTypeId().Value)
-                : QString::fromStdString(ComponentInstance->GetName());
-            if (!ComponentTypes.contains(ComponentType))
-            {
-                ComponentTypes.push_back(ComponentType);
-            }
-
-            auto* ComponentInspector = new ReflectionInspector();
-            ConfigureComponentInspector(ComponentInspector);
-            ComponentInspector->SetInspectedObject(ComponentInstance);
-            ComponentInspector->SetMeshPresentation(ComponentType == "engine.MeshRendererComponent");
-            ComponentInspector->setEnabled(!BoundEngine.GetPlaySession().IsSimulating());
-            const auto Identity = QString::fromStdString(ComponentInstance->GetPersistentId());
-            static_cast<EditorUi::ObjectInspectorView*>(ObjectInspectorContent)->AddComponentSection(
-                Identity, ComponentType, *ComponentInspector,
-                ExpandedComponents.value(Identity, ComponentType == "engine.MeshRendererComponent"));
-            ComponentInspectors.push_back(ComponentInspector);
+            if (SameSelection && Existing->GetInspectedObject() == ComponentInstance) { Inspector = Existing; break; }
         }
+        const auto Identity = QString::fromStdString(ComponentInstance->GetPersistentId());
+        if (!Inspector)
+        {
+            Inspector = new ReflectionInspector();
+            ConfigureComponentInspector(Inspector);
+            Inspector->SetMeshPresentation(ComponentType == "engine.MeshRendererComponent");
+            Inspector->SetInspectedObject(ComponentInstance);
+            ObjectView->AddComponentSection(Identity, ComponentType, *Inspector,
+                ComponentExpansion.value(Identity, ComponentType == "engine.MeshRendererComponent"));
+        }
+        else
+        {
+            Inspector->RefreshValues();
+        }
+        Inspector->setEnabled(!BoundEngine.GetPlaySession().IsSimulating());
+        ObjectView->MoveComponentSection(Identity, static_cast<int>(ComponentInspectors.size()));
+        ComponentInspectors.push_back(Inspector);
+    }
+    InspectorSelection = Selection;
+    // Keep one trailing stretch; moving a card never destroys its layout or controls.
+    for (int Index = ComponentInspectorLayout->count() - 1; Index >= 0; --Index)
+    {
+        if (ComponentInspectorLayout->itemAt(Index)->spacerItem()) { delete ComponentInspectorLayout->takeAt(Index); }
     }
     ComponentInspectorLayout->addStretch(1);
 
@@ -412,6 +432,12 @@ void EditorMainWindow::RebuildComponentInspectors()
 
 void EditorMainWindow::RefreshSelectionUi()
 {
+    const EditorUi::InspectorUpdateGuard InspectorUpdate(ObjectInspectorContent->findChild<QWidget*>("ObjectInspectorBody"));
+    if (ScrubbingTransformField && (GetSelectedObjectHandle() != ScrubbingTransformObject
+        || BoundEngine.GetPlaySession().IsSimulating()))
+    {
+        ScrubbingTransformField->FinishScrub(true);
+    }
     bUpdatingSelectionUi = true;
 
     GameObject* Selected = GetSelectedGameObject();
@@ -474,12 +500,27 @@ void EditorMainWindow::RefreshSelectionUi()
         ObjectNameEdit->setText(bHasSelection ? QString::fromStdString(Selected->GetName()) : QString());
     }
 
+    RefreshTransformUi();
+    RebuildComponentInspectors();
+
+    bUpdatingSelectionUi = false;
+}
+
+void EditorMainWindow::RefreshTransformUi()
+{
+    // Transform edits do not change component cards or hierarchy. Keep their widgets,
+    // disclosure state and scroll geometry intact when a drag is committed/cancelled.
+    const QScopedValueRollback<bool> UpdatingSelection(bUpdatingSelectionUi, true);
+    GameObject* Selected = GetSelectedGameObject();
+    const bool bHasSelection = Selected != nullptr;
+    const bool bEditableSelection = bHasSelection && !BoundEngine.GetPlaySession().IsSimulating();
     auto SetSpinEnabled = [&](QDoubleSpinBox* Spin, double Value)
     {
         if (Spin == nullptr)
         {
             return;
         }
+        const QSignalBlocker Blocker(Spin);
         Spin->setEnabled(bEditableSelection);
         Spin->setValue(Value);
     };
@@ -519,9 +560,6 @@ void EditorMainWindow::RefreshSelectionUi()
         SetSpinEnabled(ScaleZSpin, 1.0);
     }
 
-    RebuildComponentInspectors();
-
-    bUpdatingSelectionUi = false;
 }
 
 void EditorMainWindow::OnHierarchySelectionChanged()
@@ -591,9 +629,100 @@ void EditorMainWindow::OnObjectNameEdited()
     ExecuteCommand(MakeRenameObjectCommand(EditScene, Selected->GetObjectHandle(), NewName));
 }
 
+void EditorMainWindow::BindTransformScrubbing(EditorUi::StudioNumberEdit* Field, int Index)
+{
+    connect(Field, &EditorUi::StudioNumberEdit::ScrubStarted, this, [this, Field]()
+    {
+        if (GetSelectedGameObject() == nullptr || BoundEngine.GetPlaySession().IsSimulating())
+        {
+            return;
+        }
+        ScrubbingTransformField = Field;
+        ScrubbingTransformObject = GetSelectedObjectHandle();
+        CommandStack.BeginGroup("Transform Object");
+    });
+    connect(Field, &QDoubleSpinBox::valueChanged, this, [this, Field, Index](double Value)
+    {
+        if (bUpdatingSelectionUi || ScrubbingTransformField != Field || !Field->IsScrubbing())
+        {
+            return;
+        }
+        Scene* EditScene = GetEditScene();
+        GameObject* Selected = EditScene ? EditScene->FindByHandle(ScrubbingTransformObject) : nullptr;
+        if (!Selected || GetSelectedObjectHandle() != ScrubbingTransformObject || BoundEngine.GetPlaySession().IsSimulating())
+        {
+            Field->FinishScrub(true);
+            return;
+        }
+        Transform Updated = Selected->GetTransform();
+        const auto SetAxis = [Index, Value](Vector3& Vector)
+        {
+            if (Index % 3 == 0) { Vector.x = static_cast<float>(Value); }
+            else if (Index % 3 == 1) { Vector.y = static_cast<float>(Value); }
+            else { Vector.z = static_cast<float>(Value); }
+        };
+        if (Index < 3)
+        {
+            SetAxis(Updated.Position);
+        }
+        else if (Index < 6)
+        {
+            // Use the authored fields so dragging past 90/180 degrees stays continuous.
+            Vector3 Degrees(static_cast<float>(RotationXSpin->value()), static_cast<float>(RotationYSpin->value()),
+                static_cast<float>(RotationZSpin->value()));
+            Updated.Rotation = Quaternion::CreateFromYawPitchRoll(
+                Degrees.y * DegreesToRadians, Degrees.x * DegreesToRadians, Degrees.z * DegreesToRadians);
+            Updated.Rotation.Normalize();
+        }
+        else
+        {
+            SetAxis(Updated.Scale);
+        }
+        if (!CommandStack.Execute(MakeSetTransformCommand(EditScene, ScrubbingTransformObject, Updated)))
+        {
+            Field->FinishScrub(true);
+            return;
+        }
+        PrimaryViewport->SetSelectedTransform(Updated, Selected->GetWorldTransform());
+        UpdateWindowTitleDirty();
+    });
+    connect(Field, &EditorUi::StudioNumberEdit::ScrubFinished, this, [this, Field](bool Cancelled)
+    {
+        if (ScrubbingTransformField != Field)
+        {
+            return;
+        }
+        ScrubbingTransformField = nullptr;
+        ScrubbingTransformObject = {};
+        if (Cancelled) { CommandStack.CancelGroup(); }
+        else { CommandStack.EndGroup(); }
+        RefreshTransformUi();
+        UpdateWindowTitleDirty();
+        UpdateStatus();
+    });
+}
+
+bool EditorMainWindow::ExecuteSelectedTransform(const Transform& Updated)
+{
+    Scene* EditScene = GetEditScene();
+    GameObject* Selected = GetSelectedGameObject();
+    if (!EditScene || !Selected || BoundEngine.GetPlaySession().IsSimulating())
+    {
+        return false;
+    }
+    if (!CommandStack.Execute(MakeSetTransformCommand(EditScene, Selected->GetObjectHandle(), Updated)))
+    {
+        return false;
+    }
+    RefreshTransformUi();
+    UpdateWindowTitleDirty();
+    UpdateStatus();
+    return true;
+}
+
 void EditorMainWindow::OnTransformEdited()
 {
-    if (bUpdatingSelectionUi)
+    if (bUpdatingSelectionUi || ScrubbingTransformField || BoundEngine.GetPlaySession().IsSimulating())
     {
         return;
     }
@@ -605,6 +734,22 @@ void EditorMainWindow::OnTransformEdited()
         return;
     }
 
+    // Focus loss after a scrub must not add another command or round untouched axes.
+    const Transform& Current = Selected->GetTransform();
+    const Vector3 CurrentDegrees = QuaternionToEulerDegrees(Current.Rotation);
+    const double Values[]{Current.Position.x, Current.Position.y, Current.Position.z,
+        CurrentDegrees.x, CurrentDegrees.y, CurrentDegrees.z, Current.Scale.x, Current.Scale.y, Current.Scale.z};
+    const QDoubleSpinBox* Fields[]{PositionXSpin, PositionYSpin, PositionZSpin, RotationXSpin,
+        RotationYSpin, RotationZSpin, ScaleXSpin, ScaleYSpin, ScaleZSpin};
+    bool Changed = false;
+    for (int Index = 0; Index < 9; ++Index)
+    {
+        Changed = Changed || std::abs(Fields[Index]->value() - Values[Index]) >= 0.00051;
+    }
+    if (!Changed)
+    {
+        return;
+    }
     Transform Updated = Selected->GetTransform();
     Updated.Position = Vector3(
         static_cast<float>(PositionXSpin->value()),
@@ -619,7 +764,7 @@ void EditorMainWindow::OnTransformEdited()
         static_cast<float>(ScaleXSpin->value()),
         static_cast<float>(ScaleYSpin->value()),
         static_cast<float>(ScaleZSpin->value()));
-    ExecuteCommand(MakeSetTransformCommand(EditScene, Selected->GetObjectHandle(), Updated));
+    ExecuteSelectedTransform(Updated);
 }
 
 void EditorMainWindow::OnComponentFilterChanged(int Index)

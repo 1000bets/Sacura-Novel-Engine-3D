@@ -8,7 +8,9 @@
 #include "RefCntAutoPtr.hpp"
 
 #if D3D12_SUPPORTED
+#    include <d3d12.h>
 #    include "EngineFactoryD3D12.h"
+#    include "SwapChainD3D12.h"
 #endif
 #if VULKAN_SUPPORTED
 #    include "EngineFactoryVk.h"
@@ -106,6 +108,7 @@ void RenderDevice::Initialize(const NativeWindowInfo& WindowInfo, GraphicsBacken
 
 bool RenderDevice::InitializeBackend(GraphicsBackend Backend, const NativeWindowInfo& WindowInfo)
 {
+    bLiveResizeScaling = false;
     if (WindowInfo.WindowHandle == nullptr)
     {
         PrintString("RenderDevice: missing native window handle");
@@ -156,6 +159,19 @@ bool RenderDevice::InitializeBackend(GraphicsBackend Backend, const NativeWindow
 
         State->ImmediateContext.Attach(Contexts[0]);
         FactoryD3D12->CreateSwapChainD3D12(State->Device, State->ImmediateContext, SCDesc, FullScreenModeDesc{}, Window, &State->SwapChain);
+        if (State->SwapChain)
+        {
+            // Verify the loaded backend DLL, not just the patched source.
+            RefCntAutoPtr<ISwapChainD3D12> NativeSwapChain(State->SwapChain, IID_SwapChainD3D12);
+            IDXGISwapChain1* Dxgi = nullptr;
+            if (NativeSwapChain && SUCCEEDED(NativeSwapChain->GetDXGISwapChain()->QueryInterface(IID_PPV_ARGS(&Dxgi))))
+            {
+                DXGI_SWAP_CHAIN_DESC1 Description{};
+                bLiveResizeScaling = SUCCEEDED(Dxgi->GetDesc1(&Description)) && Description.Scaling == DXGI_SCALING_STRETCH;
+                Dxgi->Release();
+            }
+            PrintString(bLiveResizeScaling ? "D3D12 live resize scaling: stretch" : "D3D12 live resize scaling: unavailable");
+        }
         State->Factory = FactoryD3D12;
 
         const GraphicsAdapterInfo& Adapter = State->Device->GetAdapterInfo();

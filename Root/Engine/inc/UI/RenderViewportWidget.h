@@ -4,6 +4,7 @@
 #include "Rendering/RenderView.h"
 
 #include <QWidget>
+#include <QTimer>
 
 class RenderViewportWidget : public QWidget
 {
@@ -20,6 +21,7 @@ public:
 
     NativeWindowInfo BuildNativeWindowInfo() const;
     bool HasValidNativeHandle() const;
+    bool IsInteractiveResize() const { return ResizeSettleTimer.isActive(); }
 
 signals:
     void NativeSurfaceChanged(RenderViewportWidget* Viewport);
@@ -39,4 +41,5 @@ private:
     RenderViewCamera ViewCamera{};
     RenderViewId ViewId{};
     WId CachedNativeHandle = 0;
+    QTimer ResizeSettleTimer;
 };

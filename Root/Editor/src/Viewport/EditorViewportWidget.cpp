@@ -157,6 +157,7 @@ public:
             | Qt::WindowTransparentForInput | Qt::WindowDoesNotAcceptFocus)
         , Owner(InOwner)
     {
+        setObjectName("EditorGizmoOverlay");
         setAttribute(Qt::WA_TranslucentBackground, true);
         setAttribute(Qt::WA_ShowWithoutActivating, true);
         setAttribute(Qt::WA_TransparentForMouseEvents, true);
@@ -181,6 +182,19 @@ public:
     void SyncGeometry()
     {
         setGeometry(QRect(Owner->mapToGlobal(QPoint(0, 0)), Owner->size()));
+        // This is a top-level translucent window, so it does not inherit the
+        // viewport's clipping when a splitter makes its parent smaller.
+        const QRegion Visible = Owner->visibleRegion();
+        if (!Owner->isVisible() || Visible.isEmpty())
+        {
+            hide();
+            return;
+        }
+        if (Visible == QRegion(Owner->rect()))
+        {
+            if (!mask().isEmpty()) { clearMask(); }
+        }
+        else if (mask() != Visible) { setMask(Visible); }
         if (Owner->isVisible())
         {
             show();
@@ -229,16 +243,6 @@ public:
         ImGuizmo::BeginFrame();
         ImGuizmo::SetRect(0.0f, 0.0f, DisplayWidth, DisplayHeight);
 
-        if (Owner->bEditorToolsEnabled && Owner->IsGridVisible() && DisplayWidth > 0.0f && DisplayHeight > 0.0f)
-        {
-            const auto& Camera = Owner->GetViewCamera();
-            const Matrix View = Matrix::CreateLookAt(Camera.Position, Camera.Target, Camera.Up);
-            const Matrix Projection = Matrix::CreatePerspectiveFieldOfView(Camera.FieldOfViewDegrees * DegreesToRadians,
-                DisplayWidth / DisplayHeight, Camera.NearPlane, Camera.FarPlane);
-            const Matrix Ground = Matrix::Identity;
-            ImGuizmo::DrawGrid(&View._11, &Projection._11, &Ground._11, 100.f);
-        }
-
         if (Owner->bEditorToolsEnabled && bHasSelection && Owner->GetGizmoOperation() != EditorViewportWidget::GizmoOperation::Select
             && !Owner->IsCameraNavigationActive() && DisplayWidth > 0.0f && DisplayHeight > 0.0f)
         {
@@ -266,7 +270,7 @@ public:
                 &ViewMatrix._11,
                 &ProjectionMatrix._11,
                 OperationMask,
-                ImGuizmo::LOCAL,
+                Owner->HasWorldAxes() ? ImGuizmo::WORLD : ImGuizmo::LOCAL,
                 &WorldMatrix._11, nullptr, Owner->IsSnapEnabled() ? &Snap.x : nullptr);
             if (ImGuizmo::IsUsing() && !bManipulating)
             {
@@ -418,6 +422,9 @@ protected:
     void paintEvent(QPaintEvent*) override
     {
         QPainter Painter(this);
+        Painter.setCompositionMode(QPainter::CompositionMode_Source);
+        Painter.fillRect(rect(), Qt::transparent);
+        Painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
         Painter.setRenderHint(QPainter::SmoothPixmapTransform);
         Painter.setRenderHint(QPainter::Antialiasing);
         for (const EditorArrow& Arrow : Arrows)
@@ -812,6 +819,7 @@ void EditorViewportWidget::SetTransformCallbacks(TransformPreviewCallback Previe
 
 void EditorViewportWidget::SetEditorToolsEnabled(bool bEnabled)
 {
+    if (!bEnabled) { emit EditorToolsDisabled(); }
     bEditorToolsEnabled = bEnabled;
     if (!bEnabled)
     {
@@ -989,6 +997,13 @@ void EditorViewportWidget::hideEvent(QHideEvent* Event)
     RenderViewportWidget::hideEvent(Event);
 }
 
+void EditorViewportWidget::SetGridVisible(bool bVisible)
+{
+    if (bGridVisible == bVisible) { return; }
+    bGridVisible = bVisible;
+    emit GridVisibilityChanged(bVisible);
+}
+
 void EditorViewportWidget::HandleCameraMousePress(QMouseEvent* Event)
 {
     if (!bEditorToolsEnabled || Event == nullptr)
@@ -996,6 +1011,8 @@ void EditorViewportWidget::HandleCameraMousePress(QMouseEvent* Event)
         return;
     }
 
+    ContextPressPosition = Event->position();
+    bContextClickCandidate = Event->button() == Qt::RightButton && Event->modifiers() == Qt::NoModifier;
     LastMousePosition = Event->position();
     const bool bAltHeld = (Event->modifiers() & Qt::AltModifier) != 0;
     if (Event->button() == Qt::RightButton)
@@ -1036,6 +1053,12 @@ void EditorViewportWidget::HandleCameraMouseMove(QMouseEvent* Event)
         return;
     }
 
+    if (bContextClickCandidate)
+    {
+        if ((Event->position() - ContextPressPosition).manhattanLength() < QApplication::startDragDistance())
+        { Event->accept(); return; }
+        bContextClickCandidate = false;
+    }
     const QPointF Delta = Event->position() - LastMousePosition;
     LastMousePosition = Event->position();
     const float DeltaX = static_cast<float>(Delta.x());
@@ -1061,6 +1084,9 @@ void EditorViewportWidget::HandleCameraMouseMove(QMouseEvent* Event)
 
 void EditorViewportWidget::HandleCameraMouseRelease(QMouseEvent* Event)
 {
+    const bool OpenMenu = bEditorToolsEnabled && bContextClickCandidate && Event && Event->button() == Qt::RightButton
+        && (Event->position() - ContextPressPosition).manhattanLength() < QApplication::startDragDistance();
+    bContextClickCandidate = false;
     if (Event == nullptr)
     {
         return;
@@ -1081,6 +1107,7 @@ void EditorViewportWidget::HandleCameraMouseRelease(QMouseEvent* Event)
         }
         ActiveCameraMode = CameraMode::None;
         unsetCursor();
+        if (OpenMenu) { emit SceneContextMenuRequested(Event->position().toPoint()); }
         Event->accept();
     }
 }
@@ -1092,6 +1119,7 @@ void EditorViewportWidget::HandleCameraWheel(QWheelEvent* Event)
         return;
     }
 
+    bContextClickCandidate = false;
     const float WheelSteps = static_cast<float>(Event->angleDelta().y()) / 120.0f;
     if (ActiveCameraMode == CameraMode::FlyLook)
     {
@@ -1120,6 +1148,7 @@ void EditorViewportWidget::HandleCameraKeyPress(QKeyEvent* Event)
         return;
     }
 
+    bContextClickCandidate = false;
     const quint32 ScanCode = Event->nativeScanCode();
     if (ScanCode == 0x19 && Event->modifiers() == Qt::NoModifier)
     {
@@ -1177,6 +1206,7 @@ void EditorViewportWidget::HandleCameraKeyRelease(QKeyEvent* Event)
 
 void EditorViewportWidget::ResetCameraNavigation()
 {
+    bContextClickCandidate = false;
     ActiveCameraMode = CameraMode::None;
     HeldKeys.clear();
     NavigationTimer->stop();
@@ -1226,6 +1256,7 @@ void EditorViewportWidget::TickCameraNavigation()
     {
         return;
     }
+    bContextClickCandidate = false;
     MoveDirection.Normalize();
     MoveCamera(MoveDirection * GetCurrentMoveSpeed() * (16.0f / 1000.0f));
 }

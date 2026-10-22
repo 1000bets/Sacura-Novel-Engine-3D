@@ -1,6 +1,7 @@
 #include "Shell/EditorMainWindow.h"
 #include "UI/Adapters/StoryGraphController.h"
 #include "UI/Styles/StudioIcons.h"
+#include "UI/Views/StudioControls.h"
 
 #include "Actions/BuiltinEditorActions.h"
 #include "Actions/EditorAction.h"
@@ -91,7 +92,12 @@
 
 void EditorMainWindow::OnPlayToggled(bool bChecked)
 {
+    if (ScrubbingTransformField)
+    {
+        ScrubbingTransformField->FinishScrub();
+    }
     PlaySession& Session = BoundEngine.GetPlaySession();
+    CloseSceneContextMenu();
     bPlayRequested = bChecked;
     if (bChecked)
     {

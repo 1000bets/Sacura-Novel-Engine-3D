@@ -1,6 +1,8 @@
 #pragma once
 #include "UI/Views/StudioControls.h"
 #include "UI/Presentation/InspectorLabels.h"
+#include "UI/Adapters/InspectorUpdateGuard.h"
+#include "UI/Presentation/InspectorValue.h"
 
 #include "Assets/AssetRegistry.h"
 #include "Reflection/Json/ReflectionJson.h"
@@ -37,6 +39,13 @@ public:
         Rebuild();
     }
 
+    void SetValue(const ReflectedValue& Updated)
+    {
+        if (EditorUi::SameInspectorValue(Value, Updated)) { return; }
+        Value = Updated;
+        Rebuild();
+    }
+
 private:
     ReflectedValue& AtPath(ReflectedValue& Root, const std::vector<size_t>& Path)
     {
@@ -68,9 +77,16 @@ private:
 
     void Rebuild()
     {
+        const EditorUi::InspectorUpdateGuard Guard(this);
         while (QLayoutItem* Item = Layout->takeAt(0))
         {
-            delete Item->widget();
+            if (auto* Widget = Item->widget())
+            {
+                Widget->blockSignals(true);
+                for (auto* Child : Widget->findChildren<QWidget*>()) { Child->blockSignals(true); }
+                Widget->hide();
+                Widget->deleteLater();
+            }
             delete Item;
         }
         Layout->addWidget(Build(Type, {}, Attributes, bEditable));

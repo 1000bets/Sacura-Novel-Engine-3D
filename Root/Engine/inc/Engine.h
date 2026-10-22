@@ -83,10 +83,10 @@ public:
     void SetStartupStory(const std::filesystem::path& StoryPath) { StartupStory = StoryPath; }
     void SetEditorRenderCamera(const RenderCamera& Camera);
     void UseGameRenderCamera();
-    void ResizePresentation(uint32_t Width, uint32_t Height);
+    void ResizePresentation(uint32_t Width, uint32_t Height, bool bInteractive = false);
     bool RegisterRenderSurface(RenderSurfaceId Surface, const NativeWindowInfo& WindowInfo);
     void UnregisterRenderSurface(RenderSurfaceId Surface);
-    void ResizeRenderSurface(RenderSurfaceId Surface, uint32_t Width, uint32_t Height);
+    void ResizeRenderSurface(RenderSurfaceId Surface, uint32_t Width, uint32_t Height, bool bInteractive = false);
     void ConfigureRenderSurface(RenderSurfaceId Surface, bool bEditScene, const RenderCamera& Camera, const RenderSettings& Settings = {});
     void SetRenderSurfaceImGuiOverlay(RenderSurfaceId Surface, ImGuiOverlaySnapshot Overlay);
     RenderStatistics GetRenderStatistics(RenderSurfaceId Surface) const { return Render.GetStatistics(Surface); }
@@ -104,7 +104,7 @@ private:
     void BeginStory(Scene* World);
     void TickWorld(Scene& World, float DeltaTime, bool bSinglePhysicsStep = false);
     void BeginFrame();
-    void EndFrame();
+    void EndFrame(bool bReplacePending = false);
     void InitializeCommon(bool bCreateWindowAndRender);
     void ResolveShaderDirectory();
     void ScanConfiguredContent();
@@ -113,6 +113,7 @@ private:
     bool bRunning = false;
     bool bInitialized = false;
     bool bHeadless = false;
+    bool bFrameInProgress = false;
     uint64_t NextFrameIndex = 1;
     GraphicsBackend PreferredBackend = GraphicsBackend::Auto;
     std::string ShaderDirectory;

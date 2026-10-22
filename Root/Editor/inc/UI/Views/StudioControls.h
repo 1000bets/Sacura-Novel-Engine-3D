@@ -13,10 +13,28 @@ namespace EditorUi
 {
 class StudioNumberEdit : public QDoubleSpinBox
 {
+    Q_OBJECT
 public:
-    using QDoubleSpinBox::QDoubleSpinBox;
+    explicit StudioNumberEdit(QWidget* Parent = nullptr);
+    void SetScrubStep(double Step);
+    void FinishScrub(bool Cancel = false);
+    bool IsScrubbing() const { return bScrubbing; }
+signals:
+    void ScrubStarted();
+    void ScrubFinished(bool Cancelled);
 protected:
     QString textFromValue(double Value) const override;
+    bool eventFilter(QObject* Watched, QEvent* Event) override;
+    bool event(QEvent* Event) override;
+private:
+    bool HandleScrubEvent(QEvent* Event);
+    double ScrubStep = 0;
+    double StartValue = 0;
+    double DragValue = 0;
+    QPointF PressPosition;
+    QPointF LastPosition;
+    bool bPressed = false;
+    bool bScrubbing = false;
 };
 
 // Same model/signals as QComboBox; the chosen value is never a text editor.
