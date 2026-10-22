@@ -1,0 +1,33 @@
+{
+  "name": "sacura-desktop-experiment",
+  "version": "0.1.0",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "desktop:dev": "node scripts/dev.cjs",
+    "desktop:build": "npm run build:ui && electron-builder --dir",
+    "smoke:editor": "node scripts/smoke-editor.cjs",
+    "smoke:hmr": "node scripts/hmr-check.cjs",
+    "build:ui": "npm --prefix ../engine-web-prototype/frontend run build -- --base ./ --outDir ../../desktop-electron/dist-ui --emptyOutDir",
+    "test": "node --test tests/*.test.cjs"
+  },
+  "devDependencies": {
+    "electron": "^45.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "dev.sacura.desktop.experiment",
+    "productName": "Sacura Desktop Experiment",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "project-store.cjs",
+      "dist-ui/**/*",
+      "package.json"
+    ],
+    "asar": true
+  }
+}

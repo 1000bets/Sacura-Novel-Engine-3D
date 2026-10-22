@@ -3,33 +3,50 @@
 QWidget#StudioHeader QMenuBar { font-size: 10px; }
 QWidget#StudioHeader QMenuBar::item { padding: 5px 6px; }
 QWidget#StudioHeader QMenuBar::item:selected, QWidget#StudioHeader QMenuBar::item:pressed { background: @--accent-muted@; }
-QMenu#WindowsMenu { background: @--bg-panel-elevated@; border: 1px solid @--border-subtle@; padding: 5px; }
+QMenu#WindowsMenu { background: @--bg-panel-elevated@; border: 1px solid @--border-subtle@; padding: 3px; }
 QMenu#WindowsMenu::item { padding: 0; margin: 0; }
 QScrollArea#WindowsMenuScroll, QWidget#WindowsMenuBody { background: @--bg-panel-elevated@; border: none; }
 QWidget#WindowsMenuFixedGroup, QWidget#WindowsMenuWindowGroup {
     background: transparent; border-bottom: 1px solid @--border-subtle@;
 }
 QWidget#WindowsMenuSearchBox, QWidget#WindowsMenuFooter { background: transparent; }
-QLineEdit#WindowsMenuSearch { background: transparent; border: none; min-height: 20px; padding: 2px 1px; font-size: 10px; }
-QLineEdit#WindowsMenuSearch:focus { border: none; }
+QLineEdit#WindowsMenuSearch {
+    background: @--bg-input@; border: 1px solid transparent; border-radius: 4px;
+    min-height: 20px; padding: 0 6px; font-size: 10px;
+}
+QLineEdit#WindowsMenuSearch:focus { border: 2px solid @--accent@; }
 QPushButton[uiRole="windowsMenuRow"] {
     background: transparent; border: none; border-radius: 3px;
-    min-height: 24px; max-height: 24px; padding: 0 4px; text-align: left;
+    min-height: 22px; max-height: 22px; padding: 0 4px; text-align: left;
     color: @--text-primary@; font-size: 10px;
 }
 QPushButton[uiRole="windowsMenuRow"]:hover { background: @--bg-hover@; }
 QPushButton[uiRole="windowsMenuRow"]:disabled { background: transparent; color: @--text-secondary@; }
 QPushButton#WindowsMenuToggle_event:disabled { color: @--text-disabled@; }
 QPushButton[uiRole="windowsMenuCheck"] {
-    min-height: 24px; max-height: 24px; padding: 0; border: none; background: transparent;
+    min-height: 22px; max-height: 22px; padding: 0; border: none; background: transparent;
 }
 QPushButton[uiRole="windowsMenuCheck"]:hover { background: @--bg-hover@; }
 QPushButton[uiRole="windowsMenuReveal"] {
-    min-height: 24px; max-height: 24px; padding: 0; border: none; background: transparent;
+    min-height: 22px; max-height: 22px; padding: 0; border: none; background: transparent;
 }
 QPushButton[uiRole="windowsMenuReveal"]:hover { background: @--bg-hover@; }
 QWidget#WindowsMenuFooter QLabel { font-size: 10px; color: @--text-secondary@; }
-QComboBox#WindowsMenuPosition { min-height: 23px; font-size: 10px; }
+QWidget#WindowsMenuFooter QLabel#WindowsMenuHint {
+    font-size: 10px; color: @--text-muted@; padding: 3px 0;
+}
+QComboBox#WindowsMenuPosition {
+    min-height: 25px; max-height: 25px; padding: 0 9px; font-size: 10px;
+    background: @--bg-input@; border: 1px solid transparent; border-radius: 4px;
+}
+QComboBox#WindowsMenuPosition:focus, QComboBox#WindowsMenuPosition:on { border: 2px solid @--accent@; }
+QComboBox#WindowsMenuPosition::drop-down { border: none; width: 22px; }
+QComboBox#WindowsMenuPosition QAbstractItemView {
+    background: @--bg-panel-elevated@; color: @--text-primary@;
+    border: 1px solid @--border-strong@; outline: none;
+    selection-background-color: #9dc8fa; selection-color: #202330;
+}
+QComboBox#WindowsMenuPosition QAbstractItemView::item { min-height: 28px; padding: 2px 10px; }
 QPushButton[uiRole="windowsMenuRestore"] { text-align: left; border: none; background: transparent; font-size: 10px; }
 QPushButton[uiRole="windowsMenuRestore"]:hover { background: @--bg-hover@; }
 /* Editor.jsx renderActive / editor.css active-table / editorHelp.css workspace-guide. */

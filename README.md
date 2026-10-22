@@ -4,6 +4,8 @@
 
 Сейчас в репозитории — C++-каркас движка в `Root/` (сцена, GameObject/Component, подсистемы) и сборка через CMake. Графический стек: Qt6 (окна Editor и Player, runtime UI) + Diligent Engine (RHI над D3D12 / Vulkan / OpenGL). SDL3 сохранён для низкоуровневого host и тестов.
 
+Экспериментальная Electron оболочка существующего React редактора запускается отдельно; команды и ограничения описаны в [desktop-electron/README.md](desktop-electron/README.md).
+
 Физика и навигация реализованы через независимый интерфейс `IPhysicsWorld`, адаптер PhysX и Recast/Detour. Инструкция по компонентам, настройке сетки, Python API и демонстрационному проекту находится в [Samples/PhysicsNavigation/README.md](Samples/PhysicsNavigation/README.md).
 
 ## Сборка

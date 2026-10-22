@@ -14,10 +14,11 @@ export default function SoundImport({onImport,disabled}){
    const imported=await importAssetFiles(files,'Звук');await onImport(imported.map(file=>({...file,audioKind:kind})));setStatus(`Загружено файлов: ${imported.length}. Можно прослушать и назначить реплике.`);
   }catch(cause){setError(cause.message);setStatus('');}finally{setBusy(false);}
  };
+ const pickDesktop=async()=>{try{const files=await window.sacuraDesktop.pickAssets();await upload(files.map(item=>new File([item.bytes],item.name,{type:item.type})));}catch(cause){setError(cause.message);}};
  return <section className="sound-import" aria-label={tr("Загрузка звуков")} aria-busy={busy} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();upload(e.dataTransfer.files);}}>
   <div><strong>{tr("Загрузить свои звуки")}</strong><p>{tr("Перетащите аудиофайлы сюда или выберите их на компьютере. До 100 МБ на файл.")}</p></div>
   <Field label={tr("Тип звука")}><Select value={kind} disabled={disabled||busy} options={[["sound","Звуковой эффект"],["music","Музыка"],["voice","Озвучка"]]} onChange={setKind}/></Field>
-  <Button icon="Upload" disabled={disabled||busy||!onImport} onClick={()=>input.current.click()}>{busy?tr("Загрузка…"):tr("Выбрать звуки")}</Button>
+  <Button icon="Upload" disabled={disabled||busy||!onImport} onClick={()=>window.sacuraDesktop?.isDesktop===true?pickDesktop():input.current.click()}>{busy?tr("Загрузка…"):tr("Выбрать звуки")}</Button>
   <input ref={input} type="file" accept={AUDIO_FILE_ACCEPT} multiple hidden onChange={e=>{upload(e.target.files);e.target.value='';}}/>
   {status&&<p className="sound-import-message" role="status">{status}</p>}{error&&<p className="sound-import-message error-box" role="alert">{message(error)}</p>}
  </section>;

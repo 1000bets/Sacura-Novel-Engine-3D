@@ -177,6 +177,9 @@ Desktop.ini
 $RECYCLE.BIN/
 
 # Generated standalone game runtime
+/desktop-electron/node_modules/
+/desktop-electron/dist-ui/
+/desktop-electron/release/
 /engine-web-prototype/frontend/public/player-runtime.js
 /engine-web-prototype/frontend/public/player-runtime.css
 /engine-web-prototype/frontend/.player-build/

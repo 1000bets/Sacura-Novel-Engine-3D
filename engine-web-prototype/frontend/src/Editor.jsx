@@ -253,6 +253,7 @@ export function GameDialogue({
 
 export default function Editor({initialProject=null,user=null,onLogout,onHome}) {
  useLocale();
+ useEffect(()=>{if(window.sacuraDesktop?.isDesktop===true)window.sacuraDesktop.ready('editor');},[]);
   const clipboard=useRef(null);
   const seed = useRef();
   if (!seed.current) {
@@ -469,6 +470,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   useEffect(() => {
     if (seed.current.error) return;
     try {
+      if(window.sacuraDesktop?.isDesktop===true){setSaveError(null);return;}
       if(serverStorageEnabled)accountStorage.setItem(PROJECT_KEY, JSON.stringify(project));
       else rememberLocalProject(accountStorage,project);
       if(!serverStorageEnabled)setSaveError(null);
@@ -477,7 +479,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     }
   }, [project]);
   useEffect(() => {
-    if(!serverStorageEnabled||seed.current.error)return;
+    if(window.sacuraDesktop?.isDesktop===true||!serverStorageEnabled||seed.current.error)return;
     setSaveError('Ожидает сохранения на сервере…');
     let active=true;
     const timer=setTimeout(()=>{
@@ -535,7 +537,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   const changeAssetLibrary=operation=>{
     if(rt.running)throw new Error('Остановите предпросмотр перед импортом.');
     const next=structuredClone(currentProject.current),result=operation(next);
-    try{if(!serverStorageEnabled)accountStorage.setItem(PROJECT_KEY,JSON.stringify(next));}catch{throw new Error('Не хватает места для автосохранения. Уменьшите файлы или экспортируйте проект.');}
+    try{if(!serverStorageEnabled&&window.sacuraDesktop?.isDesktop!==true)accountStorage.setItem(PROJECT_KEY,JSON.stringify(next));}catch{throw new Error('Не хватает места для автосохранения. Уменьшите файлы или экспортируйте проект.');}
     mutate(operation);return result;
   };
   const placeLibraryModel=file=>{
@@ -810,6 +812,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   const saveProject = () => {
     setMenu(null);
     return runFileOperation(async()=>{
+      if(window.sacuraDesktop?.isDesktop===true){await window.sacuraDesktop.saveProject(project);setSaveError(null);setNotice('Проект сохранён в project.json.');return;}
       if(serverStorageEnabled){const saved=await saveServerProject(project);setProject(current=>current===project?saved:current);setSaveError(null);setNotice('Проект сохранён на сервере.');return;}
       const result=await writeProjectFile(await portableProject(project),{handle:projectFile.current,chooseFile:window.showSaveFilePicker?.bind(window),download:downloadFile,filename:projectFilename(project.title)});
       projectFile.current=result.handle;
@@ -825,12 +828,14 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   const submitProjectDialog = ({name,templateId}) => runFileOperation(async()=>{
     if(projectDialog==='new'){
       const template=projectTemplates.find(t=>t.id===templateId);const next=template?template.builtin?await createBuiltinProject(template.id,name):await instantiateAuthoringTemplate(template,name):createEmptyProject(name);
+      if(window.sacuraDesktop?.isDesktop===true){const result=await window.sacuraDesktop.createProject(next);if(result.cancelled)return;replaceProject(readProject(result.project));setProjectDialog(null);setNotice('Проект создан в выбранной папке.');return;}
       replaceProject(next);setNotice(template?tr("Создан проект из шаблона «{0}».", [template.name]):'Создан пустой проект.');
     } else if(projectDialog==='template'){
       storeTemplate(accountStorage,createProjectTemplate(project,name));
       setNotice(tr("Шаблон «{0}» записан. Он доступен при создании нового проекта.", [name.trim()]));
     } else {
       const next=copyProjectAs(project,name);
+      if(window.sacuraDesktop?.isDesktop===true){const result=await window.sacuraDesktop.saveProjectAs(next);if(result.cancelled)return;replaceProject(readProject(result.project));setProjectDialog(null);setNotice('Копия проекта сохранена в выбранной папке.');return;}
       if(serverStorageEnabled){const saved=await saveServerProject(next);replaceProject(saved);setProjectDialog(null);setNotice('Копия проекта сохранена на сервере.');return;}
       const result=await writeProjectFile(await portableProject(next),{chooseFile:window.showSaveFilePicker?.bind(window),download:downloadFile,filename:projectFilename(next.title)});
       backupProject(accountStorage,project);projectFile.current=result.handle;seed.current.error=null;
@@ -844,6 +849,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   const selectServerProject=id=>runFileOperation(async()=>{replaceProject(readProject(await openServerProject(id)));setServerProjects(null);setNotice('Проект открыт с сервера.');});
   const openProjectFile = () => {
     setMenu(null);
+    if(window.sacuraDesktop?.isDesktop===true)return runFileOperation(async()=>{const result=await window.sacuraDesktop.openProject();if(result.cancelled)return;replaceProject(readProject(result.project));setNotice('Проект загружен.');});
     if(!window.showOpenFilePicker){fileInput.current.click();return;}
     return runFileOperation(async()=>{
       const [handle]=await window.showOpenFilePicker({multiple:false,types:PROJECT_FILE_TYPES});
@@ -1075,7 +1081,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     if('model' in patch||'extraAnimations' in patch){
       const next=structuredClone(project),character=next.objects.find(object=>object.id===id&&object.type==='Персонаж');
       if(!character)throw new Error('Персонаж удалён.');if('model' in patch&&character.model?.src!==patch.model?.src)retainObjectModel(next,character);Object.assign(character,patch);
-      try{accountStorage.setItem(PROJECT_KEY,JSON.stringify(next));}catch{throw new Error('Не хватает места для модели в автосохранении. Уменьшите GLB или удалите неиспользуемые модели.');}
+      try{if(window.sacuraDesktop?.isDesktop!==true)accountStorage.setItem(PROJECT_KEY,JSON.stringify(next));}catch{throw new Error('Не хватает места для модели в автосохранении. Уменьшите GLB или удалите неиспользуемые модели.');}
     }
     mutate(p=>{const character=p.objects.find(object=>object.id===id&&object.type==='Персонаж');if(character){if('model' in patch&&character.model?.src!==patch.model?.src)retainObjectModel(p,character);Object.assign(character,patch);}});
   };
@@ -1083,7 +1089,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     if(rt.running)return;const original=project.objects.find(object=>object.id===id&&object.type==='Персонаж');if(!original)return;
     const copy={...structuredClone(original),id:uid('character'),name:original.name+' · копия'};
     const next=structuredClone(project);next.objects.push(copy);for(const sc of next.subscenes)if(sc.excludedObjectIds?.includes(id))sc.excludedObjectIds.push(copy.id);
-    try{accountStorage.setItem(PROJECT_KEY,JSON.stringify(next));}catch{setNotice('Не хватает места для копии модели в автосохранении.');return;}
+    try{if(window.sacuraDesktop?.isDesktop!==true)accountStorage.setItem(PROJECT_KEY,JSON.stringify(next));}catch{setNotice('Не хватает места для копии модели в автосохранении.');return;}
     mutate(p=>Object.assign(p,next));setSelection({kind:'object',id:copy.id});setCompactPanel('workspace');
   };
   const attachSound = (asset, cfg) => {
@@ -1401,7 +1407,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               if('model' in values){
                 const next=structuredClone(project),target=next.objects.find(x=>x.id===o.id);
                 if(!target)throw new Error('Объект удалён.');if(target.model?.src!==values.model?.src)retainObjectModel(next,target);Object.assign(target,values);
-                try{accountStorage.setItem(PROJECT_KEY,JSON.stringify(next));}catch{throw new Error('Не хватает места для автосохранения. Уменьшите модель или удалите неиспользуемые модели.');}
+                try{if(window.sacuraDesktop?.isDesktop!==true)accountStorage.setItem(PROJECT_KEY,JSON.stringify(next));}catch{throw new Error('Не хватает места для автосохранения. Уменьшите модель или удалите неиспользуемые модели.');}
               }
               mutate(p=>{const target=p.objects.find(x=>x.id===o.id);if(!target)return;if('model' in values&&target.model?.src!==values.model?.src)retainObjectModel(p,target);Object.assign(target,values);});
             }}/>}
@@ -2544,7 +2550,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           {tr("Диагностика · ")}{issues.length}
         </button>
         <span className="status-divider" />
-        <span role="status" data-help-title={tr("Хранение проекта")} data-help={serverStorageEnabled?tr("Автосохранение записывает проект в серверную БД, модели — в S3. Ctrl+S сохраняет сразу. Серверные проекты доступны через меню «Файл». Для переносимой копии используйте экспорт JSON."):tr("Автосохранение хранит последний проект в браузере. Ctrl+S сохраняет файл JSON.")}>{saveError || notice || (running&&preview?.hint) || (serverStorageEnabled?tr("Сохранено на сервере · Ctrl+S"):tr("Автосохранение в браузере · файл: Ctrl+S"))}</span>
+        <span role="status" data-help-title={tr("Хранение проекта")} data-help={window.sacuraDesktop?.isDesktop===true?'Проект сохраняется в project.json по Ctrl+S.':serverStorageEnabled?tr("Автосохранение записывает проект в серверную БД, модели — в S3. Ctrl+S сохраняет сразу. Серверные проекты доступны через меню «Файл». Для переносимой копии используйте экспорт JSON."):tr("Автосохранение хранит последний проект в браузере. Ctrl+S сохраняет файл JSON.")}>{saveError || notice || (running&&preview?.hint) || (window.sacuraDesktop?.isDesktop===true?'Файл проекта: Ctrl+S':serverStorageEnabled?tr("Сохранено на сервере · Ctrl+S"):tr("Автосохранение в браузере · файл: Ctrl+S"))}</span>
         <div className="flex-space" />
         <span>
           {tr("Выделено:")}{" "}
@@ -2566,7 +2572,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           {menu === "Файл" ? (
             <>
               <button disabled={projectFileBusy} onClick={()=>openProjectDialog('new')}><Icon name="FilePlus2"/>{tr("Новый пустой проект…")}</button>
-              {serverStorageEnabled&&<button disabled={projectFileBusy} onClick={showServerProjects}><Icon name="Database"/>{tr("Открыть с сервера…")}</button>}
+              {serverStorageEnabled&&window.sacuraDesktop?.isDesktop!==true&&<button disabled={projectFileBusy} onClick={showServerProjects}><Icon name="Database"/>{tr("Открыть с сервера…")}</button>}
               <button disabled={projectFileBusy} onClick={openProjectFile}>
                 <Icon name="FolderOpen" />
                 {tr("Открыть проект…")}</button>

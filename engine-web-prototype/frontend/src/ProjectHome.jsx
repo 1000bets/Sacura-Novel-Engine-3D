@@ -25,6 +25,7 @@ const templatePresentation={
 
 export default function ProjectHome({user=null,onLogout}) {
  useLocale();
+ const desktop=window.sacuraDesktop?.isDesktop===true?window.sacuraDesktop:null;
  const [active,setActive]=useState(null),[projects,setProjects]=useState([]),[otherProjects,setOtherProjects]=useState([]),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[creating,setCreating]=useState(false),[name,setName]=useState(()=>tr('Новый проект'));
  const [inviting,setInviting]=useState(false),[guide,setGuide]=useState(null),[search,setSearch]=useState('');
  const operation=useRef(false),fileInput=useRef(null),createInput=useRef(null);
@@ -32,13 +33,15 @@ export default function ProjectHome({user=null,onLogout}) {
  async function refresh(){
   setLoading(true);setError('');
   try{
-   const [own,others]=await Promise.all([serverStorageEnabled?listServerProjects():listLocalProjects(accountStorage),serverStorageEnabled&&user?.login==='syper'?listOtherServerProjects():[]]);
+   const [own,others]=await Promise.all([desktop?desktop.listProjects():serverStorageEnabled?listServerProjects():listLocalProjects(accountStorage),!desktop&&serverStorageEnabled&&user?.login==='syper'?listOtherServerProjects():[]]);
    setProjects(own);setOtherProjects(others);
   }
   catch(err){setError(err.message);}
   finally{setLoading(false);}
  }
  useEffect(()=>{refresh();},[]);
+ useEffect(()=>{desktop?.ready('home');},[]);
+ useEffect(()=>{if(!desktop)return;let alive=true;desktop.listProjects().then(async items=>{if(!items.length||!alive)return;const result=await desktop.openRecent(items[0].id);if(alive&&result?.project)setActive(readProject(result.project));}).catch(()=>{});return()=>{alive=false;};},[]);
  async function run(action){
   if(operation.current)return;
   operation.current=true;setBusy(true);setError('');
@@ -47,11 +50,13 @@ export default function ProjectHome({user=null,onLogout}) {
  }
  async function open(project,{save=false}={}){
   let next=readProject(project);
+  if(desktop){if(save){const result=await desktop.createProject(next);if(result.cancelled)return;next=readProject(result.project);}setCreating(false);setActive(next);return;}
   if(save&&serverStorageEnabled)next=await saveServerProject(next,null);
   if(!serverStorageEnabled)rememberLocalProject(accountStorage,next);
   setCreating(false);setActive(next);
  }
  async function home(project){
+  if(desktop){await desktop.saveProject(project);setActive(null);await refresh();return;}
   if(serverStorageEnabled){await saveServerProject(project);await flushServerSaves();}
   else rememberLocalProject(accountStorage,project);
   setActive(null);await refresh();
@@ -81,7 +86,7 @@ export default function ProjectHome({user=null,onLogout}) {
     <div className="project-home-greeting">
      <h1 id="home-title">{tr('Место для ваших')}<br/><span className="project-home-title-accent">{tr('историй.')}</span></h1>
      <p className="project-home-intro">{tr('От первой сцены до целого мира. Создавайте игры и рассказывайте истории в Sacura.')}</p>
-     <div className="project-home-start-actions"><button className="project-home-primary" disabled={busy} onClick={beginCreate}><Plus aria-hidden="true" size={19}/>{tr('Создать новый проект')}</button><button className="project-home-file" disabled={busy} onClick={()=>fileInput.current?.click()}><FolderOpen aria-hidden="true" size={18}/>{tr('Открыть из файла')}</button></div>
+     <div className="project-home-start-actions"><button className="project-home-primary" disabled={busy} onClick={beginCreate}><Plus aria-hidden="true" size={19}/>{tr('Создать новый проект')}</button><button className="project-home-file" disabled={busy} onClick={()=>desktop?run(async()=>{const result=await desktop.openProject();if(result?.project)await open(result.project);}):fileInput.current?.click()}><FolderOpen aria-hidden="true" size={18}/>{desktop?'Открыть папку проекта':tr('Открыть из файла')}</button></div>
     </div>
     <article className="project-home-featured">
      <ProjectArtwork/>
@@ -102,14 +107,14 @@ export default function ProjectHome({user=null,onLogout}) {
     {busy&&<p className="project-home-status" role="status">{tr('Подождите, сохраняем и открываем проект…')}</p>}
     {loading?<div className="project-home-loading" role="status"><span/>{tr('Загрузка проектов…')}</div>:projects.length?filteredProjects.length?<div className="project-home-list">
      <div className="project-home-list-heading" aria-hidden="true"><span>{tr('Название проекта')}</span><span>{tr('Последнее изменение')}</span><span/></div>
-     {filteredProjects.map(project=><button key={project.id} disabled={busy} onClick={()=>run(async()=>open(serverStorageEnabled?await openServerProject(project.id):project.project))}><span className="project-home-project-icon"><FolderOpen aria-hidden="true" size={21}/></span><strong>{project.title}</strong><time dateTime={project.updatedAt||undefined}><Clock3 aria-hidden="true" size={13}/>{project.updatedAt?new Date(project.updatedAt).toLocaleString(localeTag(),{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):tr('Сохранён в этом браузере')}</time><span className="project-home-open">{tr('Открыть')}<ArrowUpRight aria-hidden="true" size={17}/></span></button>)}
-    </div>:<div className="project-home-empty"><Search aria-hidden="true" size={25}/><div><h3>{tr('Проекты не найдены')}</h3><p>{tr('Попробуйте другое название или очистите поиск.')}</p></div><button onClick={()=>setSearch('')}>{tr('Очистить поиск')}</button></div>:<div className="project-home-empty"><span className="project-home-empty-icon"><FolderOpen aria-hidden="true" size={27}/></span><div><h3>{tr('Здесь будут ваши проекты')}</h3><p>{tr('Создайте первый проект или откройте сохранённый файл.')}</p></div><button disabled={busy} onClick={()=>fileInput.current?.click()}><Upload aria-hidden="true" size={16}/>{tr('Загрузить проект из файла')}</button></div>}
+     {filteredProjects.map(project=><button key={project.id} disabled={busy} onClick={()=>run(async()=>open(desktop?(await desktop.openRecent(project.id)).project:serverStorageEnabled?await openServerProject(project.id):project.project))}><span className="project-home-project-icon"><FolderOpen aria-hidden="true" size={21}/></span><strong>{project.title}</strong><time dateTime={project.updatedAt||undefined}><Clock3 aria-hidden="true" size={13}/>{project.updatedAt?new Date(project.updatedAt).toLocaleString(localeTag(),{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):tr('Сохранён в этом браузере')}</time><span className="project-home-open">{tr('Открыть')}<ArrowUpRight aria-hidden="true" size={17}/></span></button>)}
+    </div>:<div className="project-home-empty"><Search aria-hidden="true" size={25}/><div><h3>{tr('Проекты не найдены')}</h3><p>{tr('Попробуйте другое название или очистите поиск.')}</p></div><button onClick={()=>setSearch('')}>{tr('Очистить поиск')}</button></div>:<div className="project-home-empty"><span className="project-home-empty-icon"><FolderOpen aria-hidden="true" size={27}/></span><div><h3>{tr('Здесь будут ваши проекты')}</h3><p>{tr('Создайте первый проект или откройте сохранённый файл.')}</p></div><button disabled={busy} onClick={()=>desktop?run(async()=>{const result=await desktop.openProject();if(result?.project)await open(result.project);}):fileInput.current?.click()}><Upload aria-hidden="true" size={16}/>{desktop?'Открыть папку проекта':tr('Загрузить проект из файла')}</button></div>}
    </section>
 
    {serverStorageEnabled&&user?.login==='syper'&&<section className="project-home-recent" aria-labelledby="other-projects-title"><div className="project-home-section-heading"><h2 id="other-projects-title">{tr('Чужие проекты')}</h2></div>
     {loading?<p role="status">{tr('Загрузка проектов…')}</p>:otherProjects.length?<div className="project-home-list">{otherProjects.map(project=><button key={project.ownerId+':'+project.id} disabled={busy} onClick={()=>run(async()=>open(await openServerProject(project.id,project.ownerId)))}><span className="project-home-project-icon"><FolderOpen aria-hidden="true" size={21}/></span><strong>{project.title}<small>{tr('Автор: ')}{project.ownerLogin}</small></strong><time dateTime={project.updatedAt}>{new Date(project.updatedAt).toLocaleDateString(localeTag())}</time><span className="project-home-open">{tr('Открыть')}<ArrowUpRight aria-hidden="true" size={17}/></span></button>)}</div>:<p className="project-home-empty">{tr('У других пользователей пока нет сохранённых проектов.')}</p>}
    </section>}
-   <footer className="project-home-footer"><span><Monitor aria-hidden="true" size={14}/>{serverStorageEnabled?tr('Рабочее пространство Sacura'):tr('Проекты сохраняются в этом браузере')}</span><span>Sacura Novel Studio</span></footer>
+   <footer className="project-home-footer"><span><Monitor aria-hidden="true" size={14}/>{desktop?'Проекты сохраняются в выбранных папках':serverStorageEnabled?tr('Рабочее пространство Sacura'):tr('Проекты сохраняются в этом браузере')}</span><span>Sacura Novel Studio</span></footer>
    <input ref={fileInput} type="file" hidden accept="application/json,.json" onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(file)run(async()=>open((await parseProjectFile(await file.text())).project,{save:true}));}}/>
   </div>
   {creating&&<Dialog title={tr('Создать новый проект')} icon={Plus} busy={busy} onClose={()=>setCreating(false)} onSubmit={()=>{if(name.trim())run(()=>open(createEmptyProject(name),{save:true}));}}><label className="field" htmlFor="new-project-name">{tr('Название нового проекта')}<input ref={createInput} id="new-project-name" required maxLength={120} disabled={busy} value={name} onChange={e=>setName(e.target.value)}/></label><p>{tr('Пустая сцена и чистый сценарий для вашей истории.')}</p>{error&&<p className="project-dialog-error" role="alert">{message(error)}</p>}<footer><button disabled={busy} type="button" onClick={()=>setCreating(false)}>{tr('Отмена')}</button><button className="project-home-primary" disabled={busy||!name.trim()} type="submit">{busy?tr('Создаём…'):tr('Создать')}</button></footer></Dialog>}

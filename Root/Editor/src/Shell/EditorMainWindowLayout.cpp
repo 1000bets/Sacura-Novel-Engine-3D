@@ -71,9 +71,11 @@
 #include <QKeySequence>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListView>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QPainter>
 #include <QLayout>
 #include <QMimeData>
 #include <QPlainTextEdit>
@@ -81,12 +83,14 @@
 #include <QPushButton>
 #include <QScrollArea>
 #include <QScrollBar>
+#include <QStyledItemDelegate>
 #include <QGuiApplication>
 #include <QScreen>
 #include <QSignalBlocker>
 #include <QSplitter>
 #include <QStringList>
 #include <QStatusBar>
+#include <QStyle>
 #include <QTabWidget>
 #include <QTimer>
 #include <QToolBar>
@@ -853,6 +857,23 @@ void EditorMainWindow::PopulateDockPages()
 
 void EditorMainWindow::BuildWindowsMenuView()
 {
+    class PositionOptionDelegate final : public QStyledItemDelegate
+    {
+      public:
+        using QStyledItemDelegate::QStyledItemDelegate;
+        QSize sizeHint(const QStyleOptionViewItem& Option, const QModelIndex& Index) const override
+        {
+            QSize Size = QStyledItemDelegate::sizeHint(Option, Index);
+            Size.setHeight(30);
+            return Size;
+        }
+        void paint(QPainter* Painter, const QStyleOptionViewItem& Option, const QModelIndex& Index) const override
+        {
+            QStyleOptionViewItem Row = Option;
+            Row.state &= ~QStyle::State_HasFocus;
+            QStyledItemDelegate::paint(Painter, Row, Index);
+        }
+    };
     auto* Menu = findChild<QMenu*>("WindowsMenu");
     for (auto* Action : Menu->actions()) { Action->setVisible(false); }
 
@@ -865,15 +886,17 @@ void EditorMainWindow::BuildWindowsMenuView()
     auto* Body = new QWidget(Scroll);
     Body->setObjectName("WindowsMenuBody");
     auto* Layout = new QVBoxLayout(Body);
-    Layout->setContentsMargins(6, 4, 6, 4);
+    Layout->setContentsMargins(5, 2, 5, 2);
     Layout->setSpacing(0);
+    Layout->setAlignment(Qt::AlignTop);
     auto* SearchBox = new QWidget(Body);
     SearchBox->setObjectName("WindowsMenuSearchBox");
+    SearchBox->setFixedHeight(34);
     auto* SearchLayout = new QHBoxLayout(SearchBox);
-    SearchLayout->setContentsMargins(8, 3, 8, 5);
-    SearchLayout->setSpacing(7);
+    SearchLayout->setContentsMargins(4, 1, 2, 3);
+    SearchLayout->setSpacing(5);
     auto* SearchIcon = new QLabel(SearchBox);
-    SearchIcon->setPixmap(EditorUi::MakeFrontendIcon("Search").pixmap(15, 15));
+    SearchIcon->setPixmap(EditorUi::MakeFrontendIcon("Search").pixmap(13, 13));
     SearchLayout->addWidget(SearchIcon);
     auto* Search = new QLineEdit(SearchBox);
     Search->setObjectName("WindowsMenuSearch");
@@ -884,12 +907,14 @@ void EditorMainWindow::BuildWindowsMenuView()
 
     auto* FixedGroup = new QWidget(Body);
     FixedGroup->setObjectName("WindowsMenuFixedGroup");
+    FixedGroup->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
     auto* FixedLayout = new QVBoxLayout(FixedGroup);
     FixedLayout->setContentsMargins(0, 4, 0, 5);
     FixedLayout->setSpacing(0);
     Layout->addWidget(FixedGroup);
     auto* WindowGroup = new QWidget(Body);
     WindowGroup->setObjectName("WindowsMenuWindowGroup");
+    WindowGroup->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
     auto* WindowLayout = new QVBoxLayout(WindowGroup);
     WindowLayout->setContentsMargins(0, 4, 0, 5);
     WindowLayout->setSpacing(0);
@@ -903,21 +928,21 @@ void EditorMainWindow::BuildWindowsMenuView()
     {
         auto* Row = new QWidget(Body);
         Row->setObjectName("WindowsMenuRow_" + Id);
+        Row->setFixedHeight(25);
         auto* RowLayout = new QHBoxLayout(Row);
         RowLayout->setContentsMargins(0, 0, 0, 0);
         RowLayout->setSpacing(0);
         auto* Check = new QPushButton(Row);
         Check->setObjectName("WindowsMenuCheck_" + Id);
         Check->setProperty("uiRole", "windowsMenuCheck");
-        Check->setFixedWidth(24);
+        Check->setFixedWidth(22);
         Check->setEnabled(Visibility != nullptr);
         RowLayout->addWidget(Check);
         QIcon RowIcon = EditorUi::MakeFrontendIcon(Icon);
         if (!Visibility && Id != "event")
         {
-            // Keep unavailable future windows visually aligned with the React list.
             QIcon PassiveIcon;
-            PassiveIcon.addPixmap(RowIcon.pixmap(15, 15), QIcon::Disabled);
+            PassiveIcon.addPixmap(RowIcon.pixmap(13, 13), QIcon::Disabled);
             RowIcon = PassiveIcon;
         }
         auto* Toggle = new QPushButton(RowIcon, Label, Row);
@@ -926,15 +951,15 @@ void EditorMainWindow::BuildWindowsMenuView()
         Toggle->setFlat(true);
         Toggle->setEnabled(Visibility != nullptr);
         Toggle->setAccessibleName(Label);
-        Toggle->setIconSize(QSize(15, 15));
+        Toggle->setIconSize(QSize(13, 13));
         if (!Visibility) Toggle->setToolTip(tr("Это окно пока недоступно в нативном редакторе"));
         RowLayout->addWidget(Toggle, 1);
         auto* Reveal = new QPushButton(Row);
         Reveal->setObjectName("WindowsMenuReveal_" + Id);
         Reveal->setProperty("uiRole", "windowsMenuReveal");
         Reveal->setIcon(EditorUi::MakeFrontendIcon("ArrowUpRight"));
-        Reveal->setIconSize(QSize(15, 15));
-        Reveal->setFixedWidth(24);
+        Reveal->setIconSize(QSize(13, 13));
+        Reveal->setFixedWidth(22);
         Reveal->setToolTip(tr("Перейти к окну «%1»").arg(Label));
         Reveal->setVisible(Visibility && Visibility->isChecked() && Page);
         RowLayout->addWidget(Reveal);
@@ -984,19 +1009,18 @@ void EditorMainWindow::BuildWindowsMenuView()
         AddRow(WindowLayout, QString::fromLatin1(Window.Id), tr(Window.Label),
                QString::fromLatin1(Window.Icon), PageAction(Window.Page), Window.Page);
     }
-    // Older native tools remain searchable so a closed tab can always be reopened.
+    // Native utility tabs have no React menu entry, but remain discoverable when closed.
     for (int Index = 4; Index < DockTabs->count(); ++Index)
     {
         QWidget* Page = DockTabs->widget(Index);
         AddRow(WindowLayout, "native_" + QString::number(Index), DockTabs->tabText(Index),
                "PanelsTopLeft", PageAction(Page), Page, true);
     }
-
     auto* Footer = new QWidget(Body);
     Footer->setObjectName("WindowsMenuFooter");
     auto* FooterLayout = new QVBoxLayout(Footer);
-    FooterLayout->setContentsMargins(8, 8, 8, 4);
-    FooterLayout->setSpacing(5);
+    FooterLayout->setContentsMargins(8, 6, 8, 2);
+    FooterLayout->setSpacing(3);
     FooterLayout->addWidget(new QLabel(tr("Рабочая область"), Footer));
     auto* Position = new QComboBox(Footer);
     Position->setObjectName("WindowsMenuPosition");
@@ -1004,9 +1028,16 @@ void EditorMainWindow::BuildWindowsMenuView()
     Position->addItem(tr("Снизу от сцены"), "bottom");
     Position->addItem(tr("Слева от сцены"), "left");
     Position->addItem(tr("Справа от сцены"), "right");
+    Position->setView(new QListView(Position));
+    Position->view()->setObjectName("WindowsMenuPositionPopup");
+    Position->view()->setItemDelegate(new PositionOptionDelegate(Position->view()));
     FooterLayout->addWidget(Position);
     connect(Position, qOverload<int>(&QComboBox::currentIndexChanged), this, [this, Position](int Index)
     { Docking->SetWorkspacePosition(Position->itemData(Index).toString()); });
+    auto* Hint = new QLabel(tr("Перетаскивайте вкладки между областями. Кнопка рядом с вкладками открепляет окно. Раскладка сохраняется автоматически."), Footer);
+    Hint->setObjectName("WindowsMenuHint");
+    Hint->setWordWrap(true);
+    FooterLayout->addWidget(Hint);
     auto* Restore = new QPushButton(EditorUi::MakeFrontendIcon("RotateCcw"), tr("Восстановить раскладку"), Footer);
     Restore->setObjectName("WindowsMenuRestore");
     Restore->setProperty("uiRole", "windowsMenuRestore");
@@ -1014,12 +1045,19 @@ void EditorMainWindow::BuildWindowsMenuView()
     connect(Restore, &QPushButton::clicked, this, [this, Menu]()
     { findChild<QAction*>("RestoreWorkspaceLayout")->trigger(); Menu->hide(); });
     Layout->addWidget(Footer);
+    Layout->addStretch();
     Scroll->setWidget(Body);
     auto* WidgetAction = new QWidgetAction(Menu);
     WidgetAction->setDefaultWidget(Scroll);
     Menu->addAction(WidgetAction);
     Menu->setObjectName("WindowsMenu");
     Menu->setStyleSheet(EditorUi::EditorStyle::LoadStylesheet());
+    Position->view()->setStyleSheet(QString(
+        "QListView#WindowsMenuPositionPopup { background: %1; color: %2; border: 1px solid %3; outline: none; } "
+        "QListView#WindowsMenuPositionPopup::item:selected { background: #9dc8fa; color: #202330; }")
+        .arg(EditorUi::EditorStyle::Color("--bg-panel-elevated").name(),
+             EditorUi::EditorStyle::Color("--text-primary").name(),
+             EditorUi::EditorStyle::Color("--border-strong").name()));
     auto Update = [this, Rows, FixedGroup, Footer, Position, Search, Scroll, Body, Layout]()
     {
         const QString Query = Search->text().trimmed();
@@ -1034,7 +1072,7 @@ void EditorMainWindow::BuildWindowsMenuView()
             {
                 Row.Check->setIcon(Row.Visibility->isChecked()
                     ? EditorUi::MakeFrontendIcon("Check", "--accent") : QIcon());
-                Row.Check->setIconSize(QSize(14, 14));
+                Row.Check->setIconSize(QSize(12, 12));
                 Row.Reveal->setVisible(Row.Visibility->isChecked() && Row.HasReveal);
             }
         }
@@ -1043,7 +1081,7 @@ void EditorMainWindow::BuildWindowsMenuView()
         Layout->invalidate();
         Layout->activate();
         Body->updateGeometry();
-        const int Available = QGuiApplication::primaryScreen()->availableGeometry().height() - 80;
+        const int Available = QGuiApplication::primaryScreen()->availableGeometry().height() - 16;
         Scroll->setFixedHeight(std::min(Layout->sizeHint().height(), Available));
     };
     connect(Search, &QLineEdit::textChanged, this, [Update](const QString&) { Update(); });
