@@ -1,4 +1,5 @@
 #include "UI/StoryWidget.h"
+#include "UI/WidgetSurface.h"
 #include "Story/StoryRuntime.h"
 
 #include <QLabel>
@@ -33,6 +34,20 @@ StoryWidget::StoryWidget(StoryRuntime& InRuntime, QWidget* Parent)
 void StoryWidget::Refresh(bool bAllowInput)
 {
     setEnabled(bAllowInput);
+    if (Authored)
+    {
+        WidgetContext Context;
+        Context.Speaker = QString::fromStdString(Runtime.GetDisplayedSpeaker());
+        Context.Text = QString::fromStdString(Runtime.GetDisplayedLine());
+        if (Runtime.IsFinished()) Context.Text = tr("История завершена.");
+        else if (!Runtime.GetLastError().empty()) Context.Text = QString::fromStdString(Runtime.GetLastError());
+        Context.CanAdvance = Runtime.CanAdvanceDialogue();
+        Context.CanChoose = Runtime.CanSelectChoice();
+        Context.Status = Context.CanAdvance ? tr("Нажмите, чтобы продолжить") : QString();
+        for (size_t I=0; I<Runtime.GetChoiceCount(); ++I) Context.Choices.append(QString::fromStdString(Runtime.GetChoice(I).Label));
+        Authored->SetContext(std::move(Context));
+        return;
+    }
     Speaker->setText(QString::fromStdString(Runtime.GetDisplayedSpeaker()));
     QString Text = QString::fromStdString(Runtime.GetDisplayedLine());
     if (Runtime.IsFinished())
@@ -71,4 +86,23 @@ void StoryWidget::Refresh(bool bAllowInput)
             ChoiceLayout->addWidget(Choice);
         }
     }
+}
+
+void StoryWidget::SetWidgetLayout(const QJsonObject& Layout)
+{
+    if (Layout.isEmpty()) return;
+    if (!Authored)
+    {
+        Speaker->hide(); Line->hide(); Choices->hide(); Advance->hide();
+        Authored = new WidgetSurface(this);
+        layout()->addWidget(Authored);
+        Authored->Activated = [this](QString Action, int Index)
+        {
+            if (!isEnabled()) return;
+            if (Action == "advance") Runtime.AdvanceDialogue();
+            else if (Action == "choice") Runtime.SelectChoice(static_cast<size_t>(Index));
+            Refresh(isEnabled());
+        };
+    }
+    Authored->SetWidget(Layout);
 }

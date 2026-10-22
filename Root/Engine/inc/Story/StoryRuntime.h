@@ -47,6 +47,10 @@ public:
     bool SelectChoice(size_t ChoiceIndex);
     void Tick(float DeltaTime);
 
+    std::vector<StoryEventSnapshot> GetEventSnapshots() const;
+    bool SetEventPaused(uint64_t InstanceId, bool bPaused);
+    bool StopEvent(uint64_t InstanceId);
+
     const std::string& GetDisplayedSpeaker() const { return DisplayedSpeaker; }
     const std::string& GetDisplayedLine() const { return DisplayedLine; }
     const std::string& GetChoicePrompt() const { return ChoicePrompt; }
@@ -98,6 +102,7 @@ private:
     size_t ActiveActionIndex = 0;
     bool bActionSequenceRunning = false;
     std::unique_ptr<StoryEventPlayer> Events;
+    uint64_t NextEventInstanceId = 1;
     // 0: legacy/no staging, 1: before text, 2: text visible, 3: after answer.
     int StagingPhase = 0;
     StoryNodeId StagedNext;

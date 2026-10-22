@@ -1,5 +1,10 @@
 # Editor UI boundary
 
+The native Widgets workspace uses WidgetWorkspaceView / WidgetCanvasView,
+EditorCore WidgetDocument and Engine/UI WidgetLayout / WidgetSurface. Its
+supported authoring, playback and portable package profile, checks and remaining
+limitations are documented in `docs/NATIVE-UI-WIDGETS.md`.
+
 The visual reference is `engine-web-prototype/frontend/src/Editor.jsx` and
 `editorTheme.css`. The current native shell uses the screenshot's Sakura Night
 palette; Classic is retained as a source-checked resource.

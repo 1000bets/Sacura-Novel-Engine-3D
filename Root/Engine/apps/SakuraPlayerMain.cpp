@@ -4,6 +4,9 @@
 #include "Project/ProjectSession.h"
 #include "UI/RenderViewportWidget.h"
 #include "UI/StoryWidget.h"
+#include "UI/WidgetLayout.h"
+#include "Project/ProjectPaths.h"
+#include <QFileInfo>
 
 #include <QApplication>
 #include <QElapsedTimer>
@@ -93,6 +96,13 @@ int main(int ArgumentCount, char** Arguments)
     Layout->setContentsMargins(0, 0, 0, 0);
     auto* Viewport = new RenderViewportWidget(&Window);
     auto* Dialogue = new StoryWidget(EngineInstance.GetStoryRuntime(), &Window);
+    const auto WidgetPath = WidgetLayout::ProjectFile(QString::fromStdWString(ProjectPaths::Content().wstring()));
+    if (QFileInfo::exists(WidgetPath))
+    {
+        QJsonObject Library; QString Error;
+        if (WidgetLayout::Read(WidgetPath, Library, Error)) Dialogue->SetWidgetLayout(WidgetLayout::Resolve(Library,"dialogue"));
+        else PrintString("SakuraPlayer: UI library: " + Error.toStdString());
+    }
     Layout->addWidget(Viewport, 1);
     Layout->addWidget(Dialogue);
     QObject::connect(Viewport, &RenderViewportWidget::ViewportResized, &Window,

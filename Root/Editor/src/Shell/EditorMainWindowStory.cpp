@@ -1,4 +1,5 @@
 #include "Shell/EditorMainWindow.h"
+#include "UI/Views/WidgetWorkspaceView.h"
 #include "UI/Adapters/StoryGraphController.h"
 #include "UI/Adapters/WorkspaceDockController.h"
 #include "UI/Views/StoryWorkspaceView.h"
@@ -33,6 +34,7 @@ void EditorMainWindow::InitializeStoryAuthoring()
         HierarchyTree->setCurrentItem(nullptr);
         ClearSelection();
         bStoryEditingContext = true;
+        bWidgetEditingContext = false;
         InspectorPages->setCurrentWidget(StoryInspector);
     };
     StoryAuthoring->Changed = [this]()
@@ -132,6 +134,7 @@ void EditorMainWindow::RefreshStoryTargets()
 
 void EditorMainWindow::SaveActiveDocument()
 {
+    if (IsWidgetEditingContext()) { WidgetWorkspace->Save(); return; }
     if (IsStoryEditingContext())
     {
         SaveStory();

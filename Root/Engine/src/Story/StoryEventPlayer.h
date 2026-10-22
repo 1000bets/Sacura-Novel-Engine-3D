@@ -7,12 +7,15 @@
 class StoryEventPlayer
 {
   public:
-    explicit StoryEventPlayer(ObjectHandle World);
+    StoryEventPlayer(ObjectHandle World, uint64_t& NextInstanceId);
     ~StoryEventPlayer();
     void BeginPhase(const StoryDocument& Document, const StoryNode& Node, StoryEventPhase Phase);
     void Tick(float DeltaSeconds);
     bool IsReady() const;
     const std::string& GetError() const;
+    std::vector<StoryEventSnapshot> GetSnapshots() const;
+    bool SetPaused(uint64_t InstanceId, bool bPaused);
+    bool Stop(uint64_t InstanceId);
 
   private:
     struct Implementation;

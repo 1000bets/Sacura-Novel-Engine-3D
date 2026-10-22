@@ -30,6 +30,7 @@ public:
     void Open(QWidget& Page);
     void SetOpen(QWidget& Page, bool Open);
     void Dock(QWidget& Page, const QString& Area, int Index = -1);
+    void RestoreDefault(QWidget& Page);
     void Float(QWidget& Page, QRect Geometry = {});
     bool Restore();
     void Save();
@@ -60,7 +61,7 @@ private:
     QMap<QString, AreaState> Areas;
     QMap<QString, PageState> Pages;
     QPointer<QSplitter> Workspace, Center;
-    QPointer<QRubberBand> BottomDropIndicator;
+    QPointer<QRubberBand> DropIndicator;
     std::unique_ptr<QSettings> Settings;
     QTimer* SaveTimer = nullptr;
     QString DragId, DragToken;

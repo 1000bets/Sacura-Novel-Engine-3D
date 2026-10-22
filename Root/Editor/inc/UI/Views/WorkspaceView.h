@@ -5,6 +5,7 @@
 class QSplitter;
 class QVBoxLayout;
 class QShowEvent;
+class QResizeEvent;
 
 namespace EditorUi
 {
@@ -27,6 +28,7 @@ public:
 
 protected:
     void showEvent(QShowEvent* Event) override;
+    void resizeEvent(QResizeEvent* Event) override;
 
 private:
     QSplitter* Workspace = nullptr;

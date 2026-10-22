@@ -196,6 +196,18 @@ void WorkspaceDockController::Dock(QWidget& Page, const QString& Area, int Index
     Open(Page);
 }
 
+void WorkspaceDockController::RestoreDefault(QWidget& Page)
+{
+    const QString Id = PageId(&Page);
+    if (Id.isEmpty()) { return; }
+    const PageState State = Pages[Id];
+    Dock(Page, State.DefaultArea);
+    if (auto* Tabs = Host(&Page))
+    {
+        Tabs->tabBar()->moveTab(Tabs->indexOf(&Page), std::min(State.DefaultIndex, Tabs->count() - 1));
+    }
+}
+
 QRect WorkspaceDockController::VisibleGeometry(QRect Geometry) const
 {
     if (!Geometry.isValid()) { Geometry = QRect(Owner.mapToGlobal(QPoint(80, 80)), QSize(800, 520)); }
@@ -244,6 +256,12 @@ void WorkspaceDockController::ShowMenu(const QString& Id, QPoint Position)
     auto* Menu = new QMenu(&Owner);
     Menu->setAttribute(Qt::WA_DeleteOnClose);
     QPointer<QWidget> Page = Pages[Id].Page;
+    auto* Restore = Menu->addAction(tr("Вернуть на исходное место"), this, [this, Page]()
+    {
+        if (Page) { RestoreDefault(*Page); }
+    });
+    Restore->setObjectName("RestoreWorkspacePage");
+    Menu->addSeparator();
     if (!Pages[Id].Floating)
     { Menu->addAction(tr("Отдельное окно"), this, [this, Page]() { if (Page) { Float(*Page); } }); }
     for (auto It = Areas.cbegin(); It != Areas.cend(); ++It)
@@ -422,7 +440,7 @@ bool WorkspaceDockController::eventFilter(QObject* Watched, QEvent* Event)
             Drag->setMimeData(Mime);
             Drag->setPixmap(Bar->grab(Bar->tabRect(Tabs->indexOf(Pages[Id].Page))));
             const auto Result = Drag->exec(Qt::MoveAction);
-            if (BottomDropIndicator) { BottomDropIndicator->hide(); }
+            if (DropIndicator) { DropIndicator->hide(); }
             // Escape cancels with the mouse still held; only an actual outside release floats.
             if (Result == Qt::IgnoreAction && !QApplication::mouseButtons().testFlag(Qt::LeftButton))
             { Float(*Pages[Id].Page, QRect(QCursor::pos(), QSize(800, 520))); }
@@ -431,7 +449,7 @@ bool WorkspaceDockController::eventFilter(QObject* Watched, QEvent* Event)
         }
     }
     if (Event->type() == QEvent::MouseButtonRelease) { DragId.clear(); }
-    if (Event->type() == QEvent::DragLeave && BottomDropIndicator) { BottomDropIndicator->hide(); }
+    if (Event->type() == QEvent::DragLeave && DropIndicator) { DropIndicator->hide(); }
     if (Event->type() == QEvent::DragEnter || Event->type() == QEvent::DragMove || Event->type() == QEvent::Drop)
     {
         auto* Drop = static_cast<QDropEvent*>(Event);
@@ -440,31 +458,53 @@ bool WorkspaceDockController::eventFilter(QObject* Watched, QEvent* Event)
         const QString Id = Payload.startsWith(Prefix) ? Payload.mid(Prefix.size()) : QString{};
         if (Pages.contains(Id))
         {
-            // The bottom workspace can be hidden when its last tab is moved out.
-            // Dropping at the scene's lower edge must recreate that split, rather
-            // than tabifying the page with the viewport and hiding the scene.
-            const int EdgeHeight = std::min(Tabs->height(), std::clamp(Tabs->height() / 4, 48, 96));
-            const QRect BottomEdge(0, Tabs->height() - EdgeHeight, Tabs->width(), EdgeHeight);
-            const bool Bottom = !Bar && Area == "scene" && Areas.contains("workspace")
-                && BottomEdge.contains(Drop->position().toPoint());
-            if (Bottom)
+            // Empty side/bottom regions are hidden. Their neighbours' edges
+            // remain reachable drop targets that reopen the original split.
+            QString Destination = Area;
+            QRect Edge;
+            if (!Bar && (Area == "scene" || Area == "workspace"))
             {
-                if (!BottomDropIndicator)
+                const int EdgeWidth = std::min(Tabs->width() / 2, std::clamp(Tabs->width() / 4, 48, 96));
+                const int EdgeHeight = std::min(Tabs->height(), std::clamp(Tabs->height() / 4, 48, 96));
+                const QRect LeftEdge(0, 0, EdgeWidth, Tabs->height());
+                const QRect RightEdge(Tabs->width() - EdgeWidth, 0, EdgeWidth, Tabs->height());
+                const QRect BottomEdge(0, Tabs->height() - EdgeHeight, Tabs->width(), EdgeHeight);
+                const QPoint Position = Drop->position().toPoint();
+                if (Areas.contains("hierarchy") && LeftEdge.contains(Position))
                 {
-                    BottomDropIndicator = new QRubberBand(QRubberBand::Rectangle, Tabs);
-                    BottomDropIndicator->setObjectName("WorkspaceBottomDropIndicator");
-                    BottomDropIndicator->setAttribute(Qt::WA_TransparentForMouseEvents);
+                    Destination = "hierarchy";
+                    Edge = LeftEdge;
                 }
-                BottomDropIndicator->setGeometry(BottomEdge);
-                BottomDropIndicator->show();
-                BottomDropIndicator->raise();
+                else if (Areas.contains("inspector") && RightEdge.contains(Position))
+                {
+                    Destination = "inspector";
+                    Edge = RightEdge;
+                }
+                else if (Area == "scene" && Areas.contains("workspace") && BottomEdge.contains(Position))
+                {
+                    Destination = "workspace";
+                    Edge = BottomEdge;
+                }
             }
-            else if (BottomDropIndicator) { BottomDropIndicator->hide(); }
+            if (!Edge.isEmpty())
+            {
+                if (!DropIndicator)
+                {
+                    DropIndicator = new QRubberBand(QRubberBand::Rectangle, Tabs);
+                    DropIndicator->setObjectName("WorkspaceDropIndicator");
+                    DropIndicator->setAttribute(Qt::WA_TransparentForMouseEvents);
+                }
+                if (DropIndicator->parentWidget() != Tabs) { DropIndicator->setParent(Tabs); }
+                DropIndicator->setGeometry(Edge);
+                DropIndicator->show();
+                DropIndicator->raise();
+            }
+            else if (DropIndicator) { DropIndicator->hide(); }
             Drop->setDropAction(Qt::MoveAction); Drop->accept();
             if (Event->type() == QEvent::Drop)
             {
-                if (BottomDropIndicator) { BottomDropIndicator->hide(); }
-                Dock(*Pages[Id].Page, Bottom ? QStringLiteral("workspace") : Area,
+                if (DropIndicator) { DropIndicator->hide(); }
+                Dock(*Pages[Id].Page, Destination,
                      Bar ? Bar->tabAt(Drop->position().toPoint()) : -1);
             }
             return true;

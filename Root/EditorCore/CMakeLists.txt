@@ -1,4 +1,5 @@
 set(EDITOR_CORE_SRC
+    src/Documents/WidgetDocument.cpp
     src/Assets/StoryAssetCreation.cpp
     src/Assets/AssetOperations.cpp
     src/Assets/AssetImporter.cpp

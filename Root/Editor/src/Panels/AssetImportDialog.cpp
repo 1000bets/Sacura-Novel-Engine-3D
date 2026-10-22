@@ -16,17 +16,20 @@
 AssetImportDialog::AssetImportDialog(
     const QStringList& SourceFiles,
     const QString& InitialDestinationFolder,
-    QWidget* Parent)
+    QWidget* Parent,
+    const QStringList& RelativeFolders,
+    int SkippedFiles)
     : QDialog(Parent)
     , Sources(SourceFiles)
+    , SourceFolders(RelativeFolders)
 {
-    setWindowTitle(tr("Import Assets"));
+    setWindowTitle(tr("Импорт ресурсов"));
     setModal(true);
     resize(680, 420);
 
     auto* Layout = new QVBoxLayout(this);
     auto* Description = new QLabel(
-        tr("Review destination names and import options before publishing into Game Content."),
+        tr("Проверьте имена и папки перед импортом в Assets. Существующие файлы не перезаписываются."),
         this);
     Description->setWordWrap(true);
     Layout->addWidget(Description);
@@ -34,11 +37,12 @@ AssetImportDialog::AssetImportDialog(
     auto* DestinationLayout = new QFormLayout();
     DestinationFolderEdit = new QLineEdit(InitialDestinationFolder, this);
     DestinationFolderEdit->setPlaceholderText(tr("Models"));
-    DestinationLayout->addRow(tr("Destination folder"), DestinationFolderEdit);
+    DestinationLayout->addRow(tr("Папка назначения"), DestinationFolderEdit);
     Layout->addLayout(DestinationLayout);
 
-    FilesTable = new QTableWidget(SourceFiles.size(), 2, this);
-    FilesTable->setHorizontalHeaderLabels({tr("Source"), tr("Asset file name")});
+    FilesTable = new QTableWidget(SourceFiles.size(), 3, this);
+    FilesTable->setObjectName("AssetImportFiles");
+    FilesTable->setHorizontalHeaderLabels({tr("Источник"), tr("Имя файла"), tr("Вложенная папка")});
     FilesTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
     FilesTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
     FilesTable->verticalHeader()->hide();
@@ -59,16 +63,19 @@ AssetImportDialog::AssetImportDialog(
             bHasFbxSource = true;
         }
         FilesTable->setItem(SourceIndex, 1, new QTableWidgetItem(DestinationName));
+        auto* FolderItem = new QTableWidgetItem(SourceFolders.value(SourceIndex));
+        FolderItem->setFlags(FolderItem->flags() & ~Qt::ItemIsEditable);
+        FilesTable->setItem(SourceIndex, 2, FolderItem);
     }
     Layout->addWidget(FilesTable, 1);
 
-    GenerateMissingNormalsCheck = new EditorUi::StudioCheckBox(tr("Generate missing normals for FBX meshes"), this);
+    GenerateMissingNormalsCheck = new EditorUi::StudioCheckBox(tr("Создать недостающие нормали моделей FBX"), this);
     GenerateMissingNormalsCheck->setChecked(true);
     GenerateMissingNormalsCheck->setVisible(bHasFbxSource);
     Layout->addWidget(GenerateMissingNormalsCheck);
 
     auto* FormatInformation = new QLabel(
-        tr("Supported: self-contained GLB, static FBX, PNG and JPEG. FBX is converted to GLB."),
+        tr("GLB без внешних файлов, статический FBX, PNG и JPEG · до 100 МБ на файл. FBX преобразуется в GLB. Пропущено неподдерживаемых файлов: %1.").arg(SkippedFiles),
         this);
     FormatInformation->setWordWrap(true);
     Layout->addWidget(FormatInformation);
@@ -76,7 +83,8 @@ AssetImportDialog::AssetImportDialog(
     auto* Buttons = new QDialogButtonBox(
         QDialogButtonBox::Ok | QDialogButtonBox::Cancel,
         this);
-    Buttons->button(QDialogButtonBox::Ok)->setText(tr("Import"));
+    Buttons->button(QDialogButtonBox::Ok)->setText(tr("Импортировать"));
+    Buttons->button(QDialogButtonBox::Cancel)->setText(tr("Отмена"));
     connect(Buttons, &QDialogButtonBox::accepted, this, &AssetImportDialog::accept);
     connect(Buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
     Layout->addWidget(Buttons);
@@ -103,6 +111,21 @@ QString AssetImportDialog::GetDestinationFileName(int Index) const
     return Item != nullptr ? Item->text().trimmed() : QString{};
 }
 
+QString AssetImportDialog::GetDestinationRelativePath(int Index) const
+{
+    QStringList Parts;
+    if (!GetDestinationFolder().isEmpty())
+    {
+        Parts.append(GetDestinationFolder());
+    }
+    if (!SourceFolders.value(Index).isEmpty())
+    {
+        Parts.append(SourceFolders[Index]);
+    }
+    Parts.append(GetDestinationFileName(Index));
+    return Parts.join('/');
+}
+
 bool AssetImportDialog::GetGenerateMissingNormals() const
 {
     return GenerateMissingNormalsCheck->isChecked();
@@ -111,7 +134,7 @@ bool AssetImportDialog::GetGenerateMissingNormals() const
 void AssetImportDialog::accept()
 {
     const QString Folder = GetDestinationFolder();
-    if (Folder == ".." || Folder.startsWith("../") || Folder.contains("/../"))
+    if (Folder.split('/').contains("..") || Folder.contains(':'))
     {
         QMessageBox::warning(this, tr("Invalid Destination"), tr("Destination must stay inside Game Content."));
         return;

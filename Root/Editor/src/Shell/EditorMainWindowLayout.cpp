@@ -1,4 +1,5 @@
 #include "UI/Views/StudioControls.h"
+#include "UI/Views/WidgetWorkspaceView.h"
 #include "UI/Views/ObjectInspectorView.h"
 #include "Shell/EditorMainWindow.h"
 
@@ -9,6 +10,7 @@
 #include "Panels/ContentBrowserWidget.h"
 #include "Shell/EditorTheme.h"
 #include "UI/Adapters/WorkspaceLayoutAdapter.h"
+#include "UI/Adapters/WorkspaceDockController.h"
 #include "UI/Views/WorkspaceView.h"
 #include "UI/Views/HierarchyPanelView.h"
 #include "UI/Views/StudioHeaderView.h"
@@ -166,26 +168,29 @@ void EditorMainWindow::BuildMenus()
     QMenu* WindowMenu = menuBar()->addMenu(QString::fromUtf8("\xD0\x9E\xD0\xBA\xD0\xBD\xD0\xBE"));
     WindowMenu->setObjectName("WindowsMenu");
     WindowMenu->setTitle(tr("Окна"));
-    WindowMenu->addAction(QString::fromUtf8("\xD0\x92\xD0\xBE\xD1\x81\xD1\x81\xD1\x82\xD0\xB0\xD0\xBD\xD0\xBE\xD0\xB2\xD0\xB8\xD1\x82\xD1\x8C \xD1\x80\xD0\xB0\xD1\x81\xD0\xBA\xD0\xBB\xD0\xB0\xD0\xB4\xD0\xBA\xD1\x83"), this, [this]()
+    auto* RestoreLayout = WindowMenu->addAction(tr("Восстановить раскладку"), this, [this]()
     {
         if (LayoutCombo != nullptr)
         {
+            const QSignalBlocker Blocker(LayoutCombo);
             LayoutCombo->setCurrentIndex(0);
         }
         if (WorkspaceSplitter != nullptr && CenterSplitter != nullptr)
         {
-            for (int Index = 0; Index < WorkspaceSplitter->count(); ++Index)
+            for (auto* Button : findChildren<QPushButton*>())
             {
-                QWidget* Panel = WorkspaceSplitter->widget(Index);
-                if (auto* Visibility = findChild<QAction*>(Panel->objectName() + "Visibility"))
+                if (Button->property("workspaceExpand").toBool())
                 {
-                    Visibility->setChecked(true);
+                    const QSignalBlocker Blocker(Button);
+                    Button->setChecked(false);
                 }
-                Panel->show();
             }
+            Docking->Reset();
             EditorUi::WorkspaceLayoutAdapter::Reset(*WorkspaceSplitter, *CenterSplitter, height());
+            Docking->Save();
         }
     });
+    RestoreLayout->setObjectName("RestoreWorkspaceLayout");
 
     ProjectTitleLabel = new QLabel(this);
 }
@@ -220,8 +225,6 @@ void EditorMainWindow::BuildToolbar()
     connect(Header->Home, &QPushButton::clicked, this, &EditorMainWindow::OnNewProject);
     connect(LayoutCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, &EditorMainWindow::OnLayoutModeChanged);
 }
-
-#include "UI/Adapters/WorkspaceDockController.h"
 
 void EditorMainWindow::BuildUi()
 {
@@ -331,6 +334,7 @@ void EditorMainWindow::BuildUi()
     TabsLayout->addStretch();
     auto* MaximizeViewport = new QPushButton(EditorUi::MakeStudioIcon(EditorUi::StudioIcon::Expand), {}, ViewportTabs);
     MaximizeViewport->setProperty("uiRole", "chromeButton");
+    MaximizeViewport->setProperty("workspaceExpand", true);
     MaximizeViewport->setToolTip(tr("Развернуть / восстановить локацию"));
     MaximizeViewport->setCheckable(true);
     connect(MaximizeViewport, &QPushButton::toggled, this, [this](bool bMaximized)
@@ -583,6 +587,7 @@ void EditorMainWindow::BuildUi()
         ControlLayout->setSpacing(0);
         auto* Expand = new QPushButton(EditorUi::MakeStudioIcon(EditorUi::StudioIcon::Expand), {}, Controls);
         Expand->setProperty("uiRole", "chromeButton");
+        Expand->setProperty("workspaceExpand", true);
         Expand->setToolTip(tr("Развернуть / восстановить панель"));
         Expand->setCheckable(true);
         ControlLayout->addWidget(Expand);
@@ -613,6 +618,7 @@ void EditorMainWindow::BuildUi()
     DockControlsLayout->setContentsMargins(0, 0, 8, 0);
     auto* ExpandGraph = new QPushButton(EditorUi::MakeStudioIcon(EditorUi::StudioIcon::Expand), {}, DockControls);
     ExpandGraph->setProperty("uiRole", "chromeButton");
+    ExpandGraph->setProperty("workspaceExpand", true);
     ExpandGraph->setToolTip(tr("Развернуть / восстановить поток истории"));
     ExpandGraph->setCheckable(true);
     DockControlsLayout->addWidget(ExpandGraph);
@@ -755,6 +761,8 @@ void EditorMainWindow::PopulateDockPages()
     StoryGraph = new EditorUi::StoryWorkspaceView(DockTabs);
     DockTabs->addTab(StoryGraph, tr("Поток истории"));
     InitializeStoryAuthoring();
+    InitializeWidgetAuthoring();
+    BuildAudioEnvironmentDockPage();
 
     ContentBrowser = new ContentBrowserWidget(DockTabs);
     ContentBrowser->SetEngine(&BoundEngine);
@@ -766,37 +774,40 @@ void EditorMainWindow::PopulateDockPages()
         UpdateStatus();
     });
     connect(ContentBrowser, &ContentBrowserWidget::AssetActivated, this, &EditorMainWindow::OnAssetActivated);
-    DockTabs->addTab(ContentBrowser, tr("Content"));
+    DockTabs->addTab(ContentBrowser, tr("Проводник"));
     BuildStoryDockPage();
     BuildRenderStatisticsDockPage();
     BuildPostprocessDockPage();
 
     auto* WindowMenu = findChild<QMenu*>("WindowsMenu");
     WindowMenu->addSeparator();
-    const QStringList PageIds = {"story", "content", "playback", "statistics", "postprocess"};
+    const QStringList PageIds = {"story", "widgets", "active", "content", "playback", "statistics", "postprocess"};
     for (int Index = 0; Index < DockTabs->count(); ++Index)
     {
         QWidget* Page = DockTabs->widget(Index);
         // QStackedLayout otherwise includes every hidden page's minimum width.
-        // A wide Content filter row must not squeeze the shell's side rails.
+        // Hidden dock pages must not squeeze the shell's side rails.
         Page->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
         QAction* Action = new QAction(DockTabs->tabText(Index), Page);
         Action->setObjectName("WorkspaceVisibility");
         WindowMenu->addAction(Action);
+        if (Page==WidgetWorkspace || Page==StoryGraph)
+        {
+            connect(Action,&QAction::triggered,this,[this,Page](bool Open)
+            {
+                if (!Open) return;
+                bWidgetEditingContext=Page==WidgetWorkspace;
+                bStoryEditingContext=Page==StoryGraph;
+            });
+        }
         Action->setCheckable(true);
-        Action->setChecked(Index == 0);
-        DockTabs->setTabVisible(Index, Index == 0);
+        const bool InitiallyVisible = Index <= 1 || Page == ContentBrowser;
+        Action->setChecked(InitiallyVisible);
+        DockTabs->setTabVisible(Index, InitiallyVisible);
         Docking->AddPage(PageIds.value(Index), *Page, "workspace", *Action);
     }
     DockTabs->setTabsClosable(true);
     DockTabs->setCurrentWidget(StoryGraph);
-    WindowMenu->addSeparator();
-    WindowMenu->addAction(tr("Сбросить расположение окон"), this, [this]()
-    {
-        Docking->Reset();
-        EditorUi::WorkspaceLayoutAdapter::Reset(*WorkspaceSplitter, *CenterSplitter, height());
-        Docking->Save();
-    });
 }
 
 void EditorMainWindow::OnLayoutModeChanged(int Index)

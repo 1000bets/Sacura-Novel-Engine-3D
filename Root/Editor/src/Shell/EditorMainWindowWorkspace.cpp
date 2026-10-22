@@ -1,4 +1,5 @@
 #include "Shell/EditorMainWindow.h"
+#include "UI/Views/WidgetWorkspaceView.h"
 #include "UI/Adapters/StoryGraphController.h"
 
 #include "Actions/BuiltinEditorActions.h"
@@ -136,7 +137,7 @@ void EditorMainWindow::UpdateWindowTitleDirty()
     {
         Title = QString::fromUtf8("Sacura Novel Studio — %1").arg(QString::fromStdString(Descriptor->Name));
     }
-    if (Document.IsDirty() || (StoryAuthoring != nullptr && StoryAuthoring->GetDocument().IsDirty()))
+    if (Document.IsDirty() || (StoryAuthoring != nullptr && StoryAuthoring->GetDocument().IsDirty()) || (WidgetWorkspace && WidgetWorkspace->GetDocument().IsDirty()))
     {
         Title += " *";
     }
@@ -344,6 +345,7 @@ Scene* EditorMainWindow::GetHierarchyScene() const
 
 bool EditorMainWindow::PromptSaveIfDirty()
 {
+    if (WidgetWorkspace && !WidgetWorkspace->PromptSave()) return false;
     if (!PromptSaveStoryIfDirty())
     {
         return false;

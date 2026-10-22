@@ -16,6 +16,7 @@
 #include <QHash>
 #include <QPointer>
 #include <QString>
+#include <QJsonObject>
 
 #include <filesystem>
 #include <functional>
@@ -49,6 +50,8 @@ class QStackedWidget;
 namespace EditorUi
 {
 class StoryWorkspaceView;
+class AudioEnvironmentView;
+class WidgetWorkspaceView;
 class StoryInspectorView;
 class HierarchyPanelView;
 class StoryGraphController;
@@ -120,7 +123,11 @@ private:
     void PopulateDockPages();
     void RegisterBuiltInAssetEditors();
     void BuildStoryDockPage();
+    void BuildAudioEnvironmentDockPage();
+    void RefreshAudioEnvironment();
     void InitializeStoryAuthoring();
+    void InitializeWidgetAuthoring();
+    bool IsWidgetEditingContext() const;
     void RefreshStoryTargets();
     bool OpenStoryAsset(const AssetKey& Asset);
     void OpenStoryFromDialog();
@@ -209,9 +216,13 @@ private:
     QWidget* ObjectInspectorContent = nullptr;
     QWidget* EmptyInspectorPage = nullptr;
     EditorUi::StoryWorkspaceView* StoryGraph = nullptr;
+    EditorUi::AudioEnvironmentView* AudioEnvironment = nullptr;
     EditorUi::StoryInspectorView* StoryInspector = nullptr;
     std::unique_ptr<EditorUi::StoryGraphController> StoryAuthoring;
     bool bStoryEditingContext = false;
+    bool bWidgetEditingContext = false;
+    EditorUi::WidgetWorkspaceView* WidgetWorkspace = nullptr;
+    QJsonObject PendingWidgetPreview;
     QLineEdit* ObjectNameEdit = nullptr;
     QDoubleSpinBox* PositionXSpin = nullptr;
     QDoubleSpinBox* PositionYSpin = nullptr;

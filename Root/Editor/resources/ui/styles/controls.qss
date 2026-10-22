@@ -1,4 +1,28 @@
 /* EditorSelect.jsx, objectInspector.css, editorTheme.css. Logical CSS pixels. */
+/* Editor.jsx renderActive / editor.css active-table / editorHelp.css workspace-guide. */
+QWidget#AudioEnvironment, QWidget#AudioEnvironmentBody { background: @--bg-panel@; }
+QWidget#AudioEnvironmentGuide, QWidget[uiRole="audioTableHeader"], QWidget[uiRole="audioEventRow"] {
+    border-bottom: 1px solid @--border-subtle@;
+}
+QLabel[uiRole="audioTitle"] { font-size: 17px; font-weight: 600; color: @--text-primary@; }
+QLabel[uiRole="audioDescription"], QLabel[uiRole="audioFooter"] { font-size: 12px; color: @--text-muted@; }
+QLabel[uiRole="audioFooter"] { padding: 15px 0; }
+QLabel[uiRole="audioHeader"], QLabel[uiRole="audioOrigin"] { font-size: 11px; color: @--text-muted@; }
+QLabel[uiRole="audioEventName"] { font-size: 13px; font-weight: 500; color: @--accent@; }
+QLabel[uiRole="audioScope"] { font-size: 12px; color: @--accent@; }
+QLabel[uiRole="audioStatus"] { font-size: 12px; color: @--text-secondary@; }
+QPushButton[uiRole="audioShortcut"] {
+    padding: 8px 12px; min-height: 18px; font-size: 12px;
+    background: @--border-subtle@; border: 1px solid transparent; border-radius: 4px;
+}
+QPushButton[uiRole="audioShortcut"]:hover { background: @--bg-hover@; }
+QPushButton[uiRole="audioShortcut"]:disabled { color: @--text-disabled@; }
+QPushButton[uiRole="audioControl"] {
+    padding: 5px; min-width: 16px; max-width: 16px; min-height: 16px; max-height: 16px;
+    border: 1px solid @--border-subtle@; border-radius: 4px; background: transparent;
+}
+QPushButton[uiRole="audioControl"]:hover { background: @--bg-hover@; }
+QPushButton[uiRole="audioControl"]:focus { border-color: @--accent@; }
 QWidget#HierarchyPanelContent { background: @--bg-panel@; }
 QComboBox[uiRole="studioSelect"] { padding-right: 24px; }
 QComboBox[uiRole="studioSelect"]:focus, QComboBox[uiRole="studioSelect"][popupOpen="true"],

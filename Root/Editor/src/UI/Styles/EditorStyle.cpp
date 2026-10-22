@@ -56,6 +56,15 @@ QString EditorStyle::LoadStylesheet(const QString& Theme)
         return {};
     }
     Result += QLatin1Char('\n') + QString::fromUtf8(Controls.readAll());
+    QFile Explorer(QStringLiteral(":/ui/styles/explorer.qss"));
+    if (!Explorer.open(QIODevice::ReadOnly))
+    {
+        qWarning("EditorStyle: embedded explorer stylesheet is missing");
+        return {};
+    }
+    Result += QLatin1Char('\n') + QString::fromUtf8(Explorer.readAll());
+    QFile Widgets(QStringLiteral(":/ui/styles/widgets.qss"));
+    if (Widgets.open(QIODevice::ReadOnly)) Result += QLatin1Char('\n') + QString::fromUtf8(Widgets.readAll());
     const QJsonObject Tokens = QJsonDocument::fromJson(Palette.readAll()).object();
     for (auto Iterator = Tokens.begin(); Iterator != Tokens.end(); ++Iterator)
     {

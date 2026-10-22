@@ -291,6 +291,13 @@ target_include_directories(SakuraEngineThirdParty INTERFACE
 )
 
 function(sakura_copy_engine_runtime_dlls TargetName)
+    if(MSVC)
+        # Qt, JSON and the asset registry exchange UTF-8 paths. Keep narrow
+        # filesystem/CRT calls in the same encoding on Windows 10 1903+.
+        # This is process-local; never change the user's system code page.
+        target_sources(${TargetName} PRIVATE
+            "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../resources/WindowsUtf8.manifest")
+    endif()
     sakura_deploy_qt_runtime(${TargetName})
     if(COMMAND copy_required_dlls)
         # Recent Windows SDKs ship the DXIL signer in Redist/D3D rather

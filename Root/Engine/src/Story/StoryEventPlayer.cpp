@@ -131,6 +131,7 @@ struct StoryEventPlayer::Implementation
     struct Instance
     {
         StoryEventDefinition Definition;
+        StoryEventSnapshot Snapshot;
         std::unique_ptr<Authoring::Runtime> Executor;
         size_t Group = 0;
         std::vector<uint64_t> Runs;
@@ -138,7 +139,11 @@ struct StoryEventPlayer::Implementation
         bool bComplete = false;
     };
     ObjectHandle World;
+    uint64_t* NextInstanceId = nullptr;
+    StoryNodeId NodeId;
+    StoryEventPhase Phase = StoryEventPhase::OnStart;
     std::vector<std::shared_ptr<Instance>> Instances, Waiting;
+    std::vector<StoryEventSnapshot> History;
     std::vector<StoryEventBatch> Batches;
     StoryDocument Definitions;
     size_t Batch = 0, Binding = 0;
@@ -151,6 +156,7 @@ struct StoryEventPlayer::Implementation
         if (Event.Group == Event.Definition.Groups.size())
         {
             Event.bComplete = true;
+            Event.Snapshot.State = StoryEventPlaybackState::Completed;
             return;
         }
         for (const auto& Action : Event.Definition.Groups[Event.Group].Actions)
@@ -179,6 +185,22 @@ struct StoryEventPlayer::Implementation
         }
         auto Event = std::make_shared<Instance>();
         Event->Definition = ResolveStoryEvent(*Definition, Placement);
+        Event->Snapshot.InstanceId = (*NextInstanceId)++;
+        Event->Snapshot.Name = Event->Definition.Name;
+        Event->Snapshot.NodeId = NodeId;
+        Event->Snapshot.Phase = Phase;
+        for (const auto& Group : Event->Definition.Groups)
+        {
+            for (const auto& Action : Group.Actions)
+            {
+                // Navigation moves independently in the world tick. It can be
+                // cancelled, but suspending its executor alone would not pause it.
+                if (Action.Kind == StoryActionKind::NavigateTo)
+                {
+                    Event->Snapshot.bCanPause = false;
+                }
+            }
+        }
         Event->Executor = std::make_unique<Authoring::Runtime>(Operations(), World);
         const auto Started = Event->Executor->Start();
         if (!Started.bOk)
@@ -246,15 +268,19 @@ struct StoryEventPlayer::Implementation
     std::vector<std::shared_ptr<Instance>> StartedWaiting;
 };
 
-StoryEventPlayer::StoryEventPlayer(ObjectHandle World) : State(std::make_unique<Implementation>())
+StoryEventPlayer::StoryEventPlayer(ObjectHandle World, uint64_t& NextInstanceId)
+    : State(std::make_unique<Implementation>())
 {
     State->World = World;
+    State->NextInstanceId = &NextInstanceId;
 }
 StoryEventPlayer::~StoryEventPlayer() = default;
 
 void StoryEventPlayer::BeginPhase(const StoryDocument& Document, const StoryNode& Node, StoryEventPhase Phase)
 {
     State->Definitions.Events = Document.Events;
+    State->NodeId = Node.Id;
+    State->Phase = Phase;
     State->Batches.clear();
     for (const auto& Batch : Node.EventBatches)
     {
@@ -274,7 +300,7 @@ void StoryEventPlayer::Tick(float DeltaSeconds)
 {
     for (auto& Event : State->Instances)
     {
-        if (Event->bComplete)
+        if (Event->bComplete || Event->Snapshot.State == StoryEventPlaybackState::Paused)
         {
             continue;
         }
@@ -309,13 +335,25 @@ void StoryEventPlayer::Tick(float DeltaSeconds)
         }
     }
     auto& Started = State->StartedWaiting;
-    Started.erase(std::remove_if(Started.begin(), Started.end(), [](const auto& Event) { return Event->bStarted; }),
+    Started.erase(std::remove_if(Started.begin(), Started.end(), [](const auto& Event)
+                                { return Event->bStarted || Event->bComplete; }),
                   Started.end());
     if (Started.empty())
     {
         State->Pump();
     }
     auto& Instances = State->Instances;
+    for (const auto& Event : Instances)
+    {
+        if (Event->bComplete)
+        {
+            State->History.push_back(Event->Snapshot);
+        }
+    }
+    if (State->History.size() > 64)
+    {
+        State->History.erase(State->History.begin(), State->History.end() - 64);
+    }
     Instances.erase(
         std::remove_if(Instances.begin(), Instances.end(), [](const auto& Event) { return Event->bComplete; }),
         Instances.end());
@@ -327,4 +365,43 @@ bool StoryEventPlayer::IsReady() const
 const std::string& StoryEventPlayer::GetError() const
 {
     return State->Error;
+}
+
+std::vector<StoryEventSnapshot> StoryEventPlayer::GetSnapshots() const
+{
+    auto Result = State->History;
+    for (const auto& Event : State->Instances)
+    {
+        Result.push_back(Event->Snapshot);
+    }
+    return Result;
+}
+
+bool StoryEventPlayer::SetPaused(uint64_t InstanceId, bool bPaused)
+{
+    for (auto& Event : State->Instances)
+    {
+        if (Event->Snapshot.InstanceId == InstanceId && !Event->bComplete && Event->Snapshot.bCanPause)
+        {
+            Event->Snapshot.State = bPaused ? StoryEventPlaybackState::Paused : StoryEventPlaybackState::Running;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool StoryEventPlayer::Stop(uint64_t InstanceId)
+{
+    for (auto& Event : State->Instances)
+    {
+        if (Event->Snapshot.InstanceId == InstanceId && !Event->bComplete)
+        {
+            Event->Executor->Stop();
+            Event->bComplete = true;
+            Event->Snapshot.State = StoryEventPlaybackState::Cancelled;
+            // Release phase gates on the next world tick, including paused Step.
+            return true;
+        }
+    }
+    return false;
 }

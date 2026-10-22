@@ -10,6 +10,7 @@ AssetRegistry::AssetRegistry()
 {
     RegisterAssetType({SceneAssetType, "Scene", {".scene"}, true});
     RegisterAssetType({StoryAssetType, "Story", {".story"}, true});
+    RegisterAssetType({AssetType{"WidgetLibrary"}, "UI Widgets", {".widgets"}, true});
     RegisterAssetType({ModelAssetType, "Model", {".glb"}, false});
     RegisterAssetType({TextureAssetType, "Texture", {".png", ".jpg", ".jpeg"}, true});
     RegisterAssetType({MaterialAssetType, "Material", {".material"}, true});

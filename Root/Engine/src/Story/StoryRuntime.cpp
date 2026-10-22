@@ -162,6 +162,24 @@ bool StoryRuntime::IsFinished() const
     return Phase == StoryPlaybackPhase::End;
 }
 
+std::vector<StoryEventSnapshot> StoryRuntime::GetEventSnapshots() const
+{
+    AssertGameThread();
+    return Events ? Events->GetSnapshots() : std::vector<StoryEventSnapshot>{};
+}
+
+bool StoryRuntime::SetEventPaused(uint64_t InstanceId, bool bPaused)
+{
+    AssertGameThread();
+    return Events && Events->SetPaused(InstanceId, bPaused);
+}
+
+bool StoryRuntime::StopEvent(uint64_t InstanceId)
+{
+    AssertGameThread();
+    return Events && Events->Stop(InstanceId);
+}
+
 bool StoryRuntime::CanAdvanceDialogue() const
 {
     return Phase == StoryPlaybackPhase::Line && !bActionSequenceRunning &&
@@ -302,7 +320,10 @@ void StoryRuntime::EnterNode(const StoryNodeId& NodeId)
 
     if (Node->Kind == StoryNodeKind::Line || Node->Kind == StoryNodeKind::Choice)
     {
-        if (!Events && !Node->EventBatches.empty()) { Events = std::make_unique<StoryEventPlayer>(BoundScene); }
+        if (!Events && !Node->EventBatches.empty())
+        {
+            Events = std::make_unique<StoryEventPlayer>(BoundScene, NextEventInstanceId);
+        }
         if (Events)
         {
             StagingPhase = 1;

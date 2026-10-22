@@ -221,6 +221,8 @@ add_library(Engine STATIC ${ENGINE_SRC} ${ENGINE_HDR}
     src/UI/MaterialWidget.cpp
     inc/UI/StoryWidget.h
     src/UI/StoryWidget.cpp
+    src/UI/WidgetLayout.cpp
+    src/UI/WidgetSurface.cpp
 )
 set_target_properties(Engine PROPERTIES AUTOMOC ON)
 

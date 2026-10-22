@@ -1,4 +1,5 @@
 #include "Shell/EditorMainWindow.h"
+#include "UI/Views/WidgetWorkspaceView.h"
 #include "UI/Adapters/StoryGraphController.h"
 
 #include "Actions/BuiltinEditorActions.h"
@@ -114,6 +115,7 @@ bool EditorMainWindow::ExecuteCommand(std::unique_ptr<EditorCommand> Command)
 
 void EditorMainWindow::OnUndo()
 {
+    if (IsWidgetEditingContext()) { WidgetWorkspace->Undo(); return; }
     if (BoundEngine.GetPlaySession().IsSimulating())
     {
         return;
@@ -147,6 +149,7 @@ void EditorMainWindow::OnUndo()
 
 void EditorMainWindow::OnRedo()
 {
+    if (IsWidgetEditingContext()) { WidgetWorkspace->Redo(); return; }
     if (BoundEngine.GetPlaySession().IsSimulating())
     {
         return;
@@ -274,6 +277,11 @@ void EditorMainWindow::OnCreateEmptyObject()
 
 void EditorMainWindow::OnDeleteSelectedObject()
 {
+    if (IsWidgetEditingContext())
+    {
+        if (!IsTextClipboardWidget(QApplication::focusWidget())) WidgetWorkspace->DeleteSelection();
+        return;
+    }
     if (BoundEngine.GetPlaySession().IsSimulating())
     {
         return;

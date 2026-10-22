@@ -88,10 +88,13 @@
 #include <memory>
 
 #include "Shell/EditorMainWindowSupport.h"
+#include "UI/Views/WidgetWorkspaceView.h"
+#include "UI/WidgetLayout.h"
 #include "Panels/HierarchyTreeWidget.h"
 
 void EditorMainWindow::OnPlayToggled(bool bChecked)
 {
+    if (WidgetWorkspace) WidgetWorkspace->SetLocked(bChecked);
     if (ScrubbingTransformField)
     {
         ScrubbingTransformField->FinishScrub();
@@ -112,6 +115,7 @@ void EditorMainWindow::OnPlayToggled(bool bChecked)
                 LocationTab->setChecked(true);
                 GameTab->setChecked(false);
                 bPlayRequested = false;
+                if (WidgetWorkspace) WidgetWorkspace->SetLocked(false);
                 statusBar()->showMessage(QString::fromStdString(Error), 12000);
                 return;
             }
@@ -135,6 +139,7 @@ void EditorMainWindow::OnPlayToggled(bool bChecked)
             {
                 StoryAuthoring->SetLocked(false);
             }
+            if (WidgetWorkspace) WidgetWorkspace->SetLocked(false);
             statusBar()->showMessage(QString::fromUtf8("Play failed вЂ” check log"), 2500);
             UpdateStatus();
             return;
@@ -151,6 +156,7 @@ void EditorMainWindow::OnPlayToggled(bool bChecked)
                 LocationTab->setChecked(true);
                 GameTab->setChecked(false);
                 StoryAuthoring->SetLocked(false);
+                if (WidgetWorkspace) WidgetWorkspace->SetLocked(false);
                 statusBar()->showMessage(StoryError, 12000);
                 return;
             }
@@ -238,18 +244,28 @@ void EditorMainWindow::OnStepClicked()
 
 void EditorMainWindow::StartStoryPlayback()
 {
+    if (WidgetWorkspace && WidgetWorkspace->GetDocument().IsOpen())
+    {
+        auto Layout = PendingWidgetPreview.isEmpty() ? WidgetLayout::Resolve(WidgetWorkspace->GetDocument().GetData(),"dialogue") : PendingWidgetPreview;
+        GameDialogue->SetWidgetLayout(Layout);
+        StoryPanel->SetWidgetLayout(Layout);
+        PendingWidgetPreview = {};
+    }
     RefreshStoryPlaybackUi();
 }
 
 void EditorMainWindow::StopStoryPlayback()
 {
+    PendingWidgetPreview = {};
     StoryPlayback.Stop();
 }
 
 void EditorMainWindow::RefreshStoryPlaybackUi()
 {
+    if (WidgetWorkspace) WidgetWorkspace->SetLocked(bPlaying || bPlayRequested);
     const bool bAllowInput = bPlaying && !bPaused;
     StoryPanel->Refresh(bAllowInput);
     GameDialogue->Refresh(bAllowInput);
+    RefreshAudioEnvironment();
 }
 

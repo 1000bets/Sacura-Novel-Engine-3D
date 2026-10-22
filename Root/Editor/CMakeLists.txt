@@ -10,6 +10,16 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
 set(EDITOR_SRC
+    src/UI/Adapters/AudioEnvironmentAdapter.cpp
+    src/UI/Views/AudioEnvironmentView.cpp
+    src/Shell/EditorMainWindowAudioEnvironment.cpp
+    src/UI/Adapters/AssetImportSources.cpp
+    src/UI/Views/AssetExplorerView.cpp
+    src/UI/Styles/AssetExplorerStyle.cpp
+    src/Shell/EditorMainWindowWidgets.cpp
+    src/UI/Views/WidgetWorkspaceView.cpp
+    src/UI/Views/WidgetCanvasView.cpp
+    src/UI/Styles/WidgetCanvasStyle.cpp
     src/UI/Adapters/WorkspaceDockController.cpp
     src/UI/Styles/ActionMenuStyle.cpp
     src/UI/Views/StudioActionMenu.cpp
@@ -65,6 +75,12 @@ set(EDITOR_SRC
 )
 
 set(EDITOR_HDR
+    inc/UI/Presentation/AudioEnvironmentModel.h
+    inc/UI/Adapters/AudioEnvironmentAdapter.h
+    inc/UI/Views/AudioEnvironmentView.h
+    inc/UI/Adapters/AssetImportSources.h
+    inc/UI/Views/AssetExplorerView.h
+    inc/UI/Styles/AssetExplorerStyle.h
     inc/UI/Adapters/WorkspaceDockController.h
     inc/UI/Presentation/StorySpeakerLabel.h
     inc/UI/Styles/ActionMenuStyle.h

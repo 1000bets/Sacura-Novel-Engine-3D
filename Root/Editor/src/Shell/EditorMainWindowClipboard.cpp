@@ -273,6 +273,7 @@ void EditorMainWindow::OnCopy()
     {
         return;
     }
+    if (IsWidgetEditingContext()) return;
     QWidget* FocusedWidget = QApplication::focusWidget();
     if (ContentBrowser != nullptr
         && FocusedWidget != nullptr
@@ -290,6 +291,7 @@ void EditorMainWindow::OnPaste()
     {
         return;
     }
+    if (IsWidgetEditingContext()) return;
     QWidget* FocusedWidget = QApplication::focusWidget();
     if (ContentBrowser != nullptr
         && FocusedWidget != nullptr

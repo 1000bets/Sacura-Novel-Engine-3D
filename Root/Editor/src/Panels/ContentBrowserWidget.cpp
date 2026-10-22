@@ -1,5 +1,8 @@
 #include "Panels/ContentBrowserWidget.h"
 #include "UI/Styles/StudioIcons.h"
+#include "UI/Adapters/AssetImportSources.h"
+#include "UI/Styles/AssetExplorerStyle.h"
+#include "UI/Views/AssetExplorerView.h"
 
 #include "Panels/AssetImportDialog.h"
 #include "Assets/MaterialAssetCreation.h"
@@ -12,8 +15,10 @@
 #include "Engine.h"
 
 #include <QAction>
-#include <QAbstractButton>
-#include <QButtonGroup>
+#include <QActionGroup>
+#include <QLabel>
+#include <QSignalBlocker>
+#include <QTreeWidgetItemIterator>
 #include <QClipboard>
 #include <QDrag>
 #include <QEvent>
@@ -53,13 +58,6 @@ constexpr int ItemKindRole = Qt::UserRole + 5;
 constexpr int FolderItemKind = 1;
 constexpr int AssetItemKind = 2;
 
-bool IsSupportedImportFile(const QString& Path)
-{
-    const QString Extension = QFileInfo(Path).suffix().toLower();
-    return Extension == "glb" || Extension == "fbx"
-        || Extension == "png" || Extension == "jpg" || Extension == "jpeg";
-}
-
 bool TryBuildAssetPayload(QListWidgetItem* Item, EditorAssetPayload& OutPayload)
 {
     if (Item == nullptr || Item->data(AssetIdRole).toString().isEmpty())
@@ -95,6 +93,7 @@ public:
 
     std::function<void(const QStringList&)> ExternalFilesDropped;
     std::function<void(const EditorAssetPayload&, const QString&)> AssetMoveRequested;
+    bool bWritable = false;
 
 protected:
     void startDrag(Qt::DropActions) override
@@ -122,9 +121,14 @@ protected:
         }
         if (Event->mimeData()->hasUrls())
         {
+            if (!bWritable)
+            {
+                Event->ignore();
+                return;
+            }
             for (const QUrl& Url : Event->mimeData()->urls())
             {
-                if (Url.isLocalFile() && IsSupportedImportFile(Url.toLocalFile()))
+                if (Url.isLocalFile() && (QFileInfo(Url.toLocalFile()).isDir() || EditorUi::IsSupportedAssetImport(Url.toLocalFile())))
                 {
                     Event->acceptProposedAction();
                     return;
@@ -144,6 +148,11 @@ protected:
         }
         if (Event->mimeData()->hasUrls())
         {
+            if (!bWritable)
+            {
+                Event->ignore();
+                return;
+            }
             Event->acceptProposedAction();
             return;
         }
@@ -176,10 +185,15 @@ protected:
         }
 
         QStringList SourceFiles;
+        if (!bWritable)
+        {
+            Event->ignore();
+            return;
+        }
         for (const QUrl& Url : Event->mimeData()->urls())
         {
             const QString LocalFile = Url.toLocalFile();
-            if (!LocalFile.isEmpty() && IsSupportedImportFile(LocalFile))
+            if (!LocalFile.isEmpty() && (QFileInfo(LocalFile).isDir() || EditorUi::IsSupportedAssetImport(LocalFile)))
             {
                 SourceFiles.push_back(LocalFile);
             }
@@ -253,12 +267,12 @@ QIcon MakeAssetIcon(AssetType Type)
         : Type == SceneAssetType ? "Layers"
         : Type == StoryAssetType ? "MessageSquare"
         : Type == ShaderSourceAssetType ? "Code2" : "File";
-    return EditorUi::MakeFrontendIcon(QString::fromLatin1(Name), "--text-secondary");
+    return EditorUi::MakeFrontendIcon(QString::fromLatin1(Name), "--accent");
 }
 
 QIcon MakeFolderIcon()
 {
-    return EditorUi::MakeFrontendIcon(QStringLiteral("FolderOpen"), "--text-secondary");
+    return EditorUi::MakeFrontendIcon(QStringLiteral("Folder"), "--accent");
 }
 
 ContentBrowserWidget::ContentBrowserWidget(QWidget* Parent)
@@ -269,43 +283,47 @@ ContentBrowserWidget::ContentBrowserWidget(QWidget* Parent)
     Layout->setContentsMargins(0, 0, 0, 0);
     Layout->setSpacing(0);
 
-    auto* Toolbar = new QWidget(this);
-    Toolbar->setObjectName("ContentBrowserToolbar");
-    auto* ToolbarLayout = new QHBoxLayout(Toolbar);
-    ToolbarLayout->setContentsMargins(8, 6, 8, 6);
-    ToolbarLayout->setSpacing(6);
-    TypeFilterLayout = new QHBoxLayout();
-    TypeFilterLayout->setContentsMargins(0, 0, 0, 0);
-    TypeFilterLayout->setSpacing(4);
-    TypeFilterGroup = new QButtonGroup(this);
-    TypeFilterGroup->setExclusive(true);
-    ToolbarLayout->addLayout(TypeFilterLayout, 1);
-    ImportButton = new QToolButton(Toolbar);
-    ImportButton->setObjectName("ContentBrowserImport");
-    ImportButton->setText(tr("Import"));
-    ImportButton->setToolTip(tr("Import assets into the current Game Content folder"));
-    ToolbarLayout->addWidget(ImportButton);
-    Search = new QLineEdit(this);
-    Search->setPlaceholderText(tr("Search Content"));
-    Search->setMaximumWidth(260);
-    ToolbarLayout->addWidget(Search);
-    Layout->addWidget(Toolbar);
+    Explorer = new EditorUi::AssetExplorerView(this);
+    Layout->addWidget(Explorer);
+    Search = Explorer->Search;
+    ImportButton = Explorer->ImportFiles;
+    TypeFilterMenu = new QMenu(this);
+    TypeFilterMenu->setObjectName("ContentBrowserTypeFilters");
+    FilterAction = Search->addAction(EditorUi::MakeFrontendIcon("ListFilter"), QLineEdit::TrailingPosition);
+    FilterAction->setToolTip(tr("Фильтр по типу ресурса"));
+    connect(FilterAction, &QAction::triggered, this, [this]()
+    {
+        TypeFilterMenu->popup(Search->mapToGlobal(QPoint(0, Search->height())));
+    });
     RebuildTypeFilters();
-
-    auto* BrowserSplitter = new QSplitter(Qt::Horizontal, this);
+    connect(Explorer, &EditorUi::AssetExplorerView::FolderRequested, this, &ContentBrowserWidget::SetCurrentFolder);
+    connect(Explorer->NewFolder, &QToolButton::clicked, this, &ContentBrowserWidget::CreateFolder);
+    connect(Explorer->ImportFolder, &QToolButton::clicked, this, &ContentBrowserWidget::SelectImportFolder);
+    auto* BrowserSplitter = Explorer->Body;
     auto* FolderTree = new FolderTreeWidget(BrowserSplitter);
     SourcesTree = FolderTree;
     SourcesTree->setObjectName("ContentBrowserSources");
-    SourcesTree->setHeaderLabel(tr("Sources"));
-    SourcesTree->setMinimumWidth(180);
+    SourcesTree->setHeaderHidden(true);
+    SourcesTree->setAccessibleName(tr("Папки проекта"));
+    SourcesTree->setMinimumWidth(130);
+    SourcesTree->setIndentation(14);
+    SourcesTree->setIconSize(QSize(16, 16));
+    SourcesTree->setUniformRowHeights(true);
     auto* AssetList = new AssetListWidget(BrowserSplitter);
     AssetView = AssetList;
     AssetView->setObjectName("ContentBrowserAssets");
     AssetView->setViewMode(QListView::IconMode);
     AssetView->setResizeMode(QListView::Adjust);
     AssetView->setMovement(QListView::Static);
-    AssetView->setIconSize(QSize(72, 72));
-    AssetView->setGridSize(QSize(120, 112));
+    AssetView->setIconSize(QSize(36, 36));
+    AssetView->setGridSize(QSize(132, 122));
+    AssetView->setItemDelegate(new EditorUi::AssetExplorerTileDelegate(AssetView));
+    AssetView->setMouseTracking(true);
+    AssetView->setAccessibleName(tr("Файлы и папки"));
+    Explorer->EmptyState->setParent(AssetView->viewport());
+    auto* EmptyLayout = new QVBoxLayout(AssetView->viewport());
+    EmptyLayout->setContentsMargins(16, 16, 16, 16);
+    EmptyLayout->addWidget(Explorer->EmptyState);
     AssetView->setWordWrap(true);
     AssetView->setDragEnabled(true);
     AssetView->setAcceptDrops(true);
@@ -339,18 +357,14 @@ ContentBrowserWidget::ContentBrowserWidget(QWidget* Parent)
     BrowserSplitter->addWidget(AssetView);
     BrowserSplitter->setStretchFactor(0, 0);
     BrowserSplitter->setStretchFactor(1, 1);
-    BrowserSplitter->setSizes({210, 800});
-    Layout->addWidget(BrowserSplitter, 1);
+    BrowserSplitter->setSizes({190, 800});
 
     connect(Search, &QLineEdit::textChanged, this, [this]()
     {
         RefreshAssetView();
     });
-    connect(TypeFilterGroup, &QButtonGroup::idClicked, this, [this](int)
-    {
-        RefreshAssetView();
-    });
-    connect(SourcesTree, &QTreeWidget::itemClicked, this, [this](QTreeWidgetItem* Item)
+    connect(AssetView, &QListWidget::itemSelectionChanged, this, &ContentBrowserWidget::UpdateDetails);
+    connect(SourcesTree, &QTreeWidget::currentItemChanged, this, [this](QTreeWidgetItem* Item)
     {
         if (Item != nullptr)
         {
@@ -377,21 +391,21 @@ ContentBrowserWidget::ContentBrowserWidget(QWidget* Parent)
     connect(AssetView, &QListWidget::customContextMenuRequested, this, &ContentBrowserWidget::ShowAssetContextMenu);
     connect(SourcesTree, &QTreeWidget::customContextMenuRequested, this, &ContentBrowserWidget::ShowSourcesContextMenu);
 
-    auto* RenameAction = new QAction(tr("Rename"), AssetView);
+    auto* RenameAction = new QAction(tr("Переименовать"), AssetView);
     RenameAction->setShortcut(QKeySequence(Qt::Key_F2));
     RenameAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
     AssetView->addAction(RenameAction);
     SourcesTree->addAction(RenameAction);
     connect(RenameAction, &QAction::triggered, this, &ContentBrowserWidget::RenameSelection);
 
-    auto* DeleteAction = new QAction(tr("Delete"), AssetView);
+    auto* DeleteAction = new QAction(tr("Удалить"), AssetView);
     DeleteAction->setShortcut(QKeySequence::Delete);
     DeleteAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
     AssetView->addAction(DeleteAction);
     SourcesTree->addAction(DeleteAction);
     connect(DeleteAction, &QAction::triggered, this, &ContentBrowserWidget::DeleteSelection);
 
-    auto* NewFolderAction = new QAction(tr("New Folder"), this);
+    auto* NewFolderAction = new QAction(tr("Новая папка"), this);
     NewFolderAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_N));
     NewFolderAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
     addAction(NewFolderAction);
@@ -424,10 +438,15 @@ void ContentBrowserWidget::SetProjectContext(ProjectSession* Session, SceneDocum
 void ContentBrowserWidget::Refresh()
 {
     CachedEntries.clear();
+    CachedFolders.clear();
     if (Registry == nullptr)
     {
         SourcesTree->clear();
         AssetView->clear();
+        static_cast<AssetListWidget*>(AssetView)->bWritable = false;
+        Explorer->SetFolder("/Game", false);
+        Explorer->SetEmptyState(true, false);
+        UpdateDetails();
         return;
     }
     CachedEntries = Registry->FindByDirectory("/Game");
@@ -443,16 +462,28 @@ void ContentBrowserWidget::Refresh()
 
 void ContentBrowserWidget::BuildSourcesTree(const std::vector<AssetRegistryEntry>& Entries)
 {
+    const QSignalBlocker Block(SourcesTree);
+    std::set<QString> Expanded;
+    const bool FirstBuild = SourcesTree->topLevelItemCount() == 0;
+    for (QTreeWidgetItemIterator It(SourcesTree); *It; ++It)
+    {
+        if ((*It)->isExpanded())
+        {
+            Expanded.insert((*It)->data(0, FolderPathRole).toString());
+        }
+    }
     SourcesTree->clear();
     std::map<QString, QTreeWidgetItem*> ItemsByPath;
     auto AddRoot = [&](const QString& Path, const QString& Name)
     {
         auto* Root = new QTreeWidgetItem(SourcesTree, {Name});
         Root->setData(0, FolderPathRole, Path);
+        Root->setIcon(0, EditorUi::MakeFrontendIcon("FolderOpen", "--text-secondary"));
+        Root->setToolTip(0, Path);
         ItemsByPath.emplace(Path, Root);
     };
-    AddRoot("/Game", tr("Game Content"));
-    AddRoot("/Engine", tr("Engine Content"));
+    AddRoot("/Game", "Assets");
+    AddRoot("/Engine", tr("Ресурсы движка"));
 
     std::set<QString> Folders;
     for (const AssetRegistryEntry& Entry : Entries)
@@ -465,6 +496,7 @@ void ContentBrowserWidget::BuildSourcesTree(const std::vector<AssetRegistryEntry
         }
     }
     CollectGameFoldersOnDisk(Folders);
+    CachedFolders = Folders;
     for (const QString& Folder : Folders)
     {
         const QString ParentPath = Folder.section('/', 0, -2);
@@ -479,93 +511,67 @@ void ContentBrowserWidget::BuildSourcesTree(const std::vector<AssetRegistryEntry
         }
         auto* Item = new QTreeWidgetItem(Parent->second, {Folder.section('/', -1)});
         Item->setData(0, FolderPathRole, Folder);
+        Item->setIcon(0, EditorUi::MakeFrontendIcon("Folder", "--text-secondary"));
+        Item->setToolTip(0, Folder);
         ItemsByPath.emplace(Folder, Item);
     }
-    SourcesTree->expandAll();
+    for (const auto& [Path, Item] : ItemsByPath)
+    {
+        Item->setExpanded(Expanded.count(Path) > 0 || (FirstBuild && Path == "/Game"));
+    }
+    if (ItemsByPath.find(CurrentFolder) == ItemsByPath.end())
+    {
+        CurrentFolder = "/Game";
+    }
 }
 
 void ContentBrowserWidget::RebuildTypeFilters()
 {
-    if (TypeFilterLayout == nullptr || TypeFilterGroup == nullptr)
+    TypeFilterMenu->clear();
+    if (auto* Previous = TypeFilterMenu->findChild<QActionGroup*>())
     {
-        return;
+        delete Previous;
     }
-
-    const QString PreviousFilter = TypeFilterGroup->checkedButton() != nullptr
-        ? TypeFilterGroup->checkedButton()->property("assetType").toString()
-        : QString{};
-
-    const QList<QAbstractButton*> ExistingButtons = TypeFilterGroup->buttons();
-    for (QAbstractButton* Button : ExistingButtons)
+    auto* Group = new QActionGroup(TypeFilterMenu);
+    Group->setExclusive(true);
+    auto AddFilter = [&](const QString& Label, const QString& Identifier)
     {
-        TypeFilterGroup->removeButton(Button);
-    }
-    while (QLayoutItem* Item = TypeFilterLayout->takeAt(0))
-    {
-        delete Item->widget();
-        delete Item;
-    }
-
-    auto AddFilterButton = [this](const QString& Label, const QString& TypeIdentifier)
-    {
-        auto* Button = new QToolButton(this);
-        Button->setObjectName("ContentBrowserTypeFilter");
-        Button->setText(Label);
-        Button->setCheckable(true);
-        Button->setAutoRaise(false);
-        Button->setProperty("assetType", TypeIdentifier);
-        Button->setToolTip(TypeIdentifier.isEmpty()
-            ? tr("Show folders and assets in the current Content folder")
-            : tr("Show every %1 asset under the current Content folder").arg(Label));
-        TypeFilterGroup->addButton(Button);
-        TypeFilterLayout->addWidget(Button);
-        return Button;
+        auto* Action = TypeFilterMenu->addAction(Label);
+        Action->setData(Identifier);
+        Action->setCheckable(true);
+        Action->setChecked(Identifier == ActiveTypeFilter);
+        Group->addAction(Action);
     };
-
-    QToolButton* AllButton = AddFilterButton(tr("All"), QString{});
+    AddFilter(tr("Все типы"), {});
     if (Registry != nullptr)
     {
-        for (const AssetTypeRegistration& Registration : Registry->GetAssetTypeRegistrations())
+        for (const auto& Registration : Registry->GetAssetTypeRegistrations())
         {
             if (Registration.bVisibleInContentBrowser)
             {
-                AddFilterButton(
-                    QString::fromStdString(Registration.DisplayName),
-                    QString::fromStdString(Registration.Type.GetIdentifier()));
+                AddFilter(QString::fromStdString(Registration.DisplayName),
+                          QString::fromStdString(Registration.Type.GetIdentifier()));
             }
         }
     }
-    TypeFilterLayout->addStretch(1);
-
-    QAbstractButton* RestoredButton = nullptr;
-    for (QAbstractButton* Button : TypeFilterGroup->buttons())
+    if (Group->checkedAction() == nullptr)
     {
-        if (Button->property("assetType").toString() == PreviousFilter)
-        {
-            RestoredButton = Button;
-            break;
-        }
+        ActiveTypeFilter.clear();
+        Group->actions().front()->setChecked(true);
     }
-    if (RestoredButton != nullptr)
+    connect(Group, &QActionGroup::triggered, this, [this](QAction* Action)
     {
-        RestoredButton->setChecked(true);
-    }
-    else
-    {
-        AllButton->setChecked(true);
-    }
+        ActiveTypeFilter = Action->data().toString();
+        FilterAction->setIcon(EditorUi::MakeFrontendIcon("ListFilter", ActiveTypeFilter.isEmpty() ? "--text-muted" : "--accent"));
+        FilterAction->setToolTip(tr("Тип ресурса: %1").arg(Action->text()));
+        RefreshAssetView();
+    });
 }
 
 AssetType ContentBrowserWidget::GetActiveTypeFilter() const
 {
     AssetType SelectedType = UnknownAssetType;
-    if (TypeFilterGroup == nullptr || TypeFilterGroup->checkedButton() == nullptr)
-    {
-        return SelectedType;
-    }
-    TryParseAssetType(
-        TypeFilterGroup->checkedButton()->property("assetType").toString().toStdString(),
-        SelectedType);
+    TryParseAssetType(ActiveTypeFilter.toStdString(), SelectedType);
     return SelectedType;
 }
 
@@ -575,7 +581,7 @@ void ContentBrowserWidget::RefreshAssetView()
     const QString SearchText = Search->text().trimmed();
     const AssetType SelectedType = GetActiveTypeFilter();
     const bool bTypeFilterActive = SelectedType.IsValid();
-    std::set<QString> ChildFolders;
+    std::set<QString> ChildFolders = CachedFolders;
     for (const AssetRegistryEntry& Entry : CachedEntries)
     {
         const QString VirtualPath = QString::fromStdString(Entry.VirtualPath);
@@ -593,10 +599,6 @@ void ContentBrowserWidget::RefreshAssetView()
             && SearchText.isEmpty())
         {
             ChildFolders.insert(CurrentFolder + "/" + RelativePath.section('/', 0, 0));
-            continue;
-        }
-        if (!bTypeFilterActive && RelativePath.contains('/'))
-        {
             continue;
         }
 
@@ -621,13 +623,13 @@ void ContentBrowserWidget::RefreshAssetView()
             }
         }
     }
-    if (!bTypeFilterActive && SearchText.isEmpty())
+    if (!bTypeFilterActive)
     {
-        CollectGameFoldersOnDisk(ChildFolders);
         std::set<QString> DirectChildFolders;
         for (const QString& Folder : ChildFolders)
         {
-            if (Folder.section('/', 0, -2) == CurrentFolder)
+            if (Folder.section('/', 0, -2) == CurrentFolder
+                && (SearchText.isEmpty() || Folder.section('/', -1).contains(SearchText, Qt::CaseInsensitive)))
             {
                 DirectChildFolders.insert(Folder);
             }
@@ -637,34 +639,88 @@ void ContentBrowserWidget::RefreshAssetView()
             const QString& Folder = *FolderIterator;
             auto* Item = new QListWidgetItem(MakeFolderIcon(), Folder.section('/', -1));
             Item->setData(ItemKindRole, FolderItemKind);
+            Item->setData(EditorUi::ExplorerSubtitleRole, tr("Папка"));
             Item->setData(FolderPathRole, Folder);
             Item->setToolTip(Folder);
             AssetView->insertItem(0, Item);
         }
     }
+    Explorer->SetEmptyState(AssetView->count() == 0, !SearchText.isEmpty() || bTypeFilterActive);
+    UpdateDetails();
 }
 
 void ContentBrowserWidget::SetCurrentFolder(const QString& Folder)
 {
-    if (!Folder.startsWith("/Game") && !Folder.startsWith("/Engine"))
+    const bool ValidMount = Folder == "/Game" || Folder.startsWith("/Game/")
+        || Folder == "/Engine" || Folder.startsWith("/Engine/");
+    const QString NextFolder = ValidMount ? Folder : QString("/Game");
+    if (NextFolder != CurrentFolder)
     {
-        CurrentFolder = "/Game";
+        const QSignalBlocker Block(Search);
+        Search->clear();
+    }
+    CurrentFolder = NextFolder;
+    {
+        const QSignalBlocker Block(SourcesTree);
+        for (QTreeWidgetItemIterator It(SourcesTree); *It; ++It)
+        {
+            if ((*It)->data(0, FolderPathRole).toString() == CurrentFolder)
+            {
+                SourcesTree->setCurrentItem(*It);
+                for (auto* Parent = (*It)->parent(); Parent != nullptr; Parent = Parent->parent())
+                {
+                    Parent->setExpanded(true);
+                }
+                SourcesTree->scrollToItem(*It);
+                break;
+            }
+        }
+    }
+    Explorer->SetFolder(CurrentFolder, Registry != nullptr && IsWritableGameFolder(CurrentFolder));
+    static_cast<AssetListWidget*>(AssetView)->bWritable = Registry != nullptr && IsWritableGameFolder(CurrentFolder);
+    RefreshAssetView();
+}
+
+void ContentBrowserWidget::UpdateDetails()
+{
+    const auto* Item = AssetView->currentItem();
+    if (Item != nullptr && Item->isSelected())
+    {
+        const QString Path = Item->data(ItemKindRole).toInt() == FolderItemKind
+            ? Item->data(FolderPathRole).toString() : Item->data(VirtualPathRole).toString();
+        Explorer->Details->setText(Item->text() + " · " + Item->data(EditorUi::ExplorerSubtitleRole).toString()
+            + "\n" + Path);
     }
     else
     {
-        CurrentFolder = Folder;
+        int Count = 0;
+        for (const auto& Entry : CachedEntries)
+        {
+            if (Entry.VirtualPath.rfind("/Game/", 0) == 0)
+            {
+                Count += Entry.Metadata.SubAssets.empty() ? 1 : static_cast<int>(Entry.Metadata.SubAssets.size());
+            }
+        }
+        Explorer->Details->setText(tr("Ресурсов в проекте: %1 · выберите файл для подробностей · импорт до 100 МБ на файл").arg(Count));
     }
-    ImportButton->setEnabled(CurrentFolder == "/Game" || CurrentFolder.startsWith("/Game/"));
-    RefreshAssetView();
+}
+
+void ContentBrowserWidget::SelectImportFolder()
+{
+    const QString Folder = QFileDialog::getExistingDirectory(this, tr("Импорт папки"));
+    if (!Folder.isEmpty())
+    {
+        ImportFiles({Folder});
+    }
 }
 
 void ContentBrowserWidget::SelectImportFiles()
 {
     const QStringList SourceFiles = QFileDialog::getOpenFileNames(
         this,
-        tr("Import Assets"),
+        tr("Импорт файлов"),
         QString{},
-        tr("Supported Assets (*.glb *.fbx *.png *.jpg *.jpeg);;GLB Models (*.glb);;FBX Models (*.fbx);;Images (*.png *.jpg *.jpeg)"));
+        tr("Ресурсы (*.glb *.fbx *.png *.jpg *.jpeg);;Модели GLB (*.glb);;Модели FBX (*.fbx);;Изображения (*.png *.jpg *.jpeg)"));
     if (!SourceFiles.isEmpty())
     {
         ImportFiles(SourceFiles);
@@ -675,33 +731,33 @@ void ContentBrowserWidget::ImportFiles(const QStringList& SourceFiles)
 {
     if (Registry == nullptr)
     {
-        QMessageBox::warning(this, tr("Import Failed"), tr("No project asset registry is available."));
+        QMessageBox::warning(this, tr("Импорт не выполнен"), tr("Сначала откройте проект."));
         return;
     }
     if (CurrentFolder != "/Game" && !CurrentFolder.startsWith("/Game/"))
     {
-        QMessageBox::warning(this, tr("Import Failed"), tr("Engine Content is read-only. Select a Game Content folder."));
+        QMessageBox::warning(this, tr("Импорт не выполнен"), tr("Ресурсы движка доступны только для чтения. Выберите папку в Assets."));
         return;
     }
 
-    QStringList SupportedFiles;
-    for (const QString& SourceFile : SourceFiles)
+    const EditorUi::AssetImportSources Sources = EditorUi::CollectAssetImportSources(SourceFiles);
+    if (!Sources.Errors.isEmpty())
     {
-        if (QFileInfo(SourceFile).isFile() && IsSupportedImportFile(SourceFile))
-        {
-            SupportedFiles.push_back(SourceFile);
-        }
+        QMessageBox::warning(this, tr("Импорт не выполнен"), Sources.Errors.join('\n'));
+        return;
     }
+    const QStringList& SupportedFiles = Sources.Files;
     if (SupportedFiles.isEmpty())
     {
-        QMessageBox::warning(this, tr("Import Failed"), tr("No supported asset files were selected."));
+        QMessageBox::warning(this, tr("Импорт не выполнен"),
+            tr("Поддерживаемые файлы не найдены. Выберите GLB, статический FBX, PNG или JPEG."));
         return;
     }
 
     const QString InitialFolder = CurrentFolder == "/Game"
         ? QString{}
         : CurrentFolder.mid(QString("/Game/").size());
-    AssetImportDialog Dialog(SupportedFiles, InitialFolder, this);
+    AssetImportDialog Dialog(SupportedFiles, InitialFolder, this, Sources.RelativeFolders, Sources.SkippedFiles);
     if (Dialog.exec() != QDialog::Accepted)
     {
         return;
@@ -712,10 +768,7 @@ void ContentBrowserWidget::ImportFiles(const QStringList& SourceFiles)
     int ImportedCount = 0;
     for (int SourceIndex = 0; SourceIndex < SupportedFiles.size(); ++SourceIndex)
     {
-        const QString DestinationFile = Dialog.GetDestinationFileName(SourceIndex);
-        const QString DestinationPath = Dialog.GetDestinationFolder().isEmpty()
-            ? DestinationFile
-            : Dialog.GetDestinationFolder() + "/" + DestinationFile;
+        const QString DestinationPath = Dialog.GetDestinationRelativePath(SourceIndex);
 
         ImportRequest Request{};
 #if defined(_WIN32)
@@ -741,19 +794,23 @@ void ContentBrowserWidget::ImportFiles(const QStringList& SourceFiles)
     }
 
     Refresh();
+    if (ImportedCount > 0)
+    {
+        emit AssetsChanged();
+    }
     if (Failures.isEmpty())
     {
         QMessageBox::information(
             this,
-            tr("Import Complete"),
-            tr("Imported %1 asset(s).").arg(ImportedCount));
+            tr("Импорт завершён"),
+            tr("Импортировано ресурсов: %1.").arg(ImportedCount));
     }
     else
     {
         QMessageBox::warning(
             this,
-            tr("Import Completed With Errors"),
-            tr("Imported %1 asset(s).\n\n%2").arg(ImportedCount).arg(Failures.join('\n')));
+            tr("Импорт завершён с ошибками"),
+            tr("Импортировано ресурсов: %1.\n\n%2").arg(ImportedCount).arg(Failures.join('\n')));
     }
 }
 
@@ -816,7 +873,7 @@ bool ContentBrowserWidget::DuplicateClipboardAsset()
     const AssetDiagnostic Result = Operations->DuplicateAsset(Payload.Key, CurrentFolder.toStdString());
     if (Result.HasError())
     {
-        QMessageBox::warning(this, tr("Paste Failed"), QString::fromStdString(Result.Message));
+        QMessageBox::warning(this, tr("Не удалось вставить"), QString::fromStdString(Result.Message));
         Refresh();
         return false;
     }
@@ -831,14 +888,14 @@ void ContentBrowserWidget::ShowAssetContextMenu(const QPoint& Position)
     QMenu Menu(this);
     if (IsWritableGameFolder(CurrentFolder))
     {
-        Menu.addAction(tr("Create Material"), this, [this]() { CreateMaterial(false); });
-        Menu.addAction(tr("Create Material Instance"), this, [this]() { CreateMaterial(true); });
+        Menu.addAction(tr("Создать материал"), this, [this]() { CreateMaterial(false); });
+        Menu.addAction(tr("Создать экземпляр материала"), this, [this]() { CreateMaterial(true); });
     }
     if (Item != nullptr && (Item->data(AssetTypeRole).toString() == "Material"
         || Item->data(AssetTypeRole).toString() == "MaterialInstance"))
     {
         AssetView->setCurrentItem(Item);
-        Menu.addAction(tr("Create Child Instance"), this, [this]() { CreateMaterial(true, true); });
+        Menu.addAction(tr("Создать дочерний экземпляр"), this, [this]() { CreateMaterial(true, true); });
     }
     if (Item != nullptr)
     {
@@ -848,31 +905,31 @@ void ContentBrowserWidget::ShowAssetContextMenu(const QPoint& Position)
             const QString Folder = Item->data(FolderPathRole).toString();
             if (IsWritableGameFolder(Folder))
             {
-                Menu.addAction(tr("New Folder"), this, &ContentBrowserWidget::CreateFolder);
+                Menu.addAction(tr("Новая папка"), this, &ContentBrowserWidget::CreateFolder);
                 if (Folder != "/Game")
                 {
-                    Menu.addAction(tr("Rename"), this, &ContentBrowserWidget::RenameSelectedFolder);
-                    Menu.addAction(tr("Delete"), this, &ContentBrowserWidget::DeleteSelectedFolder);
+                    Menu.addAction(tr("Переименовать"), this, &ContentBrowserWidget::RenameSelectedFolder);
+                    Menu.addAction(tr("Удалить"), this, &ContentBrowserWidget::DeleteSelectedFolder);
                 }
             }
         }
         else if (Item->data(ItemKindRole).toInt() == AssetItemKind)
         {
-            Menu.addAction(tr("Copy"), this, &ContentBrowserWidget::CopySelectionToClipboard);
+            Menu.addAction(tr("Копировать"), this, &ContentBrowserWidget::CopySelectionToClipboard);
             if (Item->data(VirtualPathRole).toString().startsWith("/Game/"))
             {
-                Menu.addAction(tr("Rename"), this, &ContentBrowserWidget::RenameSelectedAsset);
-                Menu.addAction(tr("Delete"), this, &ContentBrowserWidget::DeleteSelectedAsset);
+                Menu.addAction(tr("Переименовать"), this, &ContentBrowserWidget::RenameSelectedAsset);
+                Menu.addAction(tr("Удалить"), this, &ContentBrowserWidget::DeleteSelectedAsset);
             }
         }
         Menu.addSeparator();
     }
     else if (IsWritableGameFolder(CurrentFolder))
     {
-        Menu.addAction(tr("New Folder"), this, &ContentBrowserWidget::CreateFolder);
+        Menu.addAction(tr("Новая папка"), this, &ContentBrowserWidget::CreateFolder);
         Menu.addSeparator();
     }
-    QAction* PasteAction = Menu.addAction(tr("Paste"), this, &ContentBrowserWidget::PasteFromClipboard);
+    QAction* PasteAction = Menu.addAction(tr("Вставить"), this, &ContentBrowserWidget::PasteFromClipboard);
     PasteAction->setEnabled(
         IsWritableGameFolder(CurrentFolder)
         && QGuiApplication::clipboard()->mimeData()->hasFormat(SakuraAssetMimeType));
@@ -892,11 +949,11 @@ void ContentBrowserWidget::ShowSourcesContextMenu(const QPoint& Position)
     QMenu Menu(this);
     if (IsWritableGameFolder(Folder))
     {
-        Menu.addAction(tr("New Folder"), this, &ContentBrowserWidget::CreateFolder);
+        Menu.addAction(tr("Новая папка"), this, &ContentBrowserWidget::CreateFolder);
         if (Folder != "/Game" && Folder.startsWith("/Game/"))
         {
-            Menu.addAction(tr("Rename"), this, &ContentBrowserWidget::RenameSelectedFolder);
-            Menu.addAction(tr("Delete"), this, &ContentBrowserWidget::DeleteSelectedFolder);
+            Menu.addAction(tr("Переименовать"), this, &ContentBrowserWidget::RenameSelectedFolder);
+            Menu.addAction(tr("Удалить"), this, &ContentBrowserWidget::DeleteSelectedFolder);
         }
     }
     if (Menu.actions().isEmpty())
@@ -919,7 +976,7 @@ void ContentBrowserWidget::RenameSelectedAsset()
     const QString SourceVirtualPath = Item->data(VirtualPathRole).toString();
     if (!SourceVirtualPath.startsWith("/Game/"))
     {
-        QMessageBox::warning(this, tr("Rename Failed"), tr("Engine Content is read-only."));
+        QMessageBox::warning(this, tr("Не удалось переименовать"), tr("Ресурсы движка доступны только для чтения."));
         return;
     }
 
@@ -928,8 +985,8 @@ void ContentBrowserWidget::RenameSelectedAsset()
     bool bAccepted = false;
     const QString NewBaseName = QInputDialog::getText(
         this,
-        tr("Rename Asset"),
-        tr("Asset name"),
+        tr("Переименовать ресурс"),
+        tr("Имя ресурса"),
         QLineEdit::Normal,
         SubAssetText.isEmpty() ? SourceInformation.completeBaseName() : Item->text(),
         &bAccepted).trimmed();
@@ -940,7 +997,7 @@ void ContentBrowserWidget::RenameSelectedAsset()
     if (NewBaseName.isEmpty() || NewBaseName == "." || NewBaseName == ".."
         || NewBaseName.contains('/') || NewBaseName.contains('\\'))
     {
-        QMessageBox::warning(this, tr("Rename Failed"), tr("Asset name must be a single non-empty name."));
+        QMessageBox::warning(this, tr("Не удалось переименовать"), tr("Введите имя ресурса без разделителей пути."));
         return;
     }
 
@@ -960,7 +1017,7 @@ void ContentBrowserWidget::RenameSelectedAsset()
         const AssetDiagnostic Result = Operations->RenameSubAsset(Key, NewBaseName.toUtf8().toStdString());
         if (Result.HasError())
         {
-            QMessageBox::warning(this, tr("Rename Failed"), QString::fromStdString(Result.Message));
+            QMessageBox::warning(this, tr("Не удалось переименовать"), QString::fromStdString(Result.Message));
             return;
         }
         Refresh();
@@ -982,7 +1039,7 @@ void ContentBrowserWidget::RenameSelectedAsset()
         DestinationVirtualPath.toUtf8().toStdString());
     if (Result.HasError())
     {
-        QMessageBox::warning(this, tr("Rename Failed"), QString::fromStdString(Result.Message));
+        QMessageBox::warning(this, tr("Не удалось переименовать"), QString::fromStdString(Result.Message));
         return;
     }
     Refresh();
@@ -1003,13 +1060,13 @@ void ContentBrowserWidget::DeleteSelectedAsset()
     const QString VirtualPath = Item->data(VirtualPathRole).toString();
     if (!VirtualPath.startsWith("/Game/"))
     {
-        QMessageBox::warning(this, tr("Delete Failed"), tr("Engine Content is read-only."));
+        QMessageBox::warning(this, tr("Не удалось удалить"), tr("Ресурсы движка доступны только для чтения."));
         return;
     }
     if (QMessageBox::question(
             this,
-            tr("Delete Asset"),
-            tr("Delete %1?\nThe backing file is removed when its last asset is deleted. Existing scene references will become missing.")
+            tr("Удалить ресурс"),
+            tr("Удалить %1?\nФайл будет удалён вместе с последним ресурсом в нём. Ссылки на удалённый ресурс в сценах перестанут работать.")
                 .arg(Item->text()),
             QMessageBox::Yes | QMessageBox::Cancel,
             QMessageBox::Cancel)
@@ -1021,7 +1078,7 @@ void ContentBrowserWidget::DeleteSelectedAsset()
     AssetRegistryEntry Entry{};
     if (!Registry->TryGetByPath(VirtualPath.toUtf8().toStdString(), Entry))
     {
-        QMessageBox::warning(this, tr("Delete Failed"), tr("Asset is no longer registered."));
+        QMessageBox::warning(this, tr("Не удалось удалить"), tr("Ресурс больше не зарегистрирован."));
         Refresh();
         return;
     }
@@ -1045,7 +1102,7 @@ void ContentBrowserWidget::DeleteSelectedAsset()
     const AssetDiagnostic Result = Operations->DeleteAsset(Key);
     if (Result.HasError())
     {
-        QMessageBox::warning(this, tr("Delete Failed"), QString::fromStdString(Result.Message));
+        QMessageBox::warning(this, tr("Не удалось удалить"), QString::fromStdString(Result.Message));
         return;
     }
 
@@ -1063,7 +1120,7 @@ void ContentBrowserWidget::MoveAsset(
     }
     if (!SourceVirtualPath.startsWith("/Game/") || !IsWritableGameFolder(DestinationFolder))
     {
-        QMessageBox::warning(this, tr("Move Failed"), tr("Assets can only be moved within Game Content."));
+        QMessageBox::warning(this, tr("Не удалось переместить"), tr("Перемещать ресурсы можно только внутри Assets."));
         return;
     }
 
@@ -1077,7 +1134,7 @@ void ContentBrowserWidget::MoveAsset(
         DestinationVirtualPath.toUtf8().toStdString());
     if (Result.HasError())
     {
-        QMessageBox::warning(this, tr("Move Failed"), QString::fromStdString(Result.Message));
+        QMessageBox::warning(this, tr("Не удалось переместить"), QString::fromStdString(Result.Message));
         return;
     }
     Refresh();
@@ -1196,7 +1253,7 @@ void ContentBrowserWidget::RescanAndRefresh()
     const AssetDiagnostic Result = Registry->ScanContent();
     if (Result.HasError())
     {
-        QMessageBox::warning(this, tr("Content Scan Failed"), QString::fromStdString(Result.Message));
+        QMessageBox::warning(this, tr("Не удалось обновить список ресурсов"), QString::fromStdString(Result.Message));
     }
     Refresh();
     emit AssetsChanged();
@@ -1215,17 +1272,17 @@ void ContentBrowserWidget::CreateFolder()
     }
     if (Registry == nullptr || !IsWritableGameFolder(ParentFolder))
     {
-        QMessageBox::warning(this, tr("New Folder Failed"), tr("Engine Content is read-only. Select a Game Content folder."));
+        QMessageBox::warning(this, tr("Не удалось создать папку"), tr("Ресурсы движка доступны только для чтения. Выберите папку в Assets."));
         return;
     }
 
     bool bAccepted = false;
     const QString FolderName = QInputDialog::getText(
         this,
-        tr("New Folder"),
-        tr("Folder name"),
+        tr("Новая папка"),
+        tr("Имя папки"),
         QLineEdit::Normal,
-        tr("NewFolder"),
+        tr("Новая папка"),
         &bAccepted).trimmed();
     if (!bAccepted)
     {
@@ -1234,7 +1291,7 @@ void ContentBrowserWidget::CreateFolder()
     if (FolderName.isEmpty() || FolderName == "." || FolderName == ".."
         || FolderName.contains('/') || FolderName.contains('\\'))
     {
-        QMessageBox::warning(this, tr("New Folder Failed"), tr("Folder name must be a single non-empty name."));
+        QMessageBox::warning(this, tr("Не удалось создать папку"), tr("Введите имя папки без разделителей пути."));
         return;
     }
 
@@ -1242,7 +1299,7 @@ void ContentBrowserWidget::CreateFolder()
     const AssetDiagnostic Result = Operations->CreateFolder(NewFolder.toStdString());
     if (Result.HasError())
     {
-        QMessageBox::warning(this, tr("New Folder Failed"), QString::fromStdString(Result.Message));
+        QMessageBox::warning(this, tr("Не удалось создать папку"), QString::fromStdString(Result.Message));
         return;
     }
 
@@ -1256,15 +1313,15 @@ void ContentBrowserWidget::RenameSelectedFolder()
     const QString SourceFolder = SelectedFolderPath();
     if (Registry == nullptr || !IsWritableGameFolder(SourceFolder) || SourceFolder == "/Game")
     {
-        QMessageBox::warning(this, tr("Rename Failed"), tr("Only nested Game Content folders can be renamed."));
+        QMessageBox::warning(this, tr("Не удалось переименовать"), tr("Переименовывать можно только вложенные папки в Assets."));
         return;
     }
 
     bool bAccepted = false;
     const QString NewName = QInputDialog::getText(
         this,
-        tr("Rename Folder"),
-        tr("Folder name"),
+        tr("Переименовать папку"),
+        tr("Имя папки"),
         QLineEdit::Normal,
         SourceFolder.section('/', -1),
         &bAccepted).trimmed();
@@ -1275,7 +1332,7 @@ void ContentBrowserWidget::RenameSelectedFolder()
     if (NewName.isEmpty() || NewName == "." || NewName == ".."
         || NewName.contains('/') || NewName.contains('\\'))
     {
-        QMessageBox::warning(this, tr("Rename Failed"), tr("Folder name must be a single non-empty name."));
+        QMessageBox::warning(this, tr("Не удалось переименовать"), tr("Введите имя папки без разделителей пути."));
         return;
     }
 
@@ -1288,7 +1345,7 @@ void ContentBrowserWidget::RenameSelectedFolder()
     const AssetDiagnostic Result = Operations->RenameFolder(SourceFolder.toStdString(), DestinationFolder.toStdString());
     if (Result.HasError())
     {
-        QMessageBox::warning(this, tr("Rename Failed"), QString::fromStdString(Result.Message));
+        QMessageBox::warning(this, tr("Не удалось переименовать"), QString::fromStdString(Result.Message));
         Refresh();
         return;
     }
@@ -1309,14 +1366,14 @@ void ContentBrowserWidget::DeleteSelectedFolder()
     const QString Folder = SelectedFolderPath();
     if (Registry == nullptr || BoundEngine == nullptr || !IsWritableGameFolder(Folder) || Folder == "/Game")
     {
-        QMessageBox::warning(this, tr("Delete Failed"), tr("Only nested Game Content folders can be deleted."));
+        QMessageBox::warning(this, tr("Не удалось удалить"), tr("Удалять можно только вложенные папки в Assets."));
         return;
     }
 
     const auto Answer = QMessageBox::question(
         this,
-        tr("Delete Folder"),
-        tr("Delete folder %1 and all assets inside it?\nExisting scene references will become missing.")
+        tr("Удалить папку"),
+        tr("Удалить папку %1 и все ресурсы внутри?\nСсылки на удалённые ресурсы в сценах перестанут работать.")
             .arg(Folder),
         QMessageBox::Yes | QMessageBox::No,
         QMessageBox::No);
@@ -1328,7 +1385,7 @@ void ContentBrowserWidget::DeleteSelectedFolder()
     const AssetDiagnostic Result = Operations->DeleteFolder(Folder.toStdString());
     if (Result.HasError())
     {
-        QMessageBox::warning(this, tr("Delete Failed"), QString::fromStdString(Result.Message));
+        QMessageBox::warning(this, tr("Не удалось удалить"), QString::fromStdString(Result.Message));
         Refresh();
         return;
     }
@@ -1353,6 +1410,7 @@ void ContentBrowserWidget::AddAssetItem(const AssetRegistryEntry& Entry)
         QFileInfo(VirtualPath).completeBaseName(),
         AssetView);
     Item->setData(ItemKindRole, AssetItemKind);
+    Item->setData(EditorUi::ExplorerSubtitleRole, QString::fromUtf8(AssetTypeToString(Entry.Metadata.Type)));
     Item->setData(AssetIdRole, QString::fromStdString(Entry.Metadata.Guid.ToString()));
     Item->setData(AssetTypeRole, QString::fromStdString(Entry.Metadata.Type.GetIdentifier()));
     Item->setData(VirtualPathRole, VirtualPath);
@@ -1367,6 +1425,7 @@ void ContentBrowserWidget::AddSubAssetItem(const AssetRegistryEntry& Entry, cons
         QString::fromStdString(SubAsset.Name),
         AssetView);
     Item->setData(ItemKindRole, AssetItemKind);
+    Item->setData(EditorUi::ExplorerSubtitleRole, QString::fromUtf8(AssetTypeToString(SubAsset.Type)));
     Item->setData(AssetIdRole, QString::fromStdString(Entry.Metadata.Guid.ToString()));
     Item->setData(SubAssetIdRole, QString::fromStdString(SubAsset.Id.ToString()));
     Item->setData(AssetTypeRole, QString::fromStdString(SubAsset.Type.GetIdentifier()));
@@ -1404,7 +1463,7 @@ void ContentBrowserWidget::CreateMaterial(bool bInstance, bool bSelectedParent)
             }
         }
         Parents.sort();
-        const auto Selected = QInputDialog::getItem(this, tr("Material Instance"), tr("Parent"), Parents, 0, false, &bAccepted);
+        const auto Selected = QInputDialog::getItem(this, tr("Экземпляр материала"), tr("Родительский материал"), Parents, 0, false, &bAccepted);
         if (!bAccepted || Selected.isEmpty())
         {
             return;
@@ -1413,14 +1472,14 @@ void ContentBrowserWidget::CreateMaterial(bool bInstance, bool bSelectedParent)
         Registry->TryGetByPath(Selected.toStdString(), Entry);
         Parent = AssetKey{Entry.Metadata.Guid, {}};
     }
-    const auto Name = QInputDialog::getText(this, tr("Create Material"), tr("Asset name"), QLineEdit::Normal, {}, &bAccepted);
+    const auto Name = QInputDialog::getText(this, tr("Создать материал"), tr("Имя ресурса"), QLineEdit::Normal, {}, &bAccepted);
     if (!bAccepted || Name.isEmpty())
     {
         return;
     }
     if (Name.contains('/') || Name.contains('\\') || Name.contains('.') || Name.contains(':'))
     {
-        QMessageBox::warning(this, tr("Create Material"), tr("Use a single asset name without an extension or path."));
+        QMessageBox::warning(this, tr("Создать материал"), tr("Введите имя ресурса без расширения и пути."));
         return;
     }
     QString Folder = CurrentFolder;
@@ -1438,7 +1497,7 @@ void ContentBrowserWidget::CreateMaterial(bool bInstance, bool bSelectedParent)
     const auto Diagnostic = MaterialAssetCreation::Create(*Registry, Path.toStdString(), Parent, Domain, Created);
     if (Diagnostic.HasError())
     {
-        QMessageBox::warning(this, tr("Create Material"), QString::fromStdString(Diagnostic.Message));
+        QMessageBox::warning(this, tr("Создать материал"), QString::fromStdString(Diagnostic.Message));
         return;
     }
     RescanAndRefresh();

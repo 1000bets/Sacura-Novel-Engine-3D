@@ -16,14 +16,15 @@ class Engine;
 class ProjectSession;
 class SceneDocument;
 class QEvent;
-class QButtonGroup;
 class QLineEdit;
 class QListWidget;
 class QListWidgetItem;
-class QHBoxLayout;
 class QToolButton;
 class QTreeWidget;
 class QTreeWidgetItem;
+class QMenu;
+class QAction;
+namespace EditorUi { class AssetExplorerView; }
 
 class ContentBrowserWidget : public QWidget
 {
@@ -54,7 +55,9 @@ private:
     void AddAssetItem(const AssetRegistryEntry& Entry);
     void AddSubAssetItem(const AssetRegistryEntry& Entry, const SubAssetRecord& SubAsset);
     void SelectImportFiles();
+    void SelectImportFolder();
     void ImportFiles(const QStringList& SourceFiles);
+    void UpdateDetails();
     void ShowAssetContextMenu(const QPoint& Position);
     void ShowSourcesContextMenu(const QPoint& Position);
     void RenameSelectedAsset();
@@ -79,9 +82,12 @@ private:
     QLineEdit* Search = nullptr;
     QTreeWidget* SourcesTree = nullptr;
     QListWidget* AssetView = nullptr;
-    QHBoxLayout* TypeFilterLayout = nullptr;
-    QButtonGroup* TypeFilterGroup = nullptr;
+    EditorUi::AssetExplorerView* Explorer = nullptr;
+    QMenu* TypeFilterMenu = nullptr;
+    QAction* FilterAction = nullptr;
+    QString ActiveTypeFilter;
     QToolButton* ImportButton = nullptr;
     QString CurrentFolder = "/Game";
     std::vector<AssetRegistryEntry> CachedEntries;
+    std::set<QString> CachedFolders;
 };

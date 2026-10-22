@@ -565,6 +565,7 @@ void EditorMainWindow::RefreshTransformUi()
 void EditorMainWindow::OnHierarchySelectionChanged()
 {
     bStoryEditingContext = false;
+    bWidgetEditingContext = false;
     QTreeWidgetItem* Current = HierarchyTree->currentItem();
     if (Current == nullptr)
     {

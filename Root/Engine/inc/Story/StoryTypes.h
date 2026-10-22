@@ -3,6 +3,7 @@
 #include "Core/Transform.h"
 
 #include <string>
+#include <cstdint>
 #include <vector>
 
 using StoryNodeId = std::string;
@@ -53,6 +54,19 @@ struct StoryActionDefinition
 
 enum class StoryEventPhase { Before, OnStart, After };
 enum class StoryEventJoin { None, Started, FlowEnd, EventEnd };
+
+enum class StoryEventPlaybackState { Running, Paused, Completed, Cancelled };
+
+// Runtime-only identity and copied presentation data; never serialized into a story.
+struct StoryEventSnapshot
+{
+    uint64_t InstanceId = 0;
+    std::string Name;
+    StoryNodeId NodeId;
+    StoryEventPhase Phase = StoryEventPhase::OnStart;
+    StoryEventPlaybackState State = StoryEventPlaybackState::Running;
+    bool bCanPause = true;
+};
 
 struct StoryEventGroup
 {
