@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "guid": "cc3e19f9-950c-5ff2-87c9-d6b6ce447e8d",
+  "assetType": "Model",
+  "sourceFingerprint": "18c17dc7948cb35d",
+  "importInfo": {
+    "generator": "Scripts/GenerateBasicShapes.py"
+  },
+  "subAssets": [
+    {
+      "id": "54c34d32-f908-54a9-938b-fbde87baa3bd",
+      "name": "Plane",
+      "type": "StaticMesh",
+      "selector": {
+        "kind": "mesh",
+        "index": 0
+      }
+    }
+  ],
+  "loadSettings": {
+    "staticMeshDefaults": {
+      "54c34d32-f908-54a9-938b-fbde87baa3bd": {
+        "materials": [
+          {
+            "slot": 0,
+            "material": {
+              "assetId": "42b33bd1-5bf7-5462-920b-297de12b0f18",
+              "subAssetId": null
+            }
+          }
+        ],
+        "collision": {
+          "enabled": true,
+          "elements": [
+            {
+              "shape": 0,
+              "center": [
+                0,
+                -0.005,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "halfExtents": [
+                0.5,
+                0.005,
+                0.5
+              ],
+              "radius": 0.5,
+              "capsuleHalfHeight": 0.5
+            }
+          ]
+        }
+      }
+    }
+  }
+}

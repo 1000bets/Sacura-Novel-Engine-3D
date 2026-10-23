@@ -1,4 +1,13 @@
 set(EDITOR_CORE_SRC
+    src/Commands/StaticMeshCommands.cpp
+    src/Documents/StaticMeshDocument.cpp
+    src/Project/GameExporter.cpp
+    src/Documents/CharacterDocument.cpp
+    src/Assets/CharacterAnimationImport.cpp
+    src/Documents/MaterialEditingSession.cpp
+    src/Commands/PrefabCommands.cpp
+    src/Documents/InputAssetDocument.cpp
+    src/Documents/InputPackage.cpp
     src/Documents/WidgetDocument.cpp
     src/Assets/StoryAssetCreation.cpp
     src/Assets/AssetOperations.cpp

@@ -105,7 +105,31 @@ StoryActionFieldsView::StoryActionFieldsView(StoryGraphAction Action, const Stor
             }
         });
     }
-    if (Value.Kind != 0 && (Value.Kind != 2 || !Value.bCopyTarget))
+    if (Value.Kind == 4)
+    {
+        auto* Animation = new EditorUi::StudioSelect(this);
+        Animation->setObjectName("StoryEventAnimationId");
+        Animation->addItem(tr("Выберите анимацию"), QString{});
+        for (const auto& Choice : Model.CharacterAnimations.value(Value.Target))
+        {
+            Animation->addItem(Choice.second, Choice.first);
+        }
+        if (!Value.AnimationId.isEmpty() && Animation->findData(Value.AnimationId) < 0)
+        {
+            Animation->addItem(tr("Недоступная анимация: ") + Value.AnimationId, Value.AnimationId);
+        }
+        Animation->setCurrentIndex(std::max(0, Animation->findData(Value.AnimationId)));
+        Form->addRow(tr("Анимация"), Animation);
+        connect(Animation, &QComboBox::currentIndexChanged, this, [this, Animation]()
+        {
+            Value.AnimationId = Animation->currentData().toString();
+            if (Changed)
+            {
+                Changed(Value);
+            }
+        });
+    }
+    if (Value.Kind != 0 && Value.Kind != 4 && (Value.Kind != 2 || !Value.bCopyTarget))
     {
         const QStringList Axes = {"X", "Y", "Z"};
         auto* Coordinates = new QWidget(this);

@@ -42,7 +42,13 @@ void HierarchyStyle::PaintBackground(QPainter& Painter, const QRect& Rect, QStyl
 void HierarchyStyle::paint(QPainter* Painter, const QStyleOptionViewItem& Option, const QModelIndex& Index) const
 {
     const bool Primary = Index.data(HierarchyPrimaryCameraRole).toBool();
-    const auto Font = ControlStyle::Font(Index.data(HierarchyCameraRole).toBool() ? 12 : 13);
+    auto Font = ControlStyle::Font(Index.data(HierarchyCameraRole).toBool() ? 12 : 13);
+    if (Index.data(Qt::FontRole).isValid())
+    {
+        const QFont ItemFont = qvariant_cast<QFont>(Index.data(Qt::FontRole));
+        Font.setBold(ItemFont.bold());
+        Font.setItalic(ItemFont.italic());
+    }
     Painter->save();
     Painter->setClipRect(Option.rect);
     if (!(Option.state & QStyle::State_Enabled)) { Painter->setOpacity(.4); }
@@ -52,6 +58,10 @@ void HierarchyStyle::paint(QPainter* Painter, const QStyleOptionViewItem& Option
     const auto Text = TextRect(Option.rect, Primary);
     Painter->setFont(Font);
     Painter->setPen(EditorStyle::Color(Option.state & QStyle::State_Selected ? "--text-primary" : "--text-secondary"));
+    if (Index.data(Qt::ForegroundRole).isValid())
+    {
+        Painter->setPen(qvariant_cast<QBrush>(Index.data(Qt::ForegroundRole)).color());
+    }
     Painter->drawText(Text, Qt::AlignLeft | Qt::AlignVCenter,
                       QFontMetrics(Font).elidedText(Index.data().toString(), Qt::ElideRight, qMax(0, Text.width())));
     if (Primary)

@@ -5,6 +5,7 @@
 #include <iostream>
 #include <mutex>
 #include <string>
+#include <deque>
 
 #if defined(_WIN32)
 #ifndef NOMINMAX
@@ -21,12 +22,34 @@ thread_local std::string LocalThreadDebugName = "Unnamed";
 std::atomic<uint64_t> GameFrameIndex{0};
 std::atomic<uint64_t> RenderFrameIndex{0};
 std::mutex PrintMutex;
+std::deque<std::pair<uint64_t, std::string>> PrintHistory;
+uint64_t PrintSequence = 0;
 }
 
 void PrintString(const std::string& Message)
 {
     std::lock_guard<std::mutex> Lock(PrintMutex);
     std::cout << Message << '\n';
+    PrintHistory.emplace_back(++PrintSequence, Message.substr(0, 16384));
+    if (PrintHistory.size() > 1000)
+    {
+        PrintHistory.pop_front();
+    }
+}
+
+std::vector<std::string> GetPrintMessages(uint64_t& AfterSequence)
+{
+    std::lock_guard<std::mutex> Lock(PrintMutex);
+    std::vector<std::string> Messages;
+    for (const auto& Entry : PrintHistory)
+    {
+        if (Entry.first > AfterSequence)
+        {
+            Messages.push_back(Entry.second);
+        }
+    }
+    AfterSequence = PrintSequence;
+    return Messages;
 }
 
 void SetCurrentThreadRole(ThreadRole Role)

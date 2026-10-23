@@ -77,6 +77,11 @@ bool TryParseNodeKind(const std::string& KindText, StoryNodeKind& OutKind, std::
         OutKind = StoryNodeKind::Action;
         return true;
     }
+    if (KindText == "Narrative")
+    {
+        OutKind = StoryNodeKind::Narrative;
+        return true;
+    }
     if (KindText == "End")
     {
         OutKind = StoryNodeKind::End;
@@ -96,6 +101,11 @@ bool TryParseActionKind(const std::string& KindText, StoryActionKind& OutKind, s
     if (KindText == "MoveTo")
     {
         OutKind = StoryActionKind::MoveTo;
+        return true;
+    }
+    if (KindText == "CharacterAnimation")
+    {
+        OutKind = StoryActionKind::CharacterAnimation;
         return true;
     }
     if (KindText == "NavigateTo")
@@ -159,6 +169,16 @@ bool StoryJson::ReadAction(const nlohmann::json& JsonValue, StoryActionDefinitio
     {
         if (!JsonValue.at("targetObjectName").is_string()) { OutError = "targetObjectName must be a string"; return false; }
         OutAction.TargetObjectName = JsonValue.at("targetObjectName").get<std::string>();
+    }
+
+    if (JsonValue.contains("animationId"))
+    {
+        if (!JsonValue.at("animationId").is_string())
+        {
+            OutError = "animationId must be a string";
+            return false;
+        }
+        OutAction.AnimationId = JsonValue.at("animationId").get<std::string>();
     }
 
     if (JsonValue.contains("position"))
@@ -265,6 +285,31 @@ bool TryReadNode(const nlohmann::json& JsonValue, StoryNode& OutNode, std::strin
         }
     }
 
+    if (OutNode.Kind == StoryNodeKind::Narrative)
+    {
+        if (!JsonValue.contains("narrativeType") || !JsonValue["narrativeType"].is_string()
+            || (JsonValue.contains("inputs") && !JsonValue["inputs"].is_object())
+            || (JsonValue.contains("sources") && !JsonValue["sources"].is_object()))
+        {
+            OutError = "Invalid Narrative node declaration";
+            return false;
+        }
+        OutNode.NarrativeType = JsonValue["narrativeType"].get<std::string>();
+        OutNode.NarrativeInputs = JsonValue.value("inputs", nlohmann::json::object());
+        if (JsonValue.contains("sources"))
+        {
+            for (const auto& Entry : JsonValue["sources"].items())
+            {
+                const auto& Source = Entry.value();
+                if (!Source.is_array() || Source.size() != 2 || !Source[0].is_string() || !Source[1].is_string())
+                {
+                    OutError = "Narrative source requires node and output names";
+                    return false;
+                }
+                OutNode.NarrativeSources.emplace(Entry.key(), std::make_pair(Source[0].get<std::string>(), Source[1].get<std::string>()));
+            }
+        }
+    }
     if (JsonValue.contains("actions") && JsonValue.at("actions").is_array())
     {
         for (const nlohmann::json& ActionJson : JsonValue.at("actions"))
@@ -292,6 +337,10 @@ nlohmann::json StoryJson::WriteAction(const StoryActionDefinition& Action)
         break;
     case StoryActionKind::MoveTo:
         Document["kind"] = "MoveTo";
+        break;
+    case StoryActionKind::CharacterAnimation:
+        Document["kind"] = "CharacterAnimation";
+        Document["animationId"] = Action.AnimationId;
         break;
     case StoryActionKind::NavigateTo:
         Document["kind"] = "NavigateTo";
@@ -345,6 +394,12 @@ nlohmann::json NodeToJson(const StoryNode& Node)
         break;
     case StoryNodeKind::Action:
         Document["kind"] = "Action";
+        break;
+    case StoryNodeKind::Narrative:
+        Document["kind"] = "Narrative";
+        Document["narrativeType"] = Node.NarrativeType;
+        Document["inputs"] = Node.NarrativeInputs;
+        Document["sources"] = Node.NarrativeSources;
         break;
     case StoryNodeKind::End:
         Document["kind"] = "End";
@@ -462,7 +517,7 @@ StorySerializeResult StoryDocumentIO::LoadFromJson(const std::string& JsonText, 
         OutDocument.Nodes.push_back(std::move(Node));
     }
 
-    if (!(OutDocument.Nodes.empty() && OutDocument.StartNodeId.empty())
+    if (!OutDocument.StartNodeId.empty()
         && SeenIds.find(OutDocument.StartNodeId) == SeenIds.end())
     {
         Result.Error = "startNodeId not found in nodes";

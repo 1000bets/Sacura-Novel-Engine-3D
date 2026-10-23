@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Rendering/AxisAlignedBounds.h"
+#include "Assets/StaticMeshDefaults.h"
 
 #include <SimpleMath.h>
 
@@ -29,8 +30,10 @@ struct StaticMeshResource
 {
     std::vector<StaticMeshVertex> Vertices;
     std::vector<uint32_t> Indices;
+    std::vector<uint32_t> SourceVertexIndices;
     std::vector<StaticMeshSubmesh> Submeshes;
     AxisAlignedBounds Bounds{};
+    StaticMeshDefaults Defaults;
 };
 
 void PrepareSurfaceVertices(StaticMeshResource& Mesh);

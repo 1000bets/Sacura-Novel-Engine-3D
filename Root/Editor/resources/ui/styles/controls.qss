@@ -1,5 +1,11 @@
 /* EditorSelect.jsx, objectInspector.css, editorTheme.css. Logical CSS pixels. */
 /* EditorWorkspace.jsx windows menu. */
+QDialog#MaterialEditorWindow, QDialog#MaterialParameterDialog { background: @--bg-app@; color: @--text-primary@; }
+QWidget#MaterialFields, QWidget#MaterialPreviewPanel { background: @--bg-panel@; }
+QDialog#MaterialEditorWindow QLabel { color: @--text-secondary@; }
+QDialog#MaterialEditorWindow QDoubleSpinBox, QDialog#MaterialEditorWindow QSpinBox,
+QDialog#MaterialEditorWindow QComboBox { min-height: 24px; }
+QPlainTextEdit#MaterialSourceEditor { font-family: "Cascadia Mono", "Consolas", monospace; }
 QWidget#StudioHeader QMenuBar { font-size: 10px; }
 QWidget#StudioHeader QMenuBar::item { padding: 5px 6px; }
 QWidget#StudioHeader QMenuBar::item:selected, QWidget#StudioHeader QMenuBar::item:pressed { background: @--accent-muted@; }
@@ -178,3 +184,19 @@ QLabel#StudioMenuGroup {
     border-top: 1px solid @--border-subtle@; color: @--text-muted@; font-size: 10px;
 }
 QLabel#StudioMenuEmpty { padding: 10px 7px; color: @--text-muted@; font-size: 11px; }
+
+QDialog#StaticMeshEditorWindow, QDialog#StaticMeshEditorWindow QScrollArea,
+QDialog#StaticMeshEditorWindow QScrollArea > QWidget > QWidget {
+    background: @--bg-app@; color: @--text-primary@;
+}
+QDialog#StaticMeshEditorWindow QLabel { color: @--text-secondary@; }
+QDialog#StaticMeshEditorWindow QDoubleSpinBox, QDialog#StaticMeshEditorWindow QComboBox { min-height: 24px; }
+
+QDialog#StaticMeshEditorWindow QListWidget {
+    background: @--bg-panel@; color: @--text-primary@;
+    border: 1px solid @--border-subtle@; border-radius: 4px; padding: 4px;
+}
+QDialog#StaticMeshEditorWindow QListWidget::item { padding: 6px; }
+QDialog#StaticMeshEditorWindow QListWidget::item:selected { background: @--bg-hover@; color: @--accent@; }
+QDialog#StaticMeshEditorWindow QTabWidget::pane { border: 1px solid @--border-subtle@; background: @--bg-app@; }
+QDialog#StaticMeshEditorWindow QPushButton:checked { background: @--bg-hover@; color: @--accent@; border-color: @--accent@; }

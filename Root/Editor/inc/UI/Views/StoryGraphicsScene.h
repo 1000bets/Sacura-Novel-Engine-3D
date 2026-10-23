@@ -28,6 +28,7 @@ class StoryGraphicsScene final : public QGraphicsScene
     void ShowEventMenu(const QString& Node, int Phase, const QString& Batch, QPoint Screen);
     std::function<void(QStringList)> DeleteRequested;
     std::function<void(QString, int, QString)> ConnectRequested;
+    std::function<void(QString, QString, QString, QString)> ConnectDataRequested;
     std::function<void(QMap<QString, QPointF>)> MoveRequested;
     std::function<void(QString)> StartRequested;
     std::function<void(QString, int, QString, QString)> AddEventRequested;

@@ -8,6 +8,9 @@
 #include "Reflection/TypeId.h"
 
 #include <cassert>
+#include <memory>
+
+struct PrefabInstanceData;
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -21,6 +24,8 @@ class GameObject : public Object
 
 public:
     ~GameObject() override;
+    const std::shared_ptr<PrefabInstanceData>& GetPrefabInstance() const { return PrefabInstance; }
+    void SetPrefabInstance(std::shared_ptr<PrefabInstanceData> Value) { PrefabInstance = std::move(Value); }
 
     const Transform& GetTransform() const { return m_Transform; }
     void SetTransform(const Transform& InTransform);
@@ -140,6 +145,7 @@ private:
     void RemoveChild(GameObject* Child);
     void RemoveComponentInternal(Component* ComponentInstance);
 
+    std::shared_ptr<PrefabInstanceData> PrefabInstance;
     Transform m_Transform;
     GameObject* m_Parent = nullptr;
     std::vector<GameObject*> m_Children;

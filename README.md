@@ -24,6 +24,12 @@ cmake --build --preset windows-msvc-debug --target SakuraEditor --parallel 4
 
 После сборки staged layout: `build/windows-msvc-debug/Stage/Bin/SakuraEditor.exe` + `build/windows-msvc-debug/Stage/Engine/{Content,Shaders,Config}`. Qt DLL и плагины копируются автоматически.
 
+Цель `SakuraEditorDistribution` создаёт готовый переносимый комплект Editor и Player.
+Из него игра экспортируется через «Файл → Экспорт игры в exe…» без компилятора:
+получается папка с `Game.exe`, библиотеками и независимой копией проекта.
+Форматы `.project`, ресурсов и скриптов сохраняются. Инструкция и ограничения
+Debug/Release описаны в [руководстве по дистрибутиву](docs/DISTRIBUTION.md).
+
 Открытие проекта:
 
 ```sh

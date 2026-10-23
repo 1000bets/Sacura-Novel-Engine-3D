@@ -259,6 +259,11 @@ bool BuildStaticMeshFromPrimitive(
             return false;
         }
     }
+    OutMesh.SourceVertexIndices.resize(OutMesh.Vertices.size());
+    for (uint32_t Index = 0; Index < OutMesh.SourceVertexIndices.size(); ++Index)
+    {
+        OutMesh.SourceVertexIndices[Index] = Index;
+    }
     PrepareSurfaceVertices(OutMesh);
 
     StaticMeshSubmesh Submesh{};
@@ -325,6 +330,7 @@ std::shared_ptr<ModelDocument> BuildDocument(
 
         auto MeshResource = std::make_shared<StaticMeshResource>();
         StaticMeshResource Combined{};
+        uint32_t SourceVertexOffset = 0;
         for (const fastgltf::Primitive& Primitive : SourceMesh.primitives)
         {
             StaticMeshResource Part{};
@@ -336,6 +342,13 @@ std::shared_ptr<ModelDocument> BuildDocument(
             const uint32_t VertexOffset = static_cast<uint32_t>(Combined.Vertices.size());
             const uint32_t IndexOffset = static_cast<uint32_t>(Combined.Indices.size());
             Combined.Vertices.insert(Combined.Vertices.end(), Part.Vertices.begin(), Part.Vertices.end());
+            uint32_t SourceVertexCount = 0;
+            for (const uint32_t SourceIndex : Part.SourceVertexIndices)
+            {
+                Combined.SourceVertexIndices.push_back(SourceIndex + SourceVertexOffset);
+                SourceVertexCount = std::max(SourceVertexCount, SourceIndex + 1);
+            }
+            SourceVertexOffset += SourceVertexCount;
             for (uint32_t IndexValue : Part.Indices)
             {
                 Combined.Indices.push_back(IndexValue + VertexOffset);
@@ -546,7 +559,14 @@ std::shared_ptr<const void> ModelLoader::Load(const AssetLoadContext& Context, A
                 return nullptr;
             }
 
-            return Document->Meshes[static_cast<size_t>(MeshIndex)].Mesh;
+            auto Mesh = std::make_shared<StaticMeshResource>(*Document->Meshes[static_cast<size_t>(MeshIndex)].Mesh);
+            std::string Error;
+            if (!StaticMeshDefaults::Parse(StaticMeshDefaults::Read(Context.Entry.Metadata, Context.Key), Mesh->Defaults, Error))
+            {
+                OutDiagnostic = AssetDiagnostic::Fail(AssetErrorCode::InvalidMetadata, "ModelLoader", Error, Context.Key);
+                return nullptr;
+            }
+            return Mesh;
         }
 
         OutDiagnostic = AssetDiagnostic::Fail(

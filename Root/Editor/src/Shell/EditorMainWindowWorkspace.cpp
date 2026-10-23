@@ -1,3 +1,8 @@
+#include "Prefab/PrefabEditorWindow.h"
+#include "UI/Views/CharacterWorkspaceView.h"
+#include "UI/Views/InputWorkspaceView.h"
+#include "UI/Views/MaterialEditorWindow.h"
+#include "UI/Views/StaticMeshEditorWindow.h"
 #include "Shell/EditorMainWindow.h"
 #include "UI/Views/WidgetWorkspaceView.h"
 #include "UI/Adapters/StoryGraphController.h"
@@ -383,6 +388,76 @@ bool EditorMainWindow::PromptSaveIfDirty()
 
 void EditorMainWindow::closeEvent(QCloseEvent* Event)
 {
+    for (QDialog* Dialog : findChildren<QDialog*>())
+    {
+        if (auto* MeshWindow = dynamic_cast<StaticMeshEditorWindow*>(Dialog))
+        {
+            if (!MeshWindow->close())
+            {
+                Event->ignore();
+                return;
+            }
+        }
+    }
+    if (Characters.HasDirtyDocuments())
+    {
+        const auto Answer = QMessageBox::question(this, tr("Персонажи"), tr("Сохранить изменения документов персонажей?"),
+            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+        if (Answer == QMessageBox::Cancel)
+        {
+            Event->ignore();
+            return;
+        }
+        if (Answer == QMessageBox::Save)
+        {
+            std::string Error;
+            if (!Characters.SaveAll(BoundEngine.GetAssetManager(), Error))
+            {
+                QMessageBox::warning(this, tr("Персонажи"), QString::fromStdString(Error));
+                Event->ignore();
+                return;
+            }
+        }
+        else
+        {
+            delete CharacterWorkspace.data();
+        }
+    }
+    if (CharacterWorkspace && !CharacterWorkspace->close())
+    {
+        Event->ignore();
+        return;
+    }
+    for (QDialog* Dialog : findChildren<QDialog*>())
+    {
+        if (auto* MaterialWindow = dynamic_cast<MaterialEditorWindow*>(Dialog))
+        {
+            if (!MaterialWindow->close())
+            {
+                Event->ignore();
+                return;
+            }
+        }
+    }
+    for (QDialog* Dialog : findChildren<QDialog*>())
+    {
+        if (auto* InputWindow = dynamic_cast<InputWorkspaceView*>(Dialog))
+        {
+            if (!InputWindow->close())
+            {
+                Event->ignore();
+                return;
+            }
+        }
+    }
+    for (PrefabEditorWindow* Window : findChildren<PrefabEditorWindow*>())
+    {
+        if (!Window->close())
+        {
+            Event->ignore();
+            return;
+        }
+    }
     if (!PromptSaveIfDirty())
     {
         Event->ignore();

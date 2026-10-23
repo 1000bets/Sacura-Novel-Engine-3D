@@ -1,5 +1,5 @@
 /* Native mapping of editorTheme.css: continuous rails, one command bar, quiet controls. */
-QMainWindow#EditorMainWindow, QWidget#EditorRoot {
+QMainWindow#EditorMainWindow, QMainWindow#PrefabEditorWindow, QWidget#EditorRoot, QDialog#EditorSettingsDialog {
     background: @--bg-app@; color: @--text-primary@;
     font-family: "Inter", "Segoe UI"; font-size: 13px;
 }
@@ -138,3 +138,11 @@ QPushButton[uiRole="viewportTool"]:focus, QPushButton[uiRole="viewportToggle"]:f
 QToolButton[uiRole="viewportUtility"]:focus { border: 1px solid @--border-strong@; }
 /* Tool windows share the editor surface when detached from the main shell. */
 QWidget[uiRole="workspaceFloating"] { background: @--bg-panel@; color: @--text-primary@; }
+
+QMainWindow#PrefabEditorWindow QToolBar, QWidget#PrefabComponents,
+QWidget#PrefabComponents QGroupBox { background: @--bg-panel@; }
+QWidget#PrefabComponents QGroupBox { border: 1px solid @--border-subtle@; margin-top: 8px; padding-top: 12px; }
+
+QDialog#CharacterWorkspaceView, QDialog#CharacterWorkspaceView QScrollArea, QDialog#CharacterWorkspaceView QScrollArea > QWidget > QWidget {
+    background: @--bg-app@; color: @--text-primary@;
+}

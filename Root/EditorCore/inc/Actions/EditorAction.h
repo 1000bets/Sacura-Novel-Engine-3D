@@ -11,7 +11,7 @@
 
 class EditorAction : public Object
 {
-    ENGINE_ABSTRACT_CLASS(EditorAction, Object, "editor.EditorAction", 1)
+    ENGINE_ABSTRACT_CLASS(EditorAction, Object, "editor.EditorAction")
 
 public:
     static constexpr const char* ObjectsCategory = "Objects";

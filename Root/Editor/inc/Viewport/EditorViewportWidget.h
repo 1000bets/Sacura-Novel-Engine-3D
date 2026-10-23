@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Transform.h"
+#include "Physics/PhysicsTypes.h"
 #include "Core/Object/Object.h"
 #include "UI/RenderViewportWidget.h"
 
@@ -10,6 +11,7 @@
 
 class EditorGizmoOverlay;
 class Engine;
+class Scene;
 class QDragEnterEvent;
 class QDragMoveEvent;
 class QDropEvent;
@@ -38,6 +40,8 @@ public:
     explicit EditorViewportWidget(QWidget* Parent = nullptr);
 
     void SetEngine(Engine* EngineInstance);
+    void SetPreviewScene(Scene* World);
+    Scene* GetToolScene() const;
     void SetSelectedTransform(const Transform& LocalTransform, const Transform& WorldTransform, ObjectHandle ObjectIdentity);
     void ClearSelectedTransform();
     void SetTransformCallbacks(TransformPreviewCallback Preview, TransformCommitCallback Commit);
@@ -58,6 +62,8 @@ public:
     Vector3 GetGizmoSnap() const;
     void SetNavigationVisible(bool bVisible);
     void SetCollisionVisible(bool bVisible);
+    void SetCollisionPreviewLines(std::vector<PhysicsDebugLine> Lines);
+    bool IsTransformManipulating() const;
     bool IsNavigationVisible() const { return bNavigationVisible; }
     bool IsCollisionVisible() const { return bCollisionVisible; }
 
@@ -67,6 +73,7 @@ signals:
     void CameraChanged();
     void SceneContextMenuRequested(QPoint Position);
     void EditorToolsDisabled();
+    void TransformCancelled();
     void GridVisibilityChanged(bool bVisible);
     void CameraMoveSpeedChanged(float Speed);
     void GizmoOperationChanged(EditorViewportWidget::GizmoOperation Operation);
@@ -120,6 +127,7 @@ private:
 
     EditorGizmoOverlay* Gizmo = nullptr;
     Engine* BoundEngine = nullptr;
+    ObjectHandle PreviewSceneIdentity;
     TransformPreviewCallback PreviewCallback;
     TransformCommitCallback CommitCallback;
     QTimer* NavigationTimer = nullptr;
@@ -132,9 +140,12 @@ private:
     GizmoOperation ActiveGizmoOperation = GizmoOperation::Translate;
     float MoveSpeed = 8.0f;
     bool bEditorToolsEnabled = false;
+    bool bBuildingGizmoOverlay = false;
     bool bKeyboardCaptured = false;
     bool bSnapEnabled = false;
     bool bGridVisible = true;
     bool bNavigationVisible = false;
     bool bCollisionVisible = false;
+    bool bCustomCollisionPreview = false;
+    std::vector<PhysicsDebugLine> CollisionPreviewLines;
 };

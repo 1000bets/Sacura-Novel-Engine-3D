@@ -325,11 +325,11 @@ struct ReflectionReadOnlyAccess
     }
 };
 
-#define ENGINE_CLASS_ROOT(ClassName, TypeIdLiteral, SchemaVersionValue) \
+#define ENGINE_CLASS_ROOT(ClassName, TypeIdLiteral) \
     SAKURA_OBJECT(ClassName) \
 public: \
     static constexpr const char* StaticReflectionTypeId() { return TypeIdLiteral; } \
-    static constexpr uint32_t StaticReflectionSchemaVersion() { return static_cast<uint32_t>(SchemaVersionValue); } \
+    static constexpr uint32_t StaticReflectionSchemaVersion() { return 1; } \
     static constexpr const char* StaticReflectionBaseTypeId() { return nullptr; } \
     static constexpr CreationPolicy StaticReflectionCreationPolicy() { return CreationPolicy::Concrete; } \
     friend struct ClassName##_ReflectionClassRegistrar; \
@@ -340,7 +340,7 @@ public: \
             static ClassRecipe Recipe{}; \
             Recipe.TypeIdString = TypeIdLiteral; \
             Recipe.BaseTypeIdString = nullptr; \
-            Recipe.SchemaVersion = static_cast<uint32_t>(SchemaVersionValue); \
+            Recipe.SchemaVersion = 1; \
             Recipe.Policy = CreationPolicy::Concrete; \
             Recipe.Origin = ReflectionOrigin::Native; \
             Recipe.Bind = &ClassName##_ReflectionClassRegistrar::Bind; \
@@ -352,11 +352,11 @@ public: \
     static ClassName##_ReflectionClassRegistrar s_ReflectionClassRegistrar; \
 private:
 
-#define ENGINE_CLASS(ClassName, BaseClassName, TypeIdLiteral, SchemaVersionValue) \
+#define ENGINE_CLASS(ClassName, BaseClassName, TypeIdLiteral) \
     SAKURA_OBJECT(ClassName) \
 public: \
     static constexpr const char* StaticReflectionTypeId() { return TypeIdLiteral; } \
-    static constexpr uint32_t StaticReflectionSchemaVersion() { return static_cast<uint32_t>(SchemaVersionValue); } \
+    static constexpr uint32_t StaticReflectionSchemaVersion() { return 1; } \
     static constexpr const char* StaticReflectionBaseTypeId() { return BaseClassName::StaticReflectionTypeId(); } \
     static constexpr CreationPolicy StaticReflectionCreationPolicy() { return CreationPolicy::Concrete; } \
     friend struct ClassName##_ReflectionClassRegistrar; \
@@ -367,7 +367,7 @@ public: \
             static ClassRecipe Recipe{}; \
             Recipe.TypeIdString = TypeIdLiteral; \
             Recipe.BaseTypeIdString = BaseClassName::StaticReflectionTypeId(); \
-            Recipe.SchemaVersion = static_cast<uint32_t>(SchemaVersionValue); \
+            Recipe.SchemaVersion = 1; \
             Recipe.Policy = CreationPolicy::Concrete; \
             Recipe.Origin = ReflectionOrigin::Native; \
             Recipe.Bind = &ClassName##_ReflectionClassRegistrar::Bind; \
@@ -379,11 +379,11 @@ public: \
     static ClassName##_ReflectionClassRegistrar s_ReflectionClassRegistrar; \
 private:
 
-#define ENGINE_ABSTRACT_CLASS(ClassName, BaseClassName, TypeIdLiteral, SchemaVersionValue) \
+#define ENGINE_ABSTRACT_CLASS(ClassName, BaseClassName, TypeIdLiteral) \
     SAKURA_OBJECT(ClassName) \
 public: \
     static constexpr const char* StaticReflectionTypeId() { return TypeIdLiteral; } \
-    static constexpr uint32_t StaticReflectionSchemaVersion() { return static_cast<uint32_t>(SchemaVersionValue); } \
+    static constexpr uint32_t StaticReflectionSchemaVersion() { return 1; } \
     static constexpr const char* StaticReflectionBaseTypeId() { return BaseClassName::StaticReflectionTypeId(); } \
     static constexpr CreationPolicy StaticReflectionCreationPolicy() { return CreationPolicy::Abstract; } \
     friend struct ClassName##_ReflectionClassRegistrar; \
@@ -394,7 +394,7 @@ public: \
             static ClassRecipe Recipe{}; \
             Recipe.TypeIdString = TypeIdLiteral; \
             Recipe.BaseTypeIdString = BaseClassName::StaticReflectionTypeId(); \
-            Recipe.SchemaVersion = static_cast<uint32_t>(SchemaVersionValue); \
+            Recipe.SchemaVersion = 1; \
             Recipe.Policy = CreationPolicy::Abstract; \
             Recipe.Origin = ReflectionOrigin::Native; \
             Recipe.Bind = &ClassName##_ReflectionClassRegistrar::Bind; \
@@ -406,11 +406,11 @@ public: \
     static ClassName##_ReflectionClassRegistrar s_ReflectionClassRegistrar; \
 private:
 
-#define ENGINE_ABSTRACT_CLASS_ROOT(ClassName, TypeIdLiteral, SchemaVersionValue) \
+#define ENGINE_ABSTRACT_CLASS_ROOT(ClassName, TypeIdLiteral) \
     SAKURA_OBJECT(ClassName) \
 public: \
     static constexpr const char* StaticReflectionTypeId() { return TypeIdLiteral; } \
-    static constexpr uint32_t StaticReflectionSchemaVersion() { return static_cast<uint32_t>(SchemaVersionValue); } \
+    static constexpr uint32_t StaticReflectionSchemaVersion() { return 1; } \
     static constexpr const char* StaticReflectionBaseTypeId() { return nullptr; } \
     static constexpr CreationPolicy StaticReflectionCreationPolicy() { return CreationPolicy::Abstract; } \
     friend struct ClassName##_ReflectionClassRegistrar; \
@@ -421,7 +421,7 @@ public: \
             static ClassRecipe Recipe{}; \
             Recipe.TypeIdString = TypeIdLiteral; \
             Recipe.BaseTypeIdString = nullptr; \
-            Recipe.SchemaVersion = static_cast<uint32_t>(SchemaVersionValue); \
+            Recipe.SchemaVersion = 1; \
             Recipe.Policy = CreationPolicy::Abstract; \
             Recipe.Origin = ReflectionOrigin::Native; \
             Recipe.Bind = &ClassName##_ReflectionClassRegistrar::Bind; \
@@ -457,10 +457,10 @@ private:
         return Instance; \
     }
 
-#define ENGINE_STRUCT(StructName, TypeIdLiteral, SchemaVersionValue) \
+#define ENGINE_STRUCT(StructName, TypeIdLiteral) \
 public: \
     static constexpr const char* StaticReflectionTypeId() { return TypeIdLiteral; } \
-    static constexpr uint32_t StaticReflectionSchemaVersion() { return static_cast<uint32_t>(SchemaVersionValue); } \
+    static constexpr uint32_t StaticReflectionSchemaVersion() { return 1; } \
     friend struct StructName##_ReflectionStructRegistrar; \
     struct StructName##_ReflectionStructRegistrar \
     { \
@@ -468,7 +468,7 @@ public: \
         { \
             static StructRecipe Recipe{}; \
             Recipe.TypeIdString = TypeIdLiteral; \
-            Recipe.SchemaVersion = static_cast<uint32_t>(SchemaVersionValue); \
+            Recipe.SchemaVersion = 1; \
             Recipe.Bind = &StructName##_ReflectionStructRegistrar::Bind; \
             PendingRegistry::Get().AddStructRecipe(Recipe); \
         } \
@@ -596,7 +596,7 @@ private:
 
 #define ENGINE_ENUM_VALUE(EnumType, ValueName) EnumValueDescriptor{#ValueName, static_cast<int64_t>(EnumType::ValueName)}
 
-#define ENGINE_REFLECT_ENUM(EnumType, TypeIdLiteral, SchemaVersionValue, ...) \
+#define ENGINE_REFLECT_ENUM(EnumType, TypeIdLiteral, ...) \
     template <> struct ReflectionEnumType<EnumType> \
     { \
         static TypeId GetTypeId() { return TypeId{TypeIdLiteral}; } \
@@ -607,7 +607,7 @@ private:
         { \
             static EnumRecipe Recipe{}; \
             Recipe.TypeIdString = TypeIdLiteral; \
-            Recipe.SchemaVersion = static_cast<uint32_t>(SchemaVersionValue); \
+            Recipe.SchemaVersion = 1; \
             Recipe.Bind = &EnumType##_ReflectionEnumRegistrar::Bind; \
             PendingRegistry::Get().AddEnumRecipe(Recipe); \
         } \
@@ -615,7 +615,7 @@ private:
         { \
             EnumDescriptor Descriptor; \
             Descriptor.Id = TypeId{TypeIdLiteral}; \
-            Descriptor.SchemaVersion = SchemaVersionValue; \
+            Descriptor.SchemaVersion = 1; \
             Descriptor.Values = {__VA_ARGS__}; \
             ReflectionSubsystem::Get().RegisterEnumDescriptor(std::move(Descriptor)); \
         } \

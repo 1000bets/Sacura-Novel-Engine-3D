@@ -1,4 +1,6 @@
+#include "World/Components/CharacterComponent.h"
 #include "Shell/EditorMainWindow.h"
+#include "Automation/NarrativeTools.h"
 #include "UI/Views/WidgetWorkspaceView.h"
 #include "UI/Adapters/StoryGraphController.h"
 #include "UI/Adapters/WorkspaceDockController.h"
@@ -28,6 +30,7 @@ void EditorMainWindow::InitializeStoryAuthoring()
                                           qEnvironmentVariable("SAKURA_EDITOR_LAYOUT_FILE"));
     }
     StoryAuthoring = std::make_unique<EditorUi::StoryGraphController>(*StoryGraph, *StoryInspector);
+    RegisterNarrativeTools(*Toolset, BoundEngine, *StoryAuthoring);
     StoryAuthoring->SelectionActivated = [this]()
     {
         HierarchyTree->clearSelection();
@@ -104,6 +107,8 @@ void EditorMainWindow::RefreshStoryTargets()
         return;
     }
     QVector<QPair<QString, QString>> Objects;
+    QVector<QPair<QString, QString>> NarrativeObjects;
+    QMap<QString, QVector<QPair<QString, QString>>> CharacterAnimations;
     if (auto* Scene = GetEditScene())
     {
         for (auto* Object : Scene->GetAllObjects())
@@ -112,6 +117,29 @@ void EditorMainWindow::RefreshStoryTargets()
             {
                 Objects.push_back(
                     {QString::fromStdString(Object->GetPersistentId()), QString::fromStdString(Object->GetName())});
+                if (const auto* Character = Object->GetComponent<CharacterComponent>())
+                {
+                    AssetRegistryEntry Entry;
+                    CharacterDefinition Definition;
+                    std::string Error;
+                    if (BoundEngine.GetAssetRegistry().TryGetById(Character->Character.Asset, Entry)
+                        && CharacterDefinition::Read(Entry.AbsolutePath, Definition, Error))
+                    {
+                        auto& Choices = CharacterAnimations[QString::fromStdString(Object->GetPersistentId())];
+                        for (const auto& Animation : Definition.Animations)
+                        {
+                            if (Animation.bEnabled)
+                            {
+                                Choices.push_back({QString::fromStdString(Animation.Identifier), QString::fromStdString(Animation.Name)});
+                            }
+                        }
+                    }
+                }
+                for (const auto* Component : Object->GetAllComponents())
+                {
+                    NarrativeObjects.push_back({QString::fromStdString(Component->GetPersistentId()),
+                        QString::fromStdString(Object->GetName() + " / " + Component->GetClass()->GetTypeId().Value)});
+                }
             }
         }
     }
@@ -129,7 +157,8 @@ void EditorMainWindow::RefreshStoryTargets()
             Object.second = Name + QStringLiteral(" (%1)").arg(++Ordinals[Name]);
         }
     }
-    StoryAuthoring->SetObjects(std::move(Objects));
+    NarrativeObjects += Objects;
+    StoryAuthoring->SetObjects(std::move(Objects), std::move(NarrativeObjects), std::move(CharacterAnimations));
 }
 
 void EditorMainWindow::SaveActiveDocument()

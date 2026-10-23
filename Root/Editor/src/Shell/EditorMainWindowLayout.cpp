@@ -24,6 +24,8 @@
 #include <QToolButton>
 #include <QWidgetAction>
 #include "Viewport/EditorViewportWidget.h"
+#include "UI/GameInputAdapter.h"
+#include "UI/Views/InputWorkspaceView.h"
 #include "Engine.h"
 #include "World/Simulation/PlaySession.h"
 #include "World/Scene.h"
@@ -121,6 +123,7 @@ void EditorMainWindow::BuildMenus()
     FileMenu->addAction(QString::fromUtf8("\xD0\xA1\xD0\xBE\xD1\x85\xD1\x80\xD0\xB0\xD0\xBD\xD0\xB8\xD1\x82\xD1\x8C \xD1\x81\xD1\x86\xD0\xB5\xD0\xBD\xD1\x83"), this, &EditorMainWindow::OnSaveScene);
     FileMenu->addAction(tr("Сохранить"), this, &EditorMainWindow::SaveActiveDocument, QKeySequence::Save);
     FileMenu->addAction(tr("Сохранить историю"), this, [this]() { SaveStory(); });
+    FileMenu->addAction(tr("Экспорт игры в exe..."), this, &EditorMainWindow::OnExportGame);
     FileMenu->addSeparator();
     FileMenu->addAction(QString::fromUtf8("\xD0\x92\xD1\x8B\xD1\x85\xD0\xBE\xD0\xB4"), this, &QWidget::close);
 
@@ -133,6 +136,11 @@ void EditorMainWindow::BuildMenus()
     EditMenu->addSeparator();
     EditMenu->addAction(QString::fromUtf8("Create Object"), this, &EditorMainWindow::OnCreateEmptyObject);
     EditMenu->addAction(QString::fromUtf8("Delete Object"), this, &EditorMainWindow::OnDeleteSelectedObject, QKeySequence::Delete);
+    EditMenu->addSeparator();
+    EditMenu->addAction(tr("Настройки проекта…"), this, [this]() { ShowSettings(0); });
+    EditMenu->addAction(tr("Настройки редактора…"), this, [this]() { ShowSettings(1); });
+    EditMenu->addAction(tr("MCP Server и Toolset…"), this, [this]() { ShowSettings(2); });
+    EditMenu->addAction(tr("Консоль"), this, [this]() { Docking->Open(*ConsolePage); }, QKeySequence("Ctrl+`"));
 
     QMenu* CreateMenu = menuBar()->addMenu(QString::fromUtf8("\xD0\xA1\xD0\xBE\xD0\xB7\xD0\xB4\xD0\xB0\xD1\x82\xD1\x8C"));
     QMenu* CreateObjectsMenu = CreateMenu->addMenu(QString::fromUtf8("\xD0\x9E\xD0\xB1\xD1\x8A\xD0\xB5\xD0\xBA\xD1\x82\xD1\x8B"));
@@ -177,6 +185,12 @@ void EditorMainWindow::BuildMenus()
     QMenu* WindowMenu = menuBar()->addMenu(QString::fromUtf8("\xD0\x9E\xD0\xBA\xD0\xBD\xD0\xBE"));
     WindowMenu->setObjectName("WindowsMenu");
     WindowMenu->setTitle(tr("Окна"));
+    WindowMenu->addAction(tr("Ввод"), this, [this]()
+    {
+        auto* Workspace = new InputWorkspaceView(BoundEngine, this);
+        Workspace->setAttribute(Qt::WA_DeleteOnClose);
+        Workspace->show();
+    });
     auto* RestoreLayout = WindowMenu->addAction(tr("Восстановить раскладку"), this, [this]()
     {
         if (LayoutCombo != nullptr)
@@ -281,6 +295,7 @@ void EditorMainWindow::BuildUi()
     Docking->AddArea("scene", tr("Локация и игра"), *SceneTabs, *ViewportPanel);
 
     PrimaryViewport = new EditorViewportWidget(ViewportPanel);
+    new GameInputAdapter(BoundEngine, PrimaryViewport);
     connect(PrimaryViewport, &EditorViewportWidget::NavigationVisibilityChanged, this, [this](bool bVisible)
     {
         if (QAction* Action = findChild<QAction*>("ShowNavigationAction"))
@@ -568,7 +583,19 @@ void EditorMainWindow::BuildUi()
     ObjectInspectorPage->AddComponentRequested = [this, ObjectInspectorPage](int Index) {
         if (BoundEngine.GetPlaySession().IsSimulating() || Index < 0) { return; }
         const auto Type = ObjectInspectorPage->AddComponentType->itemData(Index).toString().toStdString();
-        if (!Type.empty()) { RunEditorActionByTypeId(Type.c_str()); }
+        Class* ComponentClass = ReflectionSubsystem::Get().FindClass(TypeId{Type});
+        if (ComponentClass != nullptr && ComponentClass->GetOrigin() == ReflectionOrigin::Python
+            && ComponentClass->IsA(TypeId{"engine.ScriptComponent"}))
+        {
+            if (GameObject* Selected = GetSelectedGameObject())
+            {
+                ExecuteCommand(MakeAddComponentCommand(GetEditScene(), Selected->GetObjectHandle(), TypeId{Type}));
+            }
+        }
+        else if (!Type.empty())
+        {
+            RunEditorActionByTypeId(Type.c_str());
+        }
     };
     connect(ObjectInspectorPage->ParentObject, &QComboBox::activated, this, [this, ObjectInspectorPage](int Index) {
         auto* Selected = GetSelectedGameObject();
@@ -607,6 +634,7 @@ void EditorMainWindow::BuildUi()
     StoryInspector = new EditorUi::StoryInspectorView(InspectorPages);
     InspectorPages->addWidget(StoryInspector);
     InspectorTabs->addTab(InspectorPages, QString::fromUtf8("\xD0\x98\xD0\xBD\xD1\x81\xD0\xBF\xD0\xB5\xD0\xBA\xD1\x82\xD0\xBE\xD1\x80"));
+    InitializePrefabPanel(InspectorLayout);
     InspectorLayout->addWidget(InspectorTabs);
 
     auto AddPanelControls = [this](QTabWidget* Tabs, QWidget* Panel, const QString& Title)
@@ -823,10 +851,11 @@ void EditorMainWindow::PopulateDockPages()
     BuildStoryDockPage();
     BuildRenderStatisticsDockPage();
     BuildPostprocessDockPage();
+    BuildConsoleDockPage();
 
     auto* WindowMenu = findChild<QMenu*>("WindowsMenu");
     WindowMenu->addSeparator();
-    const QStringList PageIds = {"story", "widgets", "active", "content", "playback", "statistics", "postprocess"};
+    const QStringList PageIds = {"story", "widgets", "active", "content", "playback", "statistics", "postprocess", "console"};
     for (int Index = 0; Index < DockTabs->count(); ++Index)
     {
         QWidget* Page = DockTabs->widget(Index);
@@ -950,9 +979,21 @@ void EditorMainWindow::BuildWindowsMenuView()
         Toggle->setProperty("uiRole", "windowsMenuRow");
         Toggle->setFlat(true);
         Toggle->setEnabled(Visibility != nullptr);
+        if (Id == "characters")
+        {
+            Toggle->setEnabled(true);
+            connect(Toggle, &QPushButton::clicked, this, [this, Menu]()
+            {
+                OpenCharacterWorkspace();
+                Menu->hide();
+            });
+        }
         Toggle->setAccessibleName(Label);
         Toggle->setIconSize(QSize(13, 13));
-        if (!Visibility) Toggle->setToolTip(tr("Это окно пока недоступно в нативном редакторе"));
+        if (!Visibility && Id != "characters")
+        {
+            Toggle->setToolTip(tr("Это окно пока недоступно в нативном редакторе"));
+        }
         RowLayout->addWidget(Toggle, 1);
         auto* Reveal = new QPushButton(Row);
         Reveal->setObjectName("WindowsMenuReveal_" + Id);
@@ -991,7 +1032,6 @@ void EditorMainWindow::BuildWindowsMenuView()
         {"subscenes", "Сабсцены", "PanelsTopLeft", nullptr},
         {"characters", "Персонажи", "Users", nullptr},
         {"widgets", "Виджеты UI", "PanelsTopLeft", WidgetWorkspace},
-        {"gameplay", "Игровые механики", "Gamepad2", nullptr},
         {"scripting", "Скриптинг", "Code2", nullptr},
         {"cameras", "Камеры", "Video", nullptr},
         {"input", "Ввод", "Keyboard", nullptr},

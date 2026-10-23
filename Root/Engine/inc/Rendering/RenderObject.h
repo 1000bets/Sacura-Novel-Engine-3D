@@ -4,6 +4,7 @@
 #include "Rendering/AxisAlignedBounds.h"
 #include "Rendering/RenderResourceHandles.h"
 #include "Materials/MaterialRenderSnapshot.h"
+#include "Assets/Resources/StaticMeshResource.h"
 
 #include <SimpleMath.h>
 #include <string>
@@ -14,6 +15,7 @@ struct RenderObject
 {
     Matrix WorldMatrix = Matrix::Identity;
     MeshHandle Mesh;
+    std::shared_ptr<const StaticMeshResource> PosedMesh;
     std::shared_ptr<const MaterialRenderSnapshot> MaterialSnapshot;
     Color BaseColor = Color(1.f, 1.f, 1.f, 1.f);
     AxisAlignedBounds Bounds;

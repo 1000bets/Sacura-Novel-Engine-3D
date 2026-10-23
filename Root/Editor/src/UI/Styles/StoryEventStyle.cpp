@@ -18,7 +18,7 @@ QStringList StoryEventStyle::Joins()
 QStringList StoryEventStyle::ActionTypes()
 {
     return {QObject::tr("Ожидание"), QObject::tr("Переместить объект"), QObject::tr("Смена камеры"),
-            QObject::tr("Движение по маршруту")};
+            QObject::tr("Движение по маршруту"), QObject::tr("Анимация персонажа")};
 }
 QString StoryEventStyle::Summary(const StoryGraphAction& Action)
 {

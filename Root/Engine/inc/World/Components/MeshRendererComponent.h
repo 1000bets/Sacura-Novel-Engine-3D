@@ -19,7 +19,7 @@ using namespace DirectX::SimpleMath;
 
 class MeshRendererComponent : public Component
 {
-    ENGINE_CLASS(MeshRendererComponent, Component, "engine.MeshRendererComponent", 1)
+    ENGINE_CLASS(MeshRendererComponent, Component, "engine.MeshRendererComponent")
 
 public:
     std::string MaterialDiagnostic;
@@ -30,6 +30,7 @@ public:
     std::string MeshSubAssetId;
     std::string MaterialAssetId;
     MaterialSlotOverrides MaterialSlots;
+    std::map<int32_t, AssetKey> DefaultMaterialSlots;
     std::map<int32_t, std::shared_ptr<DynamicMaterialInstance>> DynamicMaterialSlots;
     std::map<int32_t, std::shared_ptr<const MaterialRenderSnapshot>> SlotSnapshots;
     std::vector<StaticMeshSubmesh> Submeshes;
@@ -39,6 +40,7 @@ public:
     std::shared_ptr<const MaterialRenderSnapshot> MaterialSnapshot;
 
     MeshHandle Mesh;
+    std::shared_ptr<const StaticMeshResource> PosedMesh;
     MaterialHandle Material;
     TextureHandle BaseColorTexture;
     RenderMaterial SurfaceMaterial;
@@ -63,6 +65,7 @@ public:
     void SetMeshAssetId(std::string Value)
     {
         MeshAssetId = std::move(Value);
+        DefaultMaterialSlots.clear();
         Mesh = MeshHandle{};
         bMissingAsset = false;
         bPendingAsset = false;
@@ -71,6 +74,7 @@ public:
     void SetMeshSubAssetId(std::string Value)
     {
         MeshSubAssetId = std::move(Value);
+        DefaultMaterialSlots.clear();
         Mesh = MeshHandle{};
         bMissingAsset = false;
         bPendingAsset = false;

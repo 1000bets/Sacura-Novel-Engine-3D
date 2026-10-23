@@ -50,6 +50,14 @@ class StoryPortItem final : public QGraphicsItem
     }
     void paint(QPainter* Painter, const QStyleOptionGraphicsItem*, QWidget*) override
     {
+        if (Port >= 1000)
+        {
+            Painter->setRenderHint(QPainter::Antialiasing);
+            Painter->setPen(QPen(EditorStyle::Color("--accent"), 2));
+            Painter->setBrush(EditorStyle::Color("--bg-panel"));
+            Painter->drawEllipse(QPointF(0, 0), 6, 6);
+            return;
+        }
         StoryGraphStyle::PaintPort(*Painter, bOutput, bHovered);
     }
     void hoverEnterEvent(QGraphicsSceneHoverEvent*) override { bHovered = true; update(); }
@@ -75,11 +83,26 @@ class StoryCardItem final : public QGraphicsItem
         setData(0, Node.Identity);
         Geometry = StoryGraphStyle::Layout(Node);
         setToolTip(Node.Text);
-        auto* Input = new StoryPortItem(Node.Identity, -2, false, this);
-        Input->setPos(StoryGraphStyle::InputAnchor());
+        if (!Node.NarrativeDefinition.bPure)
+        {
+            auto* Input = new StoryPortItem(Node.Identity, -2, false, this);
+            Input->setPos(StoryGraphStyle::InputAnchor());
+        }
+        for (int Index = 0; Index < Geometry.DataInputs.size(); ++Index)
+        {
+            auto* Input = new StoryPortItem(Node.Identity, 1000 + Index, false, this);
+            Input->setPos(-4, Geometry.DataInputs[Index].center().y());
+            Input->setToolTip(QString::fromStdString(Node.NarrativeDefinition.Inputs[Index].Property.Id.Value));
+        }
+        for (int Index = 0; Index < Geometry.DataOutputs.size(); ++Index)
+        {
+            auto* Output = new StoryPortItem(Node.Identity, 1000 + Index, true, this);
+            Output->setPos(StoryGraphStyle::NodeWidth + 4, Geometry.DataOutputs[Index].center().y());
+            Output->setToolTip(QString::fromStdString(Node.NarrativeDefinition.Outputs[Index].Property.Id.Value));
+        }
         for (int Index = 0; Index < StoryGraphStyle::OutputCount(Node); ++Index)
         {
-            const int Port = Node.KindId == 1 ? Index : -1;
+            const int Port = (Node.KindId == 1 || Node.KindId == 4) ? Index : -1;
             auto* Output = new StoryPortItem(Node.Identity, Port, true, this);
             Output->setPos(StoryGraphStyle::OutputAnchor(Node, Port, &Geometry));
         }
@@ -148,6 +171,19 @@ class StoryEdgeItem final : public QGraphicsPathItem
     }
     void paint(QPainter* Painter, const QStyleOptionGraphicsItem*, QWidget*) override
     {
+        if (InputIndex >= 0)
+        {
+            Painter->setRenderHint(QPainter::Antialiasing);
+            QPen Pen(EditorStyle::Color("--accent"), 2);
+            if (isSelected() || bHovered)
+            {
+                Pen.setWidth(3);
+            }
+            Painter->setPen(Pen);
+            Painter->setBrush(Qt::NoBrush);
+            Painter->drawPath(path());
+            return;
+        }
         StoryGraphStyle::PaintConnection(*Painter, path(), isSelected() || bHovered);
     }
     void hoverEnterEvent(QGraphicsSceneHoverEvent*) override { bHovered = true; update(); }
@@ -155,6 +191,9 @@ class StoryEdgeItem final : public QGraphicsPathItem
     QString Source;
     int Port = -1;
     QString Target;
+    QString InputName;
+    QString OutputName;
+    int InputIndex = -1;
     bool bHovered = false;
 };
 
@@ -199,11 +238,46 @@ void StoryGraphicsScene::SetGraph(const StoryGraphModel& Model)
             {
                 continue;
             }
-            auto* Edge = new StoryEdgeItem(Node.Identity, Node.KindId == 1 ? Index : -1, Target);
+            auto* Edge = new StoryEdgeItem(Node.Identity, (Node.KindId == 1 || Node.KindId == 4) ? Index : -1, Target);
             addItem(Edge);
             Edges.push_back(Edge);
             IncidentEdges[Node.Identity].push_back(Edge);
             if (Target != Node.Identity) { IncidentEdges[Target].push_back(Edge); }
+        }
+    }
+    for (const auto& Node : Model.Nodes)
+    {
+        for (size_t InputIndex = 0; InputIndex < Node.NarrativeDefinition.Inputs.size(); ++InputIndex)
+        {
+            const auto& InputName = Node.NarrativeDefinition.Inputs[InputIndex].Property.Id.Value;
+            const auto Connection = Node.NarrativeSources.find(InputName);
+            if (Connection == Node.NarrativeSources.end())
+            {
+                continue;
+            }
+            const QString Producer = QString::fromStdString(Connection->second.first);
+            const auto* Source = Cards.value(Producer);
+            if (!Source)
+            {
+                continue;
+            }
+            for (size_t OutputIndex = 0; OutputIndex < Source->Node.NarrativeDefinition.Outputs.size(); ++OutputIndex)
+            {
+                const auto& OutputName = Source->Node.NarrativeDefinition.Outputs[OutputIndex].Property.Id.Value;
+                if (OutputName != Connection->second.second)
+                {
+                    continue;
+                }
+                auto* Edge = new StoryEdgeItem(Producer, 1000 + static_cast<int>(OutputIndex), Node.Identity);
+                Edge->InputName = QString::fromStdString(InputName);
+                Edge->OutputName = QString::fromStdString(OutputName);
+                Edge->InputIndex = static_cast<int>(InputIndex);
+                Edge->setToolTip(tr("Данные. Delete — удалить связь"));
+                addItem(Edge);
+                Edges.push_back(Edge);
+                IncidentEdges[Producer].push_back(Edge);
+                IncidentEdges[Node.Identity].push_back(Edge);
+            }
         }
     }
     UpdateConnections();
@@ -231,7 +305,12 @@ void StoryGraphicsScene::UpdateConnections(const QString& MovedNode)
             const QPointF From = Source->pos() + StoryGraphStyle::OutputAnchor(Source->Node, Edge->Port, &Source->Geometry)
                                  + QPointF(StoryGraphStyle::PortSize / 2, 0);
             // End at the socket border so its square does not cover the arrowhead.
-            const QPointF To = Target->pos() + StoryGraphStyle::InputAnchor() - QPointF(StoryGraphStyle::PortSize / 2, 0);
+            QPointF Anchor = StoryGraphStyle::InputAnchor();
+            if (Edge->InputIndex >= 0)
+            {
+                Anchor = QPointF(-4, Target->Geometry.DataInputs[Edge->InputIndex].center().y());
+            }
+            const QPointF To = Target->pos() + Anchor - QPointF(StoryGraphStyle::PortSize / 2, 0);
             Edge->setPath(ConnectionPath(From, To));
         }
     }
@@ -279,7 +358,14 @@ bool StoryGraphicsScene::DeleteSelection()
         if (Item->type() == EdgeItemType && ConnectRequested)
         {
             const auto* Edge = static_cast<StoryEdgeItem*>(Item);
-            ConnectRequested(Edge->Source, Edge->Port, {});
+            if (Edge->InputIndex >= 0 && ConnectDataRequested)
+            {
+                ConnectDataRequested({}, {}, Edge->Target, Edge->InputName);
+            }
+            else
+            {
+                ConnectRequested(Edge->Source, Edge->Port, {});
+            }
             return true;
         }
     }
@@ -477,10 +563,42 @@ void StoryGraphicsScene::mouseReleaseEvent(QGraphicsSceneMouseEvent* Event)
     }
     if (Preview != nullptr)
     {
+        if (ConnectionPort >= 1000)
+        {
+            const auto* Source = Cards.value(ConnectionSource);
+            const QString Output = QString::fromStdString(Source->Node.NarrativeDefinition.Outputs[ConnectionPort - 1000].Property.Id.Value);
+            const auto SourceIdentity = ConnectionSource;
+            QString TargetIdentity;
+            QString Input;
+            for (auto* Item : items(Event->scenePos()))
+            {
+                if (Item->type() == PortItemType)
+                {
+                    const auto* Port = static_cast<StoryPortItem*>(Item);
+                    if (!Port->bOutput && Port->Port >= 1000)
+                    {
+                        TargetIdentity = Port->Identity;
+                        Input = QString::fromStdString(Cards.value(TargetIdentity)->Node.NarrativeDefinition.Inputs[Port->Port - 1000].Property.Id.Value);
+                        break;
+                    }
+                }
+            }
+            CancelConnection();
+            if (!TargetIdentity.isEmpty() && ConnectDataRequested)
+            {
+                ConnectDataRequested(SourceIdentity, Output, TargetIdentity, Input);
+            }
+            Event->accept();
+            return;
+        }
         QString Target;
         qreal Closest = 25;
         for (auto* Card : Cards)
         {
+            if (Card->Node.NarrativeDefinition.bPure)
+            {
+                continue;
+            }
             const qreal Distance = QLineF(Event->scenePos(), Card->pos() + StoryGraphStyle::InputAnchor()).length();
             if (Distance < Closest)
             {

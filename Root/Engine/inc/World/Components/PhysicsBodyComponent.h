@@ -5,14 +5,18 @@
 #include "Physics/PhysicsTypes.h"
 #include "Assets/Resources/StaticMeshResource.h"
 #include <memory>
+#include <optional>
 
 class AssetManager;
 
 class PhysicsBodyComponent : public Component
 {
-    ENGINE_CLASS(PhysicsBodyComponent, Component, "engine.PhysicsBodyComponent", 1)
+    ENGINE_CLASS(PhysicsBodyComponent, Component, "engine.PhysicsBodyComponent")
 
 public:
+    bool bUseMeshDefaults = false;
+    ENGINE_REFLECT_FIELD(PhysicsBodyComponent, bUseMeshDefaults, "use_mesh_defaults", RF_EDITOR_EDITABLE, RF_SERIALIZABLE,
+        RF_CATEGORY("Physics"), RF_DISPLAY_NAME("Use Static Mesh Collision Defaults"))
     int64_t MotionType = 0;
     ENGINE_REFLECT_FIELD(PhysicsBodyComponent, MotionType, "motion_type", RF_EDITOR_EDITABLE, RF_SERIALIZABLE,
         RF_SCRIPT_READ_WRITE, RF_CATEGORY("Physics"), RF_DISPLAY_NAME("Motion Type (0 Static, 1 Dynamic, 2 Kinematic, 3 Character)"), RF_UI_RANGE(0, 3))
@@ -86,6 +90,7 @@ public:
     ENGINE_REFLECT_FIELD(PhysicsBodyComponent, CollisionMeshSubAssetId, "collision_mesh_sub_asset_id", RF_EDITOR_EDITABLE, RF_SERIALIZABLE,
         RF_SCRIPT_READ_WRITE, RF_CATEGORY("Physics"), RF_DISPLAY_NAME("Collision Mesh Subasset"), RF_EDITOR_HIDDEN)
 
+    void SetCollisionPreview(const StaticMeshDefaults& Defaults) { CollisionPreview = Defaults; bUseMeshDefaults = true; }
     bool PrepareCollisionMesh(AssetManager* Assets);
     bool IsCollisionMeshPending() const { return bCollisionMeshPending; }
     bool BuildDefinition(PhysicsBodyDefinition& Definition, std::string& Error) const;
@@ -110,12 +115,14 @@ protected:
     PhysicsBodyComponent() = default;
 
 private:
+    std::optional<StaticMeshDefaults> CollisionPreview;
     std::shared_ptr<const StaticMeshResource> CollisionMesh;
     uint64_t MeshFingerprint = 0;
     std::string Diagnostic;
     bool bCollisionMeshPending = false;
 };
 ENGINE_CLASS_END(PhysicsBodyComponent)
+ENGINE_IMPLEMENT_FIELD(PhysicsBodyComponent, bUseMeshDefaults)
 ENGINE_IMPLEMENT_FIELD(PhysicsBodyComponent, MotionType)
 ENGINE_IMPLEMENT_FIELD(PhysicsBodyComponent, ShapeType)
 ENGINE_IMPLEMENT_FIELD(PhysicsBodyComponent, HalfExtents)
@@ -144,7 +151,7 @@ ENGINE_IMPLEMENT_READONLY(PhysicsBodyComponent, DiagnosticProperty, std::string,
 
 class CharacterControllerComponent : public PhysicsBodyComponent
 {
-    ENGINE_CLASS(CharacterControllerComponent, PhysicsBodyComponent, "engine.CharacterControllerComponent", 1)
+    ENGINE_CLASS(CharacterControllerComponent, PhysicsBodyComponent, "engine.CharacterControllerComponent")
 protected:
     CharacterControllerComponent()
     {

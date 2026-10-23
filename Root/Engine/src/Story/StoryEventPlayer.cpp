@@ -29,6 +29,7 @@ class NativeActionTask final : public Authoring::OperationTask
         Action.DurationSeconds = static_cast<float>(Values.at("seconds").Float64Value);
         Action.TargetObjectId = Values.at("target").StringValue;
         Action.TargetObjectName = Values.at("legacyTarget").StringValue;
+        Action.AnimationId = Values.at("animationId").StringValue;
         Action.TargetPosition =
             Vector3(static_cast<float>(Values.at("x").Float64Value), static_cast<float>(Values.at("y").Float64Value),
                     static_cast<float>(Values.at("z").Float64Value));
@@ -77,10 +78,11 @@ std::shared_ptr<const Authoring::OperationRegistry> Operations()
         Operation.Id = "sacura.story.native-action";
         Operation.Label = "Story action";
         Operation.Contexts = {Authoring::CallSite::Event};
-        Operation.Parameters = {{"kind", "Kind", {ReflectedValue::Kind::Int64, 1., 3.}, {}},
+        Operation.Parameters = {{"kind", "Kind", {ReflectedValue::Kind::Int64, 1., 4.}, {}},
                                 {"seconds", "Duration", {ReflectedValue::Kind::Float64, 0., {}}, {}},
                                 {"target", "Target", {ReflectedValue::Kind::String}, {}},
                                 {"legacyTarget", "Legacy target", {ReflectedValue::Kind::String}, {}},
+                                {"animationId", "Animation", {ReflectedValue::Kind::String}, {}},
                                 {"rotate", "Rotation", {ReflectedValue::Kind::Bool}, {}},
                                 {"copy", "Copy target", {ReflectedValue::Kind::Bool}, {}}};
         for (const char* Id : {"x", "y", "z", "qx", "qy", "qz", "qw"})
@@ -112,6 +114,7 @@ Authoring::OperationCall Call(const StoryActionDefinition& Action)
     Result.Parameters["kind"] = ReflectedValue::MakeInt64(static_cast<int>(Action.Kind));
     Result.Parameters["target"] = ReflectedValue::MakeString(Action.TargetObjectId);
     Result.Parameters["legacyTarget"] = ReflectedValue::MakeString(Action.TargetObjectName);
+    Result.Parameters["animationId"] = ReflectedValue::MakeString(Action.AnimationId);
     Result.Parameters["rotate"] = ReflectedValue::MakeBool(Action.bHasTargetRotation);
     Result.Parameters["copy"] = ReflectedValue::MakeBool(Action.bUseTargetObjectTransform);
     const double Values[] = {Action.TargetPosition.x, Action.TargetPosition.y, Action.TargetPosition.z,
@@ -195,7 +198,7 @@ struct StoryEventPlayer::Implementation
             {
                 // Navigation moves independently in the world tick. It can be
                 // cancelled, but suspending its executor alone would not pause it.
-                if (Action.Kind == StoryActionKind::NavigateTo)
+                if (Action.Kind == StoryActionKind::NavigateTo || Action.Kind == StoryActionKind::CharacterAnimation)
                 {
                     Event->Snapshot.bCanPause = false;
                 }
@@ -294,6 +297,19 @@ void StoryEventPlayer::BeginPhase(const StoryDocument& Document, const StoryNode
     State->StartedWaiting.clear();
     State->bReady = false;
     State->Pump();
+}
+
+bool StoryEventPlayer::Trigger(const StoryDocument& Document, const std::string& EventId)
+{
+    if (!FindStoryEvent(Document, EventId))
+    {
+        return false;
+    }
+    State->Definitions.Events = Document.Events;
+    StoryEventBinding Placement;
+    Placement.EventId = EventId;
+    Placement.Join = StoryEventJoin::None;
+    return State->Start(Placement) != nullptr;
 }
 
 void StoryEventPlayer::Tick(float DeltaSeconds)

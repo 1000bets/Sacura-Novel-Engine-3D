@@ -9,6 +9,35 @@ namespace EditorUi
 StoryGraphController::StoryGraphController(StoryWorkspaceView& InView, StoryInspectorView& InInspector)
     : View(InView), Inspector(InInspector)
 {
+    View.AddNarrativeRequested = [this](QString Type, QPointF Position)
+    {
+        if (bLocked || !Document.IsOpen())
+        {
+            return;
+        }
+        FlushEdits();
+        StoryNodeId Created;
+        std::string Error;
+        const bool Success = Document.AddNarrativeNode(Type.toStdString(), {Position.x(), Position.y()}, Created, Error);
+        if (Success)
+        {
+            Selected = QString::fromStdString(Created);
+            bSelectRequested = true;
+            bForceInspector = true;
+        }
+        Finish(Success, Error);
+    };
+    View.ConnectDataRequested = [this](QString Source, QString Output, QString Target, QString Input)
+    {
+        if (bLocked)
+        {
+            return;
+        }
+        FlushEdits();
+        std::string Error;
+        const bool Success = Document.ConnectData(Source.toStdString(), Output.toStdString(), Target.toStdString(), Input.toStdString(), Error);
+        Finish(Success, Error);
+    };
     View.NodeSelected = [this](const StoryGraphNode& Node) { Select(Node.Identity); };
     View.AddNodeRequested = [this](int Kind, QPointF Position)
     {
@@ -124,6 +153,8 @@ StoryGraphController::~StoryGraphController()
     ClearEventCallbacks();
     View.NodeSelected = {};
     View.AddNodeRequested = {};
+    View.AddNarrativeRequested = {};
+    View.ConnectDataRequested = {};
     View.DeleteNodesRequested = {};
     View.ConnectRequested = {};
     View.MoveNodesRequested = {};
@@ -218,6 +249,21 @@ bool StoryGraphController::DeleteSelection()
     return !bLocked && View.DeleteSelection();
 }
 
+bool StoryGraphController::ApplyDocumentEdit(
+    const std::function<bool(StoryGraphDocument&, std::string&)>& Edit, std::string& Error)
+{
+    if (bLocked || !Document.IsOpen())
+    {
+        Error = "Open a story and stop playback before editing Narrative";
+        return false;
+    }
+    FlushEdits();
+    const bool bSuccess = Edit(Document, Error);
+    bForceInspector = true;
+    Finish(bSuccess, Error);
+    return bSuccess;
+}
+
 void StoryGraphController::SetLocked(bool bValue)
 {
     if (!bLocked)
@@ -228,9 +274,15 @@ void StoryGraphController::SetLocked(bool bValue)
     bForceInspector = true;
     RefreshNow();
 }
-void StoryGraphController::SetObjects(QVector<QPair<QString, QString>> Values)
+void StoryGraphController::SetObjects(QVector<QPair<QString, QString>> Values, QVector<QPair<QString, QString>> NarrativeValues,
+    QMap<QString, QVector<QPair<QString, QString>>> AnimationValues)
 {
-    if (Objects == Values) { return; }
+    if (Objects == Values && NarrativeObjects == NarrativeValues && CharacterAnimations == AnimationValues)
+    {
+        return;
+    }
+    CharacterAnimations = std::move(AnimationValues);
+    NarrativeObjects = std::move(NarrativeValues);
     Objects = std::move(Values);
     Refresh();
 }
@@ -249,6 +301,9 @@ void StoryGraphController::EditNode(const StoryGraphNode& Value)
     StoryNode Node = *Previous;
     Node.Kind = static_cast<StoryNodeKind>(Value.KindId);
     if (Node.Kind != StoryNodeKind::Line && Node.Kind != StoryNodeKind::Choice) { Node.EventBatches.clear(); }
+    Node.NarrativeType = Value.NarrativeType;
+    Node.NarrativeInputs = Value.NarrativeInputs;
+    Node.NarrativeSources = Value.NarrativeSources;
     Node.Speaker = Value.Speaker.toStdString();
     if (Node.Kind == StoryNodeKind::Choice)
     {
@@ -276,6 +331,7 @@ void StoryGraphController::EditNode(const StoryGraphNode& Value)
         Definition.DurationSeconds = static_cast<float>(Action.Duration);
         Definition.TargetObjectId = Action.Target.toStdString();
         Definition.TargetObjectName = Action.LegacyTarget.toStdString();
+        Definition.AnimationId = Action.AnimationId.toStdString();
         Definition.TargetPosition =
             Vector3(static_cast<float>(Action.Position[0]), static_cast<float>(Action.Position[1]),
                     static_cast<float>(Action.Position[2]));
@@ -306,6 +362,8 @@ void StoryGraphController::Select(const QString& Identity)
     Selected = Identity;
     auto Model = StoryGraphAdapter::Build(Document);
     Model.Objects = Objects;
+    Model.NarrativeObjects = NarrativeObjects;
+    Model.CharacterAnimations = CharacterAnimations;
     Model.bReadOnly = Model.bReadOnly || bLocked;
     Model.bLocked = bLocked;
     for (const auto& Node : Model.Nodes)
@@ -348,6 +406,8 @@ void StoryGraphController::RefreshNow()
 {
     auto Model = StoryGraphAdapter::Build(Document);
     Model.Objects = Objects;
+    Model.NarrativeObjects = NarrativeObjects;
+    Model.CharacterAnimations = CharacterAnimations;
     Model.bReadOnly = Model.bReadOnly || bLocked;
     Model.bLocked = bLocked;
     View.SetModel(Model);

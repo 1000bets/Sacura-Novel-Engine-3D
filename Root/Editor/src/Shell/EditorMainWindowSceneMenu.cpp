@@ -148,8 +148,8 @@ void EditorMainWindow::OnViewportContextMenu(QPoint Position)
     };
     const QString Add = tr("Добавить объект"), Select = tr("Выделение");
     QVector<StudioMenuItem> Items;
-    Items.push_back(Unavailable("scene.character", tr("Персонаж"), "PersonStanding", Add,
-        tr("Шаблоны персонажей веб-прототипа ещё не перенесены в нативный редактор.")));
+    Items.push_back(Entry("scene.character", tr("Персонаж"), "PersonStanding", Add,
+        [this]() { OpenCharacterWorkspace(); }));
     Items.push_back(Unavailable("scene.interactive", tr("Интерактивный предмет"), "MousePointer2", Add,
         tr("Шаблон интерактивного предмета пока не поддерживается нативным редактором.")));
     auto Objects = Entry("scene.objects", tr("Объект"), "Box", Add);

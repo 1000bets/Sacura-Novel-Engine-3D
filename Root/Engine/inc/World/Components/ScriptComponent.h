@@ -10,7 +10,7 @@
 
 class ScriptComponent : public Component
 {
-    ENGINE_CLASS(ScriptComponent, Component, "engine.ScriptComponent", 1)
+    ENGINE_CLASS(ScriptComponent, Component, "engine.ScriptComponent")
 
 public:
     bool HasManagedProperty(const PropertyId& Id) const;

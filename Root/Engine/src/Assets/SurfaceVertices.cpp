@@ -36,6 +36,10 @@ void PrepareSurfaceVertices(StaticMeshResource& Mesh)
                     Destination = static_cast<uint32_t>(Mesh.Vertices.size());
                     const StaticMeshVertex Copy = Mesh.Vertices[Original];
                     Mesh.Vertices.push_back(Copy);
+                    if (!Mesh.SourceVertexIndices.empty())
+                    {
+                        Mesh.SourceVertexIndices.push_back(Mesh.SourceVertexIndices[Original]);
+                    }
                 }
                 SplitVertices.emplace(Key, Destination);
             }

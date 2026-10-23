@@ -1,6 +1,8 @@
 #include "World/Serialization/SceneSerializer.h"
 
 #include "Assets/Guid.h"
+#include "Prefab/PrefabSceneBuilder.h"
+#include "Prefab/PrefabGraphOps.h"
 #include "Core/IO/AtomicFileWriter.h"
 #include "Core/Object/MemorySubsystem.h"
 #include "Core/Threading/ThreadContext.h"
@@ -13,6 +15,7 @@
 #include "Navigation/NavigationWorld.h"
 #include "Physics/PhysicsWorld.h"
 
+#include <algorithm>
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <unordered_map>
@@ -169,78 +172,10 @@ SceneSerializeResult SceneSerializer::SerializeToJson(const Scene& InScene, std:
     Root["objects"] = nlohmann::json::array();
 
     const std::vector<GameObject*>& Objects = InScene.GetAllObjects();
-    std::unordered_map<const GameObject*, std::string> IdByObject;
-    IdByObject.reserve(Objects.size());
-    for (size_t Index = 0; Index < Objects.size(); ++Index)
+    bool bHasPrefabInstances = false;
+    if (!PrefabSceneBuilder::WriteEntries(InScene, Objects, false, Root["objects"], bHasPrefabInstances, Result.Error))
     {
-        const GameObject* ObjectInstance = Objects[Index];
-        if (ObjectInstance == nullptr)
-        {
-            Result.Error = "Scene contains a null GameObject";
-            return Result;
-        }
-        IdByObject.emplace(ObjectInstance, ObjectInstance->GetPersistentId());
-    }
-
-    for (size_t ObjectIndex = 0; ObjectIndex < Objects.size(); ++ObjectIndex)
-    {
-        const GameObject* ObjectInstance = Objects[ObjectIndex];
-        nlohmann::json ObjectJson = nlohmann::json::object();
-        ObjectJson["id"] = IdByObject.at(ObjectInstance);
-        ObjectJson["name"] = ObjectInstance->GetName();
-        ObjectJson["bActive"] = ObjectInstance->IsActive();
-        ObjectJson["bVisual"] = ObjectInstance->IsVisual();
-        ObjectJson["transform"] = TransformToJson(ObjectInstance->GetTransform());
-
-        if (ObjectInstance->GetParent() != nullptr)
-        {
-            const auto ParentIterator = IdByObject.find(ObjectInstance->GetParent());
-            if (ParentIterator == IdByObject.end())
-            {
-                Result.Error = "Parent object is not part of the same Scene";
-                return Result;
-            }
-            ObjectJson["parent"] = ParentIterator->second;
-        }
-        else
-        {
-            ObjectJson["parent"] = nullptr;
-        }
-
-        ObjectJson["components"] = nlohmann::json::array();
-        const std::vector<Component*>& Components = ObjectInstance->GetAllComponents();
-        for (size_t ComponentIndex = 0; ComponentIndex < Components.size(); ++ComponentIndex)
-        {
-            Component* ComponentInstance = Components[ComponentIndex];
-            if (ComponentInstance == nullptr)
-            {
-                Result.Error = "GameObject contains a null Component";
-                return Result;
-            }
-            if (ComponentInstance->GetClass() == nullptr)
-            {
-                Result.Error = "Component '" + ComponentInstance->GetName() + "' has no Class (not reflected)";
-                return Result;
-            }
-
-            ReflectionJsonDocument ComponentDocument;
-            ReflectionDiagnostic Serialized = ReflectionJson::SerializeObject(ComponentInstance, ComponentDocument);
-            if (!Serialized.bOk)
-            {
-                Result.Error = Serialized.Message;
-                return Result;
-            }
-
-            nlohmann::json ComponentJson = nlohmann::json::object();
-            ComponentJson["id"] = ComponentInstance->GetPersistentId();
-            ComponentJson["type"] = ComponentDocument.Type.Value;
-            ComponentJson["typeVersion"] = ComponentDocument.TypeVersion;
-            ComponentJson["bEnabled"] = ComponentInstance->IsEnabled();
-            ComponentJson["properties"] = std::move(ComponentDocument.Properties);
-            ObjectJson["components"].push_back(std::move(ComponentJson));
-        }
-
-        Root["objects"].push_back(std::move(ObjectJson));
+        return Result;
     }
 
     if (const NavigationWorld* Navigation = InScene.GetNavigationIfCreated())
@@ -343,6 +278,24 @@ SceneSerializeResult SceneSerializer::DeserializeFromJson(const std::string& Jso
         return Result;
     }
 
+    const bool bHasPrefabEntries = std::any_of(Root["objects"].begin(), Root["objects"].end(), [](const auto& Entry)
+    {
+        return Entry.is_object() && (Entry.value("kind", std::string{}) == PrefabInstanceEntryKind || Entry.contains("prefabOwner"));
+    });
+    if (bHasPrefabEntries)
+    {
+        PrefabGraph Graph;
+        std::vector<AssetId> ResolveStack;
+        std::vector<GameObject*> Roots;
+        if (!PrefabGraphOps::Expand(Root["objects"], {}, ResolveStack, Graph, Result.Error)
+            || !PrefabSceneBuilder::Materialize(*CreatedScene, Graph, nullptr, Roots, Result.Error))
+        {
+            DestroyPartialScene(CreatedScene, Memory);
+            return Result;
+        }
+    }
+    else
+    {
     std::unordered_map<std::string, GameObject*> ObjectById;
     std::unordered_map<std::string, std::string> ParentById;
     std::unordered_set<std::string> SeenObjectIds;
@@ -557,6 +510,8 @@ SceneSerializeResult SceneSerializer::DeserializeFromJson(const std::string& Jso
         ComponentInstance->OnCreate();
     }
 
+    }
+
     if (Root.contains("navigation") && !CreatedScene->GetNavigation().Deserialize(Root.at("navigation"), Result.Error))
     {
         DestroyPartialScene(CreatedScene, Memory);
@@ -765,23 +720,11 @@ SceneSerializeResult SceneSerializer::SerializeSubtreeToJson(const GameObject& R
         return Result;
     }
 
-    std::unordered_map<const GameObject*, std::string> IdByObject;
-    IdByObject.reserve(Subtree.size());
-    for (size_t Index = 0; Index < Subtree.size(); ++Index)
-    {
-        IdByObject.emplace(Subtree[Index], Subtree[Index]->GetPersistentId());
-    }
-
     nlohmann::json Root = nlohmann::json::object();
-    Root["objects"] = nlohmann::json::array();
-    for (size_t ObjectIndex = 0; ObjectIndex < Subtree.size(); ++ObjectIndex)
+    bool bHasPrefabInstances = false;
+    if (!PrefabSceneBuilder::WriteEntries(*RootObject.GetScene(), Subtree, true, Root["objects"], bHasPrefabInstances, Result.Error))
     {
-        nlohmann::json ObjectJson;
-        if (!TrySerializeObjectEntry(Subtree[ObjectIndex], IdByObject, ObjectJson, Result.Error))
-        {
-            return Result;
-        }
-        Root["objects"].push_back(std::move(ObjectJson));
+        return Result;
     }
 
     OutJsonText = Root.dump(2);
@@ -812,40 +755,19 @@ SceneSerializeResult SceneSerializer::RemapSubtreePersistentIds(
     }
 
     std::unordered_map<std::string, std::string> RemappedIds;
-    for (const nlohmann::json& ObjectJson : Root.at("objects"))
+    auto Map = [&](const std::string& Identifier)
     {
-        if (!ObjectJson.is_object() || !ObjectJson.contains("id") || !ObjectJson.at("id").is_string())
+        auto [Iterator, bInserted] = RemappedIds.try_emplace(Identifier);
+        if (bInserted)
         {
-            Result.Error = "Subtree object requires string id";
-            return Result;
+            Iterator->second = Guid::Generate().ToString();
         }
-        const std::string ObjectId = ObjectJson.at("id").get<std::string>();
-        if (ObjectId.empty() || !RemappedIds.emplace(ObjectId, Guid::Generate().ToString()).second)
-        {
-            Result.Error = "Subtree contains duplicate or empty object id";
-            return Result;
-        }
-        if (!ObjectJson.contains("components") || !ObjectJson.at("components").is_array())
-        {
-            continue;
-        }
-        for (const nlohmann::json& ComponentJson : ObjectJson.at("components"))
-        {
-            if (!ComponentJson.is_object() || !ComponentJson.contains("id") || !ComponentJson.at("id").is_string())
-            {
-                Result.Error = "Subtree component requires string id";
-                return Result;
-            }
-            const std::string ComponentId = ComponentJson.at("id").get<std::string>();
-            if (ComponentId.empty() || !RemappedIds.emplace(ComponentId, Guid::Generate().ToString()).second)
-            {
-                Result.Error = "Subtree contains duplicate or empty component id";
-                return Result;
-            }
-        }
+        return Iterator->second;
+    };
+    if (!PrefabSceneBuilder::RemapEntryIds(Root["objects"], Map, Result.Error))
+    {
+        return Result;
     }
-
-    RemapJsonStrings(Root, RemappedIds);
     OutRemappedJsonText = Root.dump(2);
     Result.bOk = true;
     return Result;
@@ -880,6 +802,30 @@ SceneSerializeResult SceneSerializer::DeserializeSubtreeFromJson(
     if (!Root.is_object() || !Root.contains("objects") || !Root.at("objects").is_array())
     {
         Result.Error = "Subtree JSON requires objects array";
+        return Result;
+    }
+
+    const bool bHasPrefabEntries = std::any_of(Root["objects"].begin(), Root["objects"].end(), [](const auto& Entry)
+    {
+        return Entry.is_object() && (Entry.value("kind", std::string{}) == PrefabInstanceEntryKind || Entry.contains("prefabOwner"));
+    });
+    if (bHasPrefabEntries)
+    {
+        PrefabGraph Graph;
+        std::vector<AssetId> ResolveStack;
+        std::vector<GameObject*> Roots;
+        if (!PrefabGraphOps::Expand(Root["objects"], {}, ResolveStack, Graph, Result.Error)
+            || !PrefabSceneBuilder::Materialize(TargetScene, Graph, OptionalParent, Roots, Result.Error))
+        {
+            return Result;
+        }
+        if (Roots.empty())
+        {
+            Result.Error = "Subtree has no root";
+            return Result;
+        }
+        OutRestoredRoot = Roots.front();
+        Result.bOk = true;
         return Result;
     }
 

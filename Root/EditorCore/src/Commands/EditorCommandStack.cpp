@@ -11,6 +11,10 @@ void EditorCommandStack::BindDocument(SceneDocument* Document)
 
 void EditorCommandStack::NotifyDocumentChanged()
 {
+    if (ChangedCallback)
+    {
+        ChangedCallback();
+    }
     if (BoundDocument != nullptr)
     {
         BoundDocument->MarkDirty();
@@ -137,6 +141,10 @@ bool EditorCommandStack::Undo()
         BoundDocument->RestoreRevision(Command->PreviousRevision);
     }
     RedoCommands.push_back(std::move(Command));
+    if (ChangedCallback)
+    {
+        ChangedCallback();
+    }
     return true;
 }
 
@@ -161,6 +169,10 @@ bool EditorCommandStack::Redo()
         BoundDocument->RestoreRevision(Command->CompletedRevision);
     }
     UndoCommands.push_back(std::move(Command));
+    if (ChangedCallback)
+    {
+        ChangedCallback();
+    }
     return true;
 }
 

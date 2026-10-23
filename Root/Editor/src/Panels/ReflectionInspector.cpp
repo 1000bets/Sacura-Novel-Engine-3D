@@ -917,6 +917,13 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
         ColumnLayout->setSpacing(4);
         QLabel* PropertyLabel = new QLabel(Label, Column);
         PropertyLabel->setWordWrap(true);
+        if (OverrideMarker && OverrideMarker(GetInspectedObject(), Descriptor.Id))
+        {
+            QFont Font = PropertyLabel->font();
+            Font.setBold(true);
+            PropertyLabel->setFont(Font);
+            PropertyLabel->setToolTip(tr("Prefab override"));
+        }
         ColumnLayout->addWidget(PropertyLabel);
         ColumnLayout->addWidget(FieldWidget);
         PropertiesLayout->addRow(Column);

@@ -13,6 +13,31 @@ void ProjectSession::BindEngine(Engine* InEngine)
     BoundEngine = InEngine;
 }
 
+bool ProjectSession::UpdateSettings(const ProjectDescriptor& Settings, std::string& OutError)
+{
+    if (!OpenedProject || Settings.ProjectFile != OpenedProject->ProjectFile ||
+        Settings.ProjectRoot != OpenedProject->ProjectRoot || Settings.Name.empty())
+    {
+        OutError = "Invalid project settings";
+        return false;
+    }
+    for (const auto& Startup : {Settings.StartupScene, Settings.StartupStory})
+    {
+        std::error_code Error;
+        if (!Startup.empty() && !std::filesystem::is_regular_file(Startup, Error))
+        {
+            OutError = "Startup document does not exist";
+            return false;
+        }
+    }
+    if (!Settings.TrySaveToFile(OutError))
+    {
+        return false;
+    }
+    OpenedProject = Settings;
+    return true;
+}
+
 bool ProjectSession::OpenProject(const std::filesystem::path& ProjectFile)
 {
     LastError.clear();

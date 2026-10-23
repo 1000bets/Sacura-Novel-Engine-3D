@@ -227,6 +227,28 @@ void EditorMainWindow::PopulateCreateMenus(QMenu* ObjectsMenu, QMenu* Components
             RunEditorAction(Action);
         });
     }
+    for (Class* ComponentClass : ReflectionSubsystem::Get().GetPublishedCatalog().Classes)
+    {
+        if (ComponentClass->GetOrigin() != ReflectionOrigin::Python || !ComponentClass->IsConcrete()
+            || !ComponentClass->IsA(TypeId{"engine.ScriptComponent"}))
+        {
+            continue;
+        }
+        const TypeId ComponentType = ComponentClass->GetTypeId();
+        QAction* ComponentAction = ComponentsMenu->addAction(QString::fromStdString(ComponentType.Value));
+        ComponentAction->setEnabled(GetSelectedGameObject() != nullptr && !BoundEngine.GetPlaySession().IsSimulating());
+        connect(ComponentAction, &QAction::triggered, this, [this, ComponentType]()
+        {
+            if (BoundEngine.GetPlaySession().IsSimulating())
+            {
+                return;
+            }
+            if (GameObject* Selected = GetSelectedGameObject())
+            {
+                ExecuteCommand(MakeAddComponentCommand(GetEditScene(), Selected->GetObjectHandle(), ComponentType));
+            }
+        });
+    }
 }
 
 EditorActionContext EditorMainWindow::MakeEditorActionContext()

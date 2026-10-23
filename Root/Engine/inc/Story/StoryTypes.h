@@ -5,6 +5,8 @@
 #include <string>
 #include <cstdint>
 #include <vector>
+#include <map>
+#include <nlohmann/json.hpp>
 
 using StoryNodeId = std::string;
 
@@ -13,7 +15,8 @@ enum class StoryNodeKind
     Line = 0,
     Choice,
     Action,
-    End
+    End,
+    Narrative
 };
 
 enum class StoryActionKind
@@ -21,7 +24,8 @@ enum class StoryActionKind
     Wait = 0,
     MoveTo,
     CameraCut,
-    NavigateTo
+    NavigateTo,
+    CharacterAnimation
 };
 
 enum class StoryActionState
@@ -45,6 +49,7 @@ struct StoryActionDefinition
     float DurationSeconds = 0.0f;
     std::string TargetObjectId;
     std::string TargetObjectName;
+    std::string AnimationId;
     Vector3 TargetPosition = Vector3::Zero;
     Quaternion TargetRotation = Quaternion::Identity;
     bool bHasTargetRotation = false;
@@ -108,6 +113,9 @@ struct StoryNode
     std::string Speaker;
     std::string Text;
     std::string Prompt;
+    std::string NarrativeType;
+    nlohmann::json NarrativeInputs = nlohmann::json::object();
+    std::map<std::string, std::pair<std::string, std::string>> NarrativeSources;
     std::vector<StoryChoice> Choices;
     std::vector<StoryActionDefinition> Actions;
     StoryNodeId NextNodeId;

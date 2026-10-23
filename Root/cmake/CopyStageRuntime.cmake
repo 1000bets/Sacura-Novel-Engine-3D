@@ -4,10 +4,14 @@ endif()
 
 file(MAKE_DIRECTORY "${DEST_DIR}")
 
-file(GLOB RuntimeDlls "${SOURCE_DIR}/*.dll")
+file(GLOB RuntimeDlls "${SOURCE_DIR}/*.dll" "${SOURCE_DIR}/*._pth")
 foreach(RuntimeDll IN LISTS RuntimeDlls)
     file(COPY "${RuntimeDll}" DESTINATION "${DEST_DIR}")
 endforeach()
+
+if(EXISTS "${SOURCE_DIR}/Python")
+    file(COPY "${SOURCE_DIR}/Python" DESTINATION "${DEST_DIR}")
+endif()
 
 if(EXISTS "${SOURCE_DIR}/platforms")
     file(COPY "${SOURCE_DIR}/platforms" DESTINATION "${DEST_DIR}")

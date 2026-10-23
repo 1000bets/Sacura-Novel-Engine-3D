@@ -6,12 +6,14 @@
 #include "Rendering/RenderObject.h"
 
 #include <vector>
+#include "Rendering/RenderSky.h"
 
 struct RenderScene
 {
     std::vector<RenderObject> Objects;
     std::vector<RenderLight> Lights;
     RenderCamera Camera;
+    RenderSky Sky;
     std::vector<RenderPostProcessEffect> PostProcessEffects;
 
     void Clear()
@@ -20,5 +22,6 @@ struct RenderScene
         PostProcessEffects.clear();
         Lights.clear();
         Camera = RenderCamera{};
+        Sky = RenderSky{};
     }
 };

@@ -1,4 +1,6 @@
 #include "Scripting/ScriptingSubsystem.h"
+#include "Engine.h"
+#include "Input/InputTypes.h"
 
 #include "Core/Object/MemorySubsystem.h"
 #include "Core/Threading/ThreadContext.h"
@@ -44,6 +46,10 @@ void ScriptingSubsystem::DestroyAllScriptInstances()
                 }
             }
             Record.bDestroyInvoked = true;
+            if (MaterialEngine && MaterialEngine->GetInputSession())
+            {
+                MaterialEngine->GetInputSession()->UnbindOwner(Record.Component->GetObjectHandle());
+            }
             Record.Component->MarkDestroyCalled();
             Record.Component->SetScriptInstanceHandle({});
         }
@@ -91,9 +97,9 @@ void ScriptingSubsystem::BindScriptComponent(ScriptComponent& Component)
         ScriptInstanceRecord Record;
         Record.Component = &Component;
         Record.Instance = Instance;
-        Record.OnCreate = py::getattr(PythonType, "on_create", py::none());
-        Record.OnUpdate = py::getattr(PythonType, "on_update", py::none());
-        Record.OnDestroy = py::getattr(PythonType, "on_destroy", py::none());
+        Record.OnCreate = py::getattr(PythonType, "OnCreate", py::getattr(PythonType, "on_create", py::none()));
+        Record.OnUpdate = py::getattr(PythonType, "OnUpdate", py::getattr(PythonType, "on_update", py::none()));
+        Record.OnDestroy = py::getattr(PythonType, "OnDestroy", py::getattr(PythonType, "on_destroy", py::none()));
         if (!Record.OnCreate.is_none())
         {
             Record.OnCreate = Record.OnCreate.attr("__get__")(Instance, PythonType);
@@ -130,6 +136,10 @@ void ScriptingSubsystem::BindScriptComponent(ScriptComponent& Component)
 void ScriptingSubsystem::UnbindScriptComponent(ScriptComponent& Component)
 {
     AssertGameThread();
+    if (MaterialEngine && MaterialEngine->GetInputSession())
+    {
+        MaterialEngine->GetInputSession()->UnbindOwner(Component.GetObjectHandle());
+    }
 #if !defined(SAKURA_ENABLE_PYTHON)
     return;
 #else

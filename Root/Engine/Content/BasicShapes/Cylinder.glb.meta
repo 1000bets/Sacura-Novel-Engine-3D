@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "guid": "0f868514-501c-5a4f-bd35-db83ecf03715",
+  "assetType": "Model",
+  "sourceFingerprint": "d835e9bc8d5a87e0",
+  "importInfo": {
+    "generator": "Scripts/GenerateBasicShapes.py"
+  },
+  "subAssets": [
+    {
+      "id": "0d91d200-552a-54ed-b2aa-47872cdf68df",
+      "name": "Cylinder",
+      "type": "StaticMesh",
+      "selector": {
+        "kind": "mesh",
+        "index": 0
+      }
+    }
+  ],
+  "loadSettings": {
+    "staticMeshDefaults": {
+      "0d91d200-552a-54ed-b2aa-47872cdf68df": {
+        "materials": [
+          {
+            "slot": 0,
+            "material": {
+              "assetId": "42b33bd1-5bf7-5462-920b-297de12b0f18",
+              "subAssetId": null
+            }
+          }
+        ],
+        "collision": {
+          "enabled": true,
+          "elements": [
+            {
+              "shape": 3,
+              "center": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "halfExtents": [
+                0.5,
+                0.5,
+                0.5
+              ],
+              "radius": 0.5,
+              "capsuleHalfHeight": 0.5
+            }
+          ]
+        }
+      }
+    }
+  }
+}

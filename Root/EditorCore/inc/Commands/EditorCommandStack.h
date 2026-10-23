@@ -5,6 +5,7 @@
 #include "Reflection/TypeId.h"
 
 #include <memory>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -31,6 +32,7 @@ class EditorCommandStack
 {
 public:
     void BindDocument(SceneDocument* Document);
+    void SetChangedCallback(std::function<void()> Callback) { ChangedCallback = std::move(Callback); }
 
     bool Execute(std::unique_ptr<EditorCommand> Command);
     bool Undo();
@@ -65,6 +67,7 @@ private:
     void PushDone(std::unique_ptr<EditorCommand> Command);
     void NotifyDocumentChanged();
 
+    std::function<void()> ChangedCallback;
     SceneDocument* BoundDocument = nullptr;
     std::vector<std::unique_ptr<EditorCommand>> UndoCommands;
     std::vector<std::unique_ptr<EditorCommand>> RedoCommands;

@@ -178,7 +178,7 @@ bool ProjectGenerator::CreateProject(
             "from engine import ScriptComponent, register_class, field\n"
             "\n"
             "\n"
-            "@register_class(type_id=\"game.StoryController\", schema_version=1)\n"
+            "@register_class(type_id=\"game.StoryController\")\n"
             "class StoryController(ScriptComponent):\n"
             "    pace = field(\n"
             "        float,\n"

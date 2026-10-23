@@ -10,6 +10,7 @@ class StoryEventPlayer
     StoryEventPlayer(ObjectHandle World, uint64_t& NextInstanceId);
     ~StoryEventPlayer();
     void BeginPhase(const StoryDocument& Document, const StoryNode& Node, StoryEventPhase Phase);
+    bool Trigger(const StoryDocument& Document, const std::string& EventId);
     void Tick(float DeltaSeconds);
     bool IsReady() const;
     const std::string& GetError() const;

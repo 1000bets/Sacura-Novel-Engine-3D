@@ -1,7 +1,7 @@
 from engine import ScriptComponent, register_class, field
 
 
-@register_class(type_id="game.DoorController", schema_version=1)
+@register_class(type_id="game.DoorController")
 class DoorController(ScriptComponent):
     speed = field(
         float,

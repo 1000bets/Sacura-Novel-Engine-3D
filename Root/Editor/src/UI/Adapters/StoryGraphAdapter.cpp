@@ -3,6 +3,7 @@
 #include "UI/Styles/StoryEventStyle.h"
 #include "Story/StoryEvents.h"
 #include "Documents/StoryGraphDocument.h"
+#include "Characters/CharacterDefinition.h"
 #include "UI/Styles/StoryGraphStyle.h"
 #include <QHash>
 #include <QQueue>
@@ -27,6 +28,19 @@ StoryGraphModel StoryGraphAdapter::Build(const StoryGraphDocument& Document)
 {
     StoryGraphModel Model;
     Model.bOpen = Document.IsOpen();
+    if (const auto* Registry = Document.GetAssetRegistry())
+    {
+        for (const auto& Entry : Registry->FindByType(CharacterAssetType))
+        {
+            CharacterDefinition Character;
+            std::string Error;
+            if (CharacterDefinition::Read(Entry.AbsolutePath, Character, Error))
+            {
+                Model.Characters.push_back({QString::fromStdString("character:" + Entry.Metadata.Guid.ToString()),
+                    QString::fromStdString(Character.Name)});
+            }
+        }
+    }
     Model.bReadOnly = Document.IsReadOnly();
     Model.bDirty = Document.IsDirty();
     Model.bCanUndo = Document.CanUndo();
@@ -47,7 +61,19 @@ StoryGraphModel StoryGraphAdapter::Build(const StoryGraphDocument& Document)
         StoryGraphNode Item;
         Item.Identity = QString::fromStdString(Node.Id);
         Item.KindId = static_cast<int>(Node.Kind);
+        Item.NarrativeType = Node.NarrativeType;
+        Item.NarrativeInputs = Node.NarrativeInputs;
+        Item.NarrativeSources = Node.NarrativeSources;
+        FindNarrativeDefinition(Node.NarrativeType, Item.NarrativeDefinition);
         Item.Speaker = QString::fromStdString(Node.Speaker);
+        Item.SpeakerLabel = Item.Speaker;
+        for (const auto& Character : Model.Characters)
+        {
+            if (Character.first == Item.Speaker)
+            {
+                Item.SpeakerLabel = Character.second;
+            }
+        }
         Item.Text = QString::fromStdString(Node.Kind == StoryNodeKind::Choice ? Node.Prompt : Node.Text);
         Item.bStart = Node.Id == Document.GetStory().StartNodeId;
         for (const auto& Batch : Node.EventBatches)
@@ -81,6 +107,13 @@ StoryGraphModel StoryGraphAdapter::Build(const StoryGraphDocument& Document)
         case StoryNodeKind::Action:
             Item.Kind = QString::fromUtf8("Действие");
             break;
+        case StoryNodeKind::Narrative:
+            Item.Kind = QString::fromStdString(Item.NarrativeDefinition.Label);
+            if (Item.Kind.isEmpty())
+            {
+                Item.Kind = QString::fromStdString(Node.NarrativeType);
+            }
+            break;
         case StoryNodeKind::End:
             Item.Kind = QString::fromUtf8("Концовка");
             break;
@@ -89,7 +122,7 @@ StoryGraphModel StoryGraphAdapter::Build(const StoryGraphDocument& Document)
         {
             Item.Choices.push_back({QString::fromStdString(Choice.Label), QString::fromStdString(Choice.NextNodeId),
                                     QString::fromStdString(Choice.Id)});
-            if (Node.Kind == StoryNodeKind::Choice)
+            if (Node.Kind == StoryNodeKind::Choice || Node.Kind == StoryNodeKind::Narrative)
             {
                 Item.Targets.push_back(QString::fromStdString(Choice.NextNodeId));
             }
@@ -102,6 +135,7 @@ StoryGraphModel StoryGraphAdapter::Build(const StoryGraphDocument& Document)
             Value.Duration = Action.DurationSeconds;
             Value.Target = QString::fromStdString(Action.TargetObjectId);
             Value.LegacyTarget = QString::fromStdString(Action.TargetObjectName);
+            Value.AnimationId = QString::fromStdString(Action.AnimationId);
             Value.Position = {Action.TargetPosition.x, Action.TargetPosition.y, Action.TargetPosition.z};
             Value.Rotation = {Action.TargetRotation.x, Action.TargetRotation.y, Action.TargetRotation.z,
                               Action.TargetRotation.w};

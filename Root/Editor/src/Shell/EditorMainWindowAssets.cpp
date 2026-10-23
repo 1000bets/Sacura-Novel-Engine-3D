@@ -1,4 +1,9 @@
+#include "Commands/PrefabCommands.h"
+#include "Commands/StaticMeshCommands.h"
 #include "Shell/EditorMainWindow.h"
+#include "UI/Views/InputWorkspaceView.h"
+#include "UI/Views/CharacterWorkspaceView.h"
+#include "UI/Views/MaterialEditorWindow.h"
 #include "UI/Views/StoryWorkspaceView.h"
 #include "UI/Adapters/StoryGraphAdapter.h"
 
@@ -101,6 +106,38 @@ bool EditorMainWindow::RegisterAssetEditor(const AssetType& Type, AssetEditorHan
 
 void EditorMainWindow::RegisterBuiltInAssetEditors()
 {
+    for (const auto& Type : {StaticMeshAssetType, ModelAssetType})
+    {
+        RegisterAssetEditor(Type, [this](const AssetKey& Asset, const AssetRegistryEntry&, const QString&)
+        {
+            OpenStaticMeshEditor(Asset);
+        });
+    }
+    RegisterAssetEditor(CharacterAssetType, [this](const AssetKey&, const AssetRegistryEntry& Entry, const QString&)
+    {
+        OpenCharacterWorkspace()->OpenAsset(Entry);
+    });
+    for (const auto& Type : {MaterialAssetType, MaterialInstanceAssetType})
+    {
+        RegisterAssetEditor(Type, [this](const AssetKey& Asset, const AssetRegistryEntry&, const QString&)
+        {
+            OpenMaterialEditor(Asset);
+        });
+    }
+    for (const auto& Type : {InputActionAssetType, InputMappingContextAssetType})
+    {
+        RegisterAssetEditor(Type, [this](const AssetKey&, const AssetRegistryEntry& Entry, const QString&)
+        {
+            auto* Workspace = new InputWorkspaceView(BoundEngine, this);
+            Workspace->setAttribute(Qt::WA_DeleteOnClose);
+            Workspace->OpenAsset(Entry);
+            Workspace->show();
+        });
+    }
+    RegisterAssetEditor(PrefabAssetType, [this](const AssetKey& Key, const AssetRegistryEntry&, const QString&)
+    {
+        OpenPrefabEditor(Key.Asset);
+    });
     RegisterAssetEditor(SceneAssetType, [this](
         const AssetKey&,
         const AssetRegistryEntry& Entry,
@@ -228,6 +265,16 @@ void EditorMainWindow::OnAssetDropped(
         return;
     }
 
+    if (Type == PrefabAssetType)
+    {
+        ObjectHandle Created;
+        if (ExecuteCommand(MakeInstantiatePrefabCommand(GetEditScene(), Key.Asset, {}, nullptr, &Created)))
+        {
+            SelectObject(Created);
+        }
+        return;
+    }
+
     if (Type == MaterialAssetType || Type == MaterialInstanceAssetType)
     {
         GameObject* Selected = GetSelectedGameObject();
@@ -279,54 +326,24 @@ void EditorMainWindow::OnAssetDropped(
         ObjectName = SubAsset->Name;
     }
 
+    const RenderViewCamera& Camera = PrimaryViewport->GetViewCamera();
+    Vector3 Forward = Camera.Target - Camera.Position;
+    const float Distance = std::max(1.f, Forward.Length());
+    Forward.Normalize();
+    Vector3 Right = Forward.Cross(Camera.Up);
+    Right.Normalize();
+    Vector3 Up = Right.Cross(Forward);
+    Up.Normalize();
+    const float NormalizedX = static_cast<float>(Position.x()) / std::max(1, PrimaryViewport->width()) * 2.f - 1.f;
+    const float NormalizedY = 1.f - static_cast<float>(Position.y()) / std::max(1, PrimaryViewport->height()) * 2.f;
+    const float HalfHeight = std::tan(Camera.FieldOfViewDegrees * 0.0087266463f) * Distance;
+    Transform DroppedTransform;
+    DroppedTransform.Position = Camera.Target
+        + Right * (NormalizedX * HalfHeight * static_cast<float>(PrimaryViewport->width()) / std::max(1, PrimaryViewport->height()))
+        + Up * (NormalizedY * HalfHeight);
     ObjectHandle CreatedObject;
-    ObjectHandle CreatedComponent;
-    CommandStack.BeginGroup("Create Mesh Object");
-    bool bCreated = ExecuteCommand(MakeCreateObjectCommand(EditScene, ObjectName, ObjectHandle{}, &CreatedObject));
-    if (bCreated)
-    {
-        bCreated = ExecuteCommand(MakeAddComponentCommand(
-            EditScene,
-            CreatedObject,
-            TypeId{MeshRendererComponent::StaticReflectionTypeId()},
-            &CreatedComponent));
-    }
-    if (bCreated)
-    {
-        bCreated = ExecuteCommand(MakeSetPropertyCommand(
-            EditScene,
-            CreatedComponent,
-            PropertyId{"mesh_asset_id"},
-            ReflectedValue::MakeString(Key.Asset.ToString())));
-    }
-    if (bCreated)
-    {
-        bCreated = ExecuteCommand(MakeSetPropertyCommand(
-            EditScene,
-            CreatedComponent,
-            PropertyId{"mesh_sub_asset_id"},
-            ReflectedValue::MakeString(Key.SubAsset->ToString())));
-    }
-    if (bCreated)
-    {
-        const RenderViewCamera& Camera = PrimaryViewport->GetViewCamera();
-        Vector3 Forward = Camera.Target - Camera.Position;
-        const float Distance = std::max(1.f, Forward.Length());
-        Forward.Normalize();
-        Vector3 Right = Forward.Cross(Camera.Up);
-        Right.Normalize();
-        Vector3 Up = Right.Cross(Forward);
-        Up.Normalize();
-        const float NormalizedX = static_cast<float>(Position.x()) / std::max(1, PrimaryViewport->width()) * 2.f - 1.f;
-        const float NormalizedY = 1.f - static_cast<float>(Position.y()) / std::max(1, PrimaryViewport->height()) * 2.f;
-        const float HalfHeight = std::tan(Camera.FieldOfViewDegrees * 0.0087266463f) * Distance;
-        Transform DroppedTransform;
-        DroppedTransform.Position = Camera.Target
-            + Right * (NormalizedX * HalfHeight * static_cast<float>(PrimaryViewport->width()) / std::max(1, PrimaryViewport->height()))
-            + Up * (NormalizedY * HalfHeight);
-        bCreated = ExecuteCommand(MakeSetTransformCommand(EditScene, CreatedObject, DroppedTransform));
-    }
-    CommandStack.EndGroup();
+    const bool bCreated = ExecuteCommand(MakeCreateStaticMeshObjectCommand(EditScene,
+        BoundEngine.GetAssetRegistry(), Key, ObjectName, {}, DroppedTransform, &CreatedObject));
     if (bCreated)
     {
         SelectObject(CreatedObject);

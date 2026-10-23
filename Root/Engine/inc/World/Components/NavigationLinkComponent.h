@@ -6,7 +6,7 @@
 
 class NavigationLinkComponent : public Component
 {
-    ENGINE_CLASS(NavigationLinkComponent, Component, "engine.NavigationLinkComponent", 1)
+    ENGINE_CLASS(NavigationLinkComponent, Component, "engine.NavigationLinkComponent")
 public:
     Vector3 Start = Vector3(-1.f, 0.f, 0.f);
     ENGINE_REFLECT_FIELD(NavigationLinkComponent, Start, "start", RF_EDITOR_EDITABLE, RF_SERIALIZABLE,

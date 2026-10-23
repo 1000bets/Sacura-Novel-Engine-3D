@@ -13,6 +13,7 @@ AssetManager::AssetManager()
     : SkeletalLoaderInstance(ModelLoaderInstance)
 {
     RegisterLoader(ModelAssetType, ModelLoaderInstance);
+    RegisterLoader<CharacterDefinition>(CharacterAssetType, CharacterLoaderInstance);
     RegisterLoader(StaticMeshAssetType, ModelLoaderInstance);
     RegisterLoader(TextureAssetType, TextureLoaderInstance);
     RegisterLoader(MaterialAssetType, MaterialLoaderInstance);

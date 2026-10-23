@@ -10,6 +10,7 @@ StoryGraphAction StoryEventAdapter::ToView(const StoryActionDefinition& Action)
     Value.Duration = Action.DurationSeconds;
     Value.Target = QString::fromStdString(Action.TargetObjectId);
     Value.LegacyTarget = QString::fromStdString(Action.TargetObjectName);
+    Value.AnimationId = QString::fromStdString(Action.AnimationId);
     Value.Position = {Action.TargetPosition.x, Action.TargetPosition.y, Action.TargetPosition.z};
     Value.Rotation = {Action.TargetRotation.x, Action.TargetRotation.y, Action.TargetRotation.z,
                       Action.TargetRotation.w};
@@ -27,6 +28,7 @@ StoryActionDefinition StoryEventAdapter::ToDefinition(const StoryGraphAction& Ac
     Value.DurationSeconds = static_cast<float>(Action.Duration);
     Value.TargetObjectId = Action.Target.toStdString();
     Value.TargetObjectName = Action.LegacyTarget.toStdString();
+    Value.AnimationId = Action.AnimationId.toStdString();
     Value.TargetPosition = Vector3(static_cast<float>(Action.Position[0]), static_cast<float>(Action.Position[1]),
                                    static_cast<float>(Action.Position[2]));
     Value.TargetRotation = Quaternion(static_cast<float>(Action.Rotation[0]), static_cast<float>(Action.Rotation[1]),

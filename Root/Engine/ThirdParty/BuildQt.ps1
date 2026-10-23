@@ -28,7 +28,7 @@ try
     {
         $NinjaExecutable = (Get-Command ninja -ErrorAction Stop).Source
     }
-    & $CMakeExecutable -S $SourceDirectory -B $BuildDirectory -G Ninja "-DCMAKE_MAKE_PROGRAM=$NinjaExecutable" "-DCMAKE_BUILD_TYPE=$Configuration" "-DCMAKE_INSTALL_PREFIX=$InstallDirectory" -DBUILD_SHARED_LIBS=ON -DQT_BUILD_TESTS=OFF -DQT_BUILD_EXAMPLES=OFF -DFEATURE_opengl=ON -DFEATURE_sql=OFF -DFEATURE_network=OFF -DFEATURE_dbus=OFF -DFEATURE_printsupport=OFF -DFEATURE_system_zlib=OFF -DFEATURE_system_pcre2=OFF -DFEATURE_system_jpeg=OFF -DFEATURE_system_png=OFF -DFEATURE_system_freetype=OFF -DFEATURE_system_harfbuzz=OFF
+    & $CMakeExecutable -S $SourceDirectory -B $BuildDirectory -G Ninja "-DCMAKE_MAKE_PROGRAM=$NinjaExecutable" "-DCMAKE_BUILD_TYPE=$Configuration" "-DCMAKE_INSTALL_PREFIX=$InstallDirectory" -DBUILD_SHARED_LIBS=ON -DQT_BUILD_TESTS=OFF -DQT_BUILD_EXAMPLES=OFF -DFEATURE_opengl=ON -DFEATURE_sql=OFF -DFEATURE_network=ON -DFEATURE_dbus=OFF -DFEATURE_printsupport=OFF -DFEATURE_system_zlib=OFF -DFEATURE_system_pcre2=OFF -DFEATURE_system_jpeg=OFF -DFEATURE_system_png=OFF -DFEATURE_system_freetype=OFF -DFEATURE_system_harfbuzz=OFF
     if ($LASTEXITCODE -ne 0)
     {
         throw 'Qt source configuration failed.'

@@ -17,6 +17,7 @@ public:
     explicit StoryWidget(StoryRuntime& Runtime, QWidget* Parent = nullptr);
     void Refresh(bool bAllowInput);
     void SetWidgetLayout(const QJsonObject& Layout);
+    void SetWidgetLibrary(const QJsonObject& Library);
     void AttachToViewport(QWidget* Viewport);
     void SetOverlayVisible(bool bVisible);
 
@@ -35,5 +36,8 @@ private:
     WidgetSurface* Authored = nullptr;
     QPointer<QWidget> OverlayViewport;
     QJsonObject AuthoredLayout;
+    QJsonObject WidgetLibrary;
+    QJsonObject DefaultLayout;
+    QString CharacterWidget;
     bool bOverlayRequested = false;
 };

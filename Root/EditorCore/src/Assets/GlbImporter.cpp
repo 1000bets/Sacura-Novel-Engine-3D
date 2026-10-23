@@ -129,6 +129,27 @@ ImportResult GlbImporter::ValidateAndCopy(
         Result.Metadata.SubAssets.push_back(std::move(MeshSubAsset));
     }
 
+    if (!AssetResult->skins.empty())
+    {
+        for (size_t SkinIndex = 0; SkinIndex < AssetResult->skins.size(); ++SkinIndex)
+        {
+            const auto Name = "Skeleton_" + std::to_string(SkinIndex);
+            Result.Metadata.SubAssets.push_back({Guid::Generate(), SkeletonAssetType, Name,
+                {"skin", static_cast<int32_t>(SkinIndex)}});
+            Result.Metadata.SubAssets.push_back({Guid::Generate(), SkeletalMeshAssetType,
+                "CharacterMesh_" + std::to_string(SkinIndex), {"skin", static_cast<int32_t>(SkinIndex)}});
+        }
+        for (size_t AnimationIndex = 0; AnimationIndex < AssetResult->animations.size(); ++AnimationIndex)
+        {
+            std::string Name(AssetResult->animations[AnimationIndex].name);
+            if (Name.empty())
+            {
+                Name = "Animation_" + std::to_string(AnimationIndex);
+            }
+            Result.Metadata.SubAssets.push_back({Guid::Generate(), AnimationClipAssetType, Name,
+                {"animation", static_cast<int32_t>(AnimationIndex)}});
+        }
+    }
     std::filesystem::create_directories(DestinationPath.parent_path(), ErrorCode);
     std::filesystem::copy_file(SourcePath, DestinationPath, std::filesystem::copy_options::overwrite_existing, ErrorCode);
     if (ErrorCode)

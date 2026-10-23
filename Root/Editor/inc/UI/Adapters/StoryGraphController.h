@@ -20,9 +20,11 @@ class StoryGraphController final : public QObject
     void FlushEdits();
     bool Undo();
     bool Redo();
+    bool ApplyDocumentEdit(const std::function<bool(StoryGraphDocument&, std::string&)>& Edit, std::string& Error);
     bool DeleteSelection();
     void SetLocked(bool bValue);
-    void SetObjects(QVector<QPair<QString, QString>> Objects);
+    void SetObjects(QVector<QPair<QString, QString>> Objects, QVector<QPair<QString, QString>> NarrativeObjects = {},
+        QMap<QString, QVector<QPair<QString, QString>>> CharacterAnimations = {});
     const StoryGraphDocument& GetDocument() const
     {
         return Document;
@@ -48,6 +50,8 @@ class StoryGraphController final : public QObject
     StoryWorkspaceView& View;
     StoryInspectorView& Inspector;
     QVector<QPair<QString, QString>> Objects;
+    QVector<QPair<QString, QString>> NarrativeObjects;
+    QMap<QString, QVector<QPair<QString, QString>>> CharacterAnimations;
     QString Selected;
     QString SelectedBinding;
     bool bLocked = false;

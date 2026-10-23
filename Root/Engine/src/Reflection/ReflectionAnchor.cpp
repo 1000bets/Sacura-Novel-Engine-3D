@@ -1,4 +1,7 @@
+#include "World/Components/SkySphereComponent.h"
+#include "World/Components/SkyLightComponent.h"
 #include "World/Components/CameraComponent.h"
+#include "World/Components/CharacterComponent.h"
 #include "World/Components/ArrowComponent.h"
 #include "World/Components/LightComponent.h"
 #include "World/Components/LightSettings.h"
@@ -13,6 +16,9 @@
 
 void ForceTouchRegistrars()
 {
+    (void)&SkySphereComponent::s_ReflectionClassRegistrar;
+    (void)&SkyLightComponent::s_ReflectionClassRegistrar;
+    (void)&CharacterComponent::s_ReflectionClassRegistrar;
     (void)&PhysicsBodyComponent::s_ReflectionClassRegistrar;
     (void)&CharacterControllerComponent::s_ReflectionClassRegistrar;
     (void)&NavMeshBoundsComponent::s_ReflectionClassRegistrar;

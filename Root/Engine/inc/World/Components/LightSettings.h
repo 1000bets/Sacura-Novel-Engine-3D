@@ -8,7 +8,7 @@ using namespace DirectX::SimpleMath;
 
 struct LightSettings
 {
-    ENGINE_STRUCT(LightSettings, "engine.LightSettings", 1)
+    ENGINE_STRUCT(LightSettings, "engine.LightSettings")
 
 public:
     Color LightColor = Color(1.f, 1.f, 1.f, 1.f);

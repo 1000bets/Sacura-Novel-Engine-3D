@@ -2,9 +2,9 @@
 
 ## Статус
 
-Этот документ описывает будущую интеграцию. MaterialEditingSession, команды, снимки и события ниже — предлагаемый API, который ещё не реализован.
+Этот документ описывает расширенный целевой контракт. Начальная MaterialEditingSession и нативное окно уже реализованы; фактические операции и ограничения описаны в [руководстве редактора](../../docs/MATERIAL-EDITOR.md). Снимки, события и полный набор команд ниже остаются предложением и не должны считаться реализованным API.
 
-Существующая система материалов сохраняется: GUID, загрузка, наследование, MaterialDocument/MaterialInstanceDocument, компиляция, горячее обновление, Surface/PostProcess/UserInterface, DynamicMaterialInstance и runtime MaterialWidget. Создание ассетов, назначение материаловых слотов и постэффектов остаются доступными. Без зарегистрированного редактора активация материала показывает штатное сообщение об отсутствии редактора.
+Существующая система материалов сохраняется: GUID, загрузка, наследование, MaterialDocument/MaterialInstanceDocument, компиляция, горячее обновление, Surface/PostProcess/UserInterface, DynamicMaterialInstance и runtime MaterialWidget. Создание ассетов, назначение материаловых слотов и постэффектов остаются доступными. Активация материала теперь открывает зарегистрированный MaterialEditorWindow.
 
 ## 1. Подключение и ответственность
 
@@ -112,7 +112,7 @@ Runtime MaterialWidget может быть адаптером готового �
 
 RegisterAssetEditor уже существует. MaterialDocument/MaterialInstanceDocument предоставляют Open, SetDocument, SetSource, SetDocumentAndSource, Undo, Redo, BuildResolved, Save и признаки конфликтов. MaterialDocumentIO::Resolve принимает документы/источники черновика и копию реестра. AssetGpuUploader::RequestMaterial возвращает MaterialCompilation. DynamicMaterialInstance и MaterialRenderSnapshot отделяют предпросмотр от документа; MaterialImageRequest и MaterialWidget дают offscreen-изображение.
 
-Единого MaterialEditingSession, typed-command API, editing snapshot и структурированной shader-диагностики сейчас нет. Предложенный контракт требует этой прослойки в EditorCore, включая управление ревизиями Compile/Apply. Переносить файловые операции и жизненный цикл компиляции обратно в конструктор окна нельзя.
+Начальная MaterialEditingSession реализована в EditorCore: документ, валидация, ревизии и фоновая подготовка Compile. Typed-команда material_document использует эту же сессию через окно. Полный editing snapshot, отдельный Apply, события и структурированная shader-диагностика пока не реализованы. Переносить файловые операции и жизненный цикл компиляции обратно в конструктор окна нельзя.
 
 ## 9. Проверка будущей реализации
 

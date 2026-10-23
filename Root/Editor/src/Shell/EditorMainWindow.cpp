@@ -1,4 +1,11 @@
+#include "Prefab/PrefabLibrary.h"
+#include "Prefab/PrefabEditorWindow.h"
+#include "UI/Views/MaterialEditorWindow.h"
+#include "UI/Views/StaticMeshEditorWindow.h"
+#include "UI/Views/CharacterWorkspaceView.h"
 #include "Shell/EditorMainWindow.h"
+#include "Automation/EditorToolset.h"
+#include "Automation/EditorMcpServer.h"
 #include "UI/Adapters/StoryGraphController.h"
 
 #include "Actions/BuiltinEditorActions.h"
@@ -110,6 +117,7 @@ EditorMainWindow::EditorMainWindow(Engine& InEngine, ProjectSession& InSession, 
     BuildToolbar();
     BuildUi();
     PopulateHierarchy();
+    InitializeTools();
     PopulateDockPages();
     BuildWindowsMenuView();
     centralWidget()->setProperty("layoutRestored", Docking->Restore());
@@ -126,6 +134,28 @@ EditorMainWindow::EditorMainWindow(Engine& InEngine, ProjectSession& InSession, 
 
 EditorMainWindow::~EditorMainWindow()
 {
+    for (QDialog* Dialog : findChildren<QDialog*>())
+    {
+        if (auto* MeshWindow = dynamic_cast<StaticMeshEditorWindow*>(Dialog))
+        {
+            delete MeshWindow;
+        }
+    }
+    delete CharacterWorkspace.data();
+    for (QDialog* Dialog : findChildren<QDialog*>())
+    {
+        if (auto* MaterialWindow = dynamic_cast<MaterialEditorWindow*>(Dialog))
+        {
+            delete MaterialWindow;
+        }
+    }
+    PrefabLibrary::Get().RemoveChangeListener(PrefabListener);
+    for (PrefabEditorWindow* Window : findChildren<PrefabEditorWindow*>())
+    {
+        delete Window;
+    }
+    McpServer.reset();
+    Toolset.reset();
     CloseSceneContextMenu();
     Docking->Save();
     MaintenanceTimer->stop();

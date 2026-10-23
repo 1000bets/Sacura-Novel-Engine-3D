@@ -4,6 +4,8 @@
 
 void ForceTouchEditorRegistrars()
 {
+    (void)&CreateSkySphereObjectAction::s_ReflectionClassRegistrar;
+    (void)&CreateSkyLightObjectAction::s_ReflectionClassRegistrar;
     (void)&CreatePhysicsBodyObjectAction::s_ReflectionClassRegistrar;
     (void)&CreateCharacterObjectAction::s_ReflectionClassRegistrar;
     (void)&CreateNavMeshBoundsObjectAction::s_ReflectionClassRegistrar;

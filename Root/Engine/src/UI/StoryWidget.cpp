@@ -38,6 +38,22 @@ StoryWidget::StoryWidget(StoryRuntime& InRuntime, QWidget* Parent)
 void StoryWidget::Refresh(bool bAllowInput)
 {
     setEnabled(bAllowInput);
+    const auto RequestedWidget = QString::fromStdString(Runtime.GetDisplayedDialogueWidget());
+    if (!WidgetLibrary.isEmpty() && CharacterWidget != RequestedWidget)
+    {
+        CharacterWidget = RequestedWidget;
+        QJsonObject Selected = DefaultLayout;
+        for (const auto& Entry : WidgetLibrary.value("widgets").toArray())
+        {
+            const auto Widget = Entry.toObject();
+            if (Widget.value("id").toString() == RequestedWidget && Widget.value("kind") == "dialogue")
+            {
+                Selected = Widget;
+                break;
+            }
+        }
+        SetWidgetLayout(Selected);
+    }
     if (Authored)
     {
         WidgetContext Context;
@@ -91,6 +107,14 @@ void StoryWidget::Refresh(bool bAllowInput)
             ChoiceLayout->addWidget(Choice);
         }
     }
+}
+
+void StoryWidget::SetWidgetLibrary(const QJsonObject& Library)
+{
+    WidgetLibrary = Library;
+    DefaultLayout = WidgetLayout::Resolve(Library, "dialogue");
+    CharacterWidget.clear();
+    SetWidgetLayout(DefaultLayout);
 }
 
 void StoryWidget::SetWidgetLayout(const QJsonObject& Layout)

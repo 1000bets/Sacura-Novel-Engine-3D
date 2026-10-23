@@ -609,6 +609,7 @@ void ProjectBrowserDialog::OnOpenSampleProject()
     Candidates.emplace_back(std::filesystem::current_path() / ".." / ".." / ".." / "Samples" / "SampleProject" / "SampleProject.project");
     if (EnginePaths::IsInitialized())
     {
+        Candidates.emplace_back(EnginePaths::Root() / "Samples" / "SampleProject" / "SampleProject.project");
         Candidates.emplace_back(EnginePaths::Root() / ".." / ".." / "Samples" / "SampleProject" / "SampleProject.project");
         Candidates.emplace_back(EnginePaths::Root().parent_path() / "Samples" / "SampleProject" / "SampleProject.project");
     }

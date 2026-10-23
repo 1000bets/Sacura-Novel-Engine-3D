@@ -8,6 +8,7 @@
 #include "Assets/Loaders/ModelLoader.h"
 #include "Assets/Loaders/SkeletalLoader.h"
 #include "Assets/Loaders/TextureLoader.h"
+#include "Characters/CharacterDefinition.h"
 #include "Assets/Resources/AnimationClipResource.h"
 #include "Assets/Resources/MaterialResource.h"
 #include "Assets/Resources/ModelResource.h"
@@ -129,6 +130,7 @@ private:
 
     ModelLoader ModelLoaderInstance;
     TextureLoader TextureLoaderInstance;
+    CharacterLoader CharacterLoaderInstance;
     MaterialLoader MaterialLoaderInstance;
     MaterialInstanceLoader MaterialInstanceLoaderInstance;
     SkeletalLoader SkeletalLoaderInstance;

@@ -200,7 +200,27 @@ bool ProjectDescriptor::TrySaveToFile(std::string& OutError) const
         return false;
     }
 
-    nlohmann::json Document;
+    nlohmann::json Document = nlohmann::json::object();
+    if (std::filesystem::exists(ProjectFile))
+    {
+        try
+        {
+            std::ifstream Existing(ProjectFile);
+            Existing >> Document;
+            if (!Document.is_object())
+            {
+                OutError = "Existing project descriptor must be an object";
+                return false;
+            }
+        }
+        catch (const std::exception& Exception)
+        {
+            OutError = std::string("Failed to preserve project descriptor: ") + Exception.what();
+            return false;
+        }
+    }
+    Document.erase("startupScene");
+    Document.erase("startupStory");
     Document["name"] = Name;
     Document["engineVersion"] = EngineVersion.empty() ? "0.1" : EngineVersion;
     Document["template"] = TemplateId.empty() ? "Empty" : TemplateId;

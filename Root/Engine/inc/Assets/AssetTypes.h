@@ -33,8 +33,12 @@ struct AssetTypeHash
 };
 
 inline const AssetType UnknownAssetType{};
+inline const AssetType CharacterAssetType{"Character"};
+inline const AssetType PrefabAssetType{"Prefab"};
 inline const AssetType SceneAssetType{"Scene"};
 inline const AssetType StoryAssetType{"Story"};
+inline const AssetType InputActionAssetType{"InputAction"};
+inline const AssetType InputMappingContextAssetType{"InputMappingContext"};
 inline const AssetType ModelAssetType{"Model"};
 inline const AssetType TextureAssetType{"Texture"};
 inline const AssetType MaterialAssetType{"Material"};

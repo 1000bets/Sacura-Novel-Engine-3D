@@ -2,6 +2,8 @@
 #include "World/Components/CameraComponent.h"
 #include "World/GameObject.h"
 #include "Engine.h"
+#include "Prefab/PrefabLibrary.h"
+#include "Input/InputDocument.h"
 #include "Core/EnginePaths.h"
 #include "Core/Object/MemorySubsystem.h"
 #include "Rendering/Frame/RenderFrameData.h"
@@ -121,6 +123,7 @@ ReflectionDiagnostic Engine::ImportProjectScripts()
 
 AssetDiagnostic Engine::LoadProjectContent(const ProjectDescriptor& Descriptor)
 {
+    OpenProjectFile = Descriptor.ProjectFile;
     AssertGameThread();
     ProjectDiagnostics.clear();
     if (!bInitialized)
@@ -170,12 +173,14 @@ AssetDiagnostic Engine::LoadProjectContent(const ProjectDescriptor& Descriptor)
 
 void Engine::UnloadProjectContent()
 {
+    OpenProjectFile.clear();
     AssertGameThread();
 
     AdoptScene({});
     StartupStory.clear();
     AssetResolver.Clear();
     GpuUploader.Clear();
+    PrefabLibrary::Get().BindRegistry(nullptr);
     Assets.Shutdown();
 
     ContentRoot.clear();
@@ -193,7 +198,8 @@ void Engine::UnloadProjectContent()
     ProjectPaths::Clear();
     if (bInitialized)
     {
-        Assets.Initialize(Registry, Jobs);
+        PrefabLibrary::Get().BindRegistry(&Registry);
+    Assets.Initialize(Registry, Jobs);
     }
 }
 
@@ -246,6 +252,7 @@ void Engine::InitializeCommon(bool bCreateWindowAndRender)
     }
 
     ScanConfiguredContent();
+    PrefabLibrary::Get().BindRegistry(&Registry);
     Assets.Initialize(Registry, Jobs);
     AssetResolver.Bind(&Registry, &Assets, &GpuUploader);
 
@@ -416,9 +423,14 @@ bool Engine::StartGame()
     {
         return false;
     }
+    if (!BeginInputSession())
+    {
+        return false;
+    }
     MaterialTime = 0.f;
     if (!OwnedScene->BeginPlay())
     {
+        PlayerInput.reset();
         return false;
     }
     bGameRunning = true;
@@ -452,6 +464,12 @@ std::shared_ptr<DynamicMaterialInstance> Engine::CreateDynamicMaterialInstance(c
 
 void Engine::StopGame()
 {
+    if (PlayerInput)
+    {
+        PlayerInput->Close();
+    }
+    PlayerInput.reset();
+    bGamePaused = false;
     Story.BindScene(nullptr);
     if (bGameRunning && OwnedScene != nullptr)
     {
@@ -555,6 +573,11 @@ void Engine::Tick(float DeltaTime)
 {
     AssertGameThread();
     BeginFrame();
+    if (PlayerInput)
+    {
+        const auto Session = PlayerInput;
+        Session->Tick(DeltaTime);
+    }
 
     AssetResolver.PollMaterialChanges();
     Assets.PumpCompletions();
@@ -575,7 +598,7 @@ void Engine::Tick(float DeltaTime)
     {
         Play.Tick(DeltaTime);
     }
-    else if (bGameRunning && OwnedScene != nullptr)
+    else if (bGameRunning && !bGamePaused && OwnedScene != nullptr)
     {
         TickWorld(*OwnedScene, DeltaTime);
     }
@@ -635,6 +658,7 @@ void Engine::Shutdown()
     PrintString("Engine: shutting down");
     AssetResolver.Clear();
     GpuUploader.Clear();
+    PrefabLibrary::Get().BindRegistry(nullptr);
     Assets.Shutdown();
     Scripting.Shutdown();
     Scripting.BindMaterialEngine(nullptr);
@@ -716,6 +740,26 @@ bool Engine::PrepareSceneMaterials(Scene& World)
         {
             if (auto* Mesh = dynamic_cast<MeshRendererComponent*>(Component))
             {
+                if (!Mesh->GetMaterialAssetKey().IsValid() && !Mesh->DynamicMaterial)
+                {
+                    AssetRegistryEntry MeshEntry;
+                    StaticMeshDefaults Defaults;
+                    std::string Error;
+                    const auto MeshAsset = Mesh->GetMeshAssetKey();
+                    if (Registry.TryResolveKey(MeshAsset, MeshEntry)
+                        && StaticMeshDefaults::Parse(StaticMeshDefaults::Read(MeshEntry.Metadata, MeshAsset), Defaults, Error))
+                    {
+                        for (const auto& Slot : Defaults.Materials)
+                        {
+                            const bool bOverridden = std::any_of(Mesh->MaterialSlots.Entries.begin(), Mesh->MaterialSlots.Entries.end(),
+                                [&](const MaterialSlotOverride& Override) { return Override.Slot == Slot.first; });
+                            if (!bOverridden && Mesh->DynamicMaterialSlots.find(Slot.first) == Mesh->DynamicMaterialSlots.end())
+                            {
+                                Prepare(Slot.second, {});
+                            }
+                        }
+                    }
+                }
                 Prepare(Mesh->GetMaterialAssetKey(), {});
                 Prepare({}, Mesh->DynamicMaterial);
                 for (const auto& Slot : Mesh->MaterialSlots.Entries)

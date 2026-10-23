@@ -4,6 +4,7 @@
 #include "Assets/ContentHash.h"
 #include "Story/StoryTypes.h"
 #include "Documents/StoryEventPackage.h"
+#include "Reflection/Json/ReflectionJson.h"
 #include <functional>
 #include <map>
 #include <nlohmann/json.hpp>
@@ -19,6 +20,7 @@ struct StoryGraphPosition
 class StoryGraphDocument
 {
   public:
+    const AssetRegistry* GetAssetRegistry() const { return Registry; }
     bool Open(const std::filesystem::path& Path, std::string& Error);
     bool Open(AssetRegistry& Registry, const AssetKey& Asset, std::string& Error);
     bool Save(std::string& Error);
@@ -61,6 +63,10 @@ class StoryGraphDocument
     const std::string& GetUndoLabel() const;
     const std::string& GetRedoLabel() const;
 
+    bool AddNarrativeNode(const std::string& Type, StoryGraphPosition Position, StoryNodeId& Created, std::string& Error);
+    bool ConnectData(const StoryNodeId& Source, const std::string& Output, const StoryNodeId& Target, const std::string& Input, std::string& Error);
+    bool SetNarrativeInput(const StoryNodeId& Node, const std::string& Input, const nlohmann::json& Value,
+        std::string& Error, const ReflectionJson::ObjectResolver& ResolveObject = {});
     bool AddNode(StoryNodeKind Kind, StoryGraphPosition Position, StoryNodeId& Created, std::string& Error);
     bool DeleteNodes(const std::vector<StoryNodeId>& Identities, std::string& Error);
     bool ReplaceNode(const StoryNode& Node, std::string& Error);

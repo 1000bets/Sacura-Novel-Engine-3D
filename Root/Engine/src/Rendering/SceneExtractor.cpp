@@ -1,3 +1,5 @@
+#include "World/Components/SkySphereComponent.h"
+#include "World/Components/SkyLightComponent.h"
 #include "Rendering/SceneExtractor.h"
 
 #include "Core/Threading/ThreadContext.h"
@@ -67,6 +69,38 @@ void SceneExtractor::Extract(const Scene& SourceScene, RenderScene& Output) cons
     ExtractRenderableObjects(SourceScene, Output, Context);
     ExtractCamera(SourceScene, Output, Context);
     ExtractLights(SourceScene, Output, Context);
+    std::string SkyIdentifier;
+    std::string LightIdentifier;
+    for (GameObject* Object : SourceScene.GetAllObjects())
+    {
+        if (!Object->IsActiveInHierarchy())
+        {
+            continue;
+        }
+        const auto Identifier = Object->GetPersistentId();
+        if (const auto* Sky = Object->GetComponent<SkySphereComponent>(); Sky && Sky->IsEnabled()
+            && (SkyIdentifier.empty() || Identifier < SkyIdentifier))
+        {
+            SkyIdentifier = Identifier;
+            Output.Sky.bVisible = true;
+            Output.Sky.bAuthored = true;
+            Output.Sky.Zenith = Vector3(Sky->ZenithColor.x, Sky->ZenithColor.y, Sky->ZenithColor.z);
+            Output.Sky.Horizon = Vector3(Sky->HorizonColor.x, Sky->HorizonColor.y, Sky->HorizonColor.z);
+            Output.Sky.Ground = Vector3(Sky->GroundColor.x, Sky->GroundColor.y, Sky->GroundColor.z);
+            Output.Sky.SunColor = Vector3(Sky->SunColor.x, Sky->SunColor.y, Sky->SunColor.z);
+            Output.Sky.SunDirection = Object->GetWorldUp();
+            Output.Sky.Brightness = std::max(0.f, Sky->Brightness);
+        }
+        if (const auto* Light = Object->GetComponent<SkyLightComponent>(); Light && Light->IsEnabled()
+            && (LightIdentifier.empty() || Identifier < LightIdentifier))
+        {
+            LightIdentifier = Identifier;
+            Output.Sky.bLighting = true;
+            Output.Sky.bAuthored = true;
+            Output.Sky.LightColor = Vector3(Light->LightColor.x, Light->LightColor.y, Light->LightColor.z);
+            Output.Sky.LightIntensity = std::max(0.f, Light->Intensity);
+        }
+    }
 }
 
 void SceneExtractor::ExtractRenderableObjects(const Scene& SourceScene, RenderScene& Output, ExtractionContext& Context) const
@@ -89,6 +123,7 @@ void SceneExtractor::ExtractRenderableObjects(const Scene& SourceScene, RenderSc
             RenderObject Extracted;
             Extracted.WorldMatrix = Context.GetWorldMatrix(*Object);
             Extracted.Mesh = MeshRenderer->Mesh;
+            Extracted.PosedMesh = MeshRenderer->PosedMesh;
             Extracted.MaterialSnapshot = MeshRenderer->MaterialSnapshot;
             Extracted.BaseColor = MeshRenderer->BaseColorFactor;
             if (!Extracted.MaterialSnapshot && !MeshRenderer->MaterialDiagnostic.empty())

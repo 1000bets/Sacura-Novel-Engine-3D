@@ -8,6 +8,7 @@
 #include "World/GameObject.h"
 #include "World/Components/MeshRendererComponent.h"
 #include "World/Components/CameraComponent.h"
+#include "World/Components/CharacterComponent.h"
 #include <algorithm>
 
 void SceneAssetResolver::Bind(
@@ -73,6 +74,12 @@ void SceneAssetResolver::ResolveScene(Scene& TargetScene)
             }
 
             MeshRenderer->MaterialDiagnostic.clear();
+            if (auto* Character = dynamic_cast<CharacterComponent*>(MeshRenderer))
+            {
+                Character->Resolve(*BoundManager);
+            }
+            else
+            {
             const AssetKey MeshKey = MeshRenderer->GetMeshAssetKey();
             if (!MeshKey.IsValid())
             {
@@ -118,6 +125,7 @@ void SceneAssetResolver::ResolveScene(Scene& TargetScene)
                 continue;
             }
 
+            MeshRenderer->DefaultMaterialSlots = CpuMesh->Defaults.Materials;
             BoundUploader->RequestUploadMesh(CpuMesh, MeshKey);
             MeshHandle GpuMesh{};
             if (BoundUploader->TryGetMesh(MeshKey, GpuMesh))
@@ -144,10 +152,20 @@ void SceneAssetResolver::ResolveScene(Scene& TargetScene)
                 MeshRenderer->bMissingAsset = false;
             }
 
+            }
+
+            std::map<int32_t, AssetKey> EffectiveSlots;
+            if (!MeshRenderer->GetMaterialAssetKey().IsValid() && !MeshRenderer->DynamicMaterial)
+            {
+                EffectiveSlots = MeshRenderer->DefaultMaterialSlots;
+            }
+            for (const auto& Slot : MeshRenderer->MaterialSlots.Entries)
+            {
+                EffectiveSlots[Slot.Slot] = Slot.Material;
+            }
             for (auto Iterator = MeshRenderer->SlotSnapshots.begin(); Iterator != MeshRenderer->SlotSnapshots.end();)
         {
-            const bool bAuthored = std::any_of(MeshRenderer->MaterialSlots.Entries.begin(), MeshRenderer->MaterialSlots.Entries.end(),
-                [&](const MaterialSlotOverride& Entry) { return Entry.Slot == Iterator->first; });
+            const bool bAuthored = EffectiveSlots.find(Iterator->first) != EffectiveSlots.end();
             if (!bAuthored && MeshRenderer->DynamicMaterialSlots.find(Iterator->first) == MeshRenderer->DynamicMaterialSlots.end())
             {
                 Iterator = MeshRenderer->SlotSnapshots.erase(Iterator);
@@ -157,23 +175,27 @@ void SceneAssetResolver::ResolveScene(Scene& TargetScene)
                 ++Iterator;
             }
         }
-        for (const auto& Slot : MeshRenderer->MaterialSlots.Entries)
+        for (const auto& Slot : EffectiveSlots)
         {
             std::shared_ptr<DynamicMaterialInstance> Dynamic;
-            const auto Found = MeshRenderer->DynamicMaterialSlots.find(Slot.Slot);
+            const auto Found = MeshRenderer->DynamicMaterialSlots.find(Slot.first);
             if (Found != MeshRenderer->DynamicMaterialSlots.end())
             {
                 Dynamic = Found->second;
             }
-            const auto Snapshot = ResolveMaterial(Slot.Material, Dynamic);
-            MeshRenderer->MaterialDiagnostic += GetMaterialDiagnostic(Slot.Material);
+            const auto Snapshot = ResolveMaterial(Slot.second, Dynamic);
+            MeshRenderer->MaterialDiagnostic += GetMaterialDiagnostic(Slot.second);
             if (Snapshot && Snapshot->Material->Definition.Domain != MaterialDomain::Surface)
             {
                 MeshRenderer->MaterialDiagnostic += "Mesh slot requires a Surface material";
             }
             if (Snapshot && Snapshot->Material->Definition.Domain == MaterialDomain::Surface)
             {
-                MeshRenderer->SlotSnapshots[Slot.Slot] = Snapshot;
+                MeshRenderer->SlotSnapshots[Slot.first] = Snapshot;
+            }
+            else if (!Slot.second.IsValid() && !Dynamic)
+            {
+                MeshRenderer->SlotSnapshots.erase(Slot.first);
             }
         }
         for (const auto& Slot : MeshRenderer->DynamicMaterialSlots)

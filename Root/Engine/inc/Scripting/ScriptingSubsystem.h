@@ -59,6 +59,11 @@ public:
     void BindScriptComponent(ScriptComponent& Component);
     void UnbindScriptComponent(ScriptComponent& Component);
     void TickScriptComponent(ScriptComponent& Component, float DeltaTime);
+    ReflectionDiagnostic InvokeMethod(
+        ScriptComponent& Component,
+        const std::string& MethodName,
+        const std::unordered_map<std::string, ReflectedValue>& Arguments,
+        ReflectedValue& Result);
     void DestroyAllScriptInstances();
 
 private:

@@ -44,7 +44,17 @@ add_custom_command(TARGET SakuraPlayer POST_BUILD
 # Editor application
 # ---------------------------------------------------------------
 if(SAKURA_BUILD_EDITOR)
+    add_executable(SakuraMcpBridge Editor/apps/SakuraMcpBridgeMain.cpp)
+    target_link_libraries(SakuraMcpBridge PRIVATE Qt6::Core Qt6::Network)
+    sakura_deploy_qt_runtime(SakuraMcpBridge)
+    add_custom_command(TARGET SakuraMcpBridge POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Qt6::Network>" "$<TARGET_FILE_DIR:SakuraMcpBridge>"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/Stage/Bin"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:SakuraMcpBridge>" "${CMAKE_BINARY_DIR}/Stage/Bin/"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Qt6::Network>" "${CMAKE_BINARY_DIR}/Stage/Bin/"
+        VERBATIM)
     add_executable(SakuraEditor Editor/apps/SakuraEditorMain.cpp)
+    add_dependencies(SakuraEditor SakuraMcpBridge)
     target_link_libraries(SakuraEditor PRIVATE Engine Editor)
     target_compile_definitions(SakuraEditor PRIVATE
         SAKURA_SAMPLE_PROJECT_FILE="${CMAKE_SOURCE_DIR}/Samples/SampleProject/SampleProject.project"
@@ -73,6 +83,8 @@ if(SAKURA_BUILD_EDITOR)
         VERBATIM
     )
 endif()
+
+include(cmake/Distribution.cmake)
 
 if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Tests/TestTargets.cmake")
     include("${CMAKE_CURRENT_SOURCE_DIR}/Tests/TestTargets.cmake")

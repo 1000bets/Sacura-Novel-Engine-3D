@@ -32,15 +32,22 @@ struct PhysicsTriangleMesh
     std::vector<uint32_t> Indices;
 };
 
-struct PhysicsBodyDefinition
+struct PhysicsShapeDefinition
 {
-    PhysicsMotionType MotionType = PhysicsMotionType::Static;
     PhysicsShapeType ShapeType = PhysicsShapeType::Box;
-    Transform WorldTransform;
+    Quaternion ShapeRotation = Quaternion::Identity;
     Vector3 Center = Vector3::Zero;
     Vector3 HalfExtents = Vector3(0.5f, 0.5f, 0.5f);
     float Radius = 0.3f;
     float CapsuleHalfHeight = 0.6f;
+    PhysicsTriangleMesh TriangleMesh;
+};
+
+struct PhysicsBodyDefinition : PhysicsShapeDefinition
+{
+    PhysicsMotionType MotionType = PhysicsMotionType::Static;
+    Transform WorldTransform;
+    std::vector<PhysicsShapeDefinition> Shapes;
     float Mass = 1.f;
     float StaticFriction = 0.6f;
     float DynamicFriction = 0.5f;
@@ -56,7 +63,6 @@ struct PhysicsBodyDefinition
     bool bQueryEnabled = true;
     bool bSimulationEnabled = true;
     bool bContinuousCollisionDetection = false;
-    PhysicsTriangleMesh TriangleMesh;
 };
 
 struct PhysicsQueryFilter

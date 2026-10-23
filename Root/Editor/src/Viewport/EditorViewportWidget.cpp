@@ -1,3 +1,4 @@
+#include "Core/Object/MemorySubsystem.h"
 #include "Viewport/EditorViewportWidget.h"
 
 #include "Panels/EditorAssetMime.h"
@@ -30,6 +31,8 @@
 #include <QPixmap>
 #include <QHash>
 #include <QResizeEvent>
+#include <QScopedValueRollback>
+#include <QScopeGuard>
 #include <QTimer>
 #include <QWheelEvent>
 
@@ -224,6 +227,11 @@ public:
 
     void BuildAndSubmit()
     {
+        ImGuiContext* PreviousContext = ImGui::GetCurrentContext();
+        const auto RestoreContext = qScopeGuard([PreviousContext]()
+        {
+            ImGui::SetCurrentContext(PreviousContext);
+        });
         ImGui::SetCurrentContext(ImGuiContextInstance);
         ImGuiIO& InputOutput = ImGui::GetIO();
         const qreal PixelRatio = Owner->devicePixelRatioF();
@@ -362,6 +370,16 @@ public:
 
     void keyPressEvent(QKeyEvent* Event) override
     {
+        if (Event->key() == Qt::Key_Escape && bManipulating)
+        {
+            const Matrix ParentWorld = SelectedLocal.GetMatrix().Invert() * SelectedWorld.GetMatrix();
+            ApplyManipulatedWorld(DragStartLocal.GetMatrix() * ParentWorld);
+            bLeftMouseDown = false;
+            bManipulating = false;
+            emit Owner->TransformCancelled();
+            Event->accept();
+            return;
+        }
         if (Event->matches(QKeySequence::Copy) || Event->matches(QKeySequence::Paste))
         {
             Event->ignore();
@@ -379,7 +397,13 @@ public:
     {
         Owner->ResetCameraNavigation();
         bLeftMouseDown = false;
-        bManipulating = false;
+        if (bManipulating)
+        {
+            const Matrix ParentWorld = SelectedLocal.GetMatrix().Invert() * SelectedWorld.GetMatrix();
+            ApplyManipulatedWorld(DragStartLocal.GetMatrix() * ParentWorld);
+            bManipulating = false;
+            emit Owner->TransformCancelled();
+        }
         QWidget::focusOutEvent(Event);
     }
 
@@ -454,7 +478,7 @@ private:
         {
             return;
         }
-        Scene* World = Owner->BoundEngine->GetActiveScene();
+        Scene* World = Owner->GetToolScene();
         if (World == nullptr)
         {
             return;
@@ -492,8 +516,49 @@ private:
         {
             ImVec2 ScreenStart;
             ImVec2 ScreenEnd;
-            if (Project(Start, ScreenStart) && Project(End, ScreenEnd))
+            Vector4 ClipStart = Vector4::Transform(Vector4(Start.x, Start.y, Start.z, 1.f), ViewProjection);
+            Vector4 ClipEnd = Vector4::Transform(Vector4(End.x, End.y, End.z, 1.f), ViewProjection);
+            bool bVisible = true;
+            for (int Plane = 0; Plane < 6; ++Plane)
             {
+                auto Distance = [Plane](const Vector4& Clip)
+                {
+                    switch (Plane)
+                    {
+                    case 0: return Clip.z;
+                    case 1: return Clip.w - Clip.z;
+                    case 2: return Clip.w + Clip.x;
+                    case 3: return Clip.w - Clip.x;
+                    case 4: return Clip.w + Clip.y;
+                    default: return Clip.w - Clip.y;
+                    }
+                };
+                const float StartDistance = Distance(ClipStart);
+                const float EndDistance = Distance(ClipEnd);
+                if (StartDistance < 0.f && EndDistance < 0.f)
+                {
+                    bVisible = false;
+                    break;
+                }
+                if ((StartDistance < 0.f) != (EndDistance < 0.f))
+                {
+                    const Vector4 Intersection = ClipStart + (ClipEnd - ClipStart) * (StartDistance / (StartDistance - EndDistance));
+                    if (StartDistance < 0.f)
+                    {
+                        ClipStart = Intersection;
+                    }
+                    else
+                    {
+                        ClipEnd = Intersection;
+                    }
+                }
+            }
+            if (bVisible && ClipStart.w > 0.f && ClipEnd.w > 0.f)
+            {
+                ScreenStart = ImVec2((ClipStart.x / ClipStart.w * 0.5f + 0.5f) * DisplayWidth,
+                    (0.5f - ClipStart.y / ClipStart.w * 0.5f) * DisplayHeight);
+                ScreenEnd = ImVec2((ClipEnd.x / ClipEnd.w * 0.5f + 0.5f) * DisplayWidth,
+                    (0.5f - ClipEnd.y / ClipEnd.w * 0.5f) * DisplayHeight);
                 Drawing->AddLine(ScreenStart, ScreenEnd, LineColor, Thickness);
             }
         };
@@ -606,7 +671,14 @@ private:
         }
         if (Owner->bCollisionVisible)
         {
-            for (const PhysicsDebugLine& Line : World->GetPhysics().GetDebugLines())
+            std::vector<PhysicsDebugLine> WorldLines;
+            const auto* Lines = &Owner->CollisionPreviewLines;
+            if (!Owner->bCustomCollisionPreview)
+            {
+                WorldLines = World->GetPhysics().GetDebugLines();
+                Lines = &WorldLines;
+            }
+            for (const PhysicsDebugLine& Line : *Lines)
             {
                 DrawLine(Line.Start, Line.End, ImGui::ColorConvertFloat4ToU32(
                     ImVec4(Line.LineColor.x, Line.LineColor.y, Line.LineColor.z, Line.LineColor.w)), 1.f);
@@ -636,7 +708,7 @@ private:
         {
             return;
         }
-        const Scene* EditScene = Owner->BoundEngine->GetEditScene();
+        const Scene* EditScene = Owner->GetToolScene();
         if (EditScene == nullptr)
         {
             return;
@@ -921,6 +993,11 @@ void EditorViewportWidget::SetEditorToolsEnabled(bool bEnabled)
 
 void EditorViewportWidget::SyncGizmoOverlay()
 {
+    if (bBuildingGizmoOverlay)
+    {
+        return;
+    }
+    const QScopedValueRollback<bool> BuildingOverlay(bBuildingGizmoOverlay, true);
     if (!bEditorToolsEnabled && !bNavigationVisible && !bCollisionVisible)
     {
         Gizmo->hide();
@@ -1046,6 +1123,11 @@ void EditorViewportWidget::wheelEvent(QWheelEvent* Event)
 
 void EditorViewportWidget::keyPressEvent(QKeyEvent* Event)
 {
+    if (Event->key() == Qt::Key_Escape && Gizmo->IsManipulating())
+    {
+        Gizmo->keyPressEvent(Event);
+        return;
+    }
     if (Event->matches(QKeySequence::Copy) || Event->matches(QKeySequence::Paste))
     {
         Event->ignore();
@@ -1469,4 +1551,33 @@ ObjectHandle EditorViewportWidget::PickComponentIcon(QPoint Position) const
         }
     }
     return {};
+}
+
+void EditorViewportWidget::SetPreviewScene(Scene* World)
+{
+    PreviewSceneIdentity = {};
+    if (World != nullptr)
+    {
+        PreviewSceneIdentity = World->GetObjectHandle();
+    }
+}
+
+Scene* EditorViewportWidget::GetToolScene() const
+{
+    if (PreviewSceneIdentity.IsValid())
+    {
+        return dynamic_cast<Scene*>(MemorySubsystem::Get()->ResolveHandle(PreviewSceneIdentity));
+    }
+    return BoundEngine->GetActiveScene();
+}
+
+void EditorViewportWidget::SetCollisionPreviewLines(std::vector<PhysicsDebugLine> Lines)
+{
+    bCustomCollisionPreview = true;
+    CollisionPreviewLines = std::move(Lines);
+}
+
+bool EditorViewportWidget::IsTransformManipulating() const
+{
+    return Gizmo->IsManipulating();
 }

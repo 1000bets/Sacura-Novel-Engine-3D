@@ -68,6 +68,13 @@ bool PlaySession::StartPlay()
     PlayWorld->SetJobSystem(&BoundEngine->GetJobSystem());
     PlayWorld->SetAuthoringOperations(BoundEngine->AuthoringOperations);
     PlayWorld->GetNavigation().CopyMeshesFrom(SourceEditWorld->GetNavigation());
+    if (!BoundEngine->BeginInputSession())
+    {
+        DestroyPlayWorld();
+        EditWorld = nullptr;
+        EditSceneJson.clear();
+        return false;
+    }
     State = PlaySessionState::Playing;
     if (!PlayWorld->BeginPlay())
     {
@@ -76,6 +83,7 @@ bool PlaySession::StartPlay()
         EditWorld = nullptr;
         EditSceneJson.clear();
         State = PlaySessionState::Stopped;
+        BoundEngine->PlayerInput.reset();
         return false;
     }
     BoundEngine->BeginStory(PlayWorld.get());
@@ -111,6 +119,7 @@ void PlaySession::Pause()
     if (State == PlaySessionState::Playing)
     {
         State = PlaySessionState::Paused;
+        BoundEngine->GetInputSession()->SetPaused(true);
         PrintString("PlaySession: paused");
     }
 }
@@ -120,6 +129,7 @@ void PlaySession::Resume()
     if (State == PlaySessionState::Paused)
     {
         State = PlaySessionState::Playing;
+        BoundEngine->GetInputSession()->SetPaused(false);
         PrintString("PlaySession: resumed");
     }
 }

@@ -38,6 +38,8 @@ class StoryWorkspaceView final : public QWidget
     void CancelInteraction();
     std::function<void(const StoryGraphNode&)> NodeSelected;
     std::function<void(int, QPointF)> AddNodeRequested;
+    std::function<void(QString, QPointF)> AddNarrativeRequested;
+    std::function<void(QString, QString, QString, QString)> ConnectDataRequested;
     std::function<void(QStringList)> DeleteNodesRequested;
     std::function<void(QString, int, QString)> ConnectRequested;
     std::function<void(QMap<QString, QPointF>)> MoveNodesRequested;

@@ -1,4 +1,8 @@
 #include "Documents/StoryGraphDocument.h"
+#include "Story/Narrative.h"
+#include "Reflection/ReflectionValueCodec.h"
+#include "Reflection/Json/ReflectionJson.h"
+#include "Reflection/PropertyAccess.h"
 #include "Core/IO/AtomicFileWriter.h"
 #include "Story/StoryDocumentIO.h"
 #include "Story/StoryEvents.h"
@@ -87,7 +91,7 @@ void MergeNode(Json& Original, const Json& Replacement, const Json& Before)
         { StoryDocumentSchema::Merge(Original[Field], Before.at(Field), Replacement.at(Field)); }
         else { Original[Field] = Replacement.at(Field); }
     }
-    for (const char* Field : {"id", "kind", "speaker", "text", "prompt", "nextNodeId"})
+    for (const char* Field : {"id", "kind", "speaker", "text", "prompt", "nextNodeId", "narrativeType", "inputs", "sources"})
     {
         Original.erase(Field);
         if (Replacement.contains(Field))
@@ -489,6 +493,21 @@ bool StoryGraphDocument::DeleteNodes(const std::vector<StoryNodeId>& Identities,
                 {
                     Node.erase("nextNodeId");
                 }
+                if (Node.contains("sources"))
+                {
+                    auto& Sources = Node["sources"];
+                    for (auto Source = Sources.begin(); Source != Sources.end();)
+                    {
+                        if (Removed.count(Source.value()[0].get<std::string>()))
+                        {
+                            Source = Sources.erase(Source);
+                        }
+                        else
+                        {
+                            ++Source;
+                        }
+                    }
+                }
                 if (Node.contains("choices"))
                 {
                     for (auto& Choice : Node["choices"])
@@ -502,7 +521,19 @@ bool StoryGraphDocument::DeleteNodes(const std::vector<StoryNodeId>& Identities,
             }
             if (Removed.count(Candidate.at("startNodeId")))
             {
-                Candidate["startNodeId"] = Nodes.empty() ? Json("") : Nodes.front().at("id");
+                Candidate["startNodeId"] = "";
+                for (const auto& Remaining : Nodes)
+                {
+                    NarrativeNodeDefinition Definition;
+                    if (Remaining.value("kind", std::string{}) == "Narrative"
+                        && FindNarrativeDefinition(Remaining.value("narrativeType", std::string{}), Definition)
+                        && Definition.bPure)
+                    {
+                        continue;
+                    }
+                    Candidate["startNodeId"] = Remaining.at("id");
+                    break;
+                }
             }
             if (Candidate.contains("editor") && Candidate["editor"].contains("positions"))
             {
@@ -595,7 +626,16 @@ bool StoryGraphDocument::Connect(const StoryNodeId& Source, int Port, const Stor
                 Failure = "The connection endpoint no longer exists";
                 return false;
             }
-            if (Node->at("kind") == "Choice" && Port >= 0 && Node->contains("choices") &&
+            if (const auto* Destination = FindNode(Target))
+            {
+                NarrativeNodeDefinition Definition;
+                if (FindNarrativeDefinition(Destination->NarrativeType, Definition) && Definition.bPure)
+                {
+                    Failure = "Pure nodes cannot receive execution";
+                    return false;
+                }
+            }
+            if ((Node->at("kind") == "Choice" || Node->at("kind") == "Narrative") && Port >= 0 && Node->contains("choices") &&
                 Port < static_cast<int>((*Node)["choices"].size()))
             {
                 (*Node)["choices"][Port]["nextNodeId"] = Target;
@@ -638,6 +678,15 @@ bool StoryGraphDocument::MoveNodes(const std::map<StoryNodeId, StoryGraphPositio
 
 bool StoryGraphDocument::SetStart(const StoryNodeId& Identity, std::string& Error)
 {
+    if (const auto* Node = FindNode(Identity))
+    {
+        NarrativeNodeDefinition Definition;
+        if (FindNarrativeDefinition(Node->NarrativeType, Definition) && Definition.bPure)
+        {
+            Error = "Pure nodes cannot start execution";
+            return false;
+        }
+    }
     return Apply(
         "Set story start",
         [&](Json& Candidate, std::string& Failure)
@@ -655,6 +704,10 @@ bool StoryGraphDocument::SetStart(const StoryNodeId& Identity, std::string& Erro
 
 bool StoryGraphDocument::ValidateForPlayback(std::string& Error) const
 {
+    if (!ValidateNarrativeDocument(Story, Error))
+    {
+        return false;
+    }
     if (!IsOpen())
     {
         Error = "No story document is open";
@@ -706,4 +759,168 @@ bool StoryGraphDocument::ValidateForPlayback(std::string& Error) const
         }
     }
     return true;
+}
+
+
+bool StoryGraphDocument::AddNarrativeNode(const std::string& Type, StoryGraphPosition Position,
+    StoryNodeId& Created, std::string& Error)
+{
+    NarrativeNodeDefinition Definition;
+    if (!FindNarrativeDefinition(Type, Definition))
+    {
+        Error = "Narrative type not found: " + Type;
+        return false;
+    }
+    StoryNode Node;
+    Node.Id = Guid::Generate().ToString();
+    Node.Kind = StoryNodeKind::Narrative;
+    Node.NarrativeType = Type;
+    for (const auto& Pin : Definition.Inputs)
+    {
+        if (Pin.bHasDefault)
+        {
+            Node.NarrativeInputs[Pin.Property.Id.Value] = Pin.Default;
+        }
+        else
+        {
+            ReflectedValue Value;
+            nlohmann::json Encoded;
+            if (MakeDefaultReflectionValue(Pin.Property.ValueTypeId, Value).bOk
+                && ReflectionJson::ReflectedValueToJson(Pin.Property.ValueTypeId, Value, Encoded).bOk)
+            {
+                Node.NarrativeInputs[Pin.Property.Id.Value] = std::move(Encoded);
+            }
+        }
+    }
+    for (const auto& Exit : Definition.Exits)
+    {
+        Node.Choices.push_back({Exit, {}, Exit});
+    }
+    const bool Applied = Apply("Add Narrative node", [&](Json& Candidate, std::string&)
+    {
+        Candidate["nodes"].push_back(EncodeNode(Node));
+        if (!Definition.bPure && Candidate.at("startNodeId").get<std::string>().empty())
+        {
+            Candidate["startNodeId"] = Node.Id;
+        }
+        Candidate["editor"]["version"] = 1;
+        Candidate["editor"]["positions"][Node.Id] = {{"x", Position.X}, {"y", Position.Y}};
+        return true;
+    }, Error);
+    if (Applied)
+    {
+        Created = Node.Id;
+    }
+    return Applied;
+}
+
+bool StoryGraphDocument::ConnectData(const StoryNodeId& Source, const std::string& Output,
+    const StoryNodeId& Target, const std::string& Input, std::string& Error)
+{
+    const StoryNode* Consumer = FindNode(Target);
+    const StoryNode* Producer = FindNode(Source);
+    NarrativeNodeDefinition ConsumerType;
+    NarrativeNodeDefinition ProducerType;
+    if (!Consumer || !FindNarrativeDefinition(Consumer->NarrativeType, ConsumerType))
+    {
+        Error = "Narrative input node is unavailable";
+        return false;
+    }
+    const auto InputPin = std::find_if(ConsumerType.Inputs.begin(), ConsumerType.Inputs.end(), [&](const NarrativePin& Pin)
+    {
+        return Pin.Property.Id.Value == Input;
+    });
+    if (InputPin == ConsumerType.Inputs.end())
+    {
+        Error = "Narrative input is unavailable";
+        return false;
+    }
+    if (!Source.empty())
+    {
+        if (!Producer || !FindNarrativeDefinition(Producer->NarrativeType, ProducerType))
+        {
+            Error = "Narrative output node is unavailable";
+            return false;
+        }
+        const auto OutputPin = std::find_if(ProducerType.Outputs.begin(), ProducerType.Outputs.end(), [&](const NarrativePin& Pin)
+        {
+            return Pin.Property.Id.Value == Output;
+        });
+        if (OutputPin == ProducerType.Outputs.end() || OutputPin->Property.ValueTypeId != InputPin->Property.ValueTypeId)
+        {
+            Error = "Narrative pin types do not match";
+            return false;
+        }
+        std::set<std::string> Visited;
+        std::vector<std::string> Pending{Source};
+        while (!Pending.empty())
+        {
+            const auto Identity = Pending.back();
+            Pending.pop_back();
+            if (Identity == Target)
+            {
+                Error = "Narrative data connections cannot form cycles";
+                return false;
+            }
+            if (!Visited.insert(Identity).second)
+            {
+                continue;
+            }
+            if (const auto* Node = FindNode(Identity))
+            {
+                for (const auto& Dependency : Node->NarrativeSources)
+                {
+                    Pending.push_back(Dependency.second.first);
+                }
+            }
+        }
+    }
+    StoryNode Updated = *Consumer;
+    if (Source.empty())
+    {
+        Updated.NarrativeSources.erase(Input);
+    }
+    else
+    {
+        Updated.NarrativeSources[Input] = {Source, Output};
+    }
+    return ReplaceNode(Updated, Error);
+}
+
+bool StoryGraphDocument::SetNarrativeInput(const StoryNodeId& Identity, const std::string& Input,
+    const nlohmann::json& Value, std::string& Error, const ReflectionJson::ObjectResolver& ResolveObject)
+{
+    const StoryNode* Node = FindNode(Identity);
+    NarrativeNodeDefinition Definition;
+    if (Node == nullptr || Node->Kind != StoryNodeKind::Narrative || !FindNarrativeDefinition(Node->NarrativeType, Definition))
+    {
+        Error = "Narrative node definition is unavailable";
+        return false;
+    }
+    const auto Pin = std::find_if(Definition.Inputs.begin(), Definition.Inputs.end(), [&](const NarrativePin& Candidate)
+    {
+        return Candidate.Property.Id.Value == Input;
+    });
+    if (Pin == Definition.Inputs.end())
+    {
+        Error = "Narrative input does not exist";
+        return false;
+    }
+    ReflectedValue Converted;
+    const auto Conversion = ReflectionJson::JsonToReflectedValue(Pin->Property.ValueTypeId, Value, Converted, ResolveObject);
+    if (!Conversion.bOk)
+    {
+        Error = Conversion.Message;
+        return false;
+    }
+    const auto Validation = PropertyAccess::ValidatePropertyValue(Pin->Property, Converted);
+    if (!Validation.bOk)
+    {
+        Error = Validation.Message;
+        return false;
+    }
+    StoryNode Updated = *Node;
+    Updated.NarrativeInputs[Input] = Value;
+    Updated.NarrativeSources.erase(Input);
+    return ReplaceNode(Updated, Error);
 }

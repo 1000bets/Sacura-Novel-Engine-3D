@@ -1,4 +1,7 @@
+#include "World/Components/CharacterComponent.h"
 #include "Story/StoryRuntime.h"
+#include "Characters/CharacterDefinition.h"
+#include "Assets/AssetManager.h"
 #include "World/Components/NavigationAgentComponent.h"
 
 #include "Core/Threading/ThreadContext.h"
@@ -12,6 +15,49 @@
 
 #include <algorithm>
 #include <cmath>
+
+std::shared_ptr<const CharacterDefinition> StoryRuntime::GetSpeakerCharacter() const
+{
+    if (DisplayedSpeaker.rfind("character:", 0) != 0 || !GetScene() || !GetScene()->GetAssetManager())
+    {
+        return nullptr;
+    }
+    AssetKey Key;
+    if (!Guid::TryParse(DisplayedSpeaker.substr(10), Key.Asset))
+    {
+        return nullptr;
+    }
+    auto& Assets = *GetScene()->GetAssetManager();
+    Assets.LoadAsync<CharacterDefinition>(Key);
+    AssetHandle<CharacterDefinition> Loaded;
+    if (Assets.TryGetLoaded(Key, Loaded))
+    {
+        return Loaded.GetSharedResource();
+    }
+    return nullptr;
+}
+
+std::string StoryRuntime::GetDisplayedSpeaker() const
+{
+    if (const auto Character = GetSpeakerCharacter())
+    {
+        return Character->Name;
+    }
+    if (DisplayedSpeaker.rfind("character:", 0) == 0)
+    {
+        return "Персонаж недоступен";
+    }
+    return DisplayedSpeaker;
+}
+
+std::string StoryRuntime::GetDisplayedDialogueWidget() const
+{
+    if (const auto Character = GetSpeakerCharacter())
+    {
+        return Character->DialogueWidget;
+    }
+    return {};
+}
 
 namespace
 {
@@ -71,6 +117,10 @@ bool StoryRuntime::LoadFromFile(const std::filesystem::path& AbsolutePath)
 bool StoryRuntime::LoadDocument(const StoryDocument& InDocument)
 {
     if (!ValidateStoryEvents(InDocument, LastError)) { return false; }
+    if (!ValidateNarrativeDocument(InDocument, LastError))
+    {
+        return false;
+    }
     StoryDocument ResolvedDocument = InDocument;
     for (StoryNode& Node : ResolvedDocument.Nodes)
     {
@@ -115,6 +165,8 @@ bool StoryRuntime::LoadDocument(const StoryDocument& InDocument)
 
 void StoryRuntime::Reset()
 {
+    Narrative.Reset(BoundScene);
+    bNarrativeRunning = false;
     Events.reset();
     StagingPhase = 0;
     LastError.clear();
@@ -140,6 +192,8 @@ void StoryRuntime::Reset()
 
 void StoryRuntime::Stop()
 {
+    Narrative.Stop();
+    bNarrativeRunning = false;
     Events.reset();
     StagingPhase = 0;
     LastError.clear();
@@ -222,6 +276,21 @@ bool StoryRuntime::SelectChoice(size_t ChoiceIndex)
     return true;
 }
 
+bool StoryRuntime::TriggerEvent(const std::string& EventId)
+{
+    AssertGameThread();
+    const auto* World = GetScene();
+    if (!World || !World->IsPlaying() || !FindStoryEvent(Document, EventId))
+    {
+        return false;
+    }
+    if (!Events)
+    {
+        Events = std::make_unique<StoryEventPlayer>(BoundScene, NextEventInstanceId);
+    }
+    return Events->Trigger(Document, EventId);
+}
+
 void StoryRuntime::Tick(float DeltaTime)
 {
     if (!std::isfinite(DeltaTime) || DeltaTime < 0) { return; }
@@ -247,6 +316,41 @@ void StoryRuntime::Tick(float DeltaTime)
                 return;
             }
         }
+    }
+    if (bNarrativeRunning)
+    {
+        bool Completed = false;
+        std::string Exit;
+        std::string Error;
+        if (!Narrative.Tick(DeltaTime, Completed, Exit, Error))
+        {
+            FailAction(Error);
+            return;
+        }
+        if (Completed)
+        {
+            bNarrativeRunning = false;
+            StoryNodeId Next;
+            for (const StoryChoice& Branch : FindNode(CurrentNodeId)->Choices)
+            {
+                if (Branch.Id == Exit)
+                {
+                    Next = Branch.NextNodeId;
+                    break;
+                }
+            }
+            if (Next.empty())
+            {
+                Phase = StoryPlaybackPhase::End;
+                Events.reset();
+                Narrative.Stop();
+            }
+            else
+            {
+                EnterNode(Next);
+            }
+        }
+        return;
     }
     if (Phase != StoryPlaybackPhase::Action || !bActionSequenceRunning)
     {
@@ -379,7 +483,23 @@ void StoryRuntime::DisplayNode()
         DisplayedLine.clear();
         BeginActionSequence();
         break;
+    case StoryNodeKind::Narrative:
+    {
+        Phase = StoryPlaybackPhase::Action;
+        DisplayedSpeaker.clear();
+        DisplayedLine.clear();
+        PendingChoices.clear();
+        std::string Error;
+        if (!Narrative.Start(Document, *Node, Error))
+        {
+            FailAction(Error);
+            return;
+        }
+        bNarrativeRunning = true;
+        break;
+    }
     case StoryNodeKind::End:
+        Narrative.Stop();
         Events.reset();
         StagingPhase = 0;
         Phase = StoryPlaybackPhase::End;
@@ -435,6 +555,8 @@ Scene* StoryRuntime::GetScene() const
 
 void StoryRuntime::FailAction(const std::string& Error)
 {
+    Narrative.Stop();
+    bNarrativeRunning = false;
     Events.reset();
     LastError = Error;
     CancelAllActions();
@@ -459,6 +581,14 @@ void StoryRuntime::PrepareActiveAction()
     if (Target != nullptr)
     {
         Action.TargetObject = Target->GetObjectHandle();
+    }
+    if (Action.Definition.Kind == StoryActionKind::CharacterAnimation)
+    {
+        if (!Target || !Target->GetComponent<CharacterComponent>())
+        {
+            FailAction("CharacterAnimation requires a character target");
+        }
+        return;
     }
     if (Action.Definition.Kind == StoryActionKind::NavigateTo)
     {
@@ -533,6 +663,53 @@ void StoryRuntime::TickActiveAction(float DeltaTime)
 
     Action.ElapsedSeconds += DeltaTime;
     const float Duration = std::max(Action.Definition.DurationSeconds, 0.0f);
+    if (Action.Definition.Kind == StoryActionKind::CharacterAnimation)
+    {
+        auto* World = GetScene();
+        GameObject* Target = nullptr;
+        if (World)
+        {
+            Target = World->FindByHandle(Action.TargetObject);
+        }
+        CharacterComponent* Character = nullptr;
+        if (Target && Target->IsActiveInHierarchy())
+        {
+            Character = Target->GetComponent<CharacterComponent>();
+        }
+        if (!Character || !Character->IsEnabled() || Character->IsPendingRemoval())
+        {
+            FailAction("CharacterAnimation target is no longer available");
+            return;
+        }
+        if (!Action.bAnimationStarted)
+        {
+            if (World->GetAssetManager())
+            {
+                Character->Resolve(*World->GetAssetManager());
+            }
+            if (!Character->GetDefinition())
+            {
+                Action.ElapsedSeconds = 0.f;
+                if (Character->bMissingAsset)
+                {
+                    FailAction("CharacterAnimation asset is unavailable");
+                }
+                return;
+            }
+            if (!Character->PlayAnimation(Action.Definition.AnimationId))
+            {
+                FailAction("CharacterAnimation selection is missing or disabled");
+                return;
+            }
+            Action.bAnimationStarted = true;
+            Action.ElapsedSeconds = 0.f;
+        }
+        if (Action.ElapsedSeconds >= Duration)
+        {
+            CompleteActiveAction();
+        }
+        return;
+    }
     if (Action.Definition.Kind == StoryActionKind::NavigateTo)
     {
         NavigationAgentComponent* Agent = MemorySubsystem::Get()->ResolveHandle<NavigationAgentComponent>(Action.NavigationAgent);

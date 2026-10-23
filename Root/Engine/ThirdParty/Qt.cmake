@@ -35,7 +35,9 @@ if(SAKURA_BUILD_QT_FROM_SOURCE)
     if(EXISTS "${SakuraQtBuildStamp}")
         file(READ "${SakuraQtBuildStamp}" SakuraQtCachedBuildIdentity)
     endif()
-    if(NOT SakuraQtCachedBuildIdentity STREQUAL SakuraQtBuildIdentity OR NOT EXISTS "${SakuraQtInstallDirectory}/lib/cmake/Qt6/Qt6Config.cmake")
+    if(NOT SakuraQtCachedBuildIdentity STREQUAL SakuraQtBuildIdentity
+        OR NOT EXISTS "${SakuraQtInstallDirectory}/lib/cmake/Qt6/Qt6Config.cmake"
+        OR NOT EXISTS "${SakuraQtInstallDirectory}/lib/cmake/Qt6Network/Qt6NetworkConfig.cmake")
         message(STATUS "Building Qt ${SAKURA_QT_VERSION} from source (${SakuraQtConfiguration})")
         if(WIN32)
             find_program(SakuraPowerShellExecutable NAMES powershell REQUIRED)
@@ -123,11 +125,11 @@ else()
     endif()
 endif()
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network)
 
 # find_package(Qt6) creates directory-scoped imported targets; promote so
 # Runtime executables share the Qt targets discovered by Engine.
-foreach(SakuraQtModule Core Gui Widgets QWindowsIntegrationPlugin QJpegPlugin QOffscreenIntegrationPlugin)
+foreach(SakuraQtModule Core Gui Widgets Network QWindowsIntegrationPlugin QJpegPlugin QOffscreenIntegrationPlugin)
     if(TARGET Qt6::${SakuraQtModule})
         get_target_property(SakuraQtIsGlobal Qt6::${SakuraQtModule} IMPORTED_GLOBAL)
         if(NOT SakuraQtIsGlobal)
@@ -165,6 +167,7 @@ function(sakura_deploy_qt_runtime TargetName)
             "$<TARGET_FILE:Qt6::Core>"
             "$<TARGET_FILE:Qt6::Gui>"
             "$<TARGET_FILE:Qt6::Widgets>"
+            "$<TARGET_FILE:Qt6::Network>"
             "$<TARGET_FILE_DIR:${TargetName}>"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "$<TARGET_FILE:Qt6::QWindowsIntegrationPlugin>"

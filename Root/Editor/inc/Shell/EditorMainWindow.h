@@ -1,3 +1,5 @@
+class PrefabOverridesPanel;
+class QVBoxLayout;
 #pragma once
 
 #include "Rendering/RenderSettings.h"
@@ -10,6 +12,7 @@
 #include "Core/Object/ObjectHandle.h"
 #include "Documents/SceneDocument.h"
 #include "Documents/SceneWorkspace.h"
+#include "Documents/CharacterDocument.h"
 #include "Story/StoryRuntime.h"
 
 #include <QMainWindow>
@@ -46,6 +49,12 @@ class QEvent;
 class QButtonGroup;
 class QVBoxLayout;
 class QStackedWidget;
+class EditorToolset;
+class MaterialEditorWindow;
+class StaticMeshEditorWindow;
+class CharacterWorkspaceView;
+class EditorMcpServer;
+class QPlainTextEdit;
 
 namespace EditorUi
 {
@@ -73,6 +82,9 @@ public:
     void RefreshProjectTitle();
     bool CaptureScreenshot(const QString& OutputFile);
     bool RegisterAssetEditor(const AssetType& Type, AssetEditorHandler Handler);
+    EditorToolset& GetToolset();
+    EditorMcpServer& GetMcpServer();
+    void ShowSettings(int Page = 0);
 
 protected:
     void closeEvent(QCloseEvent* Event) override;
@@ -86,6 +98,7 @@ private slots:
     void OnOpenProject();
     void OnNewProject();
     void OnSaveScene();
+    void OnExportGame();
     void OnFocusActionsAndEvents();
     void OnMaintenanceTick();
     void OnViewportSurfaceChanged(RenderViewportWidget* Viewport);
@@ -107,6 +120,24 @@ private slots:
     void OnAssetDropped(QString AssetId, QString SubAssetIdentifier, QString AssetTypeIdentifier, QString VirtualPath, QPoint Position);
 
 private:
+    void OpenPrefabEditor(const AssetId& Prefab);
+    void CreatePrefabFromSelection();
+    void InitializePrefabPanel(QVBoxLayout* Layout);
+    void RegisterPrefabTools();
+    PrefabOverridesPanel* PrefabPanel = nullptr;
+    uint64_t PrefabListener = 0;
+
+    void InitializeTools();
+    void BuildConsoleDockPage();
+    QJsonObject ReadProjectSettings() const;
+    QJsonObject ApplyProjectSettings(const QJsonObject& Settings);
+    QJsonObject ReadEditorSettings() const;
+    QJsonObject ApplyEditorSettings(const QJsonObject& Settings);
+    std::unique_ptr<EditorToolset> Toolset;
+    std::unique_ptr<EditorMcpServer> McpServer;
+    QWidget* ConsolePage = nullptr;
+    QPlainTextEdit* ConsoleOutput = nullptr;
+    uint64_t ConsoleSequence = 0;
     void BindTransformScrubbing(EditorUi::StudioNumberEdit* Field, int Index);
     QPointer<EditorUi::StudioNumberEdit> ScrubbingTransformField;
     ObjectHandle ScrubbingTransformObject;
@@ -123,6 +154,15 @@ private:
     void PopulateHierarchy();
     void PopulateDockPages();
     void RegisterBuiltInAssetEditors();
+    MaterialEditorWindow* OpenMaterialEditor(const AssetKey& Asset);
+    void RegisterMaterialTools();
+    StaticMeshEditorWindow* OpenStaticMeshEditor(const AssetKey& Asset);
+    void RegisterStaticMeshTools();
+    CharacterWorkspaceView* OpenCharacterWorkspace();
+    void RegisterCharacterTools();
+    bool PlaceCharacter(const AssetRegistryEntry& Entry, ObjectHandle& Created, std::string& Error);
+    CharacterDocuments Characters;
+    QPointer<CharacterWorkspaceView> CharacterWorkspace;
     void BuildStoryDockPage();
     void BuildAudioEnvironmentDockPage();
     void RefreshAudioEnvironment();

@@ -1,4 +1,5 @@
 #include "Assets/Loaders/SkeletalLoader.h"
+#include "Characters/CharacterAnimationIO.h"
 #include "Assets/Resources/AnimationClipResource.h"
 #include "Assets/Resources/SkeletalMeshResource.h"
 #include "Assets/Resources/SkeletonResource.h"
@@ -8,6 +9,7 @@
 #include "ozz/animation/offline/raw_animation.h"
 #include "ozz/animation/offline/raw_skeleton.h"
 #include "ozz/animation/offline/skeleton_builder.h"
+#include "ozz/animation/runtime/skeleton_utils.h"
 #include "ozz/base/maths/quaternion.h"
 #include "ozz/base/maths/transform.h"
 #include "ozz/base/maths/vec_float.h"
@@ -33,7 +35,7 @@ DirectX::SimpleMath::Matrix ToMatrix(const fastgltf::math::fmat4x4& Source)
     {
         for (int Column = 0; Column < 4; ++Column)
         {
-            Result.m[Row][Column] = Source[Column][Row];
+            Result.m[Row][Column] = Source[Row][Column];
         }
     }
     return Result;
@@ -223,6 +225,10 @@ std::shared_ptr<const SkeletonResource> BuildSkeletonResource(
         }
     }
 
+    while (ParentByNode.find(RootJoint) != ParentByNode.end())
+    {
+        RootJoint = ParentByNode.at(RootJoint);
+    }
     ozz::animation::offline::RawSkeleton RawSkeleton;
     RawSkeleton.roots.resize(1);
     BuildRawJoint(Asset, RootJoint, ChildrenByParent, RawSkeleton.roots[0]);
@@ -333,6 +339,13 @@ std::shared_ptr<const AnimationClipResource> BuildAnimationClip(
         const fastgltf::Accessor& InputAccessor = Asset.accessors[Sampler.inputAccessor];
         const fastgltf::Accessor& OutputAccessor = Asset.accessors[Sampler.outputAccessor];
 
+        if (Sampler.interpolation != fastgltf::AnimationInterpolation::Linear || InputAccessor.count != OutputAccessor.count
+            || InputAccessor.count == 0 || InputAccessor.count > 18001)
+        {
+            OutDiagnostic = AssetDiagnostic::Fail(AssetErrorCode::InvalidData, "SkeletalLoader",
+                "Character GLB animations require matching LINEAR keyframes; bake STEP or CUBICSPLINE animation before import", Key);
+            return nullptr;
+        }
         std::vector<float> Times(InputAccessor.count);
         fastgltf::copyFromAccessor<float>(Asset, InputAccessor, Times.data());
         if (!Times.empty())
@@ -380,6 +393,23 @@ std::shared_ptr<const AnimationClipResource> BuildAnimationClip(
         }
     }
 
+    for (int JointIndex = 0; JointIndex < Skeleton.num_joints(); ++JointIndex)
+    {
+        auto& Track = RawAnimation.tracks[JointIndex];
+        const auto Rest = ozz::animation::GetJointLocalRestPose(Skeleton, JointIndex);
+        if (Track.translations.empty())
+        {
+            Track.translations.push_back({0.f, Rest.translation});
+        }
+        if (Track.rotations.empty())
+        {
+            Track.rotations.push_back({0.f, Rest.rotation});
+        }
+        if (Track.scales.empty())
+        {
+            Track.scales.push_back({0.f, Rest.scale});
+        }
+    }
     RawAnimation.duration = Duration > 0.f ? Duration : 1.f;
     if (!RawAnimation.Validate())
     {
@@ -397,6 +427,10 @@ std::shared_ptr<const AnimationClipResource> BuildAnimationClip(
 
     auto Resource = std::make_shared<AnimationClipResource>();
     Resource->Name = RawAnimation.name;
+    for (const auto* JointName : Skeleton.joint_names())
+    {
+        Resource->JointNames.emplace_back(JointName);
+    }
     Resource->Animation = std::shared_ptr<const ozz::animation::Animation>(
         Built.release(),
         ozz::Deleter<ozz::animation::Animation>());
@@ -420,8 +454,18 @@ bool BuildSkinBinding(
 
     const fastgltf::Skin& Skin = Asset.skins[SkinIndex];
     OutBinding.JointNodeIndices.assign(Skin.joints.begin(), Skin.joints.end());
+    for (const auto JointNode : Skin.joints)
+    {
+        std::string Name(Asset.nodes[JointNode].name);
+        if (Name.empty())
+        {
+            Name = "Joint_" + std::to_string(JointNode);
+        }
+        OutBinding.JointNames.push_back(std::move(Name));
+    }
     OutBinding.InfluencesPerVertex = SkinBinding::MaxInfluencesPerVertex;
 
+    OutBinding.InverseBindMatrices.assign(Skin.joints.size(), DirectX::SimpleMath::Matrix::Identity);
     if (Skin.inverseBindMatrices.has_value())
     {
         const fastgltf::Accessor& MatrixAccessor = Asset.accessors[*Skin.inverseBindMatrices];
@@ -508,6 +552,16 @@ SkeletalLoader::SkeletalLoader(ModelLoader& InSharedModelLoader)
 std::shared_ptr<const void> SkeletalLoader::Load(const AssetLoadContext& Context, AssetDiagnostic& OutDiagnostic)
 {
     const std::filesystem::path AbsolutePath(Context.Entry.AbsolutePath);
+    if (Context.Entry.Metadata.Type == AnimationClipAssetType && AbsolutePath.extension() == ".animation")
+    {
+        std::string Error;
+        const auto Resource = ReadCharacterAnimation(AbsolutePath, Error);
+        if (!Resource)
+        {
+            OutDiagnostic = AssetDiagnostic::Fail(AssetErrorCode::InvalidData, "CharacterAnimation", Error, Context.Key);
+        }
+        return Resource;
+    }
     fastgltf::Asset Asset;
     if (!TryLoadGltfBinary(AbsolutePath, Asset, OutDiagnostic, Context.Key))
     {
@@ -561,40 +615,6 @@ std::shared_ptr<const void> SkeletalLoader::Load(const AssetLoadContext& Context
             return nullptr;
         }
 
-        size_t MeshIndex = 0;
-        size_t PrimitiveIndex = 0;
-        size_t SkinIndex = 0;
-        bool bFound = false;
-        for (size_t CurrentMesh = 0; CurrentMesh < Asset.meshes.size() && !bFound; ++CurrentMesh)
-        {
-            for (size_t CurrentPrimitive = 0; CurrentPrimitive < Asset.meshes[CurrentMesh].primitives.size(); ++CurrentPrimitive)
-            {
-                if (Asset.meshes[CurrentMesh].primitives[CurrentPrimitive].findAttribute("JOINTS_0")
-                    != Asset.meshes[CurrentMesh].primitives[CurrentPrimitive].attributes.end())
-                {
-                    MeshIndex = CurrentMesh;
-                    PrimitiveIndex = CurrentPrimitive;
-                    bFound = true;
-                    break;
-                }
-            }
-        }
-
-        if (!bFound)
-        {
-            OutDiagnostic = AssetDiagnostic::Fail(AssetErrorCode::InvalidData, "SkeletalLoader", "No skinned primitive found", Context.Key, Context.Entry.RelativePath, "SkeletalLoader");
-            return nullptr;
-        }
-
-        for (size_t NodeIndex = 0; NodeIndex < Asset.nodes.size(); ++NodeIndex)
-        {
-            if (Asset.nodes[NodeIndex].meshIndex.has_value() && *Asset.nodes[NodeIndex].meshIndex == MeshIndex && Asset.nodes[NodeIndex].skinIndex.has_value())
-            {
-                SkinIndex = *Asset.nodes[NodeIndex].skinIndex;
-                break;
-            }
-        }
-
         std::shared_ptr<const ModelDocument> Document = SharedModelLoader.LoadOrGetSharedDocument(
             AbsolutePath,
             Context.Entry.Metadata.SourceFingerprint,
@@ -605,25 +625,73 @@ std::shared_ptr<const void> SkeletalLoader::Load(const AssetLoadContext& Context
             return nullptr;
         }
 
-        if (MeshIndex >= Document->Meshes.size() || !Document->Meshes[MeshIndex].Mesh)
-        {
-            OutDiagnostic = AssetDiagnostic::Fail(AssetErrorCode::InvalidData, "SkeletalLoader", "Mesh missing from shared document", Context.Key, Context.Entry.RelativePath, "SkeletalLoader");
-            return nullptr;
-        }
-
+        auto Resource = std::make_shared<SkeletalMeshResource>();
         auto Binding = std::make_shared<SkinBinding>();
-        if (!BuildSkinBinding(Asset, SkinIndex, Asset.meshes[MeshIndex].primitives[PrimitiveIndex], *Binding, OutDiagnostic, Context.Key, Context.Entry.RelativePath))
+        const auto SkinIndex = static_cast<size_t>(SelectorIndex);
+        for (const auto& Node : Asset.nodes)
         {
+            if (!Node.skinIndex || *Node.skinIndex != SkinIndex || !Node.meshIndex)
+            {
+                continue;
+            }
+            const auto MeshIndex = *Node.meshIndex;
+            if (MeshIndex >= Document->Meshes.size() || !Document->Meshes[MeshIndex].Mesh)
+            {
+                OutDiagnostic = AssetDiagnostic::Fail(AssetErrorCode::InvalidData, "SkeletalLoader", "Mesh missing from shared document", Context.Key);
+                return nullptr;
+            }
+            SkinBinding MeshBinding;
+            for (const auto& Primitive : Asset.meshes[MeshIndex].primitives)
+            {
+                SkinBinding Part;
+                if (!BuildSkinBinding(Asset, SkinIndex, Primitive, Part, OutDiagnostic, Context.Key, Context.Entry.RelativePath))
+                {
+                    return nullptr;
+                }
+                Binding->JointNames = Part.JointNames;
+                Binding->JointNodeIndices = Part.JointNodeIndices;
+                Binding->InverseBindMatrices = Part.InverseBindMatrices;
+                MeshBinding.JointIndices.insert(MeshBinding.JointIndices.end(), Part.JointIndices.begin(), Part.JointIndices.end());
+                MeshBinding.JointWeights.insert(MeshBinding.JointWeights.end(), Part.JointWeights.begin(), Part.JointWeights.end());
+            }
+            const auto& Mesh = *Document->Meshes[MeshIndex].Mesh;
+            for (const uint32_t SourceIndex : Mesh.SourceVertexIndices)
+            {
+                const size_t Start = static_cast<size_t>(SourceIndex) * SkinBinding::MaxInfluencesPerVertex;
+                if (Start + SkinBinding::MaxInfluencesPerVertex > MeshBinding.JointIndices.size())
+                {
+                    OutDiagnostic = AssetDiagnostic::Fail(AssetErrorCode::InvalidData, "SkeletalLoader", "Skin vertex mapping is invalid", Context.Key);
+                    return nullptr;
+                }
+                for (size_t Influence = 0; Influence < SkinBinding::MaxInfluencesPerVertex; ++Influence)
+                {
+                    Binding->JointIndices.push_back(MeshBinding.JointIndices[Start + Influence]);
+                    Binding->JointWeights.push_back(MeshBinding.JointWeights[Start + Influence]);
+                }
+            }
+            const auto VertexOffset = static_cast<uint32_t>(Resource->Mesh.Vertices.size());
+            const auto IndexOffset = static_cast<uint32_t>(Resource->Mesh.Indices.size());
+            Resource->Mesh.Vertices.insert(Resource->Mesh.Vertices.end(), Mesh.Vertices.begin(), Mesh.Vertices.end());
+            for (const auto Index : Mesh.Indices)
+            {
+                Resource->Mesh.Indices.push_back(Index + VertexOffset);
+            }
+            for (auto Submesh : Mesh.Submeshes)
+            {
+                Submesh.IndexOffset += IndexOffset;
+                Resource->Mesh.Submeshes.push_back(Submesh);
+            }
+        }
+        if (Resource->Mesh.Vertices.empty() || Binding->JointIndices.size() != Resource->Mesh.Vertices.size() * 4)
+        {
+            OutDiagnostic = AssetDiagnostic::Fail(AssetErrorCode::InvalidData, "SkeletalLoader", "Skin has no matching mesh vertices", Context.Key);
             return nullptr;
         }
-
         if (RequestedType == SkinBindingAssetType)
         {
             return Binding;
         }
 
-        auto Resource = std::make_shared<SkeletalMeshResource>();
-        Resource->Mesh = *Document->Meshes[MeshIndex].Mesh;
         Resource->Binding = Binding;
         return Resource;
     }

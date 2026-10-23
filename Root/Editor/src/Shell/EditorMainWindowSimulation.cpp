@@ -249,6 +249,11 @@ void EditorMainWindow::StartStoryPlayback()
         auto Layout = PendingWidgetPreview.isEmpty() ? WidgetLayout::Resolve(WidgetWorkspace->GetDocument().GetData(),"dialogue") : PendingWidgetPreview;
         GameDialogue->SetWidgetLayout(Layout);
         StoryPanel->SetWidgetLayout(Layout);
+        if (PendingWidgetPreview.isEmpty())
+        {
+            GameDialogue->SetWidgetLibrary(WidgetWorkspace->GetDocument().GetData());
+            StoryPanel->SetWidgetLibrary(WidgetWorkspace->GetDocument().GetData());
+        }
         PendingWidgetPreview = {};
     }
     RefreshStoryPlaybackUi();

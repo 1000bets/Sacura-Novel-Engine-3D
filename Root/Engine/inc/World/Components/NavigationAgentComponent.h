@@ -21,7 +21,7 @@ class PhysicsBodyComponent;
 
 class NavigationAgentComponent : public Component
 {
-    ENGINE_CLASS(NavigationAgentComponent, Component, "engine.NavigationAgentComponent", 1)
+    ENGINE_CLASS(NavigationAgentComponent, Component, "engine.NavigationAgentComponent")
 public:
     std::string AgentProfile = "Default";
     ENGINE_REFLECT_FIELD(NavigationAgentComponent, AgentProfile, "agent_profile", RF_EDITOR_EDITABLE, RF_SERIALIZABLE,

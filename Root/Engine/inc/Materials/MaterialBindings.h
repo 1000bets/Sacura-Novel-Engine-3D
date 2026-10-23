@@ -6,7 +6,7 @@
 
 struct MaterialSlotOverride
 {
-    ENGINE_STRUCT(MaterialSlotOverride, "engine.MaterialSlotOverride", 1)
+    ENGINE_STRUCT(MaterialSlotOverride, "engine.MaterialSlotOverride")
 public:
     int32_t Slot = 0;
     AssetKey Material;
@@ -16,7 +16,7 @@ public:
 
 struct MaterialSlotOverrides
 {
-    ENGINE_STRUCT(MaterialSlotOverrides, "engine.MaterialSlots", 1)
+    ENGINE_STRUCT(MaterialSlotOverrides, "engine.MaterialSlots")
 public:
     std::vector<MaterialSlotOverride> Entries;
     bool operator==(const MaterialSlotOverrides& Other) const;
@@ -25,7 +25,7 @@ public:
 
 struct MaterialPostProcessEffect
 {
-    ENGINE_STRUCT(MaterialPostProcessEffect, "engine.MaterialPostProcessEffect", 1)
+    ENGINE_STRUCT(MaterialPostProcessEffect, "engine.MaterialPostProcessEffect")
 public:
     AssetKey Material;
     bool bEnabled = true;
@@ -39,7 +39,7 @@ public:
 
 struct MaterialPostProcessEffects
 {
-    ENGINE_STRUCT(MaterialPostProcessEffects, "engine.PostProcessEffects", 1)
+    ENGINE_STRUCT(MaterialPostProcessEffects, "engine.PostProcessEffects")
 public:
     std::vector<MaterialPostProcessEffect> Entries;
     bool operator==(const MaterialPostProcessEffects& Other) const;

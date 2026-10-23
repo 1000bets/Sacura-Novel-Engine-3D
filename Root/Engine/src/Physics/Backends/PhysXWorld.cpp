@@ -300,12 +300,6 @@ public:
         }
         else
         {
-            PxGeometryHolder Geometry;
-            if (!MakeGeometry(Definition, Geometry, Body->TriangleMesh, Error))
-            {
-                Body->Material->release();
-                return 0;
-            }
             const PxTransform Pose = ToPhysXTransform(Definition.WorldTransform);
             if (Definition.MotionType == PhysicsMotionType::Static)
             {
@@ -317,10 +311,6 @@ public:
             }
             if (Body->Actor == nullptr)
             {
-                if (Body->TriangleMesh != nullptr)
-                {
-                    Body->TriangleMesh->release();
-                }
                 Body->Material->release();
                 Error = "PhysX actor creation failed";
                 return 0;
@@ -334,26 +324,53 @@ public:
             {
                 ShapeFlags |= PxShapeFlag::eSIMULATION_SHAPE;
             }
-            PxShape* Shape = Physics->createShape(Geometry.any(), *Body->Material, true, ShapeFlags);
-            if (Shape == nullptr)
+            std::vector<PhysicsShapeDefinition> Elements = Definition.Shapes;
+            if (Elements.empty())
             {
-                Body->Actor->release();
-                if (Body->TriangleMesh != nullptr)
+                Elements.push_back(Definition);
+            }
+            bool bContainsTriangleMesh = false;
+            for (const auto& Element : Elements)
+            {
+                PxGeometryHolder Geometry;
+                PxTriangleMesh* TriangleMesh = nullptr;
+                if (!MakeGeometry(Element, Geometry, TriangleMesh, Error))
                 {
-                    Body->TriangleMesh->release();
+                    Body->Actor->release();
+                    Body->Material->release();
+                    return 0;
                 }
-                Body->Material->release();
-                Error = "PhysX shape creation failed";
-                return 0;
+                PxShape* Shape = Physics->createShape(Geometry.any(), *Body->Material, true, ShapeFlags);
+                if (TriangleMesh != nullptr)
+                {
+                    TriangleMesh->release();
+                }
+                if (Shape == nullptr)
+                {
+                    Body->Actor->release();
+                    Body->Material->release();
+                    Error = "PhysX shape creation failed";
+                    return 0;
+                }
+                auto Rotation = Element.ShapeRotation;
+                Rotation.Normalize();
+                PxTransform LocalPose(ToPhysXVector(Element.Center), PxQuat(Rotation.x, Rotation.y, Rotation.z, Rotation.w));
+                if (Element.ShapeType == PhysicsShapeType::Capsule)
+                {
+                    LocalPose.q *= PxQuat(PxHalfPi, PxVec3(0.f, 0.f, 1.f));
+                }
+                Shape->setLocalPose(LocalPose);
+                const bool bAttached = Body->Actor->attachShape(*Shape);
+                Shape->release();
+                if (!bAttached)
+                {
+                    Body->Actor->release();
+                    Body->Material->release();
+                    Error = "PhysX compound shape attachment failed";
+                    return 0;
+                }
+                bContainsTriangleMesh = bContainsTriangleMesh || Element.ShapeType == PhysicsShapeType::TriangleMesh;
             }
-            PxTransform LocalPose(ToPhysXVector(Definition.Center));
-            if (Definition.ShapeType == PhysicsShapeType::Capsule)
-            {
-                LocalPose.q = PxQuat(PxHalfPi, PxVec3(0.f, 0.f, 1.f));
-            }
-            Shape->setLocalPose(LocalPose);
-            Body->Actor->attachShape(*Shape);
-            Shape->release();
             if (PxRigidDynamic* Dynamic = Body->Actor->is<PxRigidDynamic>())
             {
                 Dynamic->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, Definition.MotionType == PhysicsMotionType::Kinematic);
@@ -362,7 +379,7 @@ public:
                 Dynamic->setActorFlag(PxActorFlag::eDISABLE_GRAVITY, !Definition.bUseGravity);
                 Dynamic->setLinearDamping(Definition.LinearDamping);
                 Dynamic->setAngularDamping(Definition.AngularDamping);
-                if (Definition.ShapeType != PhysicsShapeType::TriangleMesh)
+                if (!bContainsTriangleMesh)
                 {
                     PxRigidBodyExt::setMassAndUpdateInertia(*Dynamic, Definition.Mass, nullptr, true);
                 }
@@ -391,6 +408,18 @@ public:
             return;
         }
         BodyState& Body = *Found->second;
+        for (auto Iterator = ActiveShapePairs.begin(); Iterator != ActiveShapePairs.end();)
+        {
+            if (Iterator->second.first == Identity || Iterator->second.second == Identity)
+            {
+                ActiveShapeCounts.erase(Iterator->second);
+                Iterator = ActiveShapePairs.erase(Iterator);
+            }
+            else
+            {
+                ++Iterator;
+            }
+        }
         for (auto Iterator = ActivePairs.begin(); Iterator != ActivePairs.end();)
         {
             if (Iterator->second.FirstBody == Identity || Iterator->second.SecondBody == Identity)
@@ -412,10 +441,6 @@ public:
         else
         {
             Body.Actor->release();
-        }
-        if (Body.TriangleMesh != nullptr)
-        {
-            Body.TriangleMesh->release();
         }
         Body.Material->release();
         Bodies.erase(Found);
@@ -691,6 +716,28 @@ public:
         const PhysicsQueryFilter& Filter, PhysicsHit& Result) const override
     {
         AssertGameThread();
+        if (!Definition.Shapes.empty())
+        {
+            std::string Error;
+            if (!ValidatePhysicsBody(Definition, Error))
+            {
+                return false;
+            }
+            auto Element = Definition;
+            Element.Shapes.clear();
+            bool bHit = false;
+            for (const auto& Shape : Definition.Shapes)
+            {
+                static_cast<PhysicsShapeDefinition&>(Element) = Shape;
+                PhysicsHit Candidate;
+                if (Sweep(Element, Direction, Distance, Filter, Candidate) && (!bHit || Candidate.Distance < Result.Distance))
+                {
+                    Result = Candidate;
+                    bHit = true;
+                }
+            }
+            return bHit;
+        }
         if (!std::isfinite(Distance) || Distance <= 0.f || !IsValidPhysXVector(Direction)
             || !std::isfinite(Direction.LengthSquared()) || Direction.LengthSquared() < 0.000001f
             || Definition.ShapeType == PhysicsShapeType::TriangleMesh)
@@ -706,6 +753,9 @@ public:
         }
         PxTransform Pose = ToPhysXTransform(Definition.WorldTransform);
         Pose.p += Pose.q.rotate(ToPhysXVector(Definition.Center));
+        auto ShapeRotation = Definition.ShapeRotation;
+        ShapeRotation.Normalize();
+        Pose.q *= PxQuat(ShapeRotation.x, ShapeRotation.y, ShapeRotation.z, ShapeRotation.w);
         if (Definition.ShapeType == PhysicsShapeType::Capsule)
         {
             Pose.q *= PxQuat(PxHalfPi, PxVec3(0.f, 0.f, 1.f));
@@ -732,6 +782,26 @@ public:
     std::vector<PhysicsBodyId> Overlap(const PhysicsBodyDefinition& Definition, const PhysicsQueryFilter& Filter) const override
     {
         AssertGameThread();
+        if (!Definition.Shapes.empty())
+        {
+            std::string Error;
+            if (!ValidatePhysicsBody(Definition, Error))
+            {
+                return {};
+            }
+            std::vector<PhysicsBodyId> Result;
+            auto Element = Definition;
+            Element.Shapes.clear();
+            for (const auto& Shape : Definition.Shapes)
+            {
+                static_cast<PhysicsShapeDefinition&>(Element) = Shape;
+                const auto Part = Overlap(Element, Filter);
+                Result.insert(Result.end(), Part.begin(), Part.end());
+            }
+            std::sort(Result.begin(), Result.end());
+            Result.erase(std::unique(Result.begin(), Result.end()), Result.end());
+            return Result;
+        }
         if (Definition.ShapeType == PhysicsShapeType::TriangleMesh)
         {
             return {};
@@ -745,6 +815,9 @@ public:
         }
         PxTransform Pose = ToPhysXTransform(Definition.WorldTransform);
         Pose.p += Pose.q.rotate(ToPhysXVector(Definition.Center));
+        auto ShapeRotation = Definition.ShapeRotation;
+        ShapeRotation.Normalize();
+        Pose.q *= PxQuat(ShapeRotation.x, ShapeRotation.y, ShapeRotation.z, ShapeRotation.w);
         if (Definition.ShapeType == PhysicsShapeType::Capsule)
         {
             Pose.q *= PxQuat(PxHalfPi, PxVec3(0.f, 0.f, 1.f));
@@ -809,7 +882,6 @@ private:
         PxRigidActor* Actor = nullptr;
         PxController* Controller = nullptr;
         PxMaterial* Material = nullptr;
-        PxTriangleMesh* TriangleMesh = nullptr;
         PhysicsBodyDefinition Definition;
     };
 
@@ -823,7 +895,7 @@ private:
         return Found->second.get();
     }
 
-    bool MakeGeometry(const PhysicsBodyDefinition& Definition, PxGeometryHolder& Geometry,
+    bool MakeGeometry(const PhysicsShapeDefinition& Definition, PxGeometryHolder& Geometry,
         PxTriangleMesh*& TriangleMesh, std::string& Error) const
     {
         switch (Definition.ShapeType)
@@ -872,16 +944,39 @@ private:
     void onSleep(PxActor**, PxU32) override {}
     void onAdvance(const PxRigidBody* const*, const PxTransform*, const PxU32) override {}
 
-    void RecordContact(const PhysicsContact& Contact)
+    void RecordContact(PhysicsContact Contact, const PxShape* FirstShape, const PxShape* SecondShape)
     {
-        const auto Key = std::minmax(Contact.FirstBody, Contact.SecondBody);
+        const auto BodiesKey = std::minmax(Contact.FirstBody, Contact.SecondBody);
+        const auto FirstIdentity = reinterpret_cast<uintptr_t>(FirstShape);
+        const auto SecondIdentity = reinterpret_cast<uintptr_t>(SecondShape);
+        const std::pair<uintptr_t, uintptr_t> ShapesKey{
+            std::min(FirstIdentity, SecondIdentity), std::max(FirstIdentity, SecondIdentity)};
         if (Contact.Kind == PhysicsContactKind::End)
         {
-            ActivePairs.erase(Key);
+            if (ActiveShapePairs.erase(ShapesKey) == 0)
+            {
+                return;
+            }
+            auto Found = ActiveShapeCounts.find(BodiesKey);
+            if (Found != ActiveShapeCounts.end() && --Found->second > 0)
+            {
+                return;
+            }
+            ActiveShapeCounts.erase(BodiesKey);
+            ActivePairs.erase(BodiesKey);
         }
         else
         {
-            ActivePairs[Key] = Contact;
+            const bool bAlreadyTouching = ActivePairs.find(BodiesKey) != ActivePairs.end();
+            if (ActiveShapePairs.emplace(ShapesKey, BodiesKey).second)
+            {
+                ++ActiveShapeCounts[BodiesKey];
+            }
+            if (bAlreadyTouching)
+            {
+                Contact.Kind = PhysicsContactKind::Persist;
+            }
+            ActivePairs[BodiesKey] = Contact;
         }
         Contacts.push_back(Contact);
     }
@@ -914,7 +1009,7 @@ private:
                 Contact.Normal = FromPhysXVector(Point.normal);
                 Contact.Impulse = FromPhysXVector(Point.impulse);
             }
-            RecordContact(Contact);
+            RecordContact(Contact, Pair.shapes[0], Pair.shapes[1]);
         }
     }
 
@@ -936,7 +1031,7 @@ private:
             {
                 Contact.Kind = PhysicsContactKind::End;
             }
-            RecordContact(Contact);
+            RecordContact(Contact, Pair.triggerShape, Pair.otherShape);
         }
     }
 
@@ -948,6 +1043,8 @@ private:
     std::unordered_map<PhysicsBodyId, std::unique_ptr<BodyState>> Bodies;
     std::vector<PhysicsContact> Contacts;
     std::map<std::pair<PhysicsBodyId, PhysicsBodyId>, PhysicsContact> ActivePairs;
+    std::map<std::pair<uintptr_t, uintptr_t>, std::pair<PhysicsBodyId, PhysicsBodyId>> ActiveShapePairs;
+    std::map<std::pair<PhysicsBodyId, PhysicsBodyId>, size_t> ActiveShapeCounts;
 };
 
 std::unique_ptr<IPhysicsWorld> CreatePhysicsWorld()

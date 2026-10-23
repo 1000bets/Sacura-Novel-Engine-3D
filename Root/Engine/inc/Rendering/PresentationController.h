@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Platform/NativeWindowInfo.h"
+#include "Core/Object/ObjectHandle.h"
 #include "Rendering/Frame/RenderFrameData.h"
 #include "Rendering/SceneExtractor.h"
 
@@ -18,6 +19,7 @@ public:
     bool Unregister(RenderSurfaceId Surface);
     void Resize(RenderSurfaceId Surface, uint32_t Width, uint32_t Height);
     void Configure(RenderSurfaceId Surface, bool bEditScene, const RenderCamera& Camera, const RenderSettings& Settings);
+    void SetScene(RenderSurfaceId Surface, Scene* World);
     void SetOverlay(RenderSurfaceId Surface, ImGuiOverlaySnapshot Overlay);
     void Clear();
     std::unique_ptr<RenderFrameData> BuildFrame(uint64_t FrameIndex, Scene* ActiveWorld, Scene* EditWorld, float TimeSeconds = 0.f);
@@ -29,6 +31,7 @@ private:
         RenderCamera Camera;
         RenderSettings Settings;
         ImGuiOverlaySnapshot Overlay;
+        ObjectHandle SceneIdentity;
         bool bEditScene = false;
     };
 

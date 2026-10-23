@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "guid": "83851cd8-b0da-5d1d-9859-6d9326c2e4e5",
+  "assetType": "Model",
+  "sourceFingerprint": "a2d7c1fb8099301d",
+  "importInfo": {
+    "generator": "Scripts/GenerateBasicShapes.py"
+  },
+  "subAssets": [
+    {
+      "id": "e73fc22b-c03d-5d41-9d1d-9c7688b27692",
+      "name": "Sphere",
+      "type": "StaticMesh",
+      "selector": {
+        "kind": "mesh",
+        "index": 0
+      }
+    }
+  ],
+  "loadSettings": {
+    "staticMeshDefaults": {
+      "e73fc22b-c03d-5d41-9d1d-9c7688b27692": {
+        "materials": [
+          {
+            "slot": 0,
+            "material": {
+              "assetId": "42b33bd1-5bf7-5462-920b-297de12b0f18",
+              "subAssetId": null
+            }
+          }
+        ],
+        "collision": {
+          "enabled": true,
+          "elements": [
+            {
+              "shape": 1,
+              "center": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "halfExtents": [
+                0.5,
+                0.5,
+                0.5
+              ],
+              "radius": 0.5,
+              "capsuleHalfHeight": 0.5
+            }
+          ]
+        }
+      }
+    }
+  }
+}

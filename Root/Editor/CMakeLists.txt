@@ -10,6 +10,24 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
 set(EDITOR_SRC
+    src/Shell/EditorMainWindowStaticMeshes.cpp
+    src/UI/Views/StaticMeshEditorWindow.cpp
+    src/Shell/EditorMainWindowCharacters.cpp
+    src/UI/Views/CharacterWorkspaceView.cpp
+    src/Shell/EditorMainWindowMaterials.cpp
+    src/UI/Views/MaterialEditorWindow.cpp
+    src/Automation/InputTools.cpp
+    src/Automation/NarrativeTools.cpp
+    src/UI/Views/InputWorkspaceView.cpp
+    src/Shell/EditorMainWindowPrefabs.cpp
+    src/Prefab/PrefabEditorWindow.cpp
+    src/Prefab/PrefabOverridesPanel.cpp
+    inc/Prefab/PrefabEditorWindow.h
+    inc/Prefab/PrefabOverridesPanel.h
+    src/Automation/EditorToolset.cpp
+    src/Automation/EditorMcpServer.cpp
+    src/Shell/EditorMainWindowTools.cpp
+    src/Shell/EditorMainWindowSettings.cpp
     src/UI/Adapters/AudioEnvironmentAdapter.cpp
     src/UI/Views/AudioEnvironmentView.cpp
     src/Shell/EditorMainWindowAudioEnvironment.cpp
@@ -136,6 +154,7 @@ set(EDITOR_RESOURCES
 )
 
 add_library(Editor STATIC ${EDITOR_SRC} ${EDITOR_HDR} ${EDITOR_RESOURCES})
+target_compile_options(Editor PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/FS>)
 add_library(Sakura::Editor ALIAS Editor)
 
 target_include_directories(Editor PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -148,6 +167,7 @@ target_link_libraries(Editor PUBLIC
     EditorCore
 )
 target_link_libraries(Editor PRIVATE
+    Qt6::Network
     Sakura::EditorThirdParty
 )
 

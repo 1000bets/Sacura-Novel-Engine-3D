@@ -1,0 +1,6 @@
+foreach(RuntimeLibrary IN LISTS RUNTIME_LIBRARIES)
+    if(EXISTS "${RuntimeLibrary}")
+        get_filename_component(RuntimeName "${RuntimeLibrary}" NAME)
+        file(COPY_FILE "${RuntimeLibrary}" "${DEST_DIR}/${RuntimeName}" ONLY_IF_DIFFERENT)
+    endif()
+endforeach()

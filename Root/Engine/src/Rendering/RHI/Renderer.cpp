@@ -86,6 +86,17 @@ static_assert(sizeof(ForwardFrameConstants) == 3184);
 static_assert(sizeof(ForwardObjectConstants) == 176);
 static_assert(sizeof(PostprocessConstants) == 32);
 
+struct SkyConstants
+{
+    Matrix InverseViewProjection;
+    Vector4 CameraPosition;
+    Vector4 Zenith;
+    Vector4 Horizon;
+    Vector4 Ground;
+    Vector4 SunColor;
+    Vector4 SunDirection;
+};
+
 struct ForwardPipeline
 {
     RefCntAutoPtr<IPipelineState> State;
@@ -102,6 +113,9 @@ struct Renderer::PipelineState
     };
     struct SurfaceState
     {
+        EnvironmentLighting SkyEnvironment;
+        std::vector<float> SkyKey;
+        bool bSkyReady = false;
         RefCntAutoPtr<ITexture> Radiance;
         RefCntAutoPtr<ITexture> Depth;
         RefCntAutoPtr<ITexture> Accumulation;
@@ -126,6 +140,8 @@ struct Renderer::PipelineState
     std::chrono::steady_clock::time_point StartTime = std::chrono::steady_clock::now();
     ForwardPipeline Antialias;
     ForwardPipeline PreviewAntialias;
+    ForwardPipeline Sky;
+    GpuBuffer SkyBuffer;
     ForwardPipeline GroundGrid;
     GpuBuffer GroundGridBuffer;
     GpuBuffer FrameBuffer;
@@ -520,6 +536,43 @@ bool Renderer::CreatePipeline(const std::string& ShaderDirectory)
         }
     }
     // The grid is world geometry, separate from the always-on-top ImGui tools.
+    if (!Pipeline->SkyBuffer.Create(GraphicsDevice, GpuBufferUsage::Uniform, nullptr, sizeof(SkyConstants), "Sky constants", true))
+    {
+        return false;
+    }
+    const auto SkyVertex = CreateShader("Sky.hlsl", "SkyVS", SHADER_TYPE_VERTEX);
+    const auto SkyPixel = CreateShader("Sky.hlsl", "SkyPS", SHADER_TYPE_PIXEL);
+    if (!SkyVertex || !SkyPixel)
+    {
+        return false;
+    }
+    GraphicsPipelineStateCreateInfo SkyDescription;
+    SkyDescription.PSODesc.Name = "Procedural sky";
+    SkyDescription.PSODesc.PipelineType = PIPELINE_TYPE_GRAPHICS;
+    SkyDescription.PSODesc.ResourceLayout.DefaultVariableType = SHADER_RESOURCE_VARIABLE_TYPE_DYNAMIC;
+    SkyDescription.pVS = SkyVertex;
+    SkyDescription.pPS = SkyPixel;
+    auto& SkyGraphics = SkyDescription.GraphicsPipeline;
+    SkyGraphics.PrimitiveTopology = PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    SkyGraphics.RasterizerDesc.CullMode = CULL_MODE_NONE;
+    SkyGraphics.NumRenderTargets = 1;
+    SkyGraphics.RTVFormats[0] = TEX_FORMAT_RGBA16_FLOAT;
+    SkyGraphics.DSVFormat = TEX_FORMAT_D32_FLOAT;
+    SkyGraphics.DepthStencilDesc.DepthEnable = False;
+    SkyGraphics.DepthStencilDesc.DepthWriteEnable = False;
+    GraphicsDevice->CreateGraphicsPipelineState(SkyDescription, &Pipeline->Sky.State);
+    if (!Pipeline->Sky.State)
+    {
+        return false;
+    }
+    Pipeline->Sky.State->CreateShaderResourceBinding(&Pipeline->Sky.Binding, true);
+    for (SHADER_TYPE Stage : {SHADER_TYPE_VERTEX, SHADER_TYPE_PIXEL})
+    {
+        if (auto* Variable = Pipeline->Sky.Binding->GetVariableByName(Stage, "SkyConstants"))
+        {
+            Variable->Set(Pipeline->SkyBuffer.GetBuffer());
+        }
+    }
     const auto GridVertex = CreateShader("GroundGrid.hlsl", "GridVS", SHADER_TYPE_VERTEX);
     const auto GridPixel = CreateShader("GroundGrid.hlsl", "GridPS", SHADER_TYPE_PIXEL);
     if (!GridVertex || !GridPixel)
@@ -999,6 +1052,18 @@ void Renderer::Render(const RenderFrameData& Frame)
     {
         RenderView(View, Frame.FrameIndex);
     }
+    for (auto Iterator = PosedMeshes.begin(); Iterator != PosedMeshes.end();)
+    {
+        if (Iterator->second.LastFrame != Frame.FrameIndex)
+        {
+            Resources.ReleaseMesh(Iterator->second.Mesh, Frame.FrameIndex + 1);
+            Iterator = PosedMeshes.erase(Iterator);
+        }
+        else
+        {
+            ++Iterator;
+        }
+    }
     auto* Context = Device.GetImmediateContext();
     Context->EnqueueSignal(Pipeline->Completion, Frame.FrameIndex + 1);
     Context->Flush();
@@ -1106,6 +1171,36 @@ void Renderer::RenderView(const RenderViewFrame& View, uint64_t FrameIndex, ITex
     Frame.CameraPosition = Vector4(View.Scene.Camera.Position.x, View.Scene.Camera.Position.y, View.Scene.Camera.Position.z, 1.f);
     Frame.FrameParameters.w = View.TimeSeconds;
     Frame.FrameParameters.y = std::max(0.f, View.Settings.EnvironmentIntensity);
+    const auto& Sky = View.Scene.Sky;
+    if (Sky.bAuthored)
+    {
+        Frame.FrameParameters.y = 0.f;
+        if (Sky.bLighting)
+        {
+            Frame.FrameParameters.y = Sky.LightIntensity;
+        }
+    }
+    EnvironmentLighting* Lighting = &Pipeline->Environment;
+    if (Sky.bLighting)
+    {
+        const std::vector<float> Key{Sky.Zenith.x, Sky.Zenith.y, Sky.Zenith.z, Sky.Horizon.x, Sky.Horizon.y, Sky.Horizon.z,
+            Sky.Ground.x, Sky.Ground.y, Sky.Ground.z, Sky.SunColor.x, Sky.SunColor.y, Sky.SunColor.z,
+            Sky.SunDirection.x, Sky.SunDirection.y, Sky.SunDirection.z, Sky.LightColor.x, Sky.LightColor.y, Sky.LightColor.z, Sky.Brightness};
+        if (Key != Target.SkyKey)
+        {
+            EnvironmentLighting Updated;
+            if (Updated.Initialize(Device.GetDevice(), &Sky))
+            {
+                Target.SkyEnvironment = std::move(Updated);
+                Target.SkyKey = Key;
+                Target.bSkyReady = true;
+            }
+        }
+        if (Target.bSkyReady)
+        {
+            Lighting = &Target.SkyEnvironment;
+        }
+    }
     Frame.OutputParameters = Vector4(0.f, -1.f, 0.f, 0.f);
     if (Device.GetActiveBackend() == GraphicsBackend::OpenGL)
     {
@@ -1205,6 +1300,17 @@ void Renderer::RenderView(const RenderViewFrame& View, uint64_t FrameIndex, ITex
     auto DrawObject = [&](const RenderObject& Object, ForwardPipeline& DefaultPipeline, bool bShadowPass = false)
     {
         const RenderMesh* Mesh = Resources.GetMesh(Object.Mesh);
+        if (Object.PosedMesh)
+        {
+            auto& Entry = PosedMeshes[Object.PosedMesh.get()];
+            if (!Entry.Source)
+            {
+                Entry.Source = Object.PosedMesh;
+                Entry.Mesh = Resources.CreateMeshFromCpuData(*Object.PosedMesh);
+            }
+            Entry.LastFrame = FrameIndex;
+            Mesh = Resources.GetMesh(Entry.Mesh);
+        }
         bool bPlaceholder = false;
         if (Mesh == nullptr || Object.bUsePlaceholder || Object.bMissingAsset)
         {
@@ -1295,6 +1401,12 @@ void Renderer::RenderView(const RenderViewFrame& View, uint64_t FrameIndex, ITex
         }
         BindTexture(*Selected, "BaseColorImage", Texture);
         Pipeline->ObjectBuffer.Update(Context, &Constants, sizeof(Constants));
+        if (!bShadowPass)
+        {
+            BindTexture(*Selected, "IrradianceImage", Lighting->Irradiance->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE));
+            BindTexture(*Selected, "ReflectionImage", Lighting->Reflection->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE));
+            BindTexture(*Selected, "BrdfImage", Lighting->IntegratedBrdf->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE));
+        }
         Context->SetPipelineState(Selected->State);
         IBuffer* Buffers[] = {Mesh->GetVertexBuffer().GetBuffer()};
         Uint64 Offsets[] = {0};
@@ -1372,6 +1484,21 @@ void Renderer::RenderView(const RenderViewFrame& View, uint64_t FrameIndex, ITex
     const float Background[] = {0.025f, 0.03f, 0.04f, 1.f};
     Context->ClearRenderTarget(Radiance, Background, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
     Context->ClearDepthStencil(Depth, CLEAR_DEPTH_FLAG, 1.f, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+    if (Sky.bVisible && View.Scene.Camera.bValid)
+    {
+        SkyConstants Constants{View.Scene.Camera.ViewProjection.Invert(), Frame.CameraPosition,
+            Vector4(Sky.Zenith.x, Sky.Zenith.y, Sky.Zenith.z, Sky.Brightness), Vector4(Sky.Horizon), Vector4(Sky.Ground),
+            Vector4(Sky.SunColor), Vector4(Sky.SunDirection)};
+        Pipeline->SkyBuffer.Update(Context, &Constants, sizeof(Constants));
+        Context->SetPipelineState(Pipeline->Sky.State);
+        Context->CommitShaderResources(Pipeline->Sky.Binding, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+        DrawAttribs SkyDraw;
+        SkyDraw.NumVertices = 3;
+        SkyDraw.Flags = DRAW_FLAG_VERIFY_ALL;
+        Context->Draw(SkyDraw);
+        ++Statistics.DrawCalls;
+        ++Statistics.Triangles;
+    }
     for (const RenderObject* Object : Visible)
     {
         if (!IsTranslucent(*Object) && !IsAdditive(*Object))
@@ -1624,6 +1751,7 @@ void Renderer::Shutdown()
 {
     AssertRenderThread();
     Device.WaitForIdle();
+    PosedMeshes.clear();
     DestroyImGuiOverlay();
     if (Pipeline)
     {

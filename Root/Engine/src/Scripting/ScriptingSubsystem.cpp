@@ -37,6 +37,7 @@ ScriptingSubsystem::~ScriptingSubsystem()
 
 #if defined(SAKURA_ENABLE_PYTHON)
     Instances.clear();
+    ClearNarrativeBindings();
     OwnedAttributeStrings.clear();
     ClearRegisteredPythonTypes();
     EmbeddedInterpreter.reset();
@@ -98,6 +99,7 @@ void ScriptingSubsystem::Shutdown()
     DestroyAllScriptInstances();
 
 #if defined(SAKURA_ENABLE_PYTHON)
+    ClearNarrativeBindings();
     OwnedAttributeStrings.clear();
     ClearRegisteredPythonTypes();
     EmbeddedInterpreter.reset();

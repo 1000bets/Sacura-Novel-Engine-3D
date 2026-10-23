@@ -1,8 +1,10 @@
+#include <QMap>
 #pragma once
 #include <QString>
 #include <QVector>
 #include <QPointF>
 #include <array>
+#include "Story/Narrative.h"
 
 namespace EditorUi
 {
@@ -18,6 +20,7 @@ struct StoryGraphAction
     double Duration = 0;
     QString Target;
     QString LegacyTarget;
+    QString AnimationId;
     std::array<double, 3> Position{};
     std::array<double, 4> Rotation{0, 0, 0, 1};
     bool bHasRotation = false;
@@ -55,6 +58,11 @@ struct StoryGraphNode
     QString Identity;
     QString Kind;
     QString Speaker;
+    QString SpeakerLabel;
+    NarrativeNodeDefinition NarrativeDefinition;
+    std::string NarrativeType;
+    nlohmann::json NarrativeInputs = nlohmann::json::object();
+    std::map<std::string, std::pair<std::string, std::string>> NarrativeSources;
     QString Text;
     QVector<QString> Targets;
     int KindId = 0;
@@ -74,8 +82,11 @@ struct StoryGraphModel
     QString Start;
     QString Diagnostic;
     QVector<StoryGraphNode> Nodes;
+    QVector<QPair<QString, QString>> Characters;
+    QMap<QString, QVector<QPair<QString, QString>>> CharacterAnimations;
     QVector<StoryGraphEvent> Events;
     QVector<QPair<QString, QString>> Objects;
+    QVector<QPair<QString, QString>> NarrativeObjects;
     bool bOpen = false;
     bool bReadOnly = true;
     bool bDirty = false;

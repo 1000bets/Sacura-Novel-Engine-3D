@@ -3,6 +3,7 @@
 #include "Engine.h"
 #include "Project/ProjectSession.h"
 #include "UI/RenderViewportWidget.h"
+#include "UI/GameInputAdapter.h"
 #include "UI/StoryWidget.h"
 #include "UI/WidgetLayout.h"
 #include "Project/ProjectPaths.h"
@@ -42,12 +43,12 @@ int main(int ArgumentCount, char** Arguments)
     Application.setApplicationName("SakuraPlayer");
     Application.setOrganizationName("SakuraNovel");
     SetCurrentThreadRole(ThreadRole::Game);
-    EnginePaths::InitializeFromExecutable(std::filesystem::absolute(Arguments[0]));
-    const std::filesystem::path ProjectFile = ParseFlagPath(ArgumentCount, Arguments, "--project", "--project=");
+    const auto ExecutableFile = std::filesystem::path(QCoreApplication::applicationFilePath().toStdWString());
+    EnginePaths::InitializeFromExecutable(ExecutableFile);
+    std::filesystem::path ProjectFile = ParseFlagPath(ArgumentCount, Arguments, "--project", "--project=");
     if (ProjectFile.empty())
     {
-        PrintString("SakuraPlayer: missing --project <path.project>");
-        return 1;
+        ProjectFile = ExecutableFile.parent_path() / "Game" / "Game.project";
     }
 
     Engine EngineInstance;
@@ -95,13 +96,17 @@ int main(int ArgumentCount, char** Arguments)
     auto* Layout = new QVBoxLayout(&Window);
     Layout->setContentsMargins(0, 0, 0, 0);
     auto* Viewport = new RenderViewportWidget(&Window);
+    new GameInputAdapter(EngineInstance, Viewport);
     auto* Dialogue = new StoryWidget(EngineInstance.GetStoryRuntime(), &Window);
     Dialogue->SetWidgetLayout(WidgetLayout::Create("dialogue"));
     const auto WidgetPath = WidgetLayout::ProjectFile(QString::fromStdWString(ProjectPaths::Content().wstring()));
     if (QFileInfo::exists(WidgetPath))
     {
         QJsonObject Library; QString Error;
-        if (WidgetLayout::Read(WidgetPath, Library, Error)) Dialogue->SetWidgetLayout(WidgetLayout::Resolve(Library,"dialogue"));
+        if (WidgetLayout::Read(WidgetPath, Library, Error))
+        {
+            Dialogue->SetWidgetLibrary(Library);
+        }
         else PrintString("SakuraPlayer: UI library: " + Error.toStdString());
     }
     Layout->addWidget(Viewport, 1);

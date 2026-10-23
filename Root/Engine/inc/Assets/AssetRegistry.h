@@ -48,6 +48,7 @@ public:
     std::vector<AssetTypeRegistration> GetAssetTypeRegistrations() const;
 
     AssetDiagnostic RegisterExistingAsset(const std::string& RelativeOrVirtualPath, AssetMetadata Metadata);
+    AssetDiagnostic UpdateLoadSettings(const AssetId& Id, const nlohmann::json& Settings, const nlohmann::json& ExpectedSettings);
     AssetDiagnostic UpdateSourceFingerprint(const AssetId& Id, ContentHash Fingerprint);
     AssetDiagnostic Unregister(const AssetId& Id);
 

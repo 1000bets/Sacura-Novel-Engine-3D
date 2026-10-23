@@ -27,6 +27,7 @@ public:
     bool RelocateContentPath(const std::filesystem::path& Source, const std::filesystem::path& Destination, std::string& OutError);
 
     bool IsOpen() const;
+    bool UpdateSettings(const ProjectDescriptor& Settings, std::string& OutError);
     const ProjectDescriptor* GetProject() const;
 
     ProjectSessionHealth GetHealth() const { return Health; }

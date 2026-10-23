@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Story/StoryTypes.h"
+#include "Story/Narrative.h"
 #include "Core/Object/ObjectHandle.h"
 
 #include <filesystem>
@@ -11,6 +12,7 @@
 class GameObject;
 class Scene;
 class StoryEventPlayer;
+struct CharacterDefinition;
 
 enum class StoryPlaybackPhase
 {
@@ -44,6 +46,7 @@ public:
     bool CanAdvanceDialogue() const;
     bool CanSelectChoice() const;
     bool AdvanceDialogue();
+    bool TriggerEvent(const std::string& EventId);
     bool SelectChoice(size_t ChoiceIndex);
     void Tick(float DeltaTime);
 
@@ -51,7 +54,8 @@ public:
     bool SetEventPaused(uint64_t InstanceId, bool bPaused);
     bool StopEvent(uint64_t InstanceId);
 
-    const std::string& GetDisplayedSpeaker() const { return DisplayedSpeaker; }
+    std::string GetDisplayedSpeaker() const;
+    std::string GetDisplayedDialogueWidget() const;
     const std::string& GetDisplayedLine() const { return DisplayedLine; }
     const std::string& GetChoicePrompt() const { return ChoicePrompt; }
     size_t GetChoiceCount() const { return PendingChoices.size(); }
@@ -60,6 +64,7 @@ public:
     const std::string& GetLastError() const { return LastError; }
 
 private:
+    std::shared_ptr<const CharacterDefinition> GetSpeakerCharacter() const;
     struct ActiveAction
     {
         StoryActionDefinition Definition;
@@ -72,6 +77,7 @@ private:
         ObjectHandle NavigationAgent;
         uint64_t NavigationRequest = 0;
         bool bOwnsTransform = false;
+        bool bAnimationStarted = false;
     };
 
     const StoryNode* FindNode(const StoryNodeId& NodeId) const;
@@ -88,6 +94,8 @@ private:
     void ReleaseActionTransform(ActiveAction& Action);
     GameObject* ResolvePrimaryCameraObject() const;
 
+    NarrativeRuntime Narrative;
+    bool bNarrativeRunning = false;
     ObjectHandle BoundScene;
     StoryDocument Document;
     StoryNodeId CurrentNodeId;

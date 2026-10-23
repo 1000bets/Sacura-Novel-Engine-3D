@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "guid": "232ce20f-80c7-5538-906f-22e70b85c0ea",
+  "assetType": "Model",
+  "sourceFingerprint": "2735489eea1df4f3",
+  "importInfo": {
+    "generator": "Scripts/GenerateBasicShapes.py"
+  },
+  "subAssets": [
+    {
+      "id": "f1663528-6a69-5502-972e-9382707378c5",
+      "name": "Cone",
+      "type": "StaticMesh",
+      "selector": {
+        "kind": "mesh",
+        "index": 0
+      }
+    }
+  ],
+  "loadSettings": {
+    "staticMeshDefaults": {
+      "f1663528-6a69-5502-972e-9382707378c5": {
+        "materials": [
+          {
+            "slot": 0,
+            "material": {
+              "assetId": "42b33bd1-5bf7-5462-920b-297de12b0f18",
+              "subAssetId": null
+            }
+          }
+        ],
+        "collision": {
+          "enabled": true,
+          "elements": [
+            {
+              "shape": 3,
+              "center": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "halfExtents": [
+                0.5,
+                0.5,
+                0.5
+              ],
+              "radius": 0.5,
+              "capsuleHalfHeight": 0.5
+            }
+          ]
+        }
+      }
+    }
+  }
+}

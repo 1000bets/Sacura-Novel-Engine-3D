@@ -2,6 +2,7 @@
 
 #include "Core/Object/Object.h"
 #include "Reflection/PropertyDescriptor.h"
+#include "Reflection/MethodDescriptor.h"
 #include "Reflection/TypeId.h"
 
 #include <vector>
@@ -44,6 +45,7 @@ public:
     bool bClassDefaultObjectOwned = false;
     FactoryFunction Factory = nullptr;
     std::vector<PropertyDescriptor> Properties;
+    std::vector<MethodDescriptor> Methods;
 
 protected:
     Class();

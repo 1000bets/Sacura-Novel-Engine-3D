@@ -583,6 +583,13 @@ StoryWorkspaceView::StoryWorkspaceView(QWidget* Parent) : QWidget(Parent)
             DeleteNodesRequested(std::move(Nodes));
         }
     };
+    Graphics->ConnectDataRequested = [this](QString Source, QString Output, QString Target, QString Input)
+    {
+        if (ConnectDataRequested)
+        {
+            ConnectDataRequested(Source, Output, Target, Input);
+        }
+    };
     Graphics->ConnectRequested = [this](QString Source, int Port, QString Target)
     {
         if (ConnectRequested)
@@ -660,10 +667,21 @@ void StoryWorkspaceView::ShowAddMenu(QPointF Position, QPoint ScreenPosition)
         for (const auto& Node : Model.Nodes)
         { if (Node.Identity == Selected.front() && Node.KindId == 0) { SelectedLine = Node.Identity; break; } }
     }
+    std::function<void(QString)> AddNarrative;
+    if (Model.bOpen)
+    {
+        AddNarrative = [this, Position](QString Type)
+        {
+            if (AddNarrativeRequested)
+            {
+                AddNarrativeRequested(Type, Position);
+            }
+        };
+    }
     auto Items = BuildStoryNodeMenu(
         [this, Position](int Kind) { if (AddNodeRequested) { AddNodeRequested(Kind, Position); } },
         [this, SelectedLine, ScreenPosition]() { Graphics->ShowEventMenu(SelectedLine, 1, {}, ScreenPosition); },
-        !SelectedLine.isEmpty());
+        !SelectedLine.isEmpty(), std::move(AddNarrative));
     ActionMenu = new StudioActionMenu(tr("Добавить ноду"), std::move(Items), this);
     ActionMenu->Open(ScreenPosition);
 }

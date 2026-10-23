@@ -48,14 +48,24 @@ static Vector3 CubeDirection(uint32_t Face, float Horizontal, float Vertical)
     return Direction;
 }
 
-static Vector3 SkyRadiance(const Vector3& Direction)
+static Vector3 SkyRadiance(const Vector3& Direction, const RenderSky* Sky)
 {
+    if (Sky != nullptr)
+    {
+        Vector3 Color = Vector3::Lerp(Sky->Horizon, Sky->Zenith, std::sqrt(std::max(0.f, Direction.y)));
+        if (Direction.y < 0.f)
+        {
+            Color = Vector3::Lerp(Sky->Horizon, Sky->Ground, std::sqrt(-Direction.y));
+        }
+        return (Color + Sky->SunColor * std::pow(std::max(0.f, Direction.Dot(Sky->SunDirection)), 512.f))
+            * Sky->LightColor * Sky->Brightness;
+    }
     const float Blend = std::clamp(Direction.y * 0.5f + 0.5f, 0.f, 1.f);
     return Vector3::Lerp(Vector3(0.07f, 0.06f, 0.05f), Vector3(0.35f, 0.55f, 1.1f), Blend)
         + Vector3(0.4f, 0.3f, 0.2f) * std::pow(std::max(0.f, Direction.Dot(Vector3(0.57735f, 0.57735f, 0.57735f))), 32.f);
 }
 
-static bool BakeEnvironmentCube(IRenderDevice* Device, bool bDiffuse, RefCntAutoPtr<ITexture>& Texture)
+static bool BakeEnvironmentCube(IRenderDevice* Device, bool bDiffuse, RefCntAutoPtr<ITexture>& Texture, const RenderSky* Sky)
 {
     uint32_t Size = 32;
     uint32_t MipCount = 6;
@@ -99,7 +109,7 @@ static bool BakeEnvironmentCube(IRenderDevice* Device, bool bDiffuse, RefCntAuto
                             Direction = Halfway * (2.f * Normal.Dot(Halfway)) - Normal;
                             Contribution = std::max(0.f, Normal.Dot(Direction));
                         }
-                        Sum += SkyRadiance(Direction) * Contribution;
+                        Sum += SkyRadiance(Direction, Sky) * Contribution;
                         Weight += Contribution;
                     }
                     Sum /= std::max(Weight, 0.00001f);
@@ -126,9 +136,9 @@ static bool BakeEnvironmentCube(IRenderDevice* Device, bool bDiffuse, RefCntAuto
     return Texture != nullptr;
 }
 
-bool EnvironmentLighting::Initialize(IRenderDevice* Device)
+bool EnvironmentLighting::Initialize(IRenderDevice* Device, const RenderSky* Sky)
 {
-    if (!BakeEnvironmentCube(Device, true, Irradiance) || !BakeEnvironmentCube(Device, false, Reflection))
+    if (!BakeEnvironmentCube(Device, true, Irradiance, Sky) || !BakeEnvironmentCube(Device, false, Reflection, Sky))
     {
         return false;
     }

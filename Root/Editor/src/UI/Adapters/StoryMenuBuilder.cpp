@@ -27,7 +27,7 @@ StudioMenuItem Unavailable(const char* Identity, const QString& Label, const cha
 }
 
 QVector<StudioMenuItem> BuildStoryNodeMenu(std::function<void(int)> AddNode,
-                                         std::function<void()> AddEvent, bool CanAddEvent)
+                                         std::function<void()> AddEvent, bool CanAddEvent, std::function<void(QString)> AddNarrative)
 {
     QVector<StudioMenuItem> Items;
     auto Category = [&](const char* Identity, const QString& Label, const char* Icon,
@@ -38,8 +38,32 @@ QVector<StudioMenuItem> BuildStoryNodeMenu(std::function<void(int)> AddNode,
         Item.Description = QObject::tr("Доступно в веб-прототипе; поддержка в нативной истории ещё не перенесена.");
         Items.push_back(std::move(Item));
     };
-    Category("scripting", QObject::tr("Скриптинг"), "Code2",
-             {Unavailable("script-function", QObject::tr("Создать JavaScript-функцию…"), "FilePlus2")});
+    QVector<StudioMenuItem> Scripting;
+    for (const auto& Definition : GetNarrativeDefinitions())
+    {
+        const QString Type = QString::fromStdString(Definition.Type);
+        auto Item = Entry(Definition.Type.c_str(), QString::fromStdString(Definition.Label), "Code2", {}, [AddNarrative, Type]()
+        {
+            if (AddNarrative)
+            {
+                AddNarrative(Type);
+            }
+        });
+        Item.bEnabled = static_cast<bool>(AddNarrative);
+        if (!Item.bEnabled)
+        {
+            Item.Description = QObject::tr("Сначала откройте историю.");
+        }
+        Scripting.push_back(std::move(Item));
+    }
+    if (Scripting.isEmpty())
+    {
+        auto Item = Unavailable("no-narrative", QObject::tr("Нет зарегистрированных Python-нод"), "Code2");
+        Item.Description = QObject::tr("Добавьте классы с @register_node в Scripts проекта.");
+        Scripting.push_back(std::move(Item));
+    }
+    Category("scripting", QObject::tr("Скриптинг"), "Code2", std::move(Scripting));
+    Items.back().Description.clear();
     Category("project-variables", QObject::tr("Переменные проекта"), "Database",
              {Unavailable("project-variable", QObject::tr("Переменные проекта"), "Database")});
     QVector<StudioMenuItem> Mathematics;

@@ -39,6 +39,8 @@ public:
     void SetPropertyResetCallback(PropertyResetCallback Callback);
     void SetAssetRegistry(AssetRegistry* Registry);
     void SetAssetCommitCallback(AssetCommitCallback Callback);
+    using OverrideMarkerProvider = std::function<bool(Object*, const PropertyId&)>;
+    void SetOverrideMarkerProvider(OverrideMarkerProvider Provider) { OverrideMarker = std::move(Provider); }
     void SetTypeLabelVisible(bool bVisible);
     void SetMeshPresentation(bool Enabled) { if (bMeshPresentation != Enabled) { bMeshPresentation = Enabled; Rebuild(); } }
 
@@ -71,6 +73,7 @@ private:
     std::unordered_map<std::string, std::function<bool(const ReflectedValue&)>> PropertyRefreshers;
     bool bValuesDirty = false;
     bool bRefreshQueued = false;
+    OverrideMarkerProvider OverrideMarker;
     PropertyCommitCallback CommitCallback;
     PropertyResetCallback ResetCallback;
     AssetCommitCallback AssetCallback;

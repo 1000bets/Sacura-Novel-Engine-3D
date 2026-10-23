@@ -33,6 +33,7 @@ AssetKey MeshRendererComponent::GetMaterialAssetKey() const
 
 void MeshRendererComponent::SetMeshAssetKey(const AssetKey& Key)
 {
+    DefaultMaterialSlots.clear();
     MeshAssetId = Key.Asset.IsValid() ? Key.Asset.ToString() : std::string{};
     MeshSubAssetId = (Key.SubAsset.has_value() && Key.SubAsset->IsValid())
         ? Key.SubAsset->ToString()

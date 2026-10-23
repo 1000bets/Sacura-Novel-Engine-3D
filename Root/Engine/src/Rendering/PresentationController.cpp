@@ -1,3 +1,5 @@
+#include "World/Scene.h"
+#include "Core/Object/MemorySubsystem.h"
 #include "Rendering/PresentationController.h"
 
 #include "Core/Threading/ThreadContext.h"
@@ -81,6 +83,10 @@ std::unique_ptr<RenderFrameData> PresentationController::BuildFrame(uint64_t Fra
         {
             World = EditWorld;
         }
+        if (Presentation.SceneIdentity.IsValid())
+        {
+            World = dynamic_cast<Scene*>(MemorySubsystem::Get()->ResolveHandle(Presentation.SceneIdentity));
+        }
         if (World != nullptr)
         {
             Extractor.Extract(*World, View.Scene);
@@ -101,4 +107,18 @@ std::unique_ptr<RenderFrameData> PresentationController::BuildFrame(uint64_t Fra
         Frame->Views.push_back(std::move(View));
     }
     return Frame;
+}
+
+void PresentationController::SetScene(RenderSurfaceId Surface, Scene* World)
+{
+    AssertGameThread();
+    auto Existing = Presentations.find(Surface.Value);
+    if (Existing != Presentations.end())
+    {
+        Existing->second.SceneIdentity = {};
+        if (World != nullptr)
+        {
+            Existing->second.SceneIdentity = World->GetObjectHandle();
+        }
+    }
 }

@@ -14,7 +14,7 @@ bool PhysicsBodyComponent::PrepareCollisionMesh(AssetManager* Assets)
 {
     Diagnostic.clear();
     bCollisionMeshPending = false;
-    if (ShapeType != static_cast<int64_t>(PhysicsShapeType::TriangleMesh))
+    if (!bUseMeshDefaults && ShapeType != static_cast<int64_t>(PhysicsShapeType::TriangleMesh))
     {
         CollisionMesh.reset();
         MeshFingerprint = 0;
@@ -56,6 +56,26 @@ bool PhysicsBodyComponent::PrepareCollisionMesh(AssetManager* Assets)
         }
         return false;
     }
+    if (bUseMeshDefaults)
+    {
+        const StaticMeshDefaults* DefaultsValue = &Loaded->Defaults;
+        if (CollisionPreview)
+        {
+            DefaultsValue = &*CollisionPreview;
+        }
+        const auto& Defaults = *DefaultsValue;
+        if (!Defaults.CollisionElements.empty())
+        {
+            const auto& Element = Defaults.CollisionElements.front();
+            ShapeType = Element.ShapeType;
+            Center = Element.Center;
+            HalfExtents = Element.HalfExtents;
+            Radius = Element.Radius;
+            CapsuleHalfHeight = Element.CapsuleHalfHeight;
+        }
+        bSimulationEnabled = Defaults.bCollisionEnabled;
+        bQueryEnabled = Defaults.bCollisionEnabled;
+    }
     if (CollisionMesh != Loaded.GetSharedResource())
     {
         CollisionMesh = Loaded.GetSharedResource();
@@ -67,12 +87,15 @@ bool PhysicsBodyComponent::PrepareCollisionMesh(AssetManager* Assets)
         }
         MeshFingerprint = ContentHash::FromBytes(Positions.data(), Positions.size() * sizeof(float)).Value
             ^ ContentHash::FromBytes(CollisionMesh->Indices.data(), CollisionMesh->Indices.size() * sizeof(uint32_t)).Value;
+        const auto Settings = CollisionMesh->Defaults.ToJson().at("collision").dump();
+        MeshFingerprint ^= ContentHash::FromBytes(Settings.data(), Settings.size()).Value;
     }
     return true;
 }
 
 bool PhysicsBodyComponent::BuildDefinition(PhysicsBodyDefinition& Definition, std::string& Error) const
 {
+    Definition = PhysicsBodyDefinition{};
     if (MotionType < 0 || MotionType > 3 || ShapeType < 0 || ShapeType > 3
         || CollisionLayer < 1 || CollisionLayer > UINT32_MAX || CollisionMask < 0 || CollisionMask > UINT32_MAX)
     {
@@ -113,24 +136,88 @@ bool PhysicsBodyComponent::BuildDefinition(PhysicsBodyDefinition& Definition, st
     Definition.bQueryEnabled = bQueryEnabled;
     Definition.bSimulationEnabled = bSimulationEnabled;
     Definition.bContinuousCollisionDetection = bContinuousCollisionDetection;
-    if (Definition.ShapeType == PhysicsShapeType::TriangleMesh)
+    if (bUseMeshDefaults)
     {
         if (!CollisionMesh)
         {
-            Error = "Collision mesh has not finished loading";
+            Error = "Mesh collision defaults have not finished loading";
             return false;
         }
-        Definition.TriangleMesh.Vertices.reserve(CollisionMesh->Vertices.size());
-        for (const StaticMeshVertex& Vertex : CollisionMesh->Vertices)
+        const StaticMeshDefaults* Defaults = &CollisionMesh->Defaults;
+        if (CollisionPreview)
         {
-            Definition.TriangleMesh.Vertices.push_back(Vertex.Position * Scale);
+            Defaults = &*CollisionPreview;
         }
-        Definition.TriangleMesh.Indices = CollisionMesh->Indices;
-        if (Scale.x * Scale.y * Scale.z < 0.f)
+        for (const auto& Element : Defaults->CollisionElements)
         {
-            for (size_t Index = 0; Index + 2 < Definition.TriangleMesh.Indices.size(); Index += 3)
+            PhysicsShapeDefinition Shape;
+            Shape.ShapeType = static_cast<PhysicsShapeType>(Element.ShapeType);
+            Shape.Center = Element.Center * Scale;
+            Shape.HalfExtents = Element.HalfExtents * AbsoluteScale;
+            Shape.Radius = Element.Radius * std::max(AbsoluteScale.x, AbsoluteScale.z);
+            if (Shape.ShapeType == PhysicsShapeType::Sphere)
             {
-                std::swap(Definition.TriangleMesh.Indices[Index + 1], Definition.TriangleMesh.Indices[Index + 2]);
+                Shape.Radius = Element.Radius * std::max({AbsoluteScale.x, AbsoluteScale.y, AbsoluteScale.z});
+            }
+            Shape.CapsuleHalfHeight = Element.CapsuleHalfHeight * AbsoluteScale.y;
+            Shape.ShapeRotation = Quaternion::CreateFromYawPitchRoll(Element.RotationDegrees.y * 0.01745329252f,
+                Element.RotationDegrees.x * 0.01745329252f, Element.RotationDegrees.z * 0.01745329252f);
+            if (Shape.ShapeType == PhysicsShapeType::TriangleMesh)
+            {
+                Shape.TriangleMesh.Vertices.reserve(CollisionMesh->Vertices.size());
+                for (const auto& Vertex : CollisionMesh->Vertices)
+                {
+                    Shape.TriangleMesh.Vertices.push_back(Vector3::Transform(Vertex.Position, Shape.ShapeRotation) * Scale);
+                }
+                Shape.ShapeRotation = Quaternion::Identity;
+                Shape.TriangleMesh.Indices = CollisionMesh->Indices;
+                if (Scale.x * Scale.y * Scale.z < 0.f)
+                {
+                    for (size_t Index = 0; Index + 2 < Shape.TriangleMesh.Indices.size(); Index += 3)
+                    {
+                        std::swap(Shape.TriangleMesh.Indices[Index + 1], Shape.TriangleMesh.Indices[Index + 2]);
+                    }
+                }
+            }
+            else if (Shape.ShapeType != PhysicsShapeType::Sphere && Element.RotationDegrees != Vector3::Zero
+                && (Scale.x <= 0.f || Scale.y <= 0.f || Scale.z <= 0.f
+                    || std::abs(Scale.x - Scale.y) > 0.00001f || std::abs(Scale.y - Scale.z) > 0.00001f))
+            {
+                Error = "Rotated collision primitives require a positive uniform object scale";
+                return false;
+            }
+            Definition.Shapes.push_back(std::move(Shape));
+        }
+        if (!Definition.Shapes.empty())
+        {
+            static_cast<PhysicsShapeDefinition&>(Definition) = Definition.Shapes.front();
+        }
+        else
+        {
+            static_cast<PhysicsShapeDefinition&>(Definition) = PhysicsShapeDefinition{};
+        }
+    }
+    else
+    {
+        if (Definition.ShapeType == PhysicsShapeType::TriangleMesh)
+        {
+            if (!CollisionMesh)
+            {
+                Error = "Collision mesh has not finished loading";
+                return false;
+            }
+            Definition.TriangleMesh.Vertices.reserve(CollisionMesh->Vertices.size());
+            for (const StaticMeshVertex& Vertex : CollisionMesh->Vertices)
+            {
+                Definition.TriangleMesh.Vertices.push_back(Vertex.Position * Scale);
+            }
+            Definition.TriangleMesh.Indices = CollisionMesh->Indices;
+            if (Scale.x * Scale.y * Scale.z < 0.f)
+            {
+                for (size_t Index = 0; Index + 2 < Definition.TriangleMesh.Indices.size(); Index += 3)
+                {
+                    std::swap(Definition.TriangleMesh.Indices[Index + 1], Definition.TriangleMesh.Indices[Index + 2]);
+                }
             }
         }
     }
@@ -140,7 +227,7 @@ bool PhysicsBodyComponent::BuildDefinition(PhysicsBodyDefinition& Definition, st
 uint64_t PhysicsBodyComponent::GetConfigurationFingerprint() const
 {
     const Vector3 Scale = GetGameObject()->GetWorldTransform().Scale;
-    const nlohmann::json Configuration = {MotionType, ShapeType, HalfExtents.x, HalfExtents.y, HalfExtents.z,
+    const nlohmann::json Configuration = {bUseMeshDefaults, MotionType, ShapeType, HalfExtents.x, HalfExtents.y, HalfExtents.z,
         Center.x, Center.y, Center.z, Radius, CapsuleHalfHeight, Mass, StaticFriction, DynamicFriction,
         Restitution, LinearDamping, AngularDamping, StepHeight, MaximumSlopeDegrees, CollisionLayer,
         CollisionMask, bUseGravity, bTrigger, bQueryEnabled, bSimulationEnabled, bContinuousCollisionDetection,

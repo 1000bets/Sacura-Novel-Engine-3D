@@ -359,9 +359,36 @@ ReflectionDiagnostic PublishRegisteredPythonClass(
     Request.BaseTypeId = TypeId{"engine.ScriptComponent"};
 
     py::dict ClassDict = PythonType.attr("__dict__");
+    std::vector<MethodDescriptor> Methods;
     for (auto Item : ClassDict)
     {
         py::object Value = py::reinterpret_borrow<py::object>(Item.second);
+        if (py::hasattr(Value, "_sakura_method_parameters"))
+        {
+            MethodDescriptor Method;
+            Method.Name = py::str(Item.first).cast<std::string>();
+            for (auto Parameter : Value.attr("_sakura_method_parameters").cast<py::dict>())
+            {
+                PropertyDescriptor Descriptor;
+                Descriptor.Id = PropertyId{py::str(Parameter.first).cast<std::string>()};
+                Descriptor.ValueTypeId = ResolvePythonValueTypeId(py::reinterpret_borrow<py::object>(Parameter.second));
+                if (!Descriptor.ValueTypeId.IsValid())
+                {
+                    return ReflectionDiagnostic::Fail("Unsupported method parameter type", Request.Id, Descriptor.Id);
+                }
+                Method.Parameters.push_back(std::move(Descriptor));
+            }
+            py::object ResultType = Value.attr("_sakura_method_result");
+            if (!ResultType.is_none())
+            {
+                Method.ResultTypeId = ResolvePythonValueTypeId(ResultType);
+                if (!Method.ResultTypeId.IsValid())
+                {
+                    return ReflectionDiagnostic::Fail("Unsupported method result type", Request.Id);
+                }
+            }
+            Methods.push_back(std::move(Method));
+        }
         if (!py::hasattr(Value, "_sakura_field_marker"))
         {
             continue;
@@ -415,6 +442,7 @@ ReflectionDiagnostic PublishRegisteredPythonClass(
     ReflectionDiagnostic Published = ScriptingSubsystem::Get().PublishPythonClass(Request);
     if (Published.bOk)
     {
+        ReflectionSubsystem::Get().FindClass(Request.Id)->Methods = std::move(Methods);
         RegisterPythonType(TypeIdString, PythonType);
     }
     return Published;
@@ -424,9 +452,139 @@ void RegisterEmbeddedEnginePythonModule()
 {
 }
 
+ReflectionDiagnostic ScriptingSubsystem::InvokeMethod(
+    ScriptComponent& Component,
+    const std::string& MethodName,
+    const std::unordered_map<std::string, ReflectedValue>& Arguments,
+    ReflectedValue& Result)
+{
+    AssertGameThread();
+    Result = {};
+    const auto Found = Instances.find(Component.GetScriptInstanceHandle().Value);
+    if (Found == Instances.end() || Component.IsScriptFailed() || Found->second->bDestroyInvoked)
+    {
+        return ReflectionDiagnostic::Fail("Component has no active script instance");
+    }
+    const MethodDescriptor* Method = nullptr;
+    for (const MethodDescriptor& Candidate : Component.GetClass()->Methods)
+    {
+        if (Candidate.Name == MethodName)
+        {
+            Method = &Candidate;
+            break;
+        }
+    }
+    if (Method == nullptr)
+    {
+        return ReflectionDiagnostic::Fail("Method is not published: " + MethodName);
+    }
+    if (Arguments.size() != Method->Parameters.size())
+    {
+        return ReflectionDiagnostic::Fail("Method argument count mismatch: " + MethodName);
+    }
+    try
+    {
+        py::gil_scoped_acquire Gil;
+        py::dict Keywords;
+        for (const PropertyDescriptor& Parameter : Method->Parameters)
+        {
+            const auto Argument = Arguments.find(Parameter.Id.Value);
+            if (Argument == Arguments.end())
+            {
+                return ReflectionDiagnostic::Fail("Missing method argument: " + Parameter.Id.Value);
+            }
+            ReflectionDiagnostic Validated = PropertyAccess::ValidatePropertyValue(Parameter, Argument->second);
+            if (!Validated.bOk)
+            {
+                return Validated;
+            }
+            Keywords[py::str(Parameter.Id.Value)] = ReflectedToPython(Argument->second);
+        }
+        py::object Instance = Found->second->Instance;
+        py::object Returned = Instance.attr(MethodName.c_str())(**Keywords);
+        if (!Method->ResultTypeId.IsValid())
+        {
+            if (!Returned.is_none())
+            {
+                return ReflectionDiagnostic::Fail("Void method returned a value: " + MethodName);
+            }
+            return ReflectionDiagnostic::Ok();
+        }
+        ReflectedValue Converted = PythonToReflected(Returned, Method->ResultTypeId);
+        PropertyDescriptor ResultDescriptor;
+        ResultDescriptor.ValueTypeId = Method->ResultTypeId;
+        ReflectionDiagnostic Validated = PropertyAccess::ValidatePropertyValue(ResultDescriptor, Converted);
+        if (!Validated.bOk)
+        {
+            return Validated;
+        }
+        Result = std::move(Converted);
+        return ReflectionDiagnostic::Ok();
+    }
+    catch (const std::exception& Error)
+    {
+        return ReflectionDiagnostic::Fail("Script method " + MethodName + " failed: " + Error.what());
+    }
+}
+
+void RegisterInputBindings(py::module_& Module);
+
 PYBIND11_EMBEDDED_MODULE(engine, Module)
 {
     Module.doc() = "Sacura Novel Engine scripting bindings";
+
+    Module.def("invoke_method", [](uint64_t Identifier, uint32_t Generation,
+        const std::string& MethodName, const py::dict& Arguments)
+    {
+        ScriptComponent* Component = ResolveScriptCarrier(Identifier, Generation);
+        std::unordered_map<std::string, ReflectedValue> Values;
+        for (const MethodDescriptor& Method : Component->GetClass()->Methods)
+        {
+            if (Method.Name != MethodName)
+            {
+                continue;
+            }
+            if (Arguments.size() != Method.Parameters.size())
+            {
+                throw py::value_error("Method argument count mismatch");
+            }
+            for (const PropertyDescriptor& Parameter : Method.Parameters)
+            {
+                py::str Name(Parameter.Id.Value);
+                if (!Arguments.contains(Name))
+                {
+                    throw py::value_error("Missing method argument: " + Parameter.Id.Value);
+                }
+                Values.emplace(Parameter.Id.Value, PythonToReflected(Arguments[Name], Parameter.ValueTypeId));
+            }
+            break;
+        }
+        ReflectedValue Result;
+        ReflectionDiagnostic Invoked = ScriptingSubsystem::Get().InvokeMethod(*Component, MethodName, Values, Result);
+        if (!Invoked.bOk)
+        {
+            throw py::value_error(Invoked.Message);
+        }
+        return ReflectedToPython(Result);
+    });
+    Module.def("get_components", [](uint64_t Identifier, uint32_t Generation, const std::string& TypeName)
+    {
+        GameObject* Owner = dynamic_cast<GameObject*>(ResolveObjectOrThrow(Identifier, Generation));
+        if (Owner == nullptr)
+        {
+            throw py::type_error("Component lookup requires a GameObject");
+        }
+        py::list Result;
+        for (Component* ComponentInstance : Owner->GetComponents<Component>())
+        {
+            if (ComponentInstance->GetClass() != nullptr && ComponentInstance->GetClass()->IsA(TypeId{TypeName}))
+            {
+                Result.append(py::module_::import("engine").attr("Object")(
+                    ComponentInstance->GetID(), ComponentInstance->GetGeneration()));
+            }
+        }
+        return Result;
+    });
 
     py::class_<DynamicMaterialInstance, std::shared_ptr<DynamicMaterialInstance>>(Module, "DynamicMaterialInstance")
         .def("get_parameter", [](const DynamicMaterialInstance& Material, const std::string& Identifier)
@@ -670,6 +828,12 @@ class Object:
     def set_dynamic_material(self, material, slot=-1):
         assign_dynamic_material(self._id, self._generation, material, slot)
 
+    def Invoke(self, MethodName, **Arguments):
+        return invoke_method(self._id, self._generation, MethodName, Arguments)
+
+    def GetComponents(self, TypeName):
+        return get_components(self._id, self._generation, TypeName)
+
     def get_local_transform(self):
         values = get_local_transform(self._id, self._generation)
         result = Transform()
@@ -732,16 +896,47 @@ class ScriptComponent:
     def _set_managed(self, property_id, value):
         set_managed_property(self._carrier_id, self._carrier_generation, property_id, value)
 
-def register_class(type_id, schema_version=1):
+def register_class(type_id):
     def decorator(python_type):
-        _publish_registered_class(python_type, type_id, int(schema_version))
+        _publish_registered_class(python_type, type_id, 1)
         python_type._sakura_type_id = type_id
-        python_type._sakura_schema_version = int(schema_version)
         return python_type
     return decorator
+
+def method(*, Parameters=None, Result=None):
+    import inspect
+    def Decorate(Function):
+        if inspect.iscoroutinefunction(Function) or inspect.isgeneratorfunction(Function) or inspect.isasyncgenfunction(Function):
+            raise TypeError("Published component methods must be synchronous")
+        Declared = dict(Parameters or {})
+        Signature = list(inspect.signature(Function).parameters.values())
+        if not Signature or Signature[0].kind != inspect.Parameter.POSITIONAL_OR_KEYWORD:
+            raise TypeError("Published method requires an instance parameter")
+        Arguments = Signature[1:]
+        if any(Parameter.kind not in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
+               or Parameter.default is not inspect.Parameter.empty for Parameter in Arguments):
+            raise TypeError("Published method arguments must be explicit and have no defaults")
+        if set(Declared) != {Parameter.name for Parameter in Arguments}:
+            raise TypeError("Published method parameters must match its signature")
+        Function._sakura_method_parameters = Declared
+        Function._sakura_method_result = Result
+        return Function
+    return Decorate
 )PY",
         Module.attr("__dict__"));
     RegisterPhysicsNavigationBindings(Module);
+    RegisterInputBindings(Module);
+    RegisterNarrativeBindings(Module);
+}
+#else
+ReflectionDiagnostic ScriptingSubsystem::InvokeMethod(
+    ScriptComponent& Component,
+    const std::string& MethodName,
+    const std::unordered_map<std::string, ReflectedValue>& Arguments,
+    ReflectedValue& Result)
+{
+    Result = {};
+    return ReflectionDiagnostic::Fail("Python is disabled");
 }
 #endif
 

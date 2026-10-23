@@ -7,6 +7,23 @@ add_subdirectory(ThirdParty)
 # Engine library (explicit sources РІР‚вЂќ do not use file(GLOB) for compilation units)
 # ---------------------------------------------------------------
 set(ENGINE_SRC
+    src/Assets/StaticMeshDefaults.cpp
+    src/Characters/CharacterDefinition.cpp
+    src/Characters/CharacterAnimationIO.cpp
+    src/Characters/CharacterPose.cpp
+    src/World/Components/CharacterComponent.cpp
+    src/World/Serialization/SceneJson.cpp
+    src/Prefab/PrefabTypes.cpp
+    src/Prefab/PrefabGraphOps.cpp
+    src/Prefab/PrefabLibrary.cpp
+    src/Prefab/PrefabSceneBuilder.cpp
+    src/Prefab/PrefabUtility.cpp
+
+    src/Input/InputSession.cpp
+    src/Input/InputDocument.cpp
+    src/Input/EngineInput.cpp
+    src/Scripting/InputBindings.cpp
+    src/UI/GameInputAdapter.cpp
     src/Authoring/AuthoringTypes.cpp
     src/Authoring/OperationRegistry.cpp
     src/Authoring/OperationContext.cpp
@@ -83,6 +100,7 @@ set(ENGINE_SRC
     src/Rendering/RHI/RenderResourceManager.cpp
     src/Rendering/SceneExtractor.cpp
     src/Scripting/PythonBindings.cpp
+    src/Scripting/NarrativeBindings.cpp
     src/Scripting/PhysicsNavigationBindings.cpp
     src/Scripting/ScriptLifecycle.cpp
     src/Scripting/ScriptingSubsystem.cpp

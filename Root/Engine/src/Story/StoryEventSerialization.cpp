@@ -21,7 +21,7 @@ std::string Identity(const Json& Value)
 }
 bool ValidAction(const StoryActionDefinition& Action)
 {
-    return static_cast<int>(Action.Kind) >= 0 && static_cast<int>(Action.Kind) <= 3 &&
+    return static_cast<int>(Action.Kind) >= 0 && static_cast<int>(Action.Kind) <= 4 &&
            std::isfinite(Action.DurationSeconds) && Action.DurationSeconds >= 0 &&
            std::isfinite(Action.TargetPosition.x) && std::isfinite(Action.TargetPosition.y) &&
            std::isfinite(Action.TargetPosition.z) && std::isfinite(Action.TargetRotation.x) &&

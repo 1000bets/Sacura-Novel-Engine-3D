@@ -5,7 +5,7 @@
 
 class ArrowComponent : public Component
 {
-    ENGINE_CLASS(ArrowComponent, Component, "engine.ArrowComponent", 1)
+    ENGINE_CLASS(ArrowComponent, Component, "engine.ArrowComponent")
 public:
     DirectX::SimpleMath::Color ArrowColor = DirectX::SimpleMath::Color(1.f, 0.25f, 0.1f, 1.f);
     float ArrowLength = 1.f;

@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "guid": "a7b602eb-7a6e-56e7-9bb5-27d57759be2f",
+  "assetType": "Model",
+  "sourceFingerprint": "629d4efd5168ba52",
+  "importInfo": {
+    "generator": "Scripts/GenerateBasicShapes.py"
+  },
+  "subAssets": [
+    {
+      "id": "f06a9bf0-34ae-5319-95a5-1098db5bd3a5",
+      "name": "Capsule",
+      "type": "StaticMesh",
+      "selector": {
+        "kind": "mesh",
+        "index": 0
+      }
+    }
+  ],
+  "loadSettings": {
+    "staticMeshDefaults": {
+      "f06a9bf0-34ae-5319-95a5-1098db5bd3a5": {
+        "materials": [
+          {
+            "slot": 0,
+            "material": {
+              "assetId": "42b33bd1-5bf7-5462-920b-297de12b0f18",
+              "subAssetId": null
+            }
+          }
+        ],
+        "collision": {
+          "enabled": true,
+          "elements": [
+            {
+              "shape": 2,
+              "center": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "halfExtents": [
+                0.5,
+                0.5,
+                0.5
+              ],
+              "radius": 0.5,
+              "capsuleHalfHeight": 0.5
+            }
+          ]
+        }
+      }
+    }
+  }
+}

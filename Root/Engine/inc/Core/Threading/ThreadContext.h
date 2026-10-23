@@ -4,8 +4,10 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 void PrintString(const std::string& Message);
+std::vector<std::string> GetPrintMessages(uint64_t& AfterSequence);
 
 void SetCurrentThreadRole(ThreadRole Role);
 ThreadRole GetCurrentThreadRole();

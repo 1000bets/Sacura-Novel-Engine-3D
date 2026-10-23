@@ -69,6 +69,13 @@ private:
     RenderResourceManager Resources;
     MeshHandle DefaultMesh;
     MeshHandle PreviewMeshes[3];
+    struct PosedMeshEntry
+    {
+        std::shared_ptr<const StaticMeshResource> Source;
+        MeshHandle Mesh;
+        uint64_t LastFrame = 0;
+    };
+    std::unordered_map<const StaticMeshResource*, PosedMeshEntry> PosedMeshes;
 
     struct PipelineState;
     PipelineState* Pipeline = nullptr;

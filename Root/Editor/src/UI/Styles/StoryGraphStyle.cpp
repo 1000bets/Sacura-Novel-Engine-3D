@@ -109,6 +109,10 @@ void HeaderGlyph(QPainter& Painter, QPointF Center, const StoryGraphNode& Node)
 
 int StoryGraphStyle::OutputCount(const StoryGraphNode& Node)
 {
+    if (Node.KindId == 4)
+    {
+        return static_cast<int>(Node.Choices.size());
+    }
     return Node.KindId == 3 ? 0 : Node.KindId == 1 ? Node.Choices.size() : 1;
 }
 
@@ -124,6 +128,23 @@ StoryGraphStyle::CardLayout StoryGraphStyle::Layout(const StoryGraphNode& Node)
     };
     Result.Header = Row(HeaderHeight);
     Result.Execution = Row(ExecutionHeight);
+    if (Node.KindId == 4)
+    {
+        for (const auto& Exit : Node.Choices)
+        {
+            Result.Choices.push_back(Row(32));
+        }
+        for (const auto& Pin : Node.NarrativeDefinition.Inputs)
+        {
+            Result.DataInputs.push_back(Row(30));
+        }
+        for (const auto& Pin : Node.NarrativeDefinition.Outputs)
+        {
+            Result.DataOutputs.push_back(Row(30));
+        }
+        Result.Height = Y + 10;
+        return Result;
+    }
     if (Node.bStart) { Result.Environment = Row(34); }
     auto EventPhase = [&](int Phase)
     {
@@ -181,6 +202,18 @@ qreal StoryGraphStyle::Height(const StoryGraphNode& Node) { return Layout(Node).
 
 QPointF StoryGraphStyle::OutputAnchor(const StoryGraphNode& Node, int Port, const CardLayout* Geometry)
 {
+    if (Node.KindId == 4)
+    {
+        const auto Measured = Layout(Node);
+        if (Port >= 1000 && Port - 1000 < Measured.DataOutputs.size())
+        {
+            return {NodeWidth + 4, Measured.DataOutputs[Port - 1000].center().y()};
+        }
+        if (Port >= 0 && Port < Measured.Choices.size())
+        {
+            return {NodeWidth + 4, Measured.Choices[Port].center().y()};
+        }
+    }
     if (Node.KindId == 1)
     {
         if (!Geometry)
@@ -283,6 +316,44 @@ void StoryGraphStyle::PaintCard(QPainter& Painter, const StoryGraphNode& Node, c
     Clip.addRoundedRect(Bounds, 7, 7);
     Painter.setClipPath(Clip);
     Painter.fillRect(G.Header, EditorStyle::Color("--border-subtle"));
+    if (Node.KindId == 4)
+    {
+        Label(Painter, G.Header.adjusted(12, 0, -12, 0), Node.Kind, 12, "--text-primary", true);
+        QString Mode = QString::fromUtf8("Действие");
+        if (Node.NarrativeDefinition.bPure)
+        {
+            Mode = QString::fromUtf8("Вычисление значения");
+        }
+        Label(Painter, G.Execution.adjusted(12, 0, -12, 0), Mode, 11, "--text-muted");
+        for (int Index = 0; Index < G.Choices.size(); ++Index)
+        {
+            Label(Painter, G.Choices[Index].adjusted(12, 0, -12, 0), Node.Choices[Index].Label, 12,
+                "--text-primary", false, Qt::AlignRight | Qt::AlignVCenter);
+        }
+        for (int Index = 0; Index < G.DataInputs.size(); ++Index)
+        {
+            const auto& Pin = Node.NarrativeDefinition.Inputs[Index].Property;
+            QString Caption = QString::fromStdString(Pin.Id.Value);
+            if (!Node.NarrativeSources.count(Pin.Id.Value) && Node.NarrativeInputs.contains(Pin.Id.Value))
+            {
+                const auto& Value = Node.NarrativeInputs.at(Pin.Id.Value);
+                if (Value.is_primitive())
+                {
+                    Caption += " = " + QString::fromStdString(Value.dump());
+                }
+            }
+            Label(Painter, G.DataInputs[Index].adjusted(12, 0, -12, 0), Caption, 11, "--accent");
+        }
+        for (int Index = 0; Index < G.DataOutputs.size(); ++Index)
+        {
+            const auto& Pin = Node.NarrativeDefinition.Outputs[Index].Property;
+            Label(Painter, G.DataOutputs[Index].adjusted(12, 0, -12, 0),
+                QString::fromStdString(Pin.Id.Value + " : " + Pin.ValueTypeId.Value), 11,
+                "--accent", false, Qt::AlignRight | Qt::AlignVCenter);
+        }
+        Painter.restore();
+        return;
+    }
     HeaderGlyph(Painter, QPointF(20.5, G.Header.center().y()), Node);
     const qreal KindWidth = QFontMetricsF(Font(10)).horizontalAdvance(Node.Kind);
     Label(Painter, QRectF(36, 1, NodeWidth - 60 - KindWidth, HeaderHeight), Title, 12, "--text-secondary", true);
@@ -329,7 +400,7 @@ void StoryGraphStyle::PaintCard(QPainter& Painter, const StoryGraphNode& Node, c
         Painter.setFont(SpeakerFont);
         Painter.setPen(EditorStyle::Color("--accent"));
         const QString Speaker = IsNarrator(Node.Speaker) ? (Node.KindId == 1 ? QString::fromUtf8("Выбор игрока")
-                                                                         : QString::fromUtf8("Рассказчик")) : Node.Speaker;
+                                                                         : QString::fromUtf8("Рассказчик")) : Node.SpeakerLabel;
         Painter.drawText(G.Speaker, Qt::AlignVCenter,
                          QFontMetricsF(SpeakerFont).elidedText(Speaker, Qt::ElideRight, G.Speaker.width()));
         Painter.setPen(EditorStyle::Color("--text-secondary"));

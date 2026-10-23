@@ -1,3 +1,4 @@
+#include "Prefab/PrefabOverridesPanel.h"
 #include "Shell/EditorMainWindow.h"
 #include "UI/Styles/StudioIcons.h"
 #include "UI/Views/StoryWorkspaceView.h"
@@ -212,6 +213,7 @@ void EditorMainWindow::AddHierarchyItem(QTreeWidgetItem* ParentItem, GameObject*
         Item->setFlags(Item->flags() | Qt::ItemIsEditable | Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled);
     }
 
+    PrefabOverridesPanel::DecorateHierarchyItem(Item, ObjectInstance);
     for (GameObject* Child : ObjectInstance->GetChildren())
     {
         AddHierarchyItem(Item, Child);
@@ -451,6 +453,7 @@ void EditorMainWindow::RefreshSelectionUi()
         }
     }
     const bool bEditableSelection = bHasSelection && !BoundEngine.GetPlaySession().IsSimulating();
+    PrefabPanel->SetTarget(GetHierarchyScene(), Selected, bEditableSelection);
     static_cast<EditorUi::ObjectInspectorView*>(ObjectInspectorContent)->SetEditable(bEditableSelection);
     auto* ObjectView = static_cast<EditorUi::ObjectInspectorView*>(ObjectInspectorContent);
     const QString Kind = !Selected ? QString{} : Selected->GetComponent<CameraComponent>() ? tr("Камера") :
@@ -468,6 +471,15 @@ void EditorMainWindow::RefreshSelectionUi()
         {
             ObjectView->AddComponentType->addItem(QString::fromUtf8(Action->GetDisplayName()),
                 QString::fromStdString(Action->GetClass()->GetTypeId().Value));
+        }
+    }
+    for (Class* ComponentClass : ReflectionSubsystem::Get().GetPublishedCatalog().Classes)
+    {
+        if (ComponentClass->GetOrigin() == ReflectionOrigin::Python && ComponentClass->IsConcrete()
+            && ComponentClass->IsA(TypeId{"engine.ScriptComponent"}))
+        {
+            ObjectView->AddComponentType->addItem(QString::fromStdString(ComponentClass->GetTypeId().Value),
+                QString::fromStdString(ComponentClass->GetTypeId().Value));
         }
     }
     const int PreviousIndex = ObjectView->AddComponentType->findData(PreviousType);
@@ -514,6 +526,7 @@ void EditorMainWindow::RefreshTransformUi()
     GameObject* Selected = GetSelectedGameObject();
     const bool bHasSelection = Selected != nullptr;
     const bool bEditableSelection = bHasSelection && !BoundEngine.GetPlaySession().IsSimulating();
+    PrefabPanel->SetTarget(GetHierarchyScene(), Selected, bEditableSelection);
     auto SetSpinEnabled = [&](QDoubleSpinBox* Spin, double Value)
     {
         if (Spin == nullptr)
@@ -604,6 +617,7 @@ void EditorMainWindow::OnHierarchyContextMenu(const QPoint& Position)
     QMenu* CreateComponentsMenu = Menu.addMenu(QString::fromUtf8("\xD0\x9A\xD0\xBE\xD0\xBC\xD0\xBF\xD0\xBE\xD0\xBD\xD0\xB5\xD0\xBD\xD1\x82\xD1\x8B"));
     PopulateCreateMenus(CreateObjectsMenu, CreateComponentsMenu);
     Menu.addSeparator();
+    Menu.addAction(tr("Создать префаб из выбранного объекта"), this, &EditorMainWindow::CreatePrefabFromSelection);
     Menu.addAction(QString::fromUtf8("Delete Object"), this, &EditorMainWindow::OnDeleteSelectedObject);
     Menu.exec(HierarchyTree->viewport()->mapToGlobal(Position));
 }

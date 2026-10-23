@@ -525,6 +525,10 @@ std::vector<PhysicsDebugLine> PhysicsWorld::GetDebugLines() const
             {
                 continue;
             }
+            if (ComponentInstance->bUseMeshDefaults && !ComponentInstance->PrepareCollisionMesh(World.GetAssetManager()))
+            {
+                continue;
+            }
             PhysicsBodyDefinition Definition;
             std::string Error;
             if (!ComponentInstance->BuildDefinition(Definition, Error))

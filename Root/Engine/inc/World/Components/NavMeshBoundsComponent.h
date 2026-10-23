@@ -6,7 +6,7 @@
 
 class NavMeshBoundsComponent : public Component
 {
-    ENGINE_CLASS(NavMeshBoundsComponent, Component, "engine.NavMeshBoundsComponent", 1)
+    ENGINE_CLASS(NavMeshBoundsComponent, Component, "engine.NavMeshBoundsComponent")
 public:
     Vector3 HalfExtents = Vector3(10.f, 3.f, 10.f);
     ENGINE_REFLECT_FIELD(NavMeshBoundsComponent, HalfExtents, "half_extents", RF_EDITOR_EDITABLE, RF_SERIALIZABLE,

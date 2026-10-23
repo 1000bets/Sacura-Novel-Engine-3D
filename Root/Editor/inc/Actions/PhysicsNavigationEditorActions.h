@@ -9,7 +9,7 @@
 
 class CreatePhysicsBodyObjectAction : public EditorAction
 {
-    ENGINE_CLASS(CreatePhysicsBodyObjectAction, EditorAction, "editor.CreatePhysicsBodyObjectAction", 1)
+    ENGINE_CLASS(CreatePhysicsBodyObjectAction, EditorAction, "editor.CreatePhysicsBodyObjectAction")
 public:
     const char* GetMenuCategory() const override { return ObjectsCategory; }
     const char* GetDisplayName() const override { return "Physics Body"; }
@@ -25,7 +25,7 @@ ENGINE_CLASS_END(CreatePhysicsBodyObjectAction)
 
 class CreateCharacterObjectAction : public EditorAction
 {
-    ENGINE_CLASS(CreateCharacterObjectAction, EditorAction, "editor.CreateCharacterObjectAction", 1)
+    ENGINE_CLASS(CreateCharacterObjectAction, EditorAction, "editor.CreateCharacterObjectAction")
 public:
     const char* GetMenuCategory() const override { return ObjectsCategory; }
     const char* GetDisplayName() const override { return "Character Controller"; }
@@ -41,7 +41,7 @@ ENGINE_CLASS_END(CreateCharacterObjectAction)
 
 class CreateNavMeshBoundsObjectAction : public EditorAction
 {
-    ENGINE_CLASS(CreateNavMeshBoundsObjectAction, EditorAction, "editor.CreateNavMeshBoundsObjectAction", 1)
+    ENGINE_CLASS(CreateNavMeshBoundsObjectAction, EditorAction, "editor.CreateNavMeshBoundsObjectAction")
 public:
     const char* GetMenuCategory() const override { return ObjectsCategory; }
     const char* GetDisplayName() const override { return "NavMesh Bounds Volume"; }
@@ -57,7 +57,7 @@ ENGINE_CLASS_END(CreateNavMeshBoundsObjectAction)
 
 class CreateNavigationModifierObjectAction : public EditorAction
 {
-    ENGINE_CLASS(CreateNavigationModifierObjectAction, EditorAction, "editor.CreateNavigationModifierObjectAction", 1)
+    ENGINE_CLASS(CreateNavigationModifierObjectAction, EditorAction, "editor.CreateNavigationModifierObjectAction")
 public:
     const char* GetMenuCategory() const override { return ObjectsCategory; }
     const char* GetDisplayName() const override { return "Navigation Modifier Volume"; }
@@ -73,7 +73,7 @@ ENGINE_CLASS_END(CreateNavigationModifierObjectAction)
 
 class CreateNavigationLinkObjectAction : public EditorAction
 {
-    ENGINE_CLASS(CreateNavigationLinkObjectAction, EditorAction, "editor.CreateNavigationLinkObjectAction", 1)
+    ENGINE_CLASS(CreateNavigationLinkObjectAction, EditorAction, "editor.CreateNavigationLinkObjectAction")
 public:
     const char* GetMenuCategory() const override { return ObjectsCategory; }
     const char* GetDisplayName() const override { return "Navigation Link"; }
@@ -89,7 +89,7 @@ ENGINE_CLASS_END(CreateNavigationLinkObjectAction)
 
 class AddPhysicsBodyComponentAction : public EditorAction
 {
-    ENGINE_CLASS(AddPhysicsBodyComponentAction, EditorAction, "editor.AddPhysicsBodyComponentAction", 1)
+    ENGINE_CLASS(AddPhysicsBodyComponentAction, EditorAction, "editor.AddPhysicsBodyComponentAction")
 public:
     const char* GetMenuCategory() const override { return ComponentsCategory; }
     const char* GetDisplayName() const override { return "Physics Body Component"; }
@@ -106,7 +106,7 @@ ENGINE_CLASS_END(AddPhysicsBodyComponentAction)
 
 class AddCharacterControllerComponentAction : public EditorAction
 {
-    ENGINE_CLASS(AddCharacterControllerComponentAction, EditorAction, "editor.AddCharacterControllerComponentAction", 1)
+    ENGINE_CLASS(AddCharacterControllerComponentAction, EditorAction, "editor.AddCharacterControllerComponentAction")
 public:
     const char* GetMenuCategory() const override { return ComponentsCategory; }
     const char* GetDisplayName() const override { return "Character Controller Component"; }
@@ -123,7 +123,7 @@ ENGINE_CLASS_END(AddCharacterControllerComponentAction)
 
 class AddNavMeshBoundsComponentAction : public EditorAction
 {
-    ENGINE_CLASS(AddNavMeshBoundsComponentAction, EditorAction, "editor.AddNavMeshBoundsComponentAction", 1)
+    ENGINE_CLASS(AddNavMeshBoundsComponentAction, EditorAction, "editor.AddNavMeshBoundsComponentAction")
 public:
     const char* GetMenuCategory() const override { return ComponentsCategory; }
     const char* GetDisplayName() const override { return "NavMesh Bounds Component"; }
@@ -140,7 +140,7 @@ ENGINE_CLASS_END(AddNavMeshBoundsComponentAction)
 
 class AddNavigationModifierComponentAction : public EditorAction
 {
-    ENGINE_CLASS(AddNavigationModifierComponentAction, EditorAction, "editor.AddNavigationModifierComponentAction", 1)
+    ENGINE_CLASS(AddNavigationModifierComponentAction, EditorAction, "editor.AddNavigationModifierComponentAction")
 public:
     const char* GetMenuCategory() const override { return ComponentsCategory; }
     const char* GetDisplayName() const override { return "Navigation Modifier Component"; }
@@ -157,7 +157,7 @@ ENGINE_CLASS_END(AddNavigationModifierComponentAction)
 
 class AddNavigationLinkComponentAction : public EditorAction
 {
-    ENGINE_CLASS(AddNavigationLinkComponentAction, EditorAction, "editor.AddNavigationLinkComponentAction", 1)
+    ENGINE_CLASS(AddNavigationLinkComponentAction, EditorAction, "editor.AddNavigationLinkComponentAction")
 public:
     const char* GetMenuCategory() const override { return ComponentsCategory; }
     const char* GetDisplayName() const override { return "Navigation Link Component"; }
@@ -174,7 +174,7 @@ ENGINE_CLASS_END(AddNavigationLinkComponentAction)
 
 class AddNavigationAgentComponentAction : public EditorAction
 {
-    ENGINE_CLASS(AddNavigationAgentComponentAction, EditorAction, "editor.AddNavigationAgentComponentAction", 1)
+    ENGINE_CLASS(AddNavigationAgentComponentAction, EditorAction, "editor.AddNavigationAgentComponentAction")
 public:
     const char* GetMenuCategory() const override { return ComponentsCategory; }
     const char* GetDisplayName() const override { return "Navigation Agent Component"; }

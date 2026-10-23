@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ISystem.h"
+#include "Input/InputSession.h"
 #include "Authoring/OperationRegistry.h"
 #include "Rendering/Assets/AssetGpuUploader.h"
 #include "Assets/AssetManager.h"
@@ -62,6 +63,7 @@ public:
     const std::filesystem::path& GetScriptsRoot() const { return ScriptsRoot; }
 
     AssetDiagnostic LoadProjectContent(const ProjectDescriptor& Descriptor);
+    const std::filesystem::path& GetProjectFile() const { return OpenProjectFile; }
     const std::vector<AssetDiagnostic>& GetProjectDiagnostics() const { return ProjectDiagnostics; }
     const std::string& GetInitializationError() const { return InitializationError; }
     void UnloadProjectContent();
@@ -74,6 +76,10 @@ public:
     Scene* GetActiveScene() const;
     Scene* GetEditScene() const { return OwnedScene.get(); }
     bool StartGame();
+    InputSession* GetInputSession() const { return PlayerInput.get(); }
+    bool BeginInputSession();
+    void SetGamePaused(bool bPaused);
+    bool IsGamePaused() const { return bGamePaused; }
     bool PrepareSceneMaterials(Scene& World);
     bool PrepareSceneSimulation(Scene& World);
     void RegisterMaterialWidgetBinding(const std::shared_ptr<MaterialWidgetBinding>& Binding);
@@ -81,6 +87,7 @@ public:
     void StopGame();
     StoryRuntime& GetStoryRuntime() { return Story; }
     void SetStartupStory(const std::filesystem::path& StoryPath) { StartupStory = StoryPath; }
+    const std::filesystem::path& GetStartupStory() const { return StartupStory; }
     void SetEditorRenderCamera(const RenderCamera& Camera);
     void UseGameRenderCamera();
     void ResizePresentation(uint32_t Width, uint32_t Height, bool bInteractive = false);
@@ -88,6 +95,7 @@ public:
     void UnregisterRenderSurface(RenderSurfaceId Surface);
     void ResizeRenderSurface(RenderSurfaceId Surface, uint32_t Width, uint32_t Height, bool bInteractive = false);
     void ConfigureRenderSurface(RenderSurfaceId Surface, bool bEditScene, const RenderCamera& Camera, const RenderSettings& Settings = {});
+    void SetRenderSurfaceScene(RenderSurfaceId Surface, Scene* World) { Presentation.SetScene(Surface, World); }
     void SetRenderSurfaceImGuiOverlay(RenderSurfaceId Surface, ImGuiOverlaySnapshot Overlay);
     RenderStatistics GetRenderStatistics(RenderSurfaceId Surface) const { return Render.GetStatistics(Surface); }
     bool IsInitialized() const { return bInitialized; }
@@ -118,6 +126,7 @@ private:
     GraphicsBackend PreferredBackend = GraphicsBackend::Auto;
     std::string ShaderDirectory;
     std::filesystem::path ContentRoot;
+    std::filesystem::path OpenProjectFile;
     std::filesystem::path ScriptsRoot;
     std::vector<AssetDiagnostic> ProjectDiagnostics;
     std::string InitializationError;
@@ -136,6 +145,8 @@ private:
     StoryRuntime Story;
     std::filesystem::path StartupStory;
     bool bGameRunning = false;
+    bool bGamePaused = false;
+    std::shared_ptr<InputSession> PlayerInput;
     float MaterialTime = 0.f;
     std::vector<std::weak_ptr<MaterialWidgetBinding>> MaterialWidgetBindings;
 };

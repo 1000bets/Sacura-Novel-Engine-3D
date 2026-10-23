@@ -22,6 +22,10 @@ public:
     uint32_t GetGeneration() const { return m_Generation; }
     ObjectHandle GetObjectHandle() const { return ObjectHandle{m_ObjectID, m_Generation}; }
 
+    const std::string& GetPrefabInstanceId() const { return PrefabInstanceId; }
+    void SetPrefabInstanceId(const std::string& Value) { PrefabInstanceId = Value; }
+    bool IsOwnedByPrefabInstance() const { return !PrefabInstanceId.empty(); }
+
     const std::string& GetPersistentId() const { return PersistentId; }
 
     const std::string& GetName() const { return m_Name; }
@@ -52,6 +56,8 @@ protected:
 
 private:
     friend class SceneSerializer;
+    friend class PrefabSceneBuilder;
+    std::string PrefabInstanceId;
     std::string PersistentId;
     static std::atomic<ObjectID> s_NextID;
     static ObjectID GenerateID();

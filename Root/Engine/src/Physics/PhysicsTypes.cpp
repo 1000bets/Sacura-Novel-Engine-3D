@@ -11,6 +11,32 @@ static bool IsFinitePhysicsVector(const Vector3& Value)
 bool ValidatePhysicsBody(const PhysicsBodyDefinition& Definition, std::string& Error)
 {
     Error.clear();
+    if (!Definition.Shapes.empty())
+    {
+        if (Definition.MotionType == PhysicsMotionType::Character)
+        {
+            Error = "Character controllers do not support compound collision";
+            return false;
+        }
+        auto Element = Definition;
+        Element.Shapes.clear();
+        for (const auto& Shape : Definition.Shapes)
+        {
+            static_cast<PhysicsShapeDefinition&>(Element) = Shape;
+            if (!ValidatePhysicsBody(Element, Error))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+    const auto& ShapeRotation = Definition.ShapeRotation;
+    if (!std::isfinite(ShapeRotation.x) || !std::isfinite(ShapeRotation.y) || !std::isfinite(ShapeRotation.z)
+        || !std::isfinite(ShapeRotation.w) || ShapeRotation.LengthSquared() < 0.000001f)
+    {
+        Error = "Collision element rotation is invalid";
+        return false;
+    }
     if (Definition.MotionType < PhysicsMotionType::Static || Definition.MotionType > PhysicsMotionType::Character
         || Definition.ShapeType < PhysicsShapeType::Box || Definition.ShapeType > PhysicsShapeType::TriangleMesh)
     {
@@ -56,7 +82,7 @@ bool ValidatePhysicsBody(const PhysicsBodyDefinition& Definition, std::string& E
     }
     if (Definition.MotionType == PhysicsMotionType::Character
         && (Definition.ShapeType != PhysicsShapeType::Capsule || Definition.bTrigger || !Definition.bSimulationEnabled
-            || Definition.Center != Vector3::Zero
+            || Definition.Center != Vector3::Zero || Definition.ShapeRotation != Quaternion::Identity
             || !std::isfinite(Definition.StepHeight) || Definition.StepHeight < 0.f
             || Definition.StepHeight >= 2.f * (Definition.CapsuleHalfHeight + Definition.Radius)
             || !std::isfinite(Definition.MaximumSlopeDegrees) || Definition.MaximumSlopeDegrees < 0.f
@@ -107,6 +133,23 @@ bool ValidatePhysicsBody(const PhysicsBodyDefinition& Definition, std::string& E
 PhysicsTriangleMesh MakePhysicsTriangleMesh(const PhysicsBodyDefinition& Definition)
 {
     PhysicsTriangleMesh Mesh;
+    if (!Definition.Shapes.empty())
+    {
+        auto Element = Definition;
+        Element.Shapes.clear();
+        for (const auto& Shape : Definition.Shapes)
+        {
+            static_cast<PhysicsShapeDefinition&>(Element) = Shape;
+            const auto Part = MakePhysicsTriangleMesh(Element);
+            const auto Offset = static_cast<uint32_t>(Mesh.Vertices.size());
+            Mesh.Vertices.insert(Mesh.Vertices.end(), Part.Vertices.begin(), Part.Vertices.end());
+            for (uint32_t Index : Part.Indices)
+            {
+                Mesh.Indices.push_back(Offset + Index);
+            }
+        }
+        return Mesh;
+    }
     if (Definition.ShapeType == PhysicsShapeType::TriangleMesh)
     {
         Mesh = Definition.TriangleMesh;
@@ -172,9 +215,11 @@ PhysicsTriangleMesh MakePhysicsTriangleMesh(const PhysicsBodyDefinition& Definit
     }
     Quaternion Rotation = Definition.WorldTransform.Rotation;
     Rotation.Normalize();
+    auto ShapeRotation = Definition.ShapeRotation;
+    ShapeRotation.Normalize();
     for (Vector3& Vertex : Mesh.Vertices)
     {
-        Vertex = Vector3::Transform(Vertex + Definition.Center, Rotation) + Definition.WorldTransform.Position;
+        Vertex = Vector3::Transform(Vector3::Transform(Vertex, ShapeRotation) + Definition.Center, Rotation) + Definition.WorldTransform.Position;
     }
     return Mesh;
 }

@@ -8,8 +8,12 @@
 
 AssetRegistry::AssetRegistry()
 {
+    RegisterAssetType({CharacterAssetType, "Character", {".character"}, true});
+    RegisterAssetType({PrefabAssetType, "Prefab", {".prefab"}, true});
     RegisterAssetType({SceneAssetType, "Scene", {".scene"}, true});
     RegisterAssetType({StoryAssetType, "Story", {".story"}, true});
+    RegisterAssetType({InputActionAssetType, "Input Action", {".inputaction"}, true});
+    RegisterAssetType({InputMappingContextAssetType, "Input Mapping Context", {".inputcontext"}, true});
     RegisterAssetType({AssetType{"WidgetLibrary"}, "UI Widgets", {".widgets"}, true});
     RegisterAssetType({ModelAssetType, "Model", {".glb"}, false});
     RegisterAssetType({TextureAssetType, "Texture", {".png", ".jpg", ".jpeg"}, true});
@@ -19,7 +23,7 @@ AssetRegistry::AssetRegistry()
     RegisterAssetType({StaticMeshAssetType, "Static Mesh", {}, true});
     RegisterAssetType({SkeletalMeshAssetType, "Skeletal Mesh", {}, true});
     RegisterAssetType({SkeletonAssetType, "Skeleton", {}, true});
-    RegisterAssetType({AnimationClipAssetType, "Animation Clip", {}, true});
+    RegisterAssetType({AnimationClipAssetType, "Animation Clip", {".animation"}, true});
     RegisterAssetType({SkinBindingAssetType, "Skin Binding", {}, false});
 }
 
@@ -547,6 +551,33 @@ AssetDiagnostic AssetRegistry::UpdateSourceFingerprint(const AssetId& Id, Conten
         {
             return Diagnostic;
         }
+    }
+    Found->second.Metadata = std::move(Metadata);
+    return AssetDiagnostic::Ok();
+}
+
+AssetDiagnostic AssetRegistry::UpdateLoadSettings(const AssetId& Id, const nlohmann::json& Settings, const nlohmann::json& ExpectedSettings)
+{
+    AssertGameThread();
+    auto Found = EntriesById.find(Id);
+    if (Found == EntriesById.end() || Found->second.Mount != AssetMount::Game)
+    {
+        return AssetDiagnostic::Fail(AssetErrorCode::InvalidData, "AssetRegistry", "Only project assets can be edited", {Id});
+    }
+    AssetMetadata Metadata;
+    AssetDiagnostic Diagnostic;
+    if (!AssetMetadataIO::TryLoadFromFile(Found->second.AbsoluteMetaPath, Metadata, Diagnostic))
+    {
+        return Diagnostic;
+    }
+    if (Metadata.Guid != Id || Metadata.LoadSettings != ExpectedSettings)
+    {
+        return AssetDiagnostic::Fail(AssetErrorCode::AssetChanged, "AssetRegistry", "Metadata changed externally; reload before saving", {Id});
+    }
+    Metadata.LoadSettings = Settings;
+    if (!AssetMetadataIO::TrySaveToFile(Found->second.AbsoluteMetaPath, Metadata, Diagnostic))
+    {
+        return Diagnostic;
     }
     Found->second.Metadata = std::move(Metadata);
     return AssetDiagnostic::Ok();

@@ -23,5 +23,11 @@ extern std::unique_ptr<py::scoped_interpreter> EmbeddedInterpreter;
 extern std::deque<std::string> OwnedAttributeStrings;
 py::object FindRegisteredPythonType(const std::string& TypeIdString);
 void ClearRegisteredPythonTypes();
+void ClearNarrativeBindings();
+void RegisterNarrativeBindings(py::module_& Module);
+const char* InternAttributeString(const std::string& Text);
+TypeId ResolvePythonValueTypeId(const py::object& TypeObject);
+ReflectedValue PythonToReflected(const py::object& Value, const TypeId& ValueTypeId);
+py::object ReflectedToPython(const ReflectedValue& Value);
 void RegisterPhysicsNavigationBindings(py::module_& Module);
 #endif

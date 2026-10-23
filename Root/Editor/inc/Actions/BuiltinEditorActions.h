@@ -1,3 +1,5 @@
+#include "World/Components/SkySphereComponent.h"
+#include "World/Components/SkyLightComponent.h"
 #pragma once
 
 #include "Actions/EditorAction.h"
@@ -11,7 +13,7 @@
 
 class CreateEmptyObjectAction : public EditorAction
 {
-    ENGINE_CLASS(CreateEmptyObjectAction, EditorAction, "editor.CreateEmptyObjectAction", 1)
+    ENGINE_CLASS(CreateEmptyObjectAction, EditorAction, "editor.CreateEmptyObjectAction")
 
 public:
     const char* GetMenuCategory() const override { return ObjectsCategory; }
@@ -48,7 +50,7 @@ ENGINE_CLASS_END(CreateEmptyObjectAction)
 
 class CreateCameraObjectAction : public EditorAction
 {
-    ENGINE_CLASS(CreateCameraObjectAction, EditorAction, "editor.CreateCameraObjectAction", 1)
+    ENGINE_CLASS(CreateCameraObjectAction, EditorAction, "editor.CreateCameraObjectAction")
 
 public:
     const char* GetMenuCategory() const override { return ObjectsCategory; }
@@ -71,7 +73,7 @@ ENGINE_CLASS_END(CreateCameraObjectAction)
 
 class CreateStaticMeshObjectAction : public EditorAction
 {
-    ENGINE_CLASS(CreateStaticMeshObjectAction, EditorAction, "editor.CreateStaticMeshObjectAction", 1)
+    ENGINE_CLASS(CreateStaticMeshObjectAction, EditorAction, "editor.CreateStaticMeshObjectAction")
 
 public:
     const char* GetMenuCategory() const override { return ObjectsCategory; }
@@ -94,7 +96,7 @@ ENGINE_CLASS_END(CreateStaticMeshObjectAction)
 
 class CreateDirectionalLightObjectAction : public EditorAction
 {
-    ENGINE_CLASS(CreateDirectionalLightObjectAction, EditorAction, "editor.CreateDirectionalLightObjectAction", 1)
+    ENGINE_CLASS(CreateDirectionalLightObjectAction, EditorAction, "editor.CreateDirectionalLightObjectAction")
 
 public:
     const char* GetMenuCategory() const override { return ObjectsCategory; }
@@ -119,7 +121,7 @@ ENGINE_CLASS_END(CreateDirectionalLightObjectAction)
 
 class CreatePointLightObjectAction : public EditorAction
 {
-    ENGINE_CLASS(CreatePointLightObjectAction, EditorAction, "editor.CreatePointLightObjectAction", 1)
+    ENGINE_CLASS(CreatePointLightObjectAction, EditorAction, "editor.CreatePointLightObjectAction")
 
 public:
     const char* GetMenuCategory() const override { return ObjectsCategory; }
@@ -144,7 +146,7 @@ ENGINE_CLASS_END(CreatePointLightObjectAction)
 
 class CreateSpotLightObjectAction : public EditorAction
 {
-    ENGINE_CLASS(CreateSpotLightObjectAction, EditorAction, "editor.CreateSpotLightObjectAction", 1)
+    ENGINE_CLASS(CreateSpotLightObjectAction, EditorAction, "editor.CreateSpotLightObjectAction")
 
 public:
     const char* GetMenuCategory() const override { return ObjectsCategory; }
@@ -169,7 +171,7 @@ ENGINE_CLASS_END(CreateSpotLightObjectAction)
 
 class AddCameraComponentAction : public EditorAction
 {
-    ENGINE_CLASS(AddCameraComponentAction, EditorAction, "editor.AddCameraComponentAction", 1)
+    ENGINE_CLASS(AddCameraComponentAction, EditorAction, "editor.AddCameraComponentAction")
 
 public:
     const char* GetMenuCategory() const override { return ComponentsCategory; }
@@ -190,7 +192,7 @@ ENGINE_CLASS_END(AddCameraComponentAction)
 
 class AddLightComponentAction : public EditorAction
 {
-    ENGINE_CLASS(AddLightComponentAction, EditorAction, "editor.AddLightComponentAction", 1)
+    ENGINE_CLASS(AddLightComponentAction, EditorAction, "editor.AddLightComponentAction")
 
 public:
     const char* GetMenuCategory() const override { return ComponentsCategory; }
@@ -211,7 +213,7 @@ ENGINE_CLASS_END(AddLightComponentAction)
 
 class AddMeshRendererComponentAction : public EditorAction
 {
-    ENGINE_CLASS(AddMeshRendererComponentAction, EditorAction, "editor.AddMeshRendererComponentAction", 1)
+    ENGINE_CLASS(AddMeshRendererComponentAction, EditorAction, "editor.AddMeshRendererComponentAction")
 
 public:
     const char* GetMenuCategory() const override { return ComponentsCategory; }
@@ -232,7 +234,7 @@ ENGINE_CLASS_END(AddMeshRendererComponentAction)
 
 class AddArrowComponentAction : public EditorAction
 {
-    ENGINE_CLASS(AddArrowComponentAction, EditorAction, "editor.AddArrowComponentAction", 1)
+    ENGINE_CLASS(AddArrowComponentAction, EditorAction, "editor.AddArrowComponentAction")
 
 public:
     const char* GetMenuCategory() const override { return ComponentsCategory; }
@@ -250,3 +252,35 @@ protected:
 };
 
 ENGINE_CLASS_END(AddArrowComponentAction)
+
+class CreateSkySphereObjectAction : public EditorAction
+{
+    ENGINE_CLASS(CreateSkySphereObjectAction, EditorAction, "editor.CreateSkySphereObjectAction")
+public:
+    const char* GetMenuCategory() const override { return ObjectsCategory; }
+    const char* GetDisplayName() const override { return "SkySphere"; }
+    int GetSortOrder() const override { return 130; }
+    bool Execute(EditorActionContext& Context) const override
+    {
+        return CreateObjectWithComponent(Context, "SkySphere", TypeId{SkySphereComponent::StaticReflectionTypeId()});
+    }
+protected:
+    CreateSkySphereObjectAction() = default;
+};
+ENGINE_CLASS_END(CreateSkySphereObjectAction)
+
+class CreateSkyLightObjectAction : public EditorAction
+{
+    ENGINE_CLASS(CreateSkyLightObjectAction, EditorAction, "editor.CreateSkyLightObjectAction")
+public:
+    const char* GetMenuCategory() const override { return ObjectsCategory; }
+    const char* GetDisplayName() const override { return "SkyLight"; }
+    int GetSortOrder() const override { return 130; }
+    bool Execute(EditorActionContext& Context) const override
+    {
+        return CreateObjectWithComponent(Context, "SkyLight", TypeId{SkyLightComponent::StaticReflectionTypeId()});
+    }
+protected:
+    CreateSkyLightObjectAction() = default;
+};
+ENGINE_CLASS_END(CreateSkyLightObjectAction)

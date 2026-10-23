@@ -27,7 +27,7 @@ struct StoryGraphStyle
         struct EventRow { QRectF Rect; QString Binding; };
         struct BatchRow { QRectF Order; QString Identity; int Phase = 1; bool bParallel = false; QVector<EventRow> Events; };
         QRectF Header, Execution, Environment, Before, Dialogue, Speaker, Text, During, Input, After;
-        QVector<QRectF> Actions, Choices;
+        QVector<QRectF> Actions, Choices, DataInputs, DataOutputs;
         QVector<BatchRow> Batches;
         qreal Height = 0;
     };
