@@ -112,7 +112,7 @@ bool StoryGraphDocument::EditStaging(const char* Label, const std::function<bool
 }
 
 bool StoryGraphDocument::AddEvent(const StoryNodeId& Node, StoryEventPhase Phase, const std::string& SourceEvent,
-                                  std::string& Binding, std::string& Error, const std::string& BatchId)
+                                  std::string& Binding, std::string& Error, const std::string& BatchId, StoryActionKind InitialKind)
 {
     const auto Created = NewId();
     const bool Applied = EditStaging(
@@ -131,6 +131,10 @@ bool StoryGraphDocument::AddEvent(const StoryNodeId& Node, StoryEventPhase Phase
                 Event.Id = EventId = NewId();
                 Event.Name = "Новое событие";
                 StoryActionDefinition Action;
+                Action.Kind = InitialKind;
+                if (InitialKind == StoryActionKind::MoveTo) Event.Name = "Перемещение объекта";
+                if (InitialKind == StoryActionKind::CameraCut) Event.Name = "Переход камеры";
+                if (InitialKind == StoryActionKind::NavigateTo) Event.Name = "Движение по навигации";
                 Action.Id = NewId();
                 Action.DurationSeconds = 1;
                 Event.Groups.push_back({NewId(), "Основное действие", {Action}});

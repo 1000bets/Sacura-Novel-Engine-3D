@@ -23,7 +23,8 @@ struct TriangleMeshData
     bool bHasTexCoords = false;
 };
 
-bool TryBuildTriangleMesh(const ufbx_mesh* Mesh, TriangleMeshData& OutMesh, ImportResult& Result)
+bool TryBuildTriangleMesh(const ufbx_mesh* Mesh, const ufbx_node* Node,
+    TriangleMeshData& OutMesh, ImportResult& Result)
 {
     if (Mesh == nullptr)
     {
@@ -34,15 +35,17 @@ bool TryBuildTriangleMesh(const ufbx_mesh* Mesh, TriangleMeshData& OutMesh, Impo
         return false;
     }
 
-    if (Mesh->skin_deformers.count > 0)
-    {
-        Result.Diagnostic = AssetDiagnostic::Fail(
-            AssetErrorCode::UnsupportedFeature,
-            "FbxToGlbConverter",
-            "Skinning is not supported in FBX→GLB conversion");
-        return false;
-    }
-
+    // Bake the evaluated rest pose into one static mesh. The C++ viewport does not
+    // render skeletal meshes yet, but it can display their posed geometry.
+    const ufbx_vertex_vec3* Positions = Mesh->skinned_position.exists
+        ? &Mesh->skinned_position : &Mesh->vertex_position;
+    const ufbx_vertex_vec3* Normals = Mesh->skinned_normal.exists
+        ? &Mesh->skinned_normal : &Mesh->vertex_normal;
+    const bool bLocal = Node != nullptr && (!Mesh->skinned_position.exists || Mesh->skinned_is_local);
+    const ufbx_matrix NormalToWorld = bLocal
+        ? ufbx_matrix_for_normals(&Node->geometry_to_world) : ufbx_matrix{};
+    OutMesh.bHasNormals = Normals->exists;
+    OutMesh.bHasTexCoords = Mesh->vertex_uv.exists;
     std::vector<uint32_t> TriIndices;
     TriIndices.reserve(Mesh->max_face_triangles * 3);
 
@@ -66,27 +69,23 @@ bool TryBuildTriangleMesh(const ufbx_mesh* Mesh, TriangleMeshData& OutMesh, Impo
             for (uint32_t Corner = 0; Corner < 3; ++Corner)
             {
                 const uint32_t Index = TriIndices[Triangle * 3 + Corner];
-                const ufbx_vec3 Position = ufbx_get_vertex_vec3(&Mesh->vertex_position, Index);
+                ufbx_vec3 Position = ufbx_get_vertex_vec3(Positions, Index);
+                if (bLocal) Position = ufbx_transform_position(&Node->geometry_to_world, Position);
                 OutMesh.Positions.push_back(static_cast<float>(Position.x));
                 OutMesh.Positions.push_back(static_cast<float>(Position.y));
                 OutMesh.Positions.push_back(static_cast<float>(Position.z));
 
-                if (Mesh->vertex_normal.exists)
-                {
-                    const ufbx_vec3 Normal = ufbx_get_vertex_vec3(&Mesh->vertex_normal, Index);
-                    OutMesh.Normals.push_back(static_cast<float>(Normal.x));
-                    OutMesh.Normals.push_back(static_cast<float>(Normal.y));
-                    OutMesh.Normals.push_back(static_cast<float>(Normal.z));
-                    OutMesh.bHasNormals = true;
-                }
+                ufbx_vec3 Normal = Normals->exists
+                    ? ufbx_get_vertex_vec3(Normals, Index) : ufbx_vec3{0.0, 1.0, 0.0};
+                if (bLocal) Normal = ufbx_transform_direction(&NormalToWorld, Normal);
+                OutMesh.Normals.push_back(static_cast<float>(Normal.x));
+                OutMesh.Normals.push_back(static_cast<float>(Normal.y));
+                OutMesh.Normals.push_back(static_cast<float>(Normal.z));
 
-                if (Mesh->vertex_uv.exists)
-                {
-                    const ufbx_vec2 TexCoord = ufbx_get_vertex_vec2(&Mesh->vertex_uv, Index);
-                    OutMesh.TexCoords.push_back(static_cast<float>(TexCoord.x));
-                    OutMesh.TexCoords.push_back(static_cast<float>(TexCoord.y));
-                    OutMesh.bHasTexCoords = true;
-                }
+                const ufbx_vec2 TexCoord = Mesh->vertex_uv.exists
+                    ? ufbx_get_vertex_vec2(&Mesh->vertex_uv, Index) : ufbx_vec2{};
+                OutMesh.TexCoords.push_back(static_cast<float>(TexCoord.x));
+                OutMesh.TexCoords.push_back(static_cast<float>(TexCoord.y));
 
                 OutMesh.Indices.push_back(static_cast<uint32_t>(OutMesh.Indices.size()));
             }
@@ -141,6 +140,9 @@ ImportResult FbxToGlbConverter::Convert(
 
     ufbx_load_opts Options{};
     Options.generate_missing_normals = bGenerateMissingNormals;
+    Options.evaluate_skinning = true;
+    Options.target_axes = ufbx_axes_right_handed_y_up;
+    Options.target_unit_meters = 1.0;
     ufbx_error Error{};
     ufbx_scene* Scene = ufbx_load_file(SourceFbxPath.string().c_str(), &Options, &Error);
     if (Scene == nullptr)
@@ -152,33 +154,6 @@ ImportResult FbxToGlbConverter::Convert(
             {},
             SourceFbxPath.string());
         return Result;
-    }
-
-    if (Scene->anim_stacks.count > 0 || Scene->anim_layers.count > 0)
-    {
-        ufbx_free_scene(Scene);
-        Result.Diagnostic = AssetDiagnostic::Fail(
-            AssetErrorCode::UnsupportedFeature,
-            "FbxToGlbConverter",
-            "Animation is not supported in FBX→GLB conversion",
-            {},
-            SourceFbxPath.string());
-        return Result;
-    }
-
-    for (size_t MeshIndex = 0; MeshIndex < Scene->meshes.count; ++MeshIndex)
-    {
-        if (Scene->meshes[MeshIndex]->skin_deformers.count > 0)
-        {
-            ufbx_free_scene(Scene);
-            Result.Diagnostic = AssetDiagnostic::Fail(
-                AssetErrorCode::UnsupportedFeature,
-                "FbxToGlbConverter",
-                "Skinning is not supported in FBX→GLB conversion",
-                {},
-                SourceFbxPath.string());
-            return Result;
-        }
     }
 
     if (Scene->meshes.count == 0)
@@ -196,22 +171,29 @@ ImportResult FbxToGlbConverter::Convert(
     TriangleMeshData Combined{};
     for (size_t MeshIndex = 0; MeshIndex < Scene->meshes.count; ++MeshIndex)
     {
-        TriangleMeshData Part{};
-        if (!TryBuildTriangleMesh(Scene->meshes[MeshIndex], Part, Result))
+        const ufbx_mesh* SourceMesh = Scene->meshes[MeshIndex];
+        const size_t InstanceCount = SourceMesh->instances.count > 0 ? SourceMesh->instances.count : 1;
+        for (size_t InstanceIndex = 0; InstanceIndex < InstanceCount; ++InstanceIndex)
         {
-            ufbx_free_scene(Scene);
-            return Result;
-        }
+            const ufbx_node* Node = SourceMesh->instances.count > 0
+                ? SourceMesh->instances[InstanceIndex] : nullptr;
+            TriangleMeshData Part{};
+            if (!TryBuildTriangleMesh(SourceMesh, Node, Part, Result))
+            {
+                ufbx_free_scene(Scene);
+                return Result;
+            }
 
-        const uint32_t VertexOffset = static_cast<uint32_t>(Combined.Positions.size() / 3);
-        Combined.Positions.insert(Combined.Positions.end(), Part.Positions.begin(), Part.Positions.end());
-        Combined.Normals.insert(Combined.Normals.end(), Part.Normals.begin(), Part.Normals.end());
-        Combined.TexCoords.insert(Combined.TexCoords.end(), Part.TexCoords.begin(), Part.TexCoords.end());
-        Combined.bHasNormals = Combined.bHasNormals || Part.bHasNormals;
-        Combined.bHasTexCoords = Combined.bHasTexCoords || Part.bHasTexCoords;
-        for (uint32_t IndexValue : Part.Indices)
-        {
-            Combined.Indices.push_back(IndexValue + VertexOffset);
+            const uint32_t VertexOffset = static_cast<uint32_t>(Combined.Positions.size() / 3);
+            Combined.Positions.insert(Combined.Positions.end(), Part.Positions.begin(), Part.Positions.end());
+            Combined.Normals.insert(Combined.Normals.end(), Part.Normals.begin(), Part.Normals.end());
+            Combined.TexCoords.insert(Combined.TexCoords.end(), Part.TexCoords.begin(), Part.TexCoords.end());
+            Combined.bHasNormals = Combined.bHasNormals || Part.bHasNormals;
+            Combined.bHasTexCoords = Combined.bHasTexCoords || Part.bHasTexCoords;
+            for (uint32_t IndexValue : Part.Indices)
+            {
+                Combined.Indices.push_back(IndexValue + VertexOffset);
+            }
         }
     }
 

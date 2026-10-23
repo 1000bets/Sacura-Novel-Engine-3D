@@ -3,6 +3,16 @@
 # ---------------------------------------------------------------
 add_subdirectory(ThirdParty)
 
+# Diligent exports /GR- in Release through its INTERFACE build settings. Sacura
+# uses dynamic_cast for generation-checked objects, reflection and scene IO.
+# Keep RTTI enabled throughout consumers (including generated Qt MOC sources).
+# Override dependency integration here; never edit the fetched source tree.
+if(MSVC AND TARGET Diligent-BuildSettings)
+    get_target_property(SakuraDiligentOptions Diligent-BuildSettings INTERFACE_COMPILE_OPTIONS)
+    string(REPLACE "/GR-" "/GR" SakuraDiligentOptions "${SakuraDiligentOptions}")
+    set_property(TARGET Diligent-BuildSettings PROPERTY INTERFACE_COMPILE_OPTIONS "${SakuraDiligentOptions}")
+endif()
+
 # ---------------------------------------------------------------
 # Engine library (explicit sources РІР‚вЂќ do not use file(GLOB) for compilation units)
 # ---------------------------------------------------------------
@@ -79,6 +89,7 @@ set(ENGINE_SRC
     src/Platform/WindowSubsystem.cpp
     src/Project/ProjectDescriptor.cpp
     src/Project/ProjectGenerator.cpp
+    src/Project/ProjectTemplateContent.cpp
     src/Project/ProjectPaths.cpp
     src/Project/ProjectSession.cpp
     src/Reflection/Class.cpp
@@ -91,6 +102,7 @@ set(ENGINE_SRC
     src/Reflection/ReflectionSubsystem.cpp
     src/Rendering/RHI/RenderDevice.cpp
     src/Rendering/RHI/Renderer.cpp
+    src/Rendering/RHI/SharedFrameExporter.cpp
     src/Rendering/RHI/ImGuiOverlayPass.cpp
     src/Rendering/RHI/EnvironmentLighting.cpp
     src/Rendering/PresentationController.cpp

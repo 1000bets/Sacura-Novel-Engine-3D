@@ -29,6 +29,7 @@ void ForceTouchRegistrars()
     (void)ArrowComponent::StaticReflectionTypeId();
     (void)&ArrowComponent::s_ReflectionClassRegistrar;
     (void)LightComponent::StaticReflectionTypeId();
+    (void)CharacterComponent::StaticReflectionTypeId();
     (void)MeshRendererComponent::StaticReflectionTypeId();
     (void)ScriptComponent::StaticReflectionTypeId();
     (void)LightSettings::StaticReflectionTypeId();

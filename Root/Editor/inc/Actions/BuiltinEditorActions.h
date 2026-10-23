@@ -217,7 +217,7 @@ class AddMeshRendererComponentAction : public EditorAction
 
 public:
     const char* GetMenuCategory() const override { return ComponentsCategory; }
-    const char* GetDisplayName() const override { return "Mesh Renderer Component"; }
+    const char* GetDisplayName() const override { return "Static Mesh"; }
     int GetSortOrder() const override { return 20; }
     bool RequiresSelection() const override { return true; }
 

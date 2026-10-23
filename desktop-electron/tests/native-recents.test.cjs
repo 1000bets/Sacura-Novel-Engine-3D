@@ -1,0 +1,20 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs/promises');
+const os=require('node:os');
+const path=require('node:path');
+const {NativeRecents}=require('../native-recents.cjs');
+test('native recent projects persist paths, deduplicate, detect moved files and forget without deleting projects',async()=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'sacura-recents-'));
+  const filename=path.join(dir,'preferences.json'),project=path.join(dir,'Моя игра.project');
+  await fs.writeFile(project,'project fixture');
+  const store=new NativeRecents(filename);assert.deepEqual(await store.list(),[]);
+  await Promise.all([store.remember(project,'Игра'),store.remember(project,'Игра')]);
+  const restarted=new NativeRecents(filename),items=await restarted.list();assert.equal(items.length,1);assert.equal(items[0].missing,false);
+  assert.equal(await restarted.resolve(items[0].id),await fs.realpath(project));
+  await assert.rejects(()=>restarted.resolve('../../x'),/Invalid/);
+  const moved=path.join(dir,'Moved.project');await fs.rename(project,moved);
+  assert.equal((await restarted.list())[0].missing,true);await assert.rejects(()=>restarted.resolve(items[0].id),/перемещён/);
+  await restarted.remove(items[0].id);assert.deepEqual(await restarted.list(),[]);assert.equal(await fs.readFile(moved,'utf8'),'project fixture');
+  await fs.writeFile(filename,'{broken');assert.deepEqual(await restarted.list(),[]);
+});

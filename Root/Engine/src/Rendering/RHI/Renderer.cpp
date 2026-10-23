@@ -1,4 +1,5 @@
 #include "Rendering/RHI/Renderer.h"
+#include "Rendering/RHI/SharedFrameExporter.h"
 #include "Rendering/RHI/MaterialShaderCompiler.h"
 #include "Rendering/RHI/MaterialPreviewMesh.h"
 #include "Rendering/RHI/EnvironmentLighting.h"
@@ -1705,6 +1706,8 @@ void Renderer::RenderView(const RenderViewFrame& View, uint64_t FrameIndex, ITex
     if (Output == nullptr)
     {
         RenderImGuiOverlay(Context, SwapChain, View.Overlay);
+        if (FrameExporter && View.Surface.Value == 1)
+            FrameExporter->Export(Device, BackBuffer->GetTexture(), FrameIndex);
         SwapChain->Present(0);
     }
 }
@@ -1799,6 +1802,7 @@ void Renderer::Shutdown()
     AssertRenderThread();
     Device.WaitForIdle();
     PosedMeshes.clear();
+    FrameExporter.reset();
     DestroyImGuiOverlay();
     if (Pipeline)
     {
@@ -1816,6 +1820,12 @@ void Renderer::Shutdown()
     Resources.Shutdown();
     Device.Shutdown();
     bInitialized = false;
+}
+
+void Renderer::SetSharedFrameStream(std::shared_ptr<SharedGpuFrameStream> Stream)
+{
+    AssertRenderThread();
+    FrameExporter = Stream ? std::make_shared<SharedFrameExporter>(std::move(Stream)) : nullptr;
 }
 
 void Renderer::RenderMaterialPreview(const MaterialImageRequest& Request, ITextureView* Output)

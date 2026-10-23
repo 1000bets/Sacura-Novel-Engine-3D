@@ -18,6 +18,7 @@
 #include <unordered_map>
 
 class Renderer;
+class SharedGpuFrameStream;
 
 enum class RenderThreadState : uint8_t
 {
@@ -54,6 +55,7 @@ public:
     uint64_t GetRetirementValue() const { return LastSubmittedFrame.load(std::memory_order_acquire) + 1; }
     RenderStatistics GetStatistics(RenderSurfaceId Surface) const;
     void ResizeRenderer(uint32_t Width, uint32_t Height);
+    void SetSharedFrameStream(std::shared_ptr<SharedGpuFrameStream> Stream);
     bool AttachSurface(RenderSurfaceId Surface, const NativeWindowInfo& WindowInfo);
     void DetachSurface(RenderSurfaceId Surface);
     void ResizeSurface(RenderSurfaceId Surface, uint32_t Width, uint32_t Height, bool bInteractive = false);

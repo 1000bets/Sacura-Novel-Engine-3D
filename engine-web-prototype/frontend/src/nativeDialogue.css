@@ -1,0 +1,9 @@
+.native-dialogue{position:absolute;z-index:30;left:clamp(14px,4%,64px);right:clamp(14px,4%,64px);bottom:22px;max-width:900px;margin:auto;padding:18px 22px 20px;border:1px solid #d49ab6b8;border-radius:14px;background:#171720ed;box-shadow:0 18px 52px #0009;color:#f5eaf1;pointer-events:auto}
+.native-dialogue-speaker{display:block;margin-bottom:8px;color:#e3a6c2;font-size:15px}
+.native-dialogue p{margin:0 0 14px;line-height:1.5;font-size:17px}
+.native-dialogue button{border:1px solid #daa4bd;border-radius:8px;background:#d9a2ba;color:#1c1820;padding:9px 15px;cursor:pointer;font:inherit}
+.native-dialogue button:disabled{opacity:.55;cursor:default}
+.native-dialogue-next{display:block;margin-left:auto}
+.native-dialogue-choices{display:flex;gap:9px;flex-wrap:wrap}
+.native-dialogue-choices button{background:#332934;color:#f5eaf1}
+.native-dialogue small{color:#cbb6c1}

@@ -12,6 +12,7 @@ struct ProjectDescriptor
     std::filesystem::path ProjectRoot;
     std::filesystem::path StartupScene;
     std::filesystem::path StartupStory;
+    std::filesystem::path StartupAudio;
 
     static bool TryLoadFromFile(const std::filesystem::path& ProjectFile, ProjectDescriptor& OutDescriptor, std::string& OutError);
     bool TrySaveToFile(std::string& OutError) const;

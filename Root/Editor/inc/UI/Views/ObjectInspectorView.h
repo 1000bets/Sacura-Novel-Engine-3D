@@ -31,6 +31,7 @@ public:
     QComboBox* AnchorObject = nullptr;
     QPushButton* AddComponent = nullptr;
     std::function<void(int)> AddComponentRequested;
+    std::function<void(const QString&)> RemoveComponentRequested;
     std::array<QDoubleSpinBox*, 9> TransformFields{};
     QComboBox* ComponentFilter = nullptr;
     QVBoxLayout* Components = nullptr;

@@ -3,6 +3,7 @@ import {createGameVisuals} from './GameVisuals.js';
 import {createGameControls,gameSceneHit} from './GameControls.js';
 import {createScenePhysics} from './scenePhysics.js';
 import {createMeshObject,updateMeshVisual,disposeMeshVisual,applyMaterialAssignments,disposeMaterialAssignments} from './meshVisual.js';
+import {hasStaticMesh} from './staticMeshComponent.js';
 import {createRendererViewport} from './rendererViewport.js';
 import {updateObjectHighlight,updateDoorEffect} from './sceneEffects.js';
 import React, { useEffect, useRef } from "react";
@@ -264,7 +265,7 @@ export default function Scene({
       const live = callbacks.current.state;
       gameControls.tick(dt);gameVisuals.update(callbacks.current.state.game);
       animTime=updateAtmosphere(live,dt);
-      pickables.forEach(mesh=>{const o=callbacks.current.objects.find(o=>o.id===mesh.userData.id);if(!o){disposeCharacterVisual(mesh);disposeMeshVisual(mesh);mesh.visible=false;return;}mesh.visible=o.active&&live.visible?.[o.id]!==false&&!(live.game?.active&&live.game.camera?.mode==='firstPerson'&&live.game.camera.targetId===o.id);
+      pickables.forEach(mesh=>{const o=callbacks.current.objects.find(o=>o.id===mesh.userData.id);if(!o){disposeCharacterVisual(mesh);disposeMeshVisual(mesh);mesh.visible=false;return;}mesh.visible=o.active&&(o.type==='Персонаж'||o.type==='Источник света'||hasStaticMesh(o))&&live.visible?.[o.id]!==false&&!(live.game?.active&&live.game.camera?.mode==='firstPerson'&&live.game.camera.targetId===o.id);
         gizmo.apply(mesh,o,resolvedPosition(o,live,'living'));
         updateLightObject(mesh,o,callbacks.current.mode==='scene');
         updateMeshVisual(mesh,o);if(o.type!=='Персонаж'&&o.type!=='Источник света'&&!mesh.userData.placeholder)applyMaterialAssignments(mesh,o);

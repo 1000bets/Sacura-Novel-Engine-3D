@@ -25,6 +25,14 @@ sakura_copy_engine_runtime_dlls(SakuraPlayer)
 sakura_stage_engine_runtime(SakuraPlayer)
 sakura_link_whole_archive_engine(SakuraPlayer)
 
+option(SAKURA_BUILD_ELECTRON_HOST "Build experimental Electron native viewport host (Windows)" OFF)
+if(SAKURA_BUILD_ELECTRON_HOST)
+    if(NOT WIN32)
+        message(FATAL_ERROR "Electron child-window prototype currently requires Windows")
+    endif()
+    add_subdirectory("${CMAKE_SOURCE_DIR}/desktop-electron/native" "${CMAKE_BINARY_DIR}/ElectronNative")
+endif()
+
 add_custom_command(TARGET SakuraPlayer POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "$<TARGET_FILE:SDL3::SDL3>"

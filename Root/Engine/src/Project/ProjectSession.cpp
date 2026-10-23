@@ -152,6 +152,23 @@ bool ProjectSession::RelocateContentPath(
     return true;
 }
 
+bool ProjectSession::SetStartupDocuments(const std::filesystem::path& Scene, const std::filesystem::path& Story, std::string& OutError)
+{
+    if(!OpenedProject) { OutError="No project is open"; return false; }
+    const auto Root=std::filesystem::weakly_canonical(OpenedProject->ProjectRoot);
+    for(const auto& Path:{Scene,Story}) if(!Path.empty()) {
+        const auto Relative=std::filesystem::weakly_canonical(Path).lexically_relative(Root);
+        if(Relative.empty() || *Relative.begin()==".." || !std::filesystem::is_regular_file(Path)) {
+            OutError="Startup documents must exist inside the project"; return false;
+        }
+    }
+    auto Updated=*OpenedProject; Updated.StartupScene=Scene; Updated.StartupStory=Story;
+    if(!Updated.TrySaveToFile(OutError)) return false;
+    OpenedProject=std::move(Updated);
+    if(BoundEngine) BoundEngine->SetStartupStory(OpenedProject->StartupStory);
+    return true;
+}
+
 bool ProjectSession::IsOpen() const
 {
     return OpenedProject.has_value();
@@ -208,6 +225,16 @@ bool ProjectSession::ApplyOpenedProject()
             ++IssueCount;
             PrintString("ProjectSession: startupStory load failed: " + LastError);
         }
+    }
+
+    if (!Descriptor.StartupAudio.empty() && !std::filesystem::is_regular_file(Descriptor.StartupAudio))
+    {
+        LastError = "Startup audio file is missing";
+        Health = ProjectSessionHealth::Degraded;
+        Diagnostics.push_back(AssetDiagnostic::Fail(AssetErrorCode::InvalidData,
+            "StartupAudio", LastError, {}, Descriptor.StartupAudio.generic_string()));
+        ++IssueCount;
+        PrintString("ProjectSession: startupAudio missing: " + Descriptor.StartupAudio.generic_string());
     }
 
     if (!Descriptor.StartupScene.empty())

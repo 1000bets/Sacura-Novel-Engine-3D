@@ -8,6 +8,8 @@ class CharacterComponent : public MeshRendererComponent
 {
     ENGINE_CLASS(CharacterComponent, MeshRendererComponent, "engine.CharacterComponent")
 public:
+    std::string Description;
+    ENGINE_REFLECT_FIELD(CharacterComponent, Description, "description", RF_EDITOR_EDITABLE, RF_SERIALIZABLE, RF_SCRIPT_READ_WRITE, RF_DISPLAY_NAME("Description"))
     AssetKey Character;
     std::string Animation;
     bool bAutomaticWalk = true;
@@ -44,3 +46,5 @@ ENGINE_IMPLEMENT_FIELD(CharacterComponent, Character)
 ENGINE_IMPLEMENT_FIELD(CharacterComponent, Animation)
 ENGINE_IMPLEMENT_FIELD(CharacterComponent, bAutomaticWalk)
 ENGINE_IMPLEMENT_READONLY(CharacterComponent, DiagnosticProperty, std::string, GetDiagnostic)
+
+ENGINE_IMPLEMENT_FIELD(CharacterComponent, Description)

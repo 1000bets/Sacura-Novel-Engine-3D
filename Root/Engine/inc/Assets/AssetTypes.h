@@ -39,6 +39,7 @@ inline const AssetType SceneAssetType{"Scene"};
 inline const AssetType StoryAssetType{"Story"};
 inline const AssetType InputActionAssetType{"InputAction"};
 inline const AssetType InputMappingContextAssetType{"InputMappingContext"};
+inline const AssetType AudioAssetType{"Audio"};
 inline const AssetType ModelAssetType{"Model"};
 inline const AssetType TextureAssetType{"Texture"};
 inline const AssetType MaterialAssetType{"Material"};

@@ -76,7 +76,8 @@ class StoryGraphDocument
     bool SetStart(const StoryNodeId& Identity, std::string& Error);
     bool ValidateForPlayback(std::string& Error) const;
     bool AddEvent(const StoryNodeId& Node, StoryEventPhase Phase, const std::string& SourceEvent,
-                  std::string& Binding, std::string& Error, const std::string& Batch = {});
+                  std::string& Binding, std::string& Error, const std::string& Batch = {},
+                  StoryActionKind InitialKind = StoryActionKind::Wait);
     bool RemoveEventBinding(const StoryNodeId& Node, const std::string& Binding, std::string& Error);
     bool SetEventPlacement(const StoryNodeId& Node, const std::string& Binding, StoryEventPhase Phase,
                            StoryEventJoin Join, std::string& Error, const std::string& Batch = {}, const std::string& BeforeBinding = {});

@@ -15,9 +15,11 @@ import FunctionScriptsWorkspace from './FunctionScriptsWorkspace.jsx';
 import {newScriptFunction,scriptFunctionType,scriptParameterType} from './scriptFunctions.js';
 import {schemaDefaults} from './valueSchemas.js';
 import GameHUD from './GameHUD.jsx';
+import NativeDialogue from './NativeDialogue.jsx';
+import NativeStoryInspector,{NativeInspectorEmpty} from './NativeStoryInspector.jsx';
 import {exportPlayableGame} from './gameExport.js';
 import {instantiateAuthoringTemplate} from './authoringTemplates.js';
-import {builtinTemplates,loadBuiltinTemplate,createBuiltinProject} from './builtinTemplates.js';
+import {builtinTemplates,loadBuiltinTemplate,createBuiltinProject,nativeTemplateIds} from './builtinTemplates.js';
 import {inputContextsFor,inputHelp} from './inputModel.js';
 import LanguagePicker from './LanguagePicker.jsx';
 import WidgetWorkspace from './WidgetWorkspace.jsx';
@@ -96,23 +98,26 @@ import {
   Waveform,
   EventEditor,
 } from "./StudioParts.jsx";
-import LocationScene from "./LocationScene.jsx";
+import SceneViewport from "./SceneViewport.jsx";
+import {nativeStoryMenu} from "./nativeStoryMenu.js";
 import EditorGraph from "./EditorGraph.jsx";
 import EditorContextMenu from "./EditorContextMenu.jsx";
 import SceneObjectMenu from './SceneObjectMenu.jsx';
+import {nativeSceneMenuItems} from './nativeSceneMenu.js';
+import EditorCreateMenu from './EditorCreateMenu.jsx';
 import ActionFields from "./ActionFields.jsx";
 import EventSelectionInspector from './EventSelectionInspector.jsx';
 import {exportLocation,importLocation} from "./locationFiles.js";
 import FailureLab from "./FailureLab.jsx";
 import SubsceneWorkspace from './SubsceneWorkspace.jsx';
 import CharacterWorkspace from './CharacterWorkspace.jsx';
+import NativeCharacterWorkspace from './NativeCharacterWorkspace.jsx';
 import {createCharacter,setCharacterInScene} from './characterModel.js';
 import {createSubscene,cloneSubscene,setSceneEntry,connectSubscene,changeSceneLocation,newSceneDraft,LOCATION_PRIMITIVES} from './subsceneModel.js';
 import EventPlayground from './EventPlayground.jsx';
 import AuthoringWorkspace from './AuthoringWorkspace.jsx';
 import TransformInspector from './TransformInspector.jsx';
 import CollisionInspector from './CollisionInspector.jsx';
-import MeshInspector from './MeshInspector.jsx';
 import MultiTransformInspector from './MultiTransformInspector.jsx';
 import {selectedObjectIds,selectSceneObject,transformSelection} from './sceneSelection.js';
 import CameraWorkspace from './CameraWorkspace.jsx';
@@ -122,6 +127,9 @@ import {objectTransform,setObjectTransform,isObjectInScene,sceneStagingPoints} f
 import HierarchyTree from './HierarchyTree.jsx';
 import EditorSelect from './EditorSelect.jsx';
 import StoryFlow from './StoryFlow.jsx';
+import {useEditorPlatform} from './useEditorPlatform.js';
+import {presentationObject,eulerToQuaternion} from './editorPlatform.js';
+import {nativeStoryPresentation} from './nativeStoryPresentation.js';
 import EditorWorkspace, {EditorWindowsMenu, EditorDockTabs} from './EditorWorkspace.jsx';
 import {EditorDockProvider, EditorDockStrip, EditorDockBody, DockDropTarget} from './EditorDocking.jsx';
 import {defaultWindows, restoreWindows, openWindow, closeWindow, dockTabs, windowArea, activeDockWindow, selectDockBase} from './editorWindows.js';
@@ -253,6 +261,49 @@ export function GameDialogue({
 
 export default function Editor({initialProject=null,user=null,onLogout,onHome}) {
  useLocale();
+ const native=useEditorPlatform(),isNative=!!native.adapter;
+ const nativeRendered=useRef(native);nativeRendered.current=native;
+ const [nativeFocus,setNativeFocus]=useState('scene');
+ const nativeLastFocus=useRef('scene');
+ useEffect(()=>{if(nativeFocus!=='sceneSettings')nativeLastFocus.current=nativeFocus;},[nativeFocus]);
+ const [nativeAssetId,setNativeAssetId]=useState(null),[nativeStorySelection,setNativeStorySelection]=useState(null),[nativeStoryPath,setNativeStoryPath]=useState('New.story');
+ const nativeFlow=useMemo(()=>nativeStoryPresentation(native.story,native.objects),[native.story,native.objects]);
+ const nativeFiles=useMemo(()=>native.assets.map(a=>({...a,path:a.path.replace(/^\//,''),kind:a.typeId==='Texture'&&/\.(png|jpe?g|bmp|webp)$/i.test(a.path)?'image':a.typeId==='Model'?'model':'file',src:`sacura://native-asset/${native.context?.session}/${a.id}?v=${encodeURIComponent(a.version||'')}`,users:[]})),[native.assets,native.context?.session]);
+ const nativeObject=native.objects.find(o=>o.id===native.state?.selection);
+ const nativeScene={id:'native',kind:'3d',name:native.state?.project||'',location:native.state?.path||'',cameras:[]};
+ const nativeEditing=!native.connected||native.state?.play!=='stopped';
+ const nativePlaying=native.connected&&(native.state?.play==='playing'||native.state?.play==='paused');
+ const nativeCommand=(method,params={})=>native.adapter.command(method,params,native.context).catch(()=>null);
+ const [nativeStoryCreating,setNativeStoryCreating]=useState(false);
+ const createNativeStory=async()=>{
+   if(nativeStoryCreating)return;
+   setNativeStoryCreating(true);
+   try{
+     const used=new Set(native.assets.filter(a=>a.typeId==='Story').map(a=>a.relativePath.toLowerCase()));
+     let path=nativeStoryPath;
+     if(/^New\d*\.story$/i.test(path)&&used.has(path.toLowerCase())){
+       let index=2;while(used.has(`new${index}.story`))index++;path=`New${index}.story`;
+     }
+     const result=await nativeCommand('story.create',{path});
+     if(!result)return;
+     setNativeFocus('story');setDock('story');
+     setNativeStorySelection({nodeId:result.document.startNodeId});
+     used.add(path.toLowerCase());
+     let index=2;while(used.has(`new${index}.story`))index++;
+     setNativeStoryPath(`New${index}.story`);
+     return result;
+   }finally{setNativeStoryCreating(false);}
+ };
+ const selectNative=id=>{setNativeFocus('scene');return nativeCommand('selection.set',{objectId:id});};
+ const createNativeObject=async(name='GameObject',typeId)=>{
+   const result=await nativeCommand('object.create',{name});
+   if(!result)return;
+   if(typeId&&!await nativeCommand('object.addComponent',{objectId:result.id,typeId}))return;
+   await selectNative(result.id);
+   return result;
+ };
+ const createNative=()=>createNativeObject();
+ useEffect(()=>{if(native.state?.selection)setNativeFocus('scene');},[native.state?.selection]);
  useEffect(()=>{if(window.sacuraDesktop?.isDesktop===true)window.sacuraDesktop.ready('editor');},[]);
   const clipboard=useRef(null);
   const seed = useRef();
@@ -283,7 +334,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     [mode, setMode] = useState("scene"),
     [showDialogue, setShowDialogue] = useState(true),
     [showGrid, setShowGrid] = useState(true),
-    [maximized, setMaximized] = useState(dockTabs(layout.windows).length && defaultWindowId === "gameplay" ? "graph" : null),
+    [maximized, setMaximized] = useState(!window.sacuraDesktop?.nativeViewport && dockTabs(layout.windows).length && defaultWindowId === "gameplay" ? "graph" : null),
     [preview, setPreview] = useState(null),
     [componentDraft,setComponentDraft]=useState(null),
     [follow, setFollow] = useState(true),
@@ -328,13 +379,59 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   const windowPreferences=useRef(windows);windowPreferences.current=windows;
   const sceneTool=activeDockWindow(windows,'scene'), hierarchyTool=activeDockWindow(windows,'hierarchy'), inspectorTool=activeDockWindow(windows,'inspector');
   const sideWorkspace=windows.position!=='bottom'&&viewportWidth>1000;
-  useEffect(()=>{document.title='Sacura Studio · '+project.title;},[project.title]);
+  useEffect(()=>{document.title='Sacura Studio · '+(isNative?native.state?.project||'C++ Engine':project.title);},[project.title,isNative,native.state?.project]);
+  // Project-owned integration harness uses the same layout state as resize/docking.
+  useEffect(()=>window.sacuraDesktop?.onNativeTest?.(async command=>{
+    if(command.action==='create-story'){await createNativeStory();await window.sacuraDesktop.bridgeTestResult({action:'create-story',done:true});}
+  }),[native.context,nativeStoryPath,nativeStoryCreating]);
+  useEffect(()=>window.sacuraDesktop?.onNativeTest?.(command=>{
+    if(command.action==='layout')setLayout(l=>({...l,left:command.left,right:command.right,height:command.height,
+      windows:{...l.windows,position:command.position||'bottom'}}));
+  }),[]);
   useEffect(()=>{if(!workspaceTabCount)setMaximized(current=>current==='graph'?null:current);},[workspaceTabCount]);
   useEffect(()=>{
     const resize=()=>setViewportWidth(window.innerWidth);
     window.addEventListener('resize',resize);
     return()=>window.removeEventListener('resize',resize);
   },[]);
+  useEffect(()=>{
+    if(!native.adapter)return;
+    return window.sacuraDesktop.onNativeTest?.(async message=>{
+      if(message.action!=='bridge-react')return;
+      const adapter=native.adapter,checks=[];
+      const wait=async predicate=>{const until=Date.now()+10000;while(!predicate()){if(Date.now()>until)throw Error('React snapshot timeout');await new Promise(r=>setTimeout(r,20));}};
+      try{
+        const run=(m,p={})=>adapter.command(m,p);
+        const parent=await run('object.create',{name:'React Parent'}),child=await run('object.create',{name:'React Child',parentId:parent.id});
+        await run('object.rename',{objectId:child.id,name:'React Renamed'});await run('selection.set',{objectId:child.id});
+        await wait(()=>nativeRendered.current.objects.some(o=>o.id===child.id&&o.parentId===parent.id&&o.name==='React Renamed'));
+        checks.push('Hierarchy: create, rename, parent, selection from C++');
+        await run('transform.set',{objectId:child.id,transform:{position:[2,3,4],rotation:eulerToQuaternion([20,30,40]),scale:[1,2,3]}});
+        await run('editor.undo');await run('editor.redo');
+        const component=await run('object.addComponent',{objectId:child.id,typeId:'engine.LightComponent'});
+        await run('component.setProperty',{objectId:child.id,componentId:component.id,property:'light_type',value:'1'});
+        await wait(()=>nativeRendered.current.components.some(c=>c.id===component.id&&c.properties.some(p=>p.id==='light_type'&&p.value==='1')));
+        checks.push('Inspector/Transform: reflected native edits, Undo/Redo');
+        setDock('files');await adapter.loadDomain('assets.list','assets');await wait(()=>nativeRendered.current.assets.some(a=>a.typeId==='Story'));
+        checks.push('Content Browser: actual AssetRegistry in existing panel');
+        const texture=adapter.getSnapshot().assets.find(a=>a.relativePath==='Textures/PanelPreview.png');
+        if(!texture)throw Error('Native preview texture was not registered');
+        await new Promise((resolve,reject)=>{const preview=new Image();preview.onload=()=>resolve();preview.onerror=()=>reject(Error('Native asset preview failed'));preview.src=`sacura://native-asset/${adapter.getSnapshot().context.session}/${texture.id}`;});
+        checks.push('Native texture thumbnail loaded through main-process asset capability');
+        const story=adapter.getSnapshot().assets.find(a=>a.typeId==='Story'&&!a.builtin);await run('story.open',{assetId:story.id});setDock('story');setNativeFocus('story');
+        const added=await run('story.addNode',{kind:'Line',x:25,y:30});const node=added.document.nodes.at(-1);
+        setNativeStorySelection({nodeId:node.id});await run('story.updateNode',{nodeId:node.id,patch:{speaker:'React',text:'Native StoryGraphDocument'}});
+        await run('story.addEvent',{nodeId:node.id,phase:'BEFORE'});await run('story.undo');await run('story.redo');await run('story.save');
+        await wait(()=>nativeRendered.current.story?.document?.nodes.some(n=>n.id===node.id&&n.text==='Native StoryGraphDocument'));
+        await new Promise(r=>setTimeout(r,600));checks.push('StoryFlow/Inspector: native nodes, Event, save, Undo/Redo');
+        await run('play.start');await run('play.pause');await run('play.step');await wait(()=>nativeRendered.current.state?.play==='paused');await run('play.stop');checks.push('Native PlaySession: Play/Pause/Step/Stop, no JS PreviewRuntime');
+        await run('object.destroy',{objectId:parent.id});await wait(()=>!nativeRendered.current.objects.some(o=>o.id===child.id)&&!nativeRendered.current.components.length);
+        const failed=await adapter.command('transform.get',{objectId:child.id}).then(()=>false,error=>error.code==='NOT_FOUND');if(!failed)throw Error('Deleted object accepted');adapter.clearError();
+        checks.push('Deleted selection cleared and explicit native errors');
+        await window.sacuraDesktop.bridgeTestResult({ok:true,checks});
+      }catch(error){await window.sacuraDesktop.bridgeTestResult({ok:false,error:error.stack,checks});}
+    });
+  },[native.adapter]);
   const changeWindows=useCallback(value=>setLayout(current=>{
     const next=typeof value==='function'?value(current.windows):value;
     return next===current.windows?current:{...current,windows:next};
@@ -371,25 +468,25 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     physicsApi = useRef(),
     previewRef = useRef(),
     runtime = useRef();
-  if (!runtime.current)
+  if (!runtime.current&&!isNative)
     runtime.current = new PreviewRuntime(soundDesk, setPreview);
   focusedWindow.current=dock;
   graphApi.current=graphApis.current[dock]||null;
   const rt = runtime.current;
-  rt.physicsApi=physicsApi;
+  if(rt)rt.physicsApi=physicsApi;
   previewRef.current = preview;
   const inspectorScroll=useRef(null);
-  useEffect(()=>{if(inspectorScroll.current)inspectorScroll.current.scrollTop=0;},[selection.kind,selection.id,eventContext?.bindingId]);
+  useEffect(()=>{if(inspectorScroll.current)inspectorScroll.current.scrollTop=0;},[selection.kind,selection.id,eventContext?.bindingId,nativeFocus,native.state?.selection,nativeStorySelection?.nodeId,nativeStorySelection?.bindingId]);
   const nodes = useMemo(() => allBeats(project), [project]),
     beat = nodes.find((b) => b.id === selectedBeat) || nodes[0]||{id:null,kind:'gameplay',text:'',speaker:'',choices:[],bindings:[],batches:{}},
     scene = sceneFor(project, beat.id),
     chapter = project.chapters.find((c) =>
       c.beats.some((b) => b.id === beat.id),
     )||{id:null,name:"",beats:[]},
-    running = rt.running && preview?.phase !== "EDIT";
+    running = rt?.running && preview?.phase !== "EDIT";
   const hierarchyVisible=maximized==='hierarchy'||(!['scene','graph','inspector'].includes(maximized)&&!layout.hiddenHierarchy&&(window.innerWidth>1000||compactPanel==='hierarchy'));
   const inspectorVisible=maximized==='inspector'||(!['scene','graph','hierarchy'].includes(maximized)&&!layout.hiddenInspector&&(window.innerWidth>1000||compactPanel==='inspector'));
-  const playProject = running ? rt.project : project,
+  const playProject = running ? rt?.project : project,
     playBeat = running
       ? allBeats(playProject).find((b) => b.id === preview.beatId) || beat
       : beat,
@@ -400,7 +497,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     setCompactPanel(['hierarchy','inspector'].includes(area)?area:'workspace');
   },[dock,displayScene.id]);
   useEffect(()=>{
-    if(rt.invalidateStoryPreview(project))setNotice('Маршрут истории изменён. Предпросмотр остановлен — нажмите «Запуск» или «С реплики», чтобы проверить новые связи.');
+    if(rt?.invalidateStoryPreview(project))setNotice('Маршрут истории изменён. Предпросмотр остановлен — нажмите «Запуск» или «С реплики», чтобы проверить новые связи.');
   },[project,rt]);
   const [inputDevices,setInputDevices]=useState([]);
   const world = useMemo(
@@ -504,7 +601,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   }, [layout]);
   useEffect(() => soundDesk.subscribe(() => setAudioTick((n) => n + 1)), []);
   useEffect(()=>soundDesk.setAssets(projectAudioAssets(project)),[project]);
-  useEffect(() => rt.setSidechain(project.audioSettings?.sidechain), [project.audioSettings?.sidechain]);
+  useEffect(() => rt?.setSidechain(project.audioSettings?.sidechain), [project.audioSettings?.sidechain]);
   useEffect(() => {
     if (running && follow && preview.beatId) {
       setSelectedBeat(preview.beatId);
@@ -516,9 +613,10 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     const t = setTimeout(() => setNotice(""), 4200);
     return () => clearTimeout(t);
   }, [notice]);
-  useEffect(() => () => rt.stop(), []);
+  useEffect(() => () => rt?.stop(), []);
   const mutate = useCallback(
-    (fn) =>
+    (fn) => {
+      if(window.sacuraDesktop?.nativeViewport){setNotice('Эта операция ещё не подключена к C++ Engine.');return;}
       setProject((p) => {
         const next = structuredClone(p);
         fn(next);
@@ -527,7 +625,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         setHistory((h) => [...h.slice(-19), p]);
         setFuture([]);
         return next;
-      }),
+      });
+    },
     [],
   );
   const importProjectAudioFiles=async files=>{
@@ -535,13 +634,13 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     return changeAssetLibrary(p=>files.map(file=>storeAssetFile(p,file)));
   };
   const changeAssetLibrary=operation=>{
-    if(rt.running)throw new Error('Остановите предпросмотр перед импортом.');
+    if(rt?.running)throw new Error('Остановите предпросмотр перед импортом.');
     const next=structuredClone(currentProject.current),result=operation(next);
     try{if(!serverStorageEnabled&&window.sacuraDesktop?.isDesktop!==true)accountStorage.setItem(PROJECT_KEY,JSON.stringify(next));}catch{throw new Error('Не хватает места для автосохранения. Уменьшите файлы или экспортируйте проект.');}
     mutate(operation);return result;
   };
   const placeLibraryModel=file=>{
-    if(rt.running||!file.model)return;
+    if(rt?.running||!file.model)return;
     const id=uid('object'),model={...file.model,src:file.src};
     try{changeAssetLibrary(p=>p.objects.push({id,type:'Меш',name:file.name.replace(/\.[^.]+$/,''),color:'#bb99aa',active:true,subsceneId:scene.id,primitive:'box',model,transforms:{[scene.id]:{position:[0,0,1],rotation:[0,0,0],scale:[1,1,1]}}}));
       editScene();setSelection({kind:'object',id});setFocusRequest({nonce:uid('focus')});setNotice('Модель добавлена в сцену.');
@@ -551,7 +650,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     (id) => {
       setSelectedBeat(id);
       if (!inspectorPinned) setSelection({ kind: "beat", id });
-      if (rt.running) setFollow(false);
+      if (rt?.running) setFollow(false);
     },
     [inspectorPinned],
   );
@@ -704,7 +803,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       ),
     );
   const deleteFlowNode = ids => {
-    if(rt.running){setNotice('Остановите предпросмотр, чтобы удалить ноды.');return;}
+    if(rt?.running){setNotice('Остановите предпросмотр, чтобы удалить ноды.');return;}
     const next=structuredClone(project);let result;
     for(const id of Array.isArray(ids)?ids:[ids]){
       result=deleteStoryNode(next,id);
@@ -724,6 +823,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   const openWidgets=id=>{setWidgetRequest({id,token:uid("widget-request")});setDock("widgets");setDetailEditor(false);setMaximized(null);setCompactPanel("workspace");};
   const customizeWidget=owner=>{const id=uid('widget');mutate(p=>createDialogueVariant(p,owner,id));openWidgets(id);};
   const start = (fromSelection=false,entryId=null) => {
+    if(isNative){nativeCommand('play.start');return;}
     setGameMenu(null);setPreviewWidgetId(null);
     const startId=entryId||playbackStartId(project,beat.id,fromSelection);
     if(!startId&&project.gameplay.storyPolicy?.mode!=='none'){setNotice('Укажите начальную реплику во вкладке «Сабсцены».');return;}
@@ -733,18 +833,18 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     showBaseDock('scene');setMode("game");
     setMaximized(project.gameplay?.enabled ? "scene" : null);
     setShowDialogue(true);
-    rt.start(project, startId);
+    rt?.start(project, startId);
   };
-  rt.storage=accountStorage;
+  if(rt)rt.storage=accountStorage;
   const widgetAction=async(action,element)=>{
-    if(action==='load'&&!running){rt.storage=accountStorage;await rt.uiAction(action,element,project);if(rt.running){setMode('game');setGameMenu(null);}else setNotice(rt.snapshot.hint);return;}
-    if(action==='save'&&!running){await rt.uiAction(action,element,project);setNotice(rt.snapshot.hint);return;}
-    if(['none','event','gameplay','save','load','advance','resume'].includes(action)&&running){rt.storage=accountStorage;await rt.uiAction(action,element);}
+    if(action==='load'&&!running){if(rt)rt.storage=accountStorage;await rt?.uiAction(action,element,project);if(rt?.running){setMode('game');setGameMenu(null);}else setNotice(rt?.snapshot.hint);return;}
+    if(action==='save'&&!running){await rt?.uiAction(action,element,project);setNotice(rt?.snapshot.hint);return;}
+    if(['none','event','gameplay','save','load','advance','resume'].includes(action)&&running){if(rt)rt.storage=accountStorage;await rt?.uiAction(action,element);}
     if(action==='start'||action==='restart')start(false,project.subscenes[0]?.entry);
     if(action==='resume')setPreviewWidgetId(null);
-    if(action==='mainMenu'){rt.stop();setMode('game');setGameMenu('mainMenu');setPreviewWidgetId(null);}
+    if(action==='mainMenu'){rt?.stop();setMode('game');setGameMenu('mainMenu');setPreviewWidgetId(null);}
   };
-  const audition=(eventId)=>{setCameraPreviewId(null);setCameraPilotId(null);soundDesk.unlock().catch(()=>{});setMode('game');setFollow(false);rt.previewEvent(project,eventId,beat.id);};
+  const audition=(eventId)=>{setCameraPreviewId(null);setCameraPilotId(null);soundDesk.unlock().catch(()=>{});setMode('game');setFollow(false);rt?.previewEvent(project,eventId,beat.id);};
   const editSample=(eventId)=>{setEventContext({eventId});setSelection({kind:'event',id:eventId});setCompactPanel('inspector');setDetailEditor(false);};
   const selectObject = (id,options={}) => {
     if (!inspectorPinned) setSelection(current=>selectSceneObject(current,id,!!options.additive,objects));
@@ -761,8 +861,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     }
   },[selection.kind,selection.id,mode,running,dock]);
   const interact = (id) => {
-    if(mode==='game'&&running&&id&&rt.project.objects.find(o=>o.id===id)?.interactionCall){rt.playerClick(null,id);return;}
-    if(mode==='game'&&running&&preview.phase==='WAITING_INPUT'){rt.advance();return;}
+    if(mode==='game'&&running&&id&&rt?.project.objects.find(o=>o.id===id)?.interactionCall){rt?.playerClick(null,id);return;}
+    if(mode==='game'&&running&&preview.phase==='WAITING_INPUT'){rt?.advance();return;}
     const o = objects.find((o) => o.id === id);
     if (
       mode === "game" &&
@@ -771,7 +871,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       o.type === "Активный меш" &&
       world.visible?.[id] !== false
     )
-      rt.advance(null, id);
+      rt?.advance(null, id);
   };
   const downloadFile = (text,filename) => {
     const a = document.createElement("a"),
@@ -795,7 +895,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     next.id ||= uid('project');
     const entry=next.subscenes[0].entry||allBeats(next)[0].id;
     backupProject(accountStorage,project);
-    rt.stop();setHistory([]);setFuture([]);setEventContext(null);setAuthorRequest(null);setSubsceneRequest(null);setSubsceneDraft(null);
+    rt?.stop();setHistory([]);setFuture([]);setEventContext(null);setAuthorRequest(null);setSubsceneRequest(null);setSubsceneDraft(null);
     setCameraPilotId(null);setCameraPreviewId(null);setPicker(null);setDetailEditor(false);setDock('story');setMaximized(null);setMode('scene');
     setQuery('');setFocusRequest(0);setMenu(null);setPreview(null);setFollow(true);
     setLayout(l=>({...l,positions:{},treeOpen:{}}));
@@ -811,6 +911,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   };
   const saveProject = () => {
     setMenu(null);
+    if(isNative)return nativeCommand('project.save');
     return runFileOperation(async()=>{
       if(window.sacuraDesktop?.isDesktop===true){await window.sacuraDesktop.saveProject(project);setSaveError(null);setNotice('Проект сохранён в project.json.');return;}
       if(serverStorageEnabled){const saved=await saveServerProject(project);setProject(current=>current===project?saved:current);setSaveError(null);setNotice('Проект сохранён на сервере.');return;}
@@ -821,11 +922,13 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   };
   const openProjectDialog = mode => {
     if(fileOperation.current)return;
+    if(isNative){setMenu(null);setProjectFileError('');setProjectTemplates(builtinTemplates.filter(template=>nativeTemplateIds.has(template.id)));setProjectDialog(mode==='saveAs'?'sceneCopy':mode);return;}
     setMenu(null);setProjectFileError('');
     try{if(mode==='new')setProjectTemplates([...builtinTemplates,...readTemplates(accountStorage)]);setProjectDialog(mode);}
     catch(err){setNotice(err.message);}
   };
   const submitProjectDialog = ({name,templateId}) => runFileOperation(async()=>{
+    if(isNative){if(projectDialog==='sceneNew'||projectDialog==='sceneCopy'){await native.adapter.command(projectDialog==='sceneNew'?'scene.create':'scene.save',{path:'Scenes/'+name+'.scene'});setProjectDialog(null);}else if(await window.sacuraDesktop.nativeCreateProject(name,templateId||'Empty')){setProjectDialog(null);setNotice('C++ проект создан.');}return;}
     if(projectDialog==='new'){
       const template=projectTemplates.find(t=>t.id===templateId);const next=template?template.builtin?await createBuiltinProject(template.id,name):await instantiateAuthoringTemplate(template,name):createEmptyProject(name);
       if(window.sacuraDesktop?.isDesktop===true){const result=await window.sacuraDesktop.createProject(next);if(result.cancelled)return;replaceProject(readProject(result.project));setProjectDialog(null);setNotice('Проект создан в выбранной папке.');return;}
@@ -848,6 +951,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   const showServerProjects=()=>runFileOperation(async()=>{setMenu(null);setServerProjects(await listServerProjects());});
   const selectServerProject=id=>runFileOperation(async()=>{replaceProject(readProject(await openServerProject(id)));setServerProjects(null);setNotice('Проект открыт с сервера.');});
   const openProjectFile = () => {
+    if(isNative){setMenu(null);return runFileOperation(()=>window.sacuraDesktop.nativeOpenProject());}
     setMenu(null);
     if(window.sacuraDesktop?.isDesktop===true)return runFileOperation(async()=>{const result=await window.sacuraDesktop.openProject();if(result.cancelled)return;replaceProject(readProject(result.project));setNotice('Проект загружен.');});
     if(!window.showOpenFilePicker){fileInput.current.click();return;}
@@ -871,19 +975,21 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     replaceProject(readProject(raw));setNotice('Предыдущий проект восстановлен.');
   });
   const undo = () => {
+    if(isNative){nativeCommand(nativeFocus==='story'?'story.undo':'editor.undo');return;}
     if (!history.length) return;
-    rt.stop();setCameraPilotId(null);setCameraPreviewId(null);
+    rt?.stop();setCameraPilotId(null);setCameraPreviewId(null);
     setFuture(f=>[...f.slice(-19),project]);
     setProject(history.at(-1));
     setHistory((h) => h.slice(0, -1));
   };
   const redo=()=>{
+    if(isNative){nativeCommand(nativeFocus==='story'?'story.redo':'editor.redo');return;}
     if(!future.length)return;
-    rt.stop();setCameraPilotId(null);setCameraPreviewId(null);
+    rt?.stop();setCameraPilotId(null);setCameraPreviewId(null);
     setHistory(h=>[...h.slice(-19),project]);setProject(future.at(-1));setFuture(f=>f.slice(0,-1));
   };
   const addBeat = (kind,placement) => {
-    if(rt.running)return;
+    if(rt?.running)return;
     const id = uid("line");
     mutate((p) => {
       const b = {
@@ -953,16 +1059,16 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   const openLogicEvent=id=>{setLogicReturn({dock});openAuthoring('event',id?{id}:{});};
   const returnToLogicCaller=()=>{if(logicReturn){setDock(logicReturn.dock);setLogicReturn(null);setGameplayRequest(null);}};
   const createEvent = () => openAuthoring('event');
-  const editScene=()=>{showBaseDock('scene');setGameMenu(null);setPreviewWidgetId(null);if(rt.running){if(rt.snapshot.beatId)setSelectedBeat(rt.snapshot.beatId);rt.stop();}setCameraPilotId(null);setCameraPreviewId(null);setMode('scene');setMaximized(null);setCompactPanel('workspace');};
+  const editScene=()=>{showBaseDock('scene');setGameMenu(null);setPreviewWidgetId(null);if(rt?.running){if(rt?.snapshot.beatId)setSelectedBeat(rt?.snapshot.beatId);rt?.stop();}setCameraPilotId(null);setCameraPreviewId(null);setMode('scene');setMaximized(null);setCompactPanel('workspace');};
   const openSubscenes=(mode='edit',id=displayScene.id)=>{
-    if(rt.running)rt.stop();const target=project.subscenes.find(s=>s.id===id);
+    if(rt?.running)rt?.stop();const target=project.subscenes.find(s=>s.id===id);
     if(target&&mode!=='create'){setSelectedBeat(target.entry);setSelection({kind:'scene',id});}
     if(mode==='create')setSubsceneDraft({...newSceneDraft(project),choiceId:beat.choices?.[0]?.id||'',fromBeatId:beat.id});
     setCameraPilotId(null);setCameraPreviewId(null);setDock('subscenes');setDetailEditor(false);setMenu(null);setPicker(null);
     setSubsceneRequest({mode,token:uid('request')});setMaximized(value=>mode==='create'?'graph':value==='scene'?null:value);
   };
   const saveNewSubscene=(draft,copyId)=>{
-    if(rt.running)return 'Остановите воспроизведение перед созданием сабсцены.';
+    if(rt?.running)return 'Остановите воспроизведение перед созданием сабсцены.';
     try{
       const next=structuredClone(project),created=copyId?cloneSubscene(next,copyId):createSubscene(next,draft,draft.fromBeatId||beat.id);
       mutate(p=>Object.assign(p,next));setSelectedBeat(created.entry);setSelection({kind:'scene',id:created.id});setMode('scene');setCompactPanel('workspace');
@@ -970,22 +1076,22 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       setNotice(copyId?'Копия создана: сценарий, объекты и камеры независимы. Шаблоны событий общие.':'Локация создана. Добавляйте примитивы и расставляйте объекты в 3D-редакторе.');return null;
     }catch(e){setNotice(e.message);return e.message;}
   };
-  const openSubsceneBeat=id=>{if(rt.running)rt.stop();setCameraPilotId(null);setCameraPreviewId(null);selectBeat(id);setDock('story');setMaximized(null);};
-  const editSubscene=fn=>{if(!rt.running)mutate(fn);};
+  const openSubsceneBeat=id=>{if(rt?.running)rt?.stop();setCameraPilotId(null);setCameraPreviewId(null);selectBeat(id);setDock('story');setMaximized(null);};
+  const editSubscene=fn=>{if(!rt?.running)mutate(fn);};
   const selectCamera=(id,{preview=true}={})=>{
     if(!id)return;
     if(preview){
       setCameraPilotId(null);setCameraPreviewId(id);setFocusRequest(0);
-      if(!rt.running)setMode('scene');
+      if(!rt?.running)setMode('scene');
       cameraApi.current?.preview(id);
     }
     setSelection({kind:'camera',id});setDetailEditor(false);
     setLayout(current=>({...current,hiddenInspector:false}));setCompactPanel('inspector');setMaximized(null);
   };
   const openCameras=()=>{setDock('cameras');selectCamera(selection.kind==='camera'?selection.id:displayScene.defaultCameraId||displayScene.cameras?.[0]?.id);};
-  const changeCamera=(id,patch)=>{if(rt.running)return;mutate(p=>{const sc=p.subscenes.find(s=>s.id===displayScene.id),i=sc?.cameras?.findIndex(c=>c.id===id);if(i>=0)sc.cameras[i]=cleanCamera({...sc.cameras[i],...patch});});};
+  const changeCamera=(id,patch)=>{if(rt?.running)return;mutate(p=>{const sc=p.subscenes.find(s=>s.id===displayScene.id),i=sc?.cameras?.findIndex(c=>c.id===id);if(i>=0)sc.cameras[i]=cleanCamera({...sc.cameras[i],...patch});});};
   const createCamera=(followTarget)=>{
-    if(rt.running)return;const view=cameraApi.current?.capture();if(!view){setNotice('Дождитесь загрузки 3D-сцены.');return;}
+    if(rt?.running)return;const view=cameraApi.current?.capture();if(!view){setNotice('Дождитесь загрузки 3D-сцены.');return;}
     const c=newCamera(view,followTarget?'Слежение · '+followTarget.name:'Камера '+((scene.cameras?.length||0)+1));
     if(followTarget)Object.assign(c,{mode:'follow',followTargetId:followTarget.id,distance:3,height:1.7,yaw:-15,targetHeight:1.08});
     mutate(p=>{const sc=p.subscenes.find(s=>s.id===scene.id);sc.cameras||=[];sc.cameras.push(c);if(followTarget||!sc.defaultCameraId)sc.defaultCameraId=c.id;});
@@ -996,17 +1102,17 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   const captureCamera=id=>{const c=scene.cameras?.find(c=>c.id===id),view=cameraApi.current?.capture();if(c&&view){changeCamera(id,cameraFromView(c,view,world,objects,scene.kind));setCameraPilotId(null);setNotice('Ракурс сохранён.');}};
   const pilotCamera=id=>{editScene();setCameraPilotId(id);setCameraPreviewId(null);selectCamera(id,{preview:false});};
   const viewCamera=id=>{setCameraPilotId(null);setCameraPreviewId(id);setMode('game');};
-  const deleteCamera=id=>{if(rt.running)return;mutate(p=>{const sc=p.subscenes.find(s=>s.id===scene.id);sc.cameras=sc.cameras.filter(c=>c.id!==id);if(sc.defaultCameraId===id)sc.defaultCameraId=sc.cameras[0]?.id||null;});if(cameraPilotId===id)setCameraPilotId(null);if(cameraPreviewId===id)setCameraPreviewId(null);setSelection({kind:'scene',id:scene.id});setNotice('Камера удалена. Ctrl+Z — отменить.');};
+  const deleteCamera=id=>{if(rt?.running)return;mutate(p=>{const sc=p.subscenes.find(s=>s.id===scene.id);sc.cameras=sc.cameras.filter(c=>c.id!==id);if(sc.defaultCameraId===id)sc.defaultCameraId=sc.cameras[0]?.id||null;});if(cameraPilotId===id)setCameraPilotId(null);if(cameraPreviewId===id)setCameraPreviewId(null);setSelection({kind:'scene',id:scene.id});setNotice('Камера удалена. Ctrl+Z — отменить.');};
   useEffect(()=>{setCameraPilotId(null);setCameraPreviewId(null);setFocusRequest(0);},[displayScene.id]);
-  const transformObject=(id,value)=>{if(rt.running)return;mutate(p=>setObjectTransform(p,id,scene.id,value));};
-  const transformObjects=changes=>{if(rt.running)return;mutate(p=>{for(const {id,value}of changes)setObjectTransform(p,id,scene.id,value);});};
+  const transformObject=(id,value)=>{if(rt?.running)return;mutate(p=>setObjectTransform(p,id,scene.id,value));};
+  const transformObjects=changes=>{if(rt?.running)return;mutate(p=>{for(const {id,value}of changes)setObjectTransform(p,id,scene.id,value);});};
   const objectClipboard=command=>{
-    if(rt.running)return;
+    if(rt?.running)return;
     if(command==='copy'){if(!selectedObjects.length)return;clipboard.current={kind:'objects',items:copySceneObjects(selectedObjects,scene),componentSource:structuredClone({id:project.id,gameplay:project.gameplay}),step:0};setNotice('Объекты скопированы. Ctrl+V — вставить.');}
     else if(clipboard.current?.kind==='objects'){const copies=pasteSceneObjects(clipboard.current.items,scene,++clipboard.current.step);mutate(p=>{copyObjectComponents(p,clipboard.current.items,copies,clipboard.current.componentSource);p.objects.push(...copies);});setSelection({kind:'object',id:copies.at(-1).id,ids:copies.map(o=>o.id)});setFocusRequest({nonce:uid('focus')});setNotice('Объекты вставлены. Ctrl+Z — отменить.');}
   };
   const graphClipboard=(command,graphNodes,graphKey)=>{
-    if(rt.running)return;
+    if(rt?.running)return;
     if(command==='copy'){
       const chosen=graphNodes.filter(n=>n.selected),ids=chosen.map(n=>n.id);
       if(graphKey.startsWith('flow:')||graphKey.startsWith('story:')){const items=nodes.filter(b=>ids.includes(b.id));if(!items.length)return;clipboard.current={kind:'beats',items:structuredClone(items),positions:Object.fromEntries(chosen.map(n=>[n.id,n.position])),step:0};}
@@ -1027,43 +1133,44 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     }
   };
   const duplicateObjects=()=>{
-    if(rt.running)return;const copies=selectedObjects.map(object=>{const copy=structuredClone(object);copy.id=uid('object');copy.name=object.name+' · копия';copy.subsceneId=scene.id;copy.builtin=object.builtin||(['letter','door','fireplace','garden-note','ticket'].includes(object.id)?object.id:undefined);const value=objectTransform(object,scene.id,scene.kind);value.position[0]+=.65;copy.transforms={[scene.id]:value};return copy;});
+    if(rt?.running)return;const copies=selectedObjects.map(object=>{const copy=structuredClone(object);copy.id=uid('object');copy.name=object.name+' · копия';copy.subsceneId=scene.id;copy.builtin=object.builtin||(['letter','door','fireplace','garden-note','ticket'].includes(object.id)?object.id:undefined);const value=objectTransform(object,scene.id,scene.kind);value.position[0]+=.65;copy.transforms={[scene.id]:value};return copy;});
     mutate(p=>{copyObjectComponents(p,selectedObjects,copies);p.objects.push(...copies);});setSelection({kind:'object',id:copies.at(-1)?.id,ids:copies.map(object=>object.id)});setFocusRequest({nonce:uid('focus')});
   };
-  const deleteObjects=()=>{if(rt.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSelectionIds.includes(object.id));p.objects=p.objects.filter(object=>!objectSelectionIds.includes(object.id));removed.forEach(object=>retainObjectModel(p,object));});setSelection({kind:'scene',id:scene.id});setNotice('Выделенные объекты удалены. Ctrl+Z — вернуть всю группу.');};
+  const deleteObjects=()=>{if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSelectionIds.includes(object.id));p.objects=p.objects.filter(object=>!objectSelectionIds.includes(object.id));removed.forEach(object=>retainObjectModel(p,object));});setSelection({kind:'scene',id:scene.id});setNotice('Выделенные объекты удалены. Ctrl+Z — вернуть всю группу.');};
   const duplicateObject=(object)=>{
     const copy=structuredClone(object);copy.id=uid('object');copy.name=object.name+' · копия';copy.subsceneId=scene.id;copy.builtin=object.builtin||(['letter','door','fireplace','garden-note','ticket'].includes(object.id)?object.id:undefined);const t=objectTransform(object,scene.id,scene.kind);t.position[0]+=.65;copy.transforms={[scene.id]:t};
     mutate(p=>{copyObjectComponents(p,[object],[copy]);p.objects.push(copy);});setSelection({kind:'object',id:copy.id});setFocusRequest({nonce:uid('focus')});
   };
   const deleteObject=id=>{mutate(p=>{const removed=p.objects.find(o=>o.id===id);p.objects=p.objects.filter(o=>o.id!==id);retainObjectModel(p,removed);});setSelection({kind:'scene',id:scene.id});setNotice('Объект удалён. Ctrl+Z — вернуть; ссылки в событиях видны во вкладке «Ошибки».');};
   const addStagingPoint=()=>{
-    if(rt.running)return;const id=uid('point'),selectedObject=objects.find(o=>o.id===selection.id),position=contextMenu?.worldPosition||(selectedObject?objectTransform(selectedObject,scene.id,scene.kind).position:[0,0,0]);
+    if(rt?.running)return;const id=uid('point'),selectedObject=objects.find(o=>o.id===selection.id),position=contextMenu?.worldPosition||(selectedObject?objectTransform(selectedObject,scene.id,scene.kind).position:[0,0,0]);
     mutate(p=>{const target=p.subscenes.find(s=>s.id===scene.id);target.stagingPoints||=[];target.stagingPoints.push({id,label:'Новая точка постановки',position:[position[0],0,position[2]]});});
     setSelection({kind:'point',id});editScene();setPicker(null);setContextMenu(null);openObjectTransform();
   };
-  const addSoundEvent=()=>{if(rt.running)return;const e=newEvent('sound','world','Звук','Новое звуковое событие');mutate(p=>p.events.push(e));setPicker(null);setContextMenu(null);editSample(e.id);setNotice('Выберите аудиофайл в инспекторе; затем добавьте событие к реплике.');};
+  const addSoundEvent=()=>{if(rt?.running)return;const e=newEvent('sound','world','Звук','Новое звуковое событие');mutate(p=>p.events.push(e));setPicker(null);setContextMenu(null);editSample(e.id);setNotice('Выберите аудиофайл в инспекторе; затем добавьте событие к реплике.');};
   const openObjectPicker=(event,groupId)=>{
-    if(rt.running)return;
+    if(rt?.running)return;
     const clicked=event.currentTarget,anchor=clicked.closest('.editor-menu')?root.current.querySelector('.editor-menubar>button.active'):clicked;
     setPicker(current=>current?.kind==='object'&&current.anchor===anchor?null:{kind:'object',groupId,anchor});
     setMenu(null);setContextMenu(null);
   };
-  const addEmptyGroup=()=>{if(rt.running)return;const next=structuredClone(project),group=createObjectGroup(next,scene.id,[],'Новая группа',{allowEmpty:true});mutate(p=>Object.assign(p,next));setSelection({kind:'group',id:group.id});setLayout(l=>({...l,treeOpen:{...l.treeOpen,[scene.id+':'+group.id]:true}}));openObjectTransform();};
+  const addEmptyGroup=()=>{if(rt?.running)return;const next=structuredClone(project),group=createObjectGroup(next,scene.id,[],'Новая группа',{allowEmpty:true});mutate(p=>Object.assign(p,next));setSelection({kind:'group',id:group.id});setLayout(l=>({...l,treeOpen:{...l.treeOpen,[scene.id+':'+group.id]:true}}));openObjectTransform();};
   const addObject = (type,primitive="box") => {
-    if(rt.running)return;
+    if(rt?.running)return;
     editScene();
     const id = uid("object"),groupId=picker?.groupId||(selection.kind==='group'?selection.id:selection.groupId),position=contextMenu?.worldPosition;
     mutate((p) => {
       p.objects.push({
         id,
         type,
-        name: type === "Источник света" ? "Источник освещения" : type === "Персонаж" ? "Новый персонаж" : type === "Меш" ? (LOCATION_PRIMITIVES.find(([id])=>id===primitive)?.[1]||"Новый объект") : "Интерактивный предмет",
+        name: type === "Источник света" ? "Источник освещения" : type === "Персонаж" ? "Новый персонаж" : type === "Пустой объект" ? "Новый объект" : type === "Меш" ? (LOCATION_PRIMITIVES.find(([id])=>id===primitive)?.[1]||"Новый объект") : "Интерактивный предмет",
         color: "#bb99aa",
         position: "стол",
         active: true,
         subsceneId: scene.id,
         interaction: "Осмотреть",
         primitive,
+        ...(type==='Пустой объект'?{staticMesh:false}:{}),
         ...(type==='Источник света'?{light:{intensity:35,distance:10,decay:2},color:'#fff0d0'}:{}),
         transforms:{[scene.id]:{position:position?[position[0],type==="Персонаж"?0:position[1],position[2]]:[0,type==="Персонаж"?0:type==='Источник света'?2:.3,1],rotation:[0,0,0],scale:[1,1,1]}},
       });
@@ -1077,7 +1184,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     if(type==='Персонаж'){setDock('characters');setCompactPanel('workspace');}
   };
   const patchCharacter=(id,patch)=>{
-    if(rt.running)return;
+    if(rt?.running)return;
     if('model' in patch||'extraAnimations' in patch){
       const next=structuredClone(project),character=next.objects.find(object=>object.id===id&&object.type==='Персонаж');
       if(!character)throw new Error('Персонаж удалён.');if('model' in patch&&character.model?.src!==patch.model?.src)retainObjectModel(next,character);Object.assign(character,patch);
@@ -1086,7 +1193,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     mutate(p=>{const character=p.objects.find(object=>object.id===id&&object.type==='Персонаж');if(character){if('model' in patch&&character.model?.src!==patch.model?.src)retainObjectModel(p,character);Object.assign(character,patch);}});
   };
   const duplicateCharacter=id=>{
-    if(rt.running)return;const original=project.objects.find(object=>object.id===id&&object.type==='Персонаж');if(!original)return;
+    if(rt?.running)return;const original=project.objects.find(object=>object.id===id&&object.type==='Персонаж');if(!original)return;
     const copy={...structuredClone(original),id:uid('character'),name:original.name+' · копия'};
     const next=structuredClone(project);next.objects.push(copy);for(const sc of next.subscenes)if(sc.excludedObjectIds?.includes(id))sc.excludedObjectIds.push(copy.id);
     try{if(window.sacuraDesktop?.isDesktop!==true)accountStorage.setItem(PROJECT_KEY,JSON.stringify(next));}catch{setNotice('Не хватает места для копии модели в автосохранении.');return;}
@@ -1160,6 +1267,15 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   };
   useEffect(() => {
     const listener = (e) => {
+      if(isNative&&!e.defaultPrevented){
+        const editing=e.target.isContentEditable||e.target.closest?.('input,textarea,select');
+        const ctrl=e.ctrlKey||e.metaKey;
+        if(ctrl&&e.code==='KeyS'){e.preventDefault();nativeCommand(nativeFocus==='story'?'story.save':'scene.save');return;}
+        if(!editing&&ctrl&&['KeyZ','KeyY'].includes(e.code)){e.preventDefault();(e.code==='KeyY'||e.shiftKey?redo:undo)();return;}
+        if(!editing&&e.key==='Delete'&&nativeFocus==='scene'&&nativeObject){e.preventDefault();nativeCommand('object.destroy',{objectId:nativeObject.id});return;}
+        if(!editing&&e.code==='F5'){e.preventDefault();if(native.connected)nativeCommand(native.state?.play==='stopped'?'play.start':'play.stop');return;}
+        if(!editing&&ctrl&&['KeyC','KeyX','KeyV'].includes(e.code)&&!e.target.closest?.('.react-flow')){e.preventDefault();setNotice('Clipboard native-объектов пока не подключён.');return;}
+      }
       const command=clipboardCommand(e);
       if(command&&!e.target.closest?.('.react-flow, .widget-workspace')&&!contextMenu&&!picker&&!projectDialog&&!detailEditor&&!menu&&!running&&mode==='scene'&&(selection.kind==='object'||e.target.closest?.('.scene-viewport,.hierarchy'))){e.preventDefault();objectClipboard(command);return;}
       const tool = ({KeyQ:'select',KeyW:'translate',KeyE:'rotate',KeyR:'scale'})[e.code];
@@ -1215,7 +1331,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   }, [history,future,project,projectDialog,mode,running,selection,picker,detailEditor,cameraPilotId,menu,displayScene,contextMenu,dock]);
 
   const updateVariable = (id,patch) => {
-    if(rt.running)return 'Остановите игру, чтобы редактировать переменные.';
+    if(rt?.running)return 'Остановите игру, чтобы редактировать переменные.';
     const issue=editVariable(structuredClone(project),id,patch);
     if(!issue){
       mutate(p=>editVariable(p,id,patch));
@@ -1234,12 +1350,35 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     setMaximized(current=>current==='graph'||current==='hierarchy'||current==='scene'?null:current);
   };
   const inspectedVariable=selection.kind==='variable'?selection.id:selection.kind==='beat'&&['variable','set-variable'].includes(beat.kind)?beat.variable:null;
-  const createSelectionGroup=()=>{if(rt.running)return;const next=structuredClone(project),group=createObjectGroup(next,displayScene.id,objectSelectionIds);if(!group)return;mutate(p=>Object.assign(p,next));setSelection({kind:'object',id:group.objectIds[0],ids:group.objectIds,groupId:group.id});};
-  const moveBinding=(sourceId,id,targetId,phase,batchId,beforeId)=>{if(rt.running)return;mutate(p=>moveEventBinding(p,sourceId,id,targetId,phase,batchId,beforeId));if(eventContext?.bindingId===id){setEventContext(c=>({...c,beatId:targetId}));setSelectedBeat(targetId);}};
+  const createSelectionGroup=()=>{if(rt?.running)return;const next=structuredClone(project),group=createObjectGroup(next,displayScene.id,objectSelectionIds);if(!group)return;mutate(p=>Object.assign(p,next));setSelection({kind:'object',id:group.objectIds[0],ids:group.objectIds,groupId:group.id});};
+  const moveBinding=(sourceId,id,targetId,phase,batchId,beforeId)=>{if(rt?.running)return;mutate(p=>moveEventBinding(p,sourceId,id,targetId,phase,batchId,beforeId));if(eventContext?.bindingId===id){setEventContext(c=>({...c,beatId:targetId}));setSelectedBeat(targetId);}};
   const renderInspector = () => {
+    if(isNative){
+      if(nativeFocus==='sceneSettings')return <div className="story-inspector native-scene-inspector"><div className="story-inspector-heading"><Icon name="Clapperboard" size={16}/><strong>Сцена</strong><small>{native.state?.project}</small></div><div className="inspector-primary-fields"><Field label="Файл"><output>{native.state?.path||'Не открыт'}</output></Field><Field label="Объектов"><output>{native.objects.length}</output></Field><Button icon="Save" disabled={nativeEditing||!native.state?.dirty} onClick={()=>nativeCommand('scene.save')}>Сохранить сцену</Button></div></div>;
+      if(nativeFocus==='asset'){
+        const asset=nativeFiles.find(a=>a.id===nativeAssetId);return asset?<><h3>{asset.name}</h3><p>{asset.typeId} · {asset.path}</p><p>{asset.id}</p>{asset.kind==='image'&&<img style={{maxWidth:'100%'}} src={asset.src} alt={asset.name}/>}<pre style={{whiteSpace:'pre-wrap'}}>{JSON.stringify(asset.subassets,null,2)}</pre>{asset.kind==='model'&&<p>3D preview и размещение модели пока не подключены. Импорт и subassets читаются из AssetRegistry.</p>}</>:<p>Ресурс удалён или больше не зарегистрирован.</p>;
+      }
+      if(nativeFocus==='story'){
+        return <NativeStoryInspector story={native.story} selection={nativeStorySelection} objects={native.objects} disabled={nativeEditing||native.story?.readOnly} command={nativeCommand} onSelect={setNativeStorySelection} onEvents={openNativeEvents} onFocus={()=>graphApi.current?.focus(nativeStorySelection?.nodeId)}/>;
+      }
+      if(!nativeObject)return <NativeInspectorEmpty>Выберите объект в иерархии или сцене.</NativeInspectorEmpty>;
+      const id=nativeObject.id;
+      return <div className="object-inspector native-object-inspector">
+        <div className="inspector-identity"><span className="identity-icon"><Icon name="Box" size={28}/></span><div><input aria-label="Имя объекта" key={id+nativeObject.name} defaultValue={nativeObject.name} disabled={nativeEditing} onBlur={e=>{if(e.target.value!==nativeObject.name)nativeCommand('object.rename',{objectId:id,name:e.target.value});}}/><small>Объект сцены</small></div><input type="checkbox" aria-label="Объект активен" title="Объект активен" checked={nativeObject.active} disabled={nativeEditing} onChange={e=>nativeCommand('object.setActive',{objectId:id,active:e.target.checked})}/></div>
+        <Fold title="Иерархия" open={false}><Field label="Родитель"><select value={nativeObject.parentId||''} disabled={nativeEditing} onChange={e=>nativeCommand('object.setParent',{objectId:id,parentId:e.target.value||null})}><option value="">Корень</option>{native.objects.filter(o=>o.id!==id).map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select></Field></Fold>
+        <TransformInspector compact object={presentationObject(nativeObject)} scene={nativeScene} disabled={nativeEditing}
+          onChange={t=>nativeCommand('transform.set',{objectId:id,transform:{position:t.position.map(Number),rotation:eulerToQuaternion(t.rotation),scale:t.scale.map(Number)}})}
+          onReset={()=>nativeCommand('transform.set',{objectId:id,transform:{position:[0,0,0],rotation:[0,0,0,1],scale:[1,1,1]}})} onFocus={()=>setFocusRequest({nonce:uid('focus')})}
+          onDelete={()=>nativeCommand('object.destroy',{objectId:id})}/>
+        <ComponentInstancesInspector project={project} running={nativeEditing} reflection={{components:native.components,types:native.types,
+          assets:native.assets,onAsset:(componentId,property,{assetId,subAssetId})=>nativeCommand('component.setAsset',{objectId:id,componentId,property,assetId,subAssetId}),
+          onAdd:typeId=>nativeCommand('object.addComponent',{objectId:id,typeId}),onRemove:componentId=>nativeCommand('object.removeComponent',{objectId:id,componentId}),onEnabled:(componentId,enabled)=>nativeCommand('component.setEnabled',{objectId:id,componentId,enabled}),
+          onProperty:(componentId,property,value)=>nativeCommand('component.setProperty',{objectId:id,componentId,property,value})}}/>
+      </div>;
+    }
     if(selection.kind==='point'){
       const point=sceneStagingPoints(scene,project.objects).find(p=>p.id===selection.id);
-      if(point){const patch=value=>{if(!rt.running)mutate(p=>Object.assign(p.subscenes.find(s=>s.id===scene.id).stagingPoints.find(x=>x.id===point.id),value));};return <fieldset disabled={running} className="staging-point-editor"><legend>{tr("Точка постановки")}</legend><label>{tr("Название")}<input value={point.label} onChange={e=>patch({label:e.target.value})}/></label>{['X','Y','Z'].map((axis,i)=><label key={axis}>{tr("Положение ")}{axis}{tr(", м")}<input type="number" step="0.1" value={point.position[i]} onChange={e=>patch({position:point.position.map((v,j)=>i===j?Number(e.target.value):v),objectId:undefined,objectOrigin:undefined})}/></label>)}<small>{tr("Выберите эту точку в действии «Переместить → К точке».")}</small><Button icon="Focus" onClick={()=>setFocusRequest({nonce:uid('focus'),position:point.position})}>{tr("Показать в сцене")}</Button><Button icon="Trash2" onClick={()=>{mutate(p=>{const s=p.subscenes.find(s=>s.id===scene.id);s.stagingPoints=s.stagingPoints.filter(x=>x.id!==point.id);});setSelection({kind:'scene',id:scene.id});}}>{tr("Удалить точку")}</Button></fieldset>;}
+      if(point){const patch=value=>{if(!rt?.running)mutate(p=>Object.assign(p.subscenes.find(s=>s.id===scene.id).stagingPoints.find(x=>x.id===point.id),value));};return <fieldset disabled={running} className="staging-point-editor"><legend>{tr("Точка постановки")}</legend><label>{tr("Название")}<input value={point.label} onChange={e=>patch({label:e.target.value})}/></label>{['X','Y','Z'].map((axis,i)=><label key={axis}>{tr("Положение ")}{axis}{tr(", м")}<input type="number" step="0.1" value={point.position[i]} onChange={e=>patch({position:point.position.map((v,j)=>i===j?Number(e.target.value):v),objectId:undefined,objectOrigin:undefined})}/></label>)}<small>{tr("Выберите эту точку в действии «Переместить → К точке».")}</small><Button icon="Focus" onClick={()=>setFocusRequest({nonce:uid('focus'),position:point.position})}>{tr("Показать в сцене")}</Button><Button icon="Trash2" onClick={()=>{mutate(p=>{const s=p.subscenes.find(s=>s.id===scene.id);s.stagingPoints=s.stagingPoints.filter(x=>x.id!==point.id);});setSelection({kind:'scene',id:scene.id});}}>{tr("Удалить точку")}</Button></fieldset>;}
     }
     if(selection.kind==='group'){
       const group=project.objectGroups?.find(g=>g.id===selection.id);
@@ -1247,12 +1386,12 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     }
     if(selection.kind==='file'){
       const file=collectAssetFiles(project,projectAudioAssets(project)).find(f=>f.id===selection.id);
-      if(file)return <FileInspector key={file.id+file.name} file={file} disabled={running} onChange={patch=>{if(rt.running)return;const next=structuredClone(project);updateAssetFile(next,file,patch);mutate(p=>Object.assign(p,next));}} onPlaceModel={placeLibraryModel} onPreviewAudio={file=>{const key='file-preview';if(soundDesk.get(key)?.status==='playing'){soundDesk.stop(key);return;}soundDesk.play(file.audioId||file.id,{key,duck:false});}}/>;
+      if(file)return <FileInspector key={file.id+file.name} file={file} disabled={running} onChange={patch=>{if(rt?.running)return;const next=structuredClone(project);updateAssetFile(next,file,patch);mutate(p=>Object.assign(p,next));}} onPlaceModel={placeLibraryModel} onPreviewAudio={file=>{const key='file-preview';if(soundDesk.get(key)?.status==='playing'){soundDesk.stop(key);return;}soundDesk.play(file.audioId||file.id,{key,duck:false});}}/>;
       return <p>{tr("Файл больше не существует.")}</p>;
     }
     if(selection.kind==='object'&&selection.groupId){
       const group=project.objectGroups?.find(g=>g.id===selection.groupId);
-      if(group)return <><Field label={tr("Имя группы")}><input disabled={running} value={group.name} onChange={e=>{const name=e.target.value;if(!rt.running)mutate(p=>p.objectGroups.find(g=>g.id===group.id).name=name);}}/></Field><p>{selectedObjects.length} {tr("объектов · перемещаются вместе")}</p><MultiTransformInspector key={objectSelectionIds.join('|')} objects={selectedObjects} disabled={running} onChange={change=>{if(!rt.running)mutate(p=>{for(const item of transformSelection(selectedObjects,displayScene,change))setObjectTransform(p,item.id,displayScene.id,item.value);});}} onFocus={()=>setFocusRequest({nonce:uid('focus')})} onDuplicate={duplicateObjects} onDelete={deleteObjects} onReset={()=>{if(!rt.running)mutate(p=>{for(const id of objectSelectionIds){const object=p.objects.find(o=>o.id===id);if(object?.transforms)delete object.transforms[displayScene.id];}});}}/><Button icon="Ungroup" disabled={running} onClick={()=>{mutate(p=>p.objectGroups=p.objectGroups.filter(g=>g.id!==group.id));setSelection({kind:'object',id:objectSelectionIds[0],ids:objectSelectionIds});}}>{tr("Разгруппировать")}</Button></>;
+      if(group)return <><Field label={tr("Имя группы")}><input disabled={running} value={group.name} onChange={e=>{const name=e.target.value;if(!rt?.running)mutate(p=>p.objectGroups.find(g=>g.id===group.id).name=name);}}/></Field><p>{selectedObjects.length} {tr("объектов · перемещаются вместе")}</p><MultiTransformInspector key={objectSelectionIds.join('|')} objects={selectedObjects} disabled={running} onChange={change=>{if(!rt?.running)mutate(p=>{for(const item of transformSelection(selectedObjects,displayScene,change))setObjectTransform(p,item.id,displayScene.id,item.value);});}} onFocus={()=>setFocusRequest({nonce:uid('focus')})} onDuplicate={duplicateObjects} onDelete={deleteObjects} onReset={()=>{if(!rt?.running)mutate(p=>{for(const id of objectSelectionIds){const object=p.objects.find(o=>o.id===id);if(object?.transforms)delete object.transforms[displayScene.id];}});}}/><Button icon="Ungroup" disabled={running} onClick={()=>{mutate(p=>p.objectGroups=p.objectGroups.filter(g=>g.id!==group.id));setSelection({kind:'object',id:objectSelectionIds[0],ids:objectSelectionIds});}}>{tr("Разгруппировать")}</Button></>;
     }
 
     if(inspectedVariable&&(inspectedVariable===ANSWER_VARIABLE||Object.hasOwn(project.variables,inspectedVariable)))return <><VariableInspector key={inspectedVariable} variable={inspectedVariable} project={project} preview={preview} disabled={running} onEdit={updateVariable} onAddNode={(variable,kind)=>graphApi.current?.addVariableNode?.(variable,kind)}/>{selection.kind==='beat'&&<Button icon="Focus" onClick={()=>graphApi.current?.focus(beat.id)}>{tr("Показать ноду")}</Button>}</>;
@@ -1261,7 +1400,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     if(selection.kind==='camera'){
       const c=displayScene.cameras?.find(c=>c.id===selection.id);
       if(c)return <CameraInspector camera={c} scene={displayScene} objects={objects} state={world}
-        onChange={changeCamera} onDefault={id=>{if(!rt.running)mutate(p=>p.subscenes.find(s=>s.id===displayScene.id).defaultCameraId=id);}}
+        onChange={changeCamera} onDefault={id=>{if(!rt?.running)mutate(p=>p.subscenes.find(s=>s.id===displayScene.id).defaultCameraId=id);}}
         onDelete={deleteCamera} onPilot={pilotCamera} onView={viewCamera} onCapture={captureCamera}
         piloting={cameraPilotId} running={running} onEdit={editScene}/>;
     }
@@ -1396,21 +1535,18 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             />
           </div>
           {player&&transformInspector}
-          <ComponentInstancesInspector key={'components:'+o.id} project={project} scope={{kind:'object',id:o.id}} onChange={mutate} preview={preview} running={running} onOpen={(resourceId,mechanicId)=>{setGameplayRequest({resourceId,mechanicId,nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');}} onOpenFunction={(functionId,mechanicId)=>{setGameplayRequest({functionId,mechanicId,nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');}} onCreate={()=>{setGameplayRequest({createComponent:true,scope:{kind:'object',id:o.id},nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');}}/>
+          <ComponentInstancesInspector key={'components:'+o.id} project={project} scope={{kind:'object',id:o.id}} onChange={mutate} preview={preview} running={running} onOpen={(resourceId,mechanicId)=>{setGameplayRequest({resourceId,mechanicId,nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');}} onOpenFunction={(functionId,mechanicId)=>{setGameplayRequest({functionId,mechanicId,nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');}} onCreate={()=>{setGameplayRequest({createComponent:true,scope:{kind:'object',id:o.id},nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');}} allowMeshUpload={!o.builtin&&!['letter','door','fireplace','garden-note','ticket'].includes(o.id)} onMeshChange={async values=>{
+            if(rt?.running)return;
+            if('model' in values){
+              const next=structuredClone(project),target=next.objects.find(x=>x.id===o.id);
+              if(!target)throw new Error('Объект удалён.');if(target.model?.src!==values.model?.src)retainObjectModel(next,target);Object.assign(target,values);
+              try{if(window.sacuraDesktop?.isDesktop!==true)accountStorage.setItem(PROJECT_KEY,JSON.stringify(next));}catch{throw new Error('Не хватает места для автосохранения. Уменьшите модель или удалите неиспользуемые модели.');}
+            }
+            mutate(p=>{const target=p.objects.find(x=>x.id===o.id);if(!target)return;if('model' in values&&target.model?.src!==values.model?.src)retainObjectModel(p,target);Object.assign(target,values);});
+          }}/>
           {!player&&transformInspector}
           <Fold title={tr("Коллизия")} open={false}><CollisionInspector compact object={o} disabled={running} onChange={collision=>patch({collision})}/></Fold>
           {o.type==='Персонаж'&&<Fold title={tr("Виджет диалога")} icon="PanelsTopLeft" open={false}><WidgetAssignment project={project} character={o} onCustomize={()=>customizeWidget({characterId:o.id})} onChange={dialogueWidgetId=>patch({dialogueWidgetId})} onEdit={openWidgets} disabled={running}/><Button icon="Users" onClick={()=>{setDock('characters');setCompactPanel('workspace');}}>{tr("Модель и анимации персонажа")}</Button></Fold>}
-          {o.type!=='Персонаж'&&o.type!=='Источник света'&&<MeshInspector key={o.id} object={o} disabled={running}
-            allowUpload={!o.builtin&&!['letter','door','fireplace','garden-note','ticket'].includes(o.id)}
-            onChange={async values=>{
-              if(rt.running)return;
-              if('model' in values){
-                const next=structuredClone(project),target=next.objects.find(x=>x.id===o.id);
-                if(!target)throw new Error('Объект удалён.');if(target.model?.src!==values.model?.src)retainObjectModel(next,target);Object.assign(target,values);
-                try{if(window.sacuraDesktop?.isDesktop!==true)accountStorage.setItem(PROJECT_KEY,JSON.stringify(next));}catch{throw new Error('Не хватает места для автосохранения. Уменьшите модель или удалите неиспользуемые модели.');}
-              }
-              mutate(p=>{const target=p.objects.find(x=>x.id===o.id);if(!target)return;if('model' in values&&target.model?.src!==values.model?.src)retainObjectModel(p,target);Object.assign(target,values);});
-            }}/>}
           {running&&<Button icon="Square" onClick={editScene}>{tr("Остановить и редактировать сцену")}</Button>}
           <Fold title={tr("Объект сцены")} icon="Box" open={false}>
           <Field label={tr("Группа в иерархии")}><Select disabled={running} value={project.objectGroups?.find(g=>g.sceneId===scene.id&&g.objectIds.includes(o.id))?.id||''} options={[["","Объекты сцены · корень"],...(project.objectGroups||[]).filter(g=>g.sceneId===scene.id).map(g=>[g.id,literalLabel(g.name)])]} onChange={groupId=>mutate(p=>groupId?addObjectsToGroup(p,groupId,[o.id]):removeObjectsFromGroups(p,scene.id,[o.id]))}/></Field>
@@ -1432,7 +1568,6 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 onChange={(subsceneId) => patch({ subsceneId })}
               />
             </Field>
-            {!o.model&&!o.builtin&&!['letter','door','fireplace','garden-note','ticket'].includes(o.id)&&o.type!=='Персонаж'&&o.type!=='Источник света'&&<Field label={tr("Форма")}><Select value={o.primitive||'box'} options={[["box","Куб"],["sphere","Сфера"],["cylinder","Цилиндр"]]} onChange={primitive=>patch({primitive})}/></Field>}
             <Field label={o.type==='Источник света'?tr("Цвет света"):tr("Цвет в макете")}>
               <input
                 type="color"
@@ -1492,12 +1627,12 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         onEdit={editEvent} onAction={patchAction}
         onSelectAction={id=>setSelection({kind:'action',id})}
         onBack={()=>setSelection(binding?{kind:'binding',id:binding.id}:{kind:'event',id:event.id})}
-        onBinding={values=>{if(!rt.running)mutate(p=>Object.assign(allBeats(p).find(b=>b.id===contextBeat.id).bindings.find(b=>b.id===binding.id),values));}}
-        onReset={()=>{if(!rt.running)mutate(p=>{const b=allBeats(p).find(b=>b.id===contextBeat.id).bindings.find(b=>b.id===binding.id);b.actionOverrides={};b.overrides={};});}}
+        onBinding={values=>{if(!rt?.running)mutate(p=>Object.assign(allBeats(p).find(b=>b.id===contextBeat.id).bindings.find(b=>b.id===binding.id),values));}}
+        onReset={()=>{if(!rt?.running)mutate(p=>{const b=allBeats(p).find(b=>b.id===contextBeat.id).bindings.find(b=>b.id===binding.id);b.actionOverrides={};b.overrides={};});}}
         onOpenSource={()=>{const id=binding.sourceEventId||event.id;setEventContext({eventId:id});setSelection({kind:'event',id});}}
         onOpenEditor={()=>{setDock('event');setDetailEditor(true);setMaximized(null);}}
         onAdd={()=>{addEvent(event.id);openStaging(beat.id);}}
-        onRemove={()=>{if(rt.running)return;mutate(p=>removeEventBinding(p,contextBeat.id,binding.id));setEventContext(null);setSelection({kind:'beat',id:contextBeat.id});}}
+        onRemove={()=>{if(rt?.running)return;mutate(p=>removeEventBinding(p,contextBeat.id,binding.id));setEventContext(null);setSelection({kind:'beat',id:contextBeat.id});}}
         onPickPosition={id=>{editScene();setPositionPick({id,context:{...eventContext}});setNotice('Нажмите на место в 3D-сцене. Escape — отмена.');}}/>;
     }
 
@@ -1770,7 +1905,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 title={e.status === "paused" ? tr("Продолжить") : tr("Пауза")}
                 icon={e.status === "paused" ? "Play" : "Pause"}
                 onClick={() =>
-                  rt.controlEffect(
+                  rt?.controlEffect(
                     key,
                     e.status === "paused" ? "resume" : "pause",
                   )
@@ -1780,7 +1915,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 disabled={!running}
                 title={tr("Остановить этот эффект")}
                 icon="Square"
-                onClick={() => rt.controlEffect(key, "stop")}
+                onClick={() => rt?.controlEffect(key, "stop")}
               />
             </div>
           </div>
@@ -1818,7 +1953,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                     }
                     icon={i.status === "paused" ? "Play" : "Pause"}
                     onClick={() =>
-                      rt.controlInstance(
+                      rt?.controlInstance(
                         i.id,
                         i.status === "paused" ? "resume" : "pause",
                       )
@@ -1827,7 +1962,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   <Button
                     icon="Square"
                     title={tr("Завершить событие целиком")}
-                    onClick={() => rt.controlInstance(i.id, "stop")}
+                    onClick={() => rt?.controlInstance(i.id, "stop")}
                   />
                 </div>
               </div>
@@ -1846,12 +1981,94 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   useEffect(()=>{setContextMenu(null);},[dock,mode,displayScene.id,running]);
   const placeContextNode=(id,placement)=>setLayout(l=>({...l,positions:{...l.positions,[placement.graphKey]:{...l.positions[placement.graphKey],[id]:placement.position}}}));
   const addContextAction=type=>{
-    if(rt.running||!event||binding)return;
+    if(rt?.running||!event||binding)return;
     const action=makeAction(type);
     mutate(p=>{const ev=p.events.find(e=>e.id===event.id);if(!ev.groups.length)ev.groups.push({id:uid('group'),name:'Основное действие',actions:[]});ev.groups.at(-1).actions.push(action);});
     placeContextNode(action.id,contextMenu);setSelection({kind:'action',id:action.id});
   };
+  const openNativeEvents=({nodeId,phase,batchId,x,y})=>{
+    if(nativeEditing)return;
+    const rect=document.activeElement?.getBoundingClientRect?.();
+    setNativeFocus('story');setContextMenu({kind:'native-event',nodeId,phase,batchId,x:x??rect?.left??300,y:y??rect?.bottom??300});
+  };
+  const nativeCreateStoryDocument=async()=>native.story?.document||(await createNativeStory())?.document;
+  const nativeCreateNode=async kind=>{
+    const doc=await nativeCreateStoryDocument();if(!doc)return;
+    const before=new Set(doc.nodes.map(node=>node.id));
+    const offset=doc.nodes.length*56;
+    const result=await nativeCommand('story.addNode',{kind,x:80+offset,y:80+offset});
+    const node=result?.document?.nodes.find(item=>!before.has(item.id));
+    if(node){setNativeStorySelection({nodeId:node.id});setNativeFocus('story');setDock('story');}
+  };
+  const nativeEventNode=async()=>{
+    const doc=await nativeCreateStoryDocument();if(!doc)return null;
+    const selected=doc.nodes.find(node=>node.id===nativeStorySelection?.nodeId&&['Line','Choice'].includes(node.kind));
+    const node=selected||doc.nodes.find(item=>['Line','Choice'].includes(item.kind));
+    if(node)return node;
+    const before=new Set(doc.nodes.map(item=>item.id));
+    const result=await nativeCommand('story.addNode',{kind:'Line',x:80,y:80});
+    return result?.document?.nodes.find(item=>!before.has(item.id))||null;
+  };
+  const nativeCreateFromMenu=async id=>{
+    setMenu(null);
+    const x=menuAnchor.left+24,y=menuAnchor.top+12;
+    if(id==='component'||id==='object'||id==='beat'){
+      if(id==='beat'&&!await nativeCreateStoryDocument())return;
+      setContextMenu({kind:'native-create-'+id,x,y});return;
+    }
+    if(id==='subscene'){openProjectDialog('sceneNew');return;}
+    if(id==='action'){await nativeCreateNode('Action');return;}
+    const node=await nativeEventNode();if(!node)return;
+    setNativeStorySelection({nodeId:node.id});setNativeFocus('story');setDock('story');
+    if(id==='event'){openNativeEvents({nodeId:node.id,phase:'ON_START',x,y});return;}
+    if(id==='group'){
+      const before=new Set(node.bindings?.map(binding=>binding.id));
+      const result=await nativeCommand('story.addEvent',{nodeId:node.id,phase:'ON_START',actionKind:'Wait'});
+      const binding=result?.document?.nodes.find(item=>item.id===node.id)?.bindings?.find(item=>!before.has(item.id));
+      if(binding)setNativeStorySelection({nodeId:node.id,bindingId:binding.id,eventId:binding.eventId});
+    }
+  };
+  const createMenuAction=(id,event)=>{
+    if(isNative)return nativeCreateFromMenu(id);
+    if(id==='component'){setMenu(null);setGameplayRequest({createComponent:true,nonce:uid('request')});setDock('gameplay');maximizeWindow('gameplay');}
+    else if(id==='subscene')openSubscenes('create');
+    else if(id==='action'||id==='group')openAuthoring(id);
+    else if(id==='beat'){setMenu(null);setPicker({kind:'beat'});}
+    else if(id==='event'){setMenu(null);createEvent();}
+    else if(id==='object')openObjectPicker(event);
+  };
+  const nativeMenuItems=context=>nativeStoryMenu({context,story:native.story,selection:nativeStorySelection,disabled:nativeEditing||native.story?.readOnly,command:nativeCommand,
+    onSelect:value=>{setNativeStorySelection(value);setNativeFocus('story');},onEvents:openNativeEvents});
+  useEffect(()=>window.sacuraDesktop?.onNativeTest?.(async message=>{
+    if(message.action!=='story-menu')return;
+    try{
+      if(message.choose){const items=nativeMenuItems(message.context),item=items.find(i=>i.id===message.choose)||items.find(i=>i.label===message.choose);if(!item||item.disabled||!item.action)throw Error('Menu action unavailable');setContextMenu(null);await item.action();}
+      else setContextMenu(message.context);
+      await window.sacuraDesktop.bridgeTestResult({action:'story-menu',token:message.token,ok:true});
+    }catch(error){await window.sacuraDesktop.bridgeTestResult({action:'story-menu',token:message.token,ok:false,error:error.message});}
+  }),[native.context,native.story,nativeStorySelection,nativeEditing]);
   const contextItems=()=>{
+    if(isNative&&contextMenu?.kind==='scene')return nativeSceneMenuItems({context:contextMenu,selection:native.state?.selection,objects:native.objects,
+      editing:!nativeEditing,editSpace,showGrid,command:nativeCommand,select:selectNative,
+      focus:()=>setFocusRequest({nonce:uid('focus')}),setEditSpace,setShowGrid});
+    if(isNative&&contextMenu?.kind==='native-create-component')return native.types.map(type=>({
+      label:({'engine.CameraComponent':'Камера','engine.LightComponent':'Источник освещения','engine.MeshRendererComponent':'Меш','engine.PhysicsBodyComponent':'Физическое тело'}[type.typeId]||type.typeId.replace(/^.*\./,'')),
+      icon:'Puzzle',group:'Компоненты C++',searchText:type.typeId,action:async()=>{
+        let objectId=native.state?.selection;
+        if(!objectId)objectId=(await createNativeObject())?.id;
+        if(objectId)await nativeCommand('object.addComponent',{objectId,typeId:type.typeId});
+      }
+    }));
+    if(isNative&&contextMenu?.kind==='native-create-object')return [
+      {label:'Пустой объект',icon:'Box',action:()=>createNativeObject('GameObject')},
+      {label:'Камера',icon:'Video',action:()=>createNativeObject('Camera','engine.CameraComponent')},
+      {label:'Источник освещения',icon:'Lightbulb',action:()=>createNativeObject('Light','engine.LightComponent')},
+    ];
+    if(isNative&&contextMenu?.kind==='native-create-beat')return [
+      ['Line','Реплика','MessageSquare'],['Choice','Выбор игрока','GitFork'],
+      ['Action','Действие','Zap'],['End','Концовка','Flag']
+    ].map(([kind,label,icon])=>({label,icon,action:()=>nativeCreateNode(kind)}));
+    if(isNative)return nativeMenuItems(contextMenu);
     const scripting=()=>{const type=contextMenu?.valueType,fromSource=contextMenu?.pin?.handleType==='source';return {label:'Скриптинг',icon:'Code2',children:[{label:'Создать JavaScript-функцию…',icon:'FilePlus2',action:()=>{const fn=newScriptFunction(project,type);addBeat('script-function',{...contextMenu,functionId:fn.id,scriptFunction:fn,wireType:type});}},...project.functions.filter(f=>f.functionScript&&(!type||type==='any'||(fromSource?f.parameters.some(a=>scriptParameterType(a)===type):scriptFunctionType(f)===type))).map(fn=>({label:fn.name,icon:'Code2',action:()=>addBeat('script-function',{...contextMenu,functionId:fn.id,wireType:type,argumentName:fn.parameters.find(a=>scriptParameterType(a)===type)?.name})}))]};};
     if(contextMenu?.kind==='wire-drop'){
       const type=contextMenu.valueType,fromSource=contextMenu.pin.handleType==='source';
@@ -1879,6 +2096,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     if(contextMenu?.kind==='scene')return [
       {label:'Персонаж',icon:'PersonStanding',group:'Добавить объект',action:()=>addObject('Персонаж')},
       {label:'Интерактивный предмет',icon:'MousePointer2',group:'Добавить объект',action:()=>addObject('Активный меш')},
+      {label:'Пустой объект',icon:'Box',group:'Добавить объект',action:()=>addObject('Пустой объект')},
       {label:'Объект',icon:'Box',group:'Добавить объект',children:LOCATION_PRIMITIVES.map(([shape,label,icon])=>({label,icon,action:()=>addObject('Меш',shape)}))},
       {label:'Источник освещения',icon:'Lightbulb',group:'Добавить объект',action:()=>addObject('Источник света')},
       {label:'Точка постановки здесь',icon:'MapPin',group:'Добавить объект',action:addStagingPoint},
@@ -1935,7 +2153,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   onPositions={setPositions}
                   onReady={api=>onGraphReady(graphMode,api)}
                   onClipboard={graphClipboard}
-                  onContext={point=>{if(!rt.running)setContextMenu({...point,kind:graphMode});}}
+                  onContext={point=>{if(!rt?.running)setContextMenu({...point,kind:graphMode});}}
 
                 />);
   const renderHistory = () => (<div className="history-window-content"><input aria-label={tr("Поиск реплик")} placeholder={tr("Найти реплику…")} value={historyQuery} onChange={e=>setHistoryQuery(e.target.value)}/>{project.subscenes.map((s) => (
@@ -1994,7 +2212,53 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                     ))}
                 </details>
               ))}</div>);
-  const renderWorkspace=(dock,visible)=><>
+  const renderNativeWorkspace=(dock,visible)=>{
+    const openAsset=async asset=>{
+      if(asset.typeId==='Scene'){if(await nativeCommand('scene.open',{path:asset.relativePath})){setNativeFocus('scene');showBaseDock('scene');}}
+      else if(asset.typeId==='Story'){if(await nativeCommand('story.open',{assetId:asset.id})){setNativeFocus('story');setDock('story');}}
+      else {setNativeAssetId(asset.id);setNativeFocus('asset');}
+    };
+    if(dock==='files')return <AssetExplorer project={project} audioAssets={[]} disabled={nativeEditing} onSelectFile={id=>{setNativeAssetId(id);setNativeFocus('asset');}} adapter={{files:nativeFiles,open:openAsset,import:async folder=>{if(folder.startsWith('Engine'))throw Error('Engine Content доступен только для чтения');const results=await window.sacuraDesktop.nativeImportAssets(folder.replace(/^Game\/?/,''));await native.adapter.loadDomain('assets.list','assets');const failure=results.find(r=>!r.ok);if(failure)throw Error(failure.error.message);}}}/>;
+    if(dock==='characters')return <NativeCharacterWorkspace objects={native.objects} components={native.components} assets={native.assets}
+      selected={native.state?.selection} disabled={nativeEditing} playing={nativePlaying} dirty={native.state?.dirty}
+      command={nativeCommand} select={selectNative} onActivate={()=>setNativeFocus('scene')}
+      onFocus={async id=>{await selectNative(id);setFocusRequest({nonce:uid('focus')});}}
+      onImport={async()=>{const results=await window.sacuraDesktop.nativeImportAssets('Models');
+        const assets=await native.adapter.loadDomain('assets.list','assets');const failure=results.find(result=>!result.ok);
+        if(failure)throw Error(failure.error.message);
+        const imported=assets.find(asset=>asset.id===results.find(result=>result.ok)?.value?.id);
+        const mesh=imported?.subassets?.find(item=>item.typeId==='StaticMesh');
+        if(results.length&&!mesh)throw Error('В импортированном файле нет статического меша.');
+        return mesh?{assetId:imported.id,subAssetId:mesh.id,name:imported.name?.replace(/\.glb$/i,'')}:null;}}/>;
+    if(dock!=='story'&&dock!=='event')return <p role="status">Эта панель ещё не подключена к C++ Engine. Доступны Hierarchy, Inspector, Сцена, Файлы и История.</p>;
+    const doc=native.story?.document;
+    const select=value=>{setNativeFocus('story');setNativeStorySelection(!value?null:typeof value==='string'?{nodeId:value}:{nodeId:value.flowBeatId,eventId:value.event?.id,bindingId:value.binding?.id});};
+    const connect=async value=>{const changes=value.changes||[value];for(const c of changes){const node=doc.nodes.find(n=>n.id===c.source);if(!node)continue;const port=c.sourceHandle==='next'?-1:(node.choices||[]).findIndex(p=>'choice:'+p.id===c.sourceHandle);await nativeCommand('story.connect',{sourceId:c.source,port,targetId:c.target||null});}};
+    return <div style={{height:'100%',display:'flex',flexDirection:'column'}} onPointerDown={()=>setNativeFocus('story')}>
+      <div className="dock-toolbar"><select aria-label="Story asset" value={native.assets.find(a=>a.typeId==='Story'&&native.story?.path?.replaceAll('\\','/').endsWith('/'+a.relativePath))?.id||''} onChange={e=>nativeCommand('story.open',{assetId:e.target.value})}><option value="">Открыть историю…</option>{native.assets.filter(a=>a.typeId==='Story').map(a=><option key={a.id} value={a.id}>{a.path}</option>)}</select>
+        <input aria-label="Новый story asset" disabled={nativeStoryCreating} value={nativeStoryPath} onChange={e=>setNativeStoryPath(e.target.value)}/><Button disabled={nativeEditing||nativeStoryCreating} onClick={createNativeStory}>{nativeStoryCreating?'Создание…':'Создать историю'}</Button>
+        <Button disabled={!doc||nativeEditing} onClick={()=>nativeCommand('story.save')}>Сохранить</Button><Button disabled={!native.story?.canUndo||nativeEditing} onClick={()=>nativeCommand('story.undo')}>Undo</Button><Button disabled={!native.story?.canRedo||nativeEditing} onClick={()=>nativeCommand('story.redo')}>Redo</Button>
+        <span className="muted" title="Кнопка + у фазы открывает меню событий">ПКМ — добавить ноду</span>
+        <span>{native.story?.dirty?'Изменено':''}{native.story?.externalChanges?' · Файл изменён извне':''}</span>
+      </div>
+      {doc?<div style={{flex:1,minHeight:220}}><StoryFlow key={native.story.path} nativeMode model={nativeFlow.model} project={nativeFlow.project} running={nativeEditing||native.story.readOnly} selectedId={nativeStorySelection?.nodeId} selectionId={nativeStorySelection?.bindingId} positions={native.story.positions} onPositions={positions=>nativeCommand('story.moveNodes',{positions})} onSelect={select} onOpen={select} onConnect={connect}
+        onClipboard={()=>setNotice("Копирование и вставка native-нод пока не подключены.")} onReady={api=>onGraphReady(dock,api)} onDeleteNode={ids=>ids.forEach(nodeId=>nativeCommand('story.deleteNode',{nodeId}))} onContext={point=>{if(!nativeEditing)setContextMenu({...point,kind:'native-story'});}}
+        onAdd={(nodeId,phase)=>openNativeEvents({nodeId,phase})} onScene={()=>{}}
+        onChoice={(nodeId,choiceId,patch)=>{const node=doc.nodes.find(n=>n.id===nodeId),choices=[...(node.choices||[])];if(!choiceId)choices.push({label:patch.label,nextNodeId:''});else{const i=choices.findIndex(c=>c.id===choiceId);if(patch)choices[i]={...choices[i],label:patch.label};else choices.splice(i,1);}nativeCommand('story.updateNode',{nodeId,patch:{choices}});}}
+        onBatch={async(batchId,action,value,nodeId)=>{
+          if(action==='mode')return nativeCommand('story.batchMode',{nodeId,batchId,parallel:value==='PARALLEL'});
+          if(action==='removeBinding')return nativeCommand('story.removeEvent',{nodeId,bindingId:value});
+          if(action==='add'){
+            const node=doc.nodes.find(n=>n.id===nodeId),phase=Object.keys(node.batches).find(key=>node.batches[key].some(b=>b.id===batchId));
+            openNativeEvents({nodeId,phase,batchId});return;
+          }
+          select(nodeId);setNotice('Порядок группы изменяется списком «По очереди / Одновременно»; свойства Event — щелчком по событию.');
+        }}
+        onMoveBinding={(from,bindingId,to,phase,batchId,beforeId)=>{if(from!==to){setNotice('Перенос Event между нодами пока не подключён.');return;}nativeCommand('story.placeEvent',{nodeId:from,bindingId,phase,join:doc.nodes.find(n=>n.id===from)?.bindings?.find(b=>b.id===bindingId)?.join||'EVENT_END',...(batchId?{batchId}:{}),...(beforeId?{beforeId}:{})});}}
+      /></div>:<p>Откройте настоящий .story из AssetRegistry или создайте новый.</p>}
+    </div>;
+  };
+  const renderWorkspace=(dock,visible)=>isNative?renderNativeWorkspace(dock,visible):<>
             {["story", "timeline", "staging", "event"].includes(dock) && !detailEditor && (
               <div className="graph-toolbar">
                 {dock==='event'?<><Button icon="ArrowLeft" title={tr("Вернуться в поток истории")} onClick={()=>setDock('story')}/><span className="graph-breadcrumb">{event?.name}</span></>:<><Icon name="Route" size={15}/><span className="flow-toolbar-context">{project.subscenes.length} {tr("сабсцены · ")}{nodes.length} {tr("реплик · единый поток")}</span><Button icon="Focus" onClick={()=>graphApis.current[dock]?.focus(beat.id)}>{tr("К реплике")}</Button><Button icon="Scan" onClick={()=>graphApis.current[dock]?.fit()}>{tr("Вся история")}</Button></>}
@@ -2077,9 +2341,9 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             >
               {dock==='create'&&<AuthoringWorkspace hidden={!visible} project={project} request={authorRequest} mutate={mutate} beat={beat} onNotice={setNotice}
                 onGraph={id=>{setEventContext({eventId:id});setSelection({kind:'event',id});setDock('event');}}
-                onPreview={draft=>{setCameraPreviewId(null);setCameraPilotId(null);const test=structuredClone(project);const i=test.events.findIndex(e=>e.id===draft.id);if(i<0)test.events.push(draft);else test.events[i]=draft;soundDesk.unlock();rt.stop();setMode('game');setMaximized(null);setFollow(false);rt.previewEvent(test,draft.id,beat.id);}}
+                onPreview={draft=>{setCameraPreviewId(null);setCameraPilotId(null);const test=structuredClone(project);const i=test.events.findIndex(e=>e.id===draft.id);if(i<0)test.events.push(draft);else test.events[i]=draft;soundDesk.unlock();rt?.stop();setMode('game');setMaximized(null);setFollow(false);rt?.previewEvent(test,draft.id,beat.id);}}
                 onPlace={(draft,hook)=>{mutate(p=>addToBatch(p,beat.id,hook,null,draft.id));setPhase(hook);setDock('story');setMaximized(null);setNotice(tr("Добавлено: {0} · {1}", [draft.name, PHASES.find(x=>x.id===hook).label]));}}/>}
-              {dock==='create'?null:dock==='scripting'?<FunctionScriptsWorkspace project={project} requestedId={scriptFunctionId} onChange={mutate} disabled={running} onBack={()=>{setDock('story');setMaximized(null);}} onInsert={fn=>{addBeat('script-function',{functionId:fn.id});setMaximized(null);}}/>:dock==='gameplay'?<GameplayWorkspace onReturn={logicReturn?.dock!=='gameplay'&&logicReturn?returnToLogicCaller:undefined} preview={preview} onObject={id=>{setSelection({kind:"object",id});openObjectTransform();}} addRequest={gameplayRequest} onUndo={undo} onRedo={redo} canUndo={!!history.length} canRedo={!!future.length} onPlay={()=>start()} selectedObjectId={selection.kind==="object"?selection.id:null} project={project} onChange={mutate} onImport={plan=>changeAssetLibrary(p=>Object.assign(p,plan.apply(p)))} sceneId={displayScene.id} running={running} onStop={()=>rt.stop()} onWidgets={()=>{setWidgetRequest({id:project.gameplay.hudWidgetId||project.ui.hud});setDock('widgets');}} onInput={()=>setDock('input')} onEvent={openLogicEvent} onStory={()=>{setDock('story');setDetailEditor(false);}}/>:dock==='input'?<InputWorkspace project={project} onChange={mutate} beat={playBeat} preview={preview} devices={inputDevices} running={running} onStop={()=>rt.stop()}/>:dock==='event' && detailEditor && event ? (
+              {dock==='create'?null:dock==='scripting'?<FunctionScriptsWorkspace project={project} requestedId={scriptFunctionId} onChange={mutate} disabled={running} onBack={()=>{setDock('story');setMaximized(null);}} onInsert={fn=>{addBeat('script-function',{functionId:fn.id});setMaximized(null);}}/>:dock==='gameplay'?<GameplayWorkspace onReturn={logicReturn?.dock!=='gameplay'&&logicReturn?returnToLogicCaller:undefined} preview={preview} onObject={id=>{setSelection({kind:"object",id});openObjectTransform();}} addRequest={gameplayRequest} onUndo={undo} onRedo={redo} canUndo={!!history.length} canRedo={!!future.length} onPlay={()=>start()} selectedObjectId={selection.kind==="object"?selection.id:null} project={project} onChange={mutate} onImport={plan=>changeAssetLibrary(p=>Object.assign(p,plan.apply(p)))} sceneId={displayScene.id} running={running} onStop={()=>rt?.stop()} onWidgets={()=>{setWidgetRequest({id:project.gameplay.hudWidgetId||project.ui.hud});setDock('widgets');}} onInput={()=>setDock('input')} onEvent={openLogicEvent} onStory={()=>{setDock('story');setDetailEditor(false);}}/>:dock==='input'?<InputWorkspace project={project} onChange={mutate} beat={playBeat} preview={preview} devices={inputDevices} running={running} onStop={()=>rt?.stop()}/>:dock==='event' && detailEditor && event ? (
                 <EventEditor
                   project={project}
                   event={event}
@@ -2092,30 +2356,30 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   onPreview={()=>audition(event.id)}
                 />
               ) : ["story", "timeline", "staging"].includes(dock) ? (
-                <StoryFlow running={running} onVariableEdit={updateVariable} onVariableAdd={(variable,kind,point)=>{if(!rt.running)addBeat(kind,{...point,variable});}} onInspectVariable={inspectVariable} selectedVariable={inspectedVariable} onVariableDrop={point=>{if(rt.running)return;if(point.get||point.set)addBeat(point.set&&point.variable!==ANSWER_VARIABLE?'set-variable':'variable',point);else setContextMenu({...point,kind:'variable-drop'});}} onLogicChange={(id,patch)=>{if(!rt.running)mutate(p=>Object.assign(allBeats(p).find(n=>n.id===id),patch));}} onVariable={(id,name,type,value)=>{if(!rt.running)mutate(p=>{const node=allBeats(p).find(n=>n.id===id);node.valueType=type;node.variable=name.trim();if(node.variable&&node.variable!==ANSWER_VARIABLE)p.variables[node.variable]=typedValue(value,type);});}} onChoice={(id,choiceId,patch)=>{if(!rt.running)mutate(p=>{const b=allBeats(p).find(n=>n.id===id);if(!choiceId)b.choices.push(newChoice(uid('choice'),patch.label));else if(!patch)b.choices=b.choices.filter(c=>c.id!==choiceId);else Object.assign(b.choices.find(c=>c.id===choiceId),patch);});}} onClipboard={graphClipboard} contextNodeId={contextNodeId} project={project} issues={issues} selectedId={beat.id} selectionId={selection.id} preview={preview}
+                <StoryFlow running={running} onVariableEdit={updateVariable} onVariableAdd={(variable,kind,point)=>{if(!rt?.running)addBeat(kind,{...point,variable});}} onInspectVariable={inspectVariable} selectedVariable={inspectedVariable} onVariableDrop={point=>{if(rt?.running)return;if(point.get||point.set)addBeat(point.set&&point.variable!==ANSWER_VARIABLE?'set-variable':'variable',point);else setContextMenu({...point,kind:'variable-drop'});}} onLogicChange={(id,patch)=>{if(!rt?.running)mutate(p=>Object.assign(allBeats(p).find(n=>n.id===id),patch));}} onVariable={(id,name,type,value)=>{if(!rt?.running)mutate(p=>{const node=allBeats(p).find(n=>n.id===id);node.valueType=type;node.variable=name.trim();if(node.variable&&node.variable!==ANSWER_VARIABLE)p.variables[node.variable]=typedValue(value,type);});}} onChoice={(id,choiceId,patch)=>{if(!rt?.running)mutate(p=>{const b=allBeats(p).find(n=>n.id===id);if(!choiceId)b.choices.push(newChoice(uid('choice'),patch.label));else if(!patch)b.choices=b.choices.filter(c=>c.id!==choiceId);else Object.assign(b.choices.find(c=>c.id===choiceId),patch);});}} onClipboard={graphClipboard} contextNodeId={contextNodeId} project={project} issues={issues} selectedId={beat.id} selectionId={selection.id} preview={preview}
                   onSelect={graphSelect} onOpen={openGraph} onMoveBinding={moveBinding} onBatch={changeBatch} onConnect={connect} onDeleteNode={deleteFlowNode}
                   onScene={id=>openSubscenes('edit',id)}
-                  onContext={point=>{if(!rt.running)setContextMenu({...point,kind:point.kind||'story'});}}
+                  onContext={point=>{if(!rt?.running)setContextMenu({...point,kind:point.kind||'story'});}}
                   onAdd={(id,hook)=>{setSelectedBeat(id);setSelection({kind:'beat',id});setPicker({kind:'event',phase:hook});}}
                   positions={layout.positions['flow:all']||{}} onPositions={positions=>setPositions('flow:all',positions)} onReady={api=>onGraphReady(dock,api)}/>
               ) : dock === 'event' ? renderGraph('event') : dock === 'cameras' ? <CameraWorkspace scene={displayScene} objects={objects} selected={selection.kind==='camera'?selection.id:null} onSelect={selectCamera} onCreate={()=>createCamera()} onFollow={followCharacter} running={running} onEdit={editScene}/> : dock === 'subscenes' ? <SubsceneWorkspace project={project} scene={displayScene} beat={nodes.find(b=>b.id===subsceneDraft?.fromBeatId)||beat} request={subsceneRequest} draft={subsceneDraft} onDraftChange={setSubsceneDraft} running={running}
                 onSaveLocation={async()=>{try{const data=await portableProject(exportLocation(project,displayScene.id));const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download='location.sacura-location.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setNotice('Локация сохранена в файл.');}catch(e){setNotice(e.message);}}}
-                onLoadLocation={async file=>{try{if(rt.running)return;validateImportSize(file);const raw=await file.text(),next=structuredClone(project),created=importLocation(next,raw);mutate(p=>Object.assign(p,next));setSelectedBeat(created.entry);setSelection({kind:'scene',id:created.id});setMode('scene');setMaximized(null);setNotice(tr("Локация загружена: {0}", [created.name]));}catch(e){setNotice(tr("Локация не загружена: {0}", [e.message]));}}}
-                onStop={()=>rt.stop()} onSelect={id=>openSubscenes('edit',id)} onCreate={draft=>saveNewSubscene(draft)} onDuplicate={id=>saveNewSubscene(null,id)}
+                onLoadLocation={async file=>{try{if(rt?.running)return;validateImportSize(file);const raw=await file.text(),next=structuredClone(project),created=importLocation(next,raw);mutate(p=>Object.assign(p,next));setSelectedBeat(created.entry);setSelection({kind:'scene',id:created.id});setMode('scene');setMaximized(null);setNotice(tr("Локация загружена: {0}", [created.name]));}catch(e){setNotice(tr("Локация не загружена: {0}", [e.message]));}}}
+                onStop={()=>rt?.stop()} onSelect={id=>openSubscenes('edit',id)} onCreate={draft=>saveNewSubscene(draft)} onDuplicate={id=>saveNewSubscene(null,id)}
                 onPatch={patch=>editSubscene(p=>Object.assign(p.subscenes.find(s=>s.id===scene.id),patch))}
                 onKind={kind=>editSubscene(p=>changeSceneLocation(p,scene.id,kind))} onEntry={(id,reroute)=>editSubscene(p=>setSceneEntry(p,scene.id,id,reroute))}
                 onConnect={(from,choice,to)=>{editSubscene(p=>connectSubscene(p,from,choice,to));setNotice('Переход сохранён. Он виден на карте и работает при запуске.');}}
                 onDisconnect={(from,choice,to)=>{editSubscene(p=>{const b=allBeats(p).find(b=>b.id===from),edge=choice?b?.choices.find(c=>c.id===choice):b;if(edge?.next===to)edge.next=null;});setNotice('Переход убран. Ctrl+Z — вернуть.');}}
                 onOpenBeat={openSubsceneBeat} onScene={editScene} onPrimitive={shape=>addObject("Меш",shape)} onCameras={openCameras} onCreateRequest={()=>openSubscenes('create')}
-                onCancel={()=>setSubsceneRequest({mode:'edit',token:uid('request')})}/> : dock === 'samples' ? <EventPlayground project={project} preview={preview} scene={displayScene} onPreview={audition} onEdit={editSample} onAdd={id=>{mutate(p=>addToBatch(p,beat.id,'ON_START',null,id));setNotice(tr("Событие добавлено: во время реплики {0}", [beat.id]));}}/> : dock === "widgets" ? <WidgetWorkspace project={project} onChange={mutate} request={widgetRequest} beat={beat} running={running} onStop={()=>{rt.stop();setGameMenu(null);}}
-                onPreview={widget=>{setMode('game');setPreviewWidgetId(widget.id);if(widget.kind==='mainMenu'){setGameMenu('mainMenu');}else if(widget.kind==='pauseMenu'){start();setPreviewWidgetId(widget.id);rt.togglePause();}else{setGameMenu(null);setShowDialogue(true);}}}/>: dock === "characters" ? <CharacterWorkspace project={project} scene={displayScene} selected={selection.kind==="object"?selection.id:null} running={running} onStop={()=>rt.stop()}
+                onCancel={()=>setSubsceneRequest({mode:'edit',token:uid('request')})}/> : dock === 'samples' ? <EventPlayground project={project} preview={preview} scene={displayScene} onPreview={audition} onEdit={editSample} onAdd={id=>{mutate(p=>addToBatch(p,beat.id,'ON_START',null,id));setNotice(tr("Событие добавлено: во время реплики {0}", [beat.id]));}}/> : dock === "widgets" ? <WidgetWorkspace project={project} onChange={mutate} request={widgetRequest} beat={beat} running={running} onStop={()=>{rt?.stop();setGameMenu(null);}}
+                onPreview={widget=>{setMode('game');setPreviewWidgetId(widget.id);if(widget.kind==='mainMenu'){setGameMenu('mainMenu');}else if(widget.kind==='pauseMenu'){start();setPreviewWidgetId(widget.id);rt?.togglePause();}else{setGameMenu(null);setShowDialogue(true);}}}/>: dock === "characters" ? <CharacterWorkspace project={project} scene={displayScene} selected={selection.kind==="object"?selection.id:null} running={running} onStop={()=>rt?.stop()}
                 onSelect={id=>{setSelection({kind:"object",id});setCompactPanel("workspace");}}
                 onCreate={name=>{const next=structuredClone(project),character=createCharacter(next,scene.id,name);mutate(p=>Object.assign(p,next));setSelection({kind:"object",id:character.id});setMode("scene");setCompactPanel("workspace");}}
                 onCustomizeWidget={id=>customizeWidget({characterId:id})} onEditWidget={openWidgets} onPatch={patchCharacter} onPresence={(id,sceneId,present)=>editSubscene(p=>setCharacterInScene(p,id,sceneId,present))}
                 onTransform={(id,sceneId,value)=>editSubscene(p=>setObjectTransform(p,id,sceneId,value))}
                 onReset={(id,sceneId)=>editSubscene(p=>{const character=p.objects.find(object=>object.id===id);if(character?.transforms)delete character.transforms[sceneId];})}
                 onPlace={(id,sceneId)=>{openSubscenes("edit",sceneId);editScene();setSelection({kind:"object",id});setFocusRequest({nonce:uid("focus")});}}
-                onDuplicate={duplicateCharacter} onDelete={id=>{if(!rt.running)deleteObject(id);}}/> : dock === "files" ? (
+                onDuplicate={duplicateCharacter} onDelete={id=>{if(!rt?.running)deleteObject(id);}}/> : dock === "files" ? (
                 <AssetExplorer onLogic={resourceId=>{setGameplayRequest({resourceId,nonce:uid('request')});setDock('gameplay');maximizeWindow('gameplay');}} onSelectFile={id=>{setSelection({kind:'file',id});setLayout(l=>({...l,hiddenInspector:false}));setCompactPanel('inspector');setMaximized(null);}} project={project} audioAssets={projectAudioAssets(project)} disabled={running}
                   onImport={importProjectAudioFiles}
                   onCreateFolder={path=>changeAssetLibrary(p=>{p.assetFolders=[...new Set([...(p.assetFolders||[]),path])];})}
@@ -2208,48 +2472,51 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         <div className="flex-space" />
         <span className="project-title" title={project.title}>
           <Icon name="FolderOpen" size={14} />
-          {project.title}
+          {isNative?native.state?.project||'C++ Engine':project.title}
         </span>
         <div className="main-play-controls">
           <Button
-            className={running ? "playing" : ""}
-            icon={running ? "Square" : "Play"}
+            className={(isNative?nativePlaying:running) ? "playing" : ""}
+            icon={(isNative?nativePlaying:running) ? "Square" : "Play"}
             title={
               running
                 ? tr("Остановить предпросмотр")
                 : tr("Запустить с начала текущей сабсцены")
             }
-            onClick={() => (running ? rt.stop() : start())}
-          >{running ? tr("Стоп") : tr("Запуск")}</Button>
-          <Button icon="Play" title={tr("Проверить историю с выделенной реплики")} disabled={running} onClick={()=>start(true)}>{tr("С реплики")}</Button>
+            disabled={isNative&&!native.connected} onClick={() => isNative?nativeCommand(native.state?.play==="stopped"?"play.start":"play.stop"):(running ? rt?.stop() : start())}
+          >{(isNative?nativePlaying:running) ? tr("Стоп") : tr("Запуск")}</Button>
+          <Button icon="Play" title={tr("Проверить историю с выделенной реплики")} disabled={isNative||running} onClick={()=>start(true)}>{tr("С реплики")}</Button>
           <Button
             icon="Pause"
             title={tr("Пауза / продолжить")}
-            className={preview?.paused ? "active" : ""}
-            disabled={!running || preview.phase === "FINISHED"}
-            onClick={() => rt.togglePause()}
+            className={(isNative?native.state?.play==='paused':preview?.paused) ? "active" : ""}
+            disabled={isNative?native.state?.play==="stopped"||!native.connected:!running || preview.phase === "FINISHED"}
+            onClick={() => isNative?nativeCommand(native.state?.play==="paused"?"play.start":"play.pause"):rt?.togglePause()}
           />
           <Button
             icon="StepForward"
-            title={tr("Следующая реплика")}
+            title={isNative?"Step · один кадр PlaySession":tr("Следующая реплика")}
             disabled={
-              !running ||
+              isNative ? native.state?.play!=="paused" : !running ||
               !preview.ready ||
               preview.paused ||
               ["choice", "gate"].includes(playBeat.kind)
             }
-            onClick={() => rt.advance()}
+            onClick={() => isNative?nativeCommand("play.step"):rt?.advance()}
           />
         </div>
         {running&&<div className="toolbar-layout">
           <span className="play-label">{preview.paused ? tr("На паузе") : tr("Предпросмотр")}</span>
         </div>}
-        {onHome&&<Button icon="FolderOpen" disabled={projectFileBusy} onClick={()=>runFileOperation(async()=>{rt.stop();await onHome(project);})}>{tr("Главное меню")}</Button>}
+        {onHome&&<Button icon="FolderOpen" disabled={projectFileBusy} onClick={()=>runFileOperation(async()=>{rt?.stop();await onHome(project);})}>{isNative?"К проектам":tr("Главное меню")}</Button>}
         {user&&<button onClick={()=>onLogout(project)} title={tr("Выйти из аккаунта {0}", [user.login])}>{user.login} {tr("· Выйти")}</button>}
         <LanguagePicker onOpen={() => setMenu(null)} />
         <ThemePicker onOpen={() => setMenu(null)} />
         {logicReturn&&<Button icon="ArrowLeft" onClick={returnToLogicCaller}>{tr('К месту вызова')}</Button>}
       </header>
+      {isNative&&(native.state?.assetError||native.story?.error)&&<div role="alert" className="error-box" style={{flex:'0 0 auto',maxHeight:120,overflow:'auto'}}>{native.state?.assetError||native.story?.error}</div>}
+      {isNative&&native.error&&<div role="alert" className="error-box" style={{flex:'0 0 auto',maxHeight:120,overflow:'auto'}}>{native.error}<button onClick={()=>native.adapter.clearError()}>Закрыть</button></div>}
+      {isNative&&(native.state?.externalChanges||native.state?.projectExternalChanges||native.story?.externalChanges)&&<div role="alert" className="error-box" style={{flex:'0 0 auto',maxHeight:120,overflow:'auto'}}>Файлы проекта изменены вне редактора. Сохранение поверх изменённой версии заблокировано. <button onClick={()=>runFileOperation(()=>window.sacuraDesktop.nativeReloadProject())}>Перечитать проект…</button><button onClick={()=>openProjectDialog('sceneCopy')}>Сохранить копию сцены…</button></div>}
       <div className={'editor-workspace compact-'+compactPanel+(layout.hiddenHierarchy?' hierarchy-hidden':'')+(layout.hiddenInspector?' inspector-hidden':'')+(['scene','graph'].includes(maximized)?' focus-center':maximized==='hierarchy'?' focus-hierarchy':maximized==='inspector'?' focus-inspector':'')}>
         <nav className="compact-panel-tabs" aria-label={tr("Панели редактора")}>
           {[['hierarchy','ListTree','Объекты сцены'],['workspace','PanelsTopLeft','Рабочая область'],['inspector','Settings2','Свойства']].map(([id,icon,label])=><button key={id} aria-pressed={compactPanel===id} onClick={()=>{if(['hierarchy','inspector'].includes(maximized))setMaximized(null);setCompactPanel(id);}}><Icon name={icon} size={13}/>{tr(label)}</button>)}
@@ -2266,7 +2533,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           <EditorDockBody area="hierarchy"/>
           <DockDropTarget area="hierarchy"/>
           <div className="hierarchy-toolbar">
-            <Button className="hierarchy-add" icon="Plus" title={tr("Добавить объект")} aria-haspopup="menu" aria-expanded={picker?.kind==='object'&&picker.anchor===root.current?.querySelector('.hierarchy-add')} disabled={running} onClick={openObjectPicker}/>
+            <Button className="hierarchy-add" icon="Plus" title={tr("Добавить объект")} aria-haspopup="menu" aria-expanded={picker?.kind==='object'&&picker.anchor===root.current?.querySelector('.hierarchy-add')} disabled={isNative?nativeEditing:running} onClick={isNative?createNative:openObjectPicker}/>
             <div className="panel-search">
               <Icon name="Search" size={13} />
               <input
@@ -2278,19 +2545,19 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             </div>
           </div>
           <div className="hierarchy-tree">
-              <HierarchyTree playerId={project.gameplay?.controller?.mode!=='none'?project.gameplay?.controller?.ownerId:undefined} onAddObject={(groupId,event)=>openObjectPicker(event,groupId)} onRootDrop={ids=>{if(!rt.running)mutate(p=>removeObjectsFromGroups(p,displayScene.id,ids));}} groups={sceneObjectGroups(project,displayScene.id,objects)} disabled={running} onSelectGroup={group=>{if(rt.running)return;setMode('scene');setSelection(group.objectIds.length?{kind:'object',id:group.objectIds[0],ids:group.objectIds,groupId:group.id}:{kind:'group',id:group.id});openObjectTransform();}} onGroupDrop={(groupId,ids)=>{if(!rt.running)mutate(p=>addObjectsToGroup(p,groupId,ids));}} scene={displayScene} objects={objects} points={sceneStagingPoints(displayScene,objects)} query={query} selected={selection.id} selectedIds={objectSelectionIds}
+              <HierarchyTree playerId={project.gameplay?.controller?.mode!=='none'?project.gameplay?.controller?.ownerId:undefined} onAddObject={(groupId,event)=>openObjectPicker(event,groupId)} onRootDrop={ids=>{if(!rt?.running)mutate(p=>removeObjectsFromGroups(p,displayScene.id,ids));}} groups={sceneObjectGroups(project,displayScene.id,objects)} disabled={running} onSelectGroup={group=>{if(rt?.running)return;setMode('scene');setSelection(group.objectIds.length?{kind:'object',id:group.objectIds[0],ids:group.objectIds,groupId:group.id}:{kind:'group',id:group.id});openObjectTransform();}} onGroupDrop={(groupId,ids)=>{if(!rt?.running)mutate(p=>addObjectsToGroup(p,groupId,ids));}} scene={displayScene} objects={objects} points={sceneStagingPoints(displayScene,objects)} query={query} selected={selection.id} selectedIds={objectSelectionIds}
                 expanded={layout.treeOpen||{}} onExpanded={treeOpen=>setLayout(l=>({...l,treeOpen}))}
                 onSelectObject={(id,options)=>{if(!running){setMode('scene');setCameraPilotId(null);setCameraPreviewId(null);}selectObject(id,options);}}
                 onFrameObject={id=>{editScene();showBaseDock('inspector');setLayout(l=>({...l,hiddenInspector:false}));setSelection({kind:'object',id});setFocusRequest({nonce:uid('focus')});}}
                 onVisibility={id=>mutate(p=>{const o=p.objects.find(o=>o.id===id);o.active=o.active===false;})}
                 onPoint={point=>{editScene();setSelection({kind:'point',id:point.id});openObjectTransform();setFocusRequest({nonce:uid('focus'),position:point.position,objectId:point.objectId});}}
-                onSelectCamera={selectCamera}/>
+                onSelectCamera={selectCamera} {...(isNative?{scene:nativeScene,objects:native.objects,groups:[],points:[],playerId:undefined,disabled:nativeEditing,selected:native.state?.selection,selectedIds:native.state?.selection?[native.state.selection]:[],onSelectObject:selectNative,onFrameObject:id=>{selectNative(id);setFocusRequest({nonce:uid('focus')});},onVisibility:undefined,onReparent:(objectId,parentId)=>nativeCommand('object.setParent',{objectId,parentId}),onRootDrop:ids=>ids.forEach(objectId=>nativeCommand('object.setParent',{objectId,parentId:null})),onRename:id=>{selectNative(id);setNotice('Измените имя объекта в Inspector.');},onDelete:objectId=>nativeCommand('object.destroy',{objectId})}: {})}/>
 
           </div>
           <div className="hierarchy-footer">
             <Icon name="Layers" size={13} />
-            {objects.length} {tr("объектов")}<span />
-            {nodes.length} {tr("блоков")}</div>
+            {isNative?native.objects.length:objects.length} {tr("объектов")}<span />
+            {isNative?native.story?.document?.nodes.length||0:nodes.length} {tr("блоков")}</div>
           <InfoView />
         </aside>
         <ResizeBar
@@ -2329,12 +2596,12 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 {tr("Игра")}</button>
               <EditorDockTabs area="scene"/>
               <div className="flex-space" />
-              <Button icon="PanelsTopLeft" title={tr("Редактор интерфейса игры")} onClick={()=>openWidgets(resolveWidget(project,'dialogue',beat).id)}/>
-              {mode==='game'&&<Button icon="Menu" title={tr("Главное меню игры")} onClick={()=>{rt.stop();setGameMenu('mainMenu');setPreviewWidgetId(null);}}>{tr("Меню")}</Button>}
+              <Button disabled={isNative} icon="PanelsTopLeft" title={isNative?"Редактор игрового UI пока не подключён":tr("Редактор интерфейса игры")} onClick={()=>openWidgets(resolveWidget(project,'dialogue',beat).id)}/>
+              {!isNative&&mode==='game'&&<Button icon="Menu" title={tr("Главное меню игры")} onClick={()=>{rt?.stop();setGameMenu('mainMenu');setPreviewWidgetId(null);}}>{tr("Меню")}</Button>}
               {mode==='game'&&running&&!preview.audition&&<><Button icon="Save" title={tr("Сохранить прохождение")} onClick={()=>widgetAction('save')}>{tr("Сохранить прохождение")}</Button><Button icon="FolderOpen" title={tr("Загрузить прохождение")} onClick={()=>widgetAction('load')}>{tr("Загрузить прохождение")}</Button></>}
               <button
                 title={tr("Диалог в игровом кадре")}
-                hidden={mode !== "game"}
+                hidden={isNative||mode !== "game"}
                 aria-pressed={showDialogue}
                 className={showDialogue ? "toggled" : ""}
                 onClick={() => setShowDialogue((v) => !v)}
@@ -2357,12 +2624,12 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             <DockDropTarget area="scene"/>
             <div className="viewport-commandbar" aria-label={tr("Инструменты сцены")}>
               {mode==='scene'&&!cameraPilotId&&<div className="scene-edit-bar">
-                {[['select','MousePointer2','Выбор','Q'],['translate','Move','Сдвиг','W'],['rotate','Rotate3D','Поворот','E'],['scale','Scaling','Масштаб','R']].map(([tool,icon,label,key])=><button key={tool} disabled={running||(selection.kind==='camera'&&(tool==='scale'||(tool==='rotate'&&displayScene.cameras?.find(c=>c.id===selection.id)?.mode==='follow')))} title={tr(label)+' · '+key} aria-pressed={editTool===tool} className={'transform-tool '+(editTool===tool?'active':'')} onClick={()=>setEditTool(tool)}><Icon name={icon} size={14}/><span className="tool-label">{tr(label)} · {key}</span></button>)}
+                {[['select','MousePointer2','Выбор','Q'],['translate','Move','Сдвиг','W'],['rotate','Rotate3D','Поворот','E'],['scale','Scaling','Масштаб','R']].map(([tool,icon,label,key])=><button key={tool} disabled={(isNative?nativeEditing:running)||(selection.kind==='camera'&&(tool==='scale'||(tool==='rotate'&&displayScene.cameras?.find(c=>c.id===selection.id)?.mode==='follow')))} title={tr(label)+' · '+key} aria-pressed={editTool===tool} className={'transform-tool '+(editTool===tool?'active':'')} onClick={()=>setEditTool(tool)}><Icon name={icon} size={14}/><span className="tool-label">{tr(label)} · {key}</span></button>)}
                 <button title={tr("Привязка: 0,25 м / 15° / 0,1×")} aria-pressed={snap} className={snap?'active':''} onClick={()=>setSnap(v=>!v)}><Icon name="Magnet" size={14}/></button>
                 <Button icon="Grid3X3" title={tr("Сетка сцены")} aria-pressed={showGrid} className={showGrid?"active":""} onClick={()=>setShowGrid(v=>!v)}/>
               </div>}
               {cameraPilotId&&mode==='scene'&&<div className="camera-pilot-bar"><Icon name="Video"/><span>{tr("Настройка: ")}{displayScene.cameras?.find(c=>c.id===cameraPilotId)?.name}<small>{tr("Обзор мышью · правая кнопка — сдвиг · колесо — приближение")}</small></span><Button icon="Check" onClick={()=>captureCamera(cameraPilotId)}>{tr("Сохранить ракурс")}</Button><Button icon="X" title={tr("Вернуться без сохранения")} onClick={()=>setCameraPilotId(null)}/></div>}
-              {(mode==='game'||(cameraPreviewId&&!cameraPilotId))&&<div className="camera-view-badge"><Icon name={resolveCamera(displayScene,world,objects,cameraPreviewId).mode==='follow'?'UserRoundCheck':'Video'} size={14}/><span className="camera-view-name">{resolveCamera(displayScene,world,objects,cameraPreviewId).name}</span>{cameraPreviewId&&<button onClick={()=>setCameraPreviewId(null)}>{mode==='game'?tr("По сценарию"):tr("Вернуться к сцене")} <Icon name="X" size={12}/></button>}</div>}
+              {!isNative&&(mode==='game'||(cameraPreviewId&&!cameraPilotId))&&<div className="camera-view-badge"><Icon name={resolveCamera(displayScene,world,objects,cameraPreviewId).mode==='follow'?'UserRoundCheck':'Video'} size={14}/><span className="camera-view-name">{resolveCamera(displayScene,world,objects,cameraPreviewId).name}</span>{cameraPreviewId&&<button onClick={()=>setCameraPreviewId(null)}>{mode==='game'?tr("По сценарию"):tr("Вернуться к сцене")} <Icon name="X" size={12}/></button>}</div>}
               <details className="viewport-help"><summary title={tr("Управление сценой")} aria-label={tr("Управление сценой")}><Icon name="CircleHelp" size={15}/></summary><div>{mode==='game'?<>{tr("Кадр показан из активной камеры.")}<br/>{tr("Выберите камеру в иерархии, чтобы посмотреть её ракурс.")}<br/>{tr("«По сценарию» возвращает камеру, выбранную историей.")}<br/>{inputHelp(playProject.input,inputContextsFor(playProject,playBeat),['move','interact','point','advance','pause'])}<br/>{tr("Для настройки ракурса вернитесь в «Локацию».")}</>:<>{tr("W — перемещение · E — вращение")}<br/>{tr("R — масштаб · Q — выбор")}<br/>{tr("Работают и в русской раскладке")}<br/>{tr("Shift + щелчок — мультивыбор")}<br/>{tr("Alt + ЛКМ — орбита · СКМ — панорама")}<br/>{tr("ПКМ + WASD / QE — полёт")}<br/>{tr("F — выделение в кадр")}<br/>{tr("Delete — удалить выделенные объекты")}<br/>{tr("Ctrl+Z — вернуть удалённые объекты")}</>}</div></details>
             </div>
             <div
@@ -2382,9 +2649,9 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 }
               }}
             >
-              <LocationScene
+              <SceneViewport onCreateProject={()=>openProjectDialog('new')} onActivate={()=>setNativeFocus('scene')} blocked={!!(contextMenu || picker || projectDialog || detailEditor || menu || running || positionPick)}
                 sceneId={displayScene.id}
-                editTool={editTool} editSpace={editSpace} snap={snap} focusRequest={cameraPilotId?0:focusRequest} editing={!running&&!cameraPilotId&&!positionPick} onTransform={transformObject} onTransforms={transformObjects}
+                editTool={editTool} editSpace={editSpace} snap={snap} focusRequest={cameraPilotId?0:focusRequest} editing={!running&&!cameraPilotId&&!positionPick&&(!isNative||!nativeEditing)} onTransform={transformObject} onTransforms={transformObjects}
                 cameraScene={displayScene} selectedCameraId={selection.kind==='camera'?selection.id:null} cameraPreviewId={cameraPreviewId} cameraPilotId={cameraPilotId} onCameraChange={changeCamera} onCameraSelect={selectCamera} cameraApi={cameraApi} physicsApi={physicsApi}
                 kind={displayScene.kind}
                 objects={objects}
@@ -2401,25 +2668,26 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   setPositionPick(null);setNotice(tr("Координаты выбраны: {0}", [value.join(', ')]));
                 }:undefined}
                 onSelect={selectObject}
-                onContext={point=>{if(!rt.running)setContextMenu({...point,kind:'scene'});}}
+                onContext={point=>{if(!rt?.running&&(!isNative||!nativeEditing))setContextMenu({...point,kind:'scene'});}}
                 inputSettings={playProject.input}
-                onInputAction={event=>rt.inputAction(event)}
+                onInputAction={event=>rt?.inputAction(event)}
                 onInputDevices={setInputDevices}
-                onPlayerStep={(direction,dt)=>rt.playerStep(direction,dt)}
-                onPlayerClick={(point,id)=>rt.playerClick(point,id)}
-                onPlayerInteract={()=>rt.playerInteract()}
+                onPlayerStep={(direction,dt)=>rt?.playerStep(direction,dt)}
+                onPlayerClick={(point,id)=>rt?.playerClick(point,id)}
+                onPlayerInteract={()=>rt?.playerInteract()}
                 onInteract={interact}
               />
-              {mode==='game'&&<TouchInput settings={playProject.input} contexts={world.inputContexts||[]} active={world.inputActive} playerMode={world.playerControl?.mode} paused={world.paused||!world.inputReady}/>}
+              {isNative&&nativePlaying&&<NativeDialogue state={native.state} session={native.context?.session} onAdvance={()=>nativeCommand('play.advanceDialogue')} onChoice={index=>nativeCommand('play.selectChoice',{index})}/>}
+              {!isNative&&<>{mode==='game'&&<TouchInput settings={playProject.input} contexts={world.inputContexts||[]} active={world.inputActive} playerMode={world.playerControl?.mode} paused={world.paused||!world.inputReady}/>}
               {positionPick&&<div className="viewport-caption"><strong>{tr("Выберите точку на сцене")}</strong><Button icon="X" onClick={()=>setPositionPick(null)}>{tr("Отмена")}</Button></div>}
-              <GameDialogue project={running?rt.project:project}
+              <GameDialogue project={running?rt?.project:project}
                 beat={playBeat}
                 onUiAction={widgetAction}
                 widgetOverride={!running?project.widgets.find(w=>w.id===previewWidgetId&&w.kind==='dialogue'):null}
                 preview={preview}
                 running={running}
                 variables={variables}
-                onAdvance={(c) => rt.advance(c)}
+                onAdvance={(c) => rt?.advance(c)}
                 onStart={start}
                 objectLabel={
                   playProject.objects.find((o) => o.id === playBeat.signal)
@@ -2438,7 +2706,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 </div>
               )}
               {running&&!preview.world.playerControl&&<div className="scene-activity" aria-live="polite">
-                {preview.audition&&<header><Icon name="Clapperboard" size={13}/><strong>{tr("Проба · ")}{preview.auditionName}</strong><button title={tr("Закончить пробу")} onClick={()=>rt.stop()}><Icon name="X" size={13}/></button></header>}
+                {preview.audition&&<header><Icon name="Clapperboard" size={13}/><strong>{tr("Проба · ")}{preview.auditionName}</strong><button title={tr("Закончить пробу")} onClick={()=>rt?.stop()}><Icon name="X" size={13}/></button></header>}
                 {(preview.activity||[]).slice(-4).map(a=><div className={'activity-item '+a.status} key={a.id}><Icon name={a.status==='running'?'LoaderCircle':'Check'} size={12}/><span>{tr(TYPES[a.type]?.label)} <b>{project.objects.find(o=>o.id===a.target)?.name||''} {activityValue(project,a).slice(0,64)}</b></span>{a.status==='running'&&<progress max="1" value={a.progress||0}/>}</div>)}
                 {preview.error&&<span className="error-box">{message(preview.error)}</span>}
               </div>}
@@ -2452,8 +2720,9 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   ? `${preview.beatId||playScene.name} / ${preview.phase}`
                   : tr("3D · примитивы")}
               </div>}
+              </>}
             </div>
-            <ComponentRuntimeIssue diagnostic={preview?.componentError} onOpen={issue=>{rt.stop();if(issue.owner.kind==='object'&&project.objects.some(o=>o.id===issue.owner.id))setSelection({kind:'object',id:issue.owner.id});setGameplayRequest({resourceId:issue.resourceId,functionId:issue.functionId,mechanicId:issue.instanceId,nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');maximizeWindow('gameplay');}}/>
+            <ComponentRuntimeIssue diagnostic={preview?.componentError} onOpen={issue=>{rt?.stop();if(issue.owner.kind==='object'&&project.objects.some(o=>o.id===issue.owner.id))setSelection({kind:'object',id:issue.owner.id});setGameplayRequest({resourceId:issue.resourceId,functionId:issue.functionId,mechanicId:issue.instanceId,nonce:uid('request')});setDock('gameplay');setCompactPanel('workspace');maximizeWindow('gameplay');}}/>
             {(running || [...soundDesk.tracks.values()].some(t=>["playing","error"].includes(t.status))) && <div className="live-strip">
               <output className="audio-output" title={tr("Измеренный уровень на аудиовыходе")} aria-label={tr("Уровень звукового выхода")}><Icon name="Volume2" size={13}/><meter min="0" max="1" value={[...soundDesk.tracks.values()].some(t=>t.status==='playing')?(soundDesk.output?.level()||0):0}/><span>{soundDesk.output?.context?.state==='running'?tr("Аудио включено"):tr("Аудио · нажмите Play")}</span></output>
               <button onClick={() => setDock("active")}>
@@ -2504,13 +2773,13 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         <aside data-dock-root="inspector" className={"inspector-panel dockable-region"+(inspectorTool?" has-docked-tool":"")}>
           <button className="panel-restore" aria-label={tr("Показать инспектор")} title={tr("Показать инспектор")} onClick={()=>setLayout(l=>({...l,hiddenInspector:false}))}><Icon name="PanelRightOpen" size={18}/><span>{tr("Инспектор")}</span></button>
           <EditorDockStrip area="inspector" className="panel-tabs">
-            <button data-dock-base="inspector" className={!inspectorTool&&selection.kind!=="scene"?"active":""} onClick={()=>{showBaseDock('inspector');if(selection.kind==='scene')setSelection({kind:'beat',id:beat.id});}}>{tr("Инспектор")}</button>
+            <button data-dock-base="inspector" className={!inspectorTool&&(isNative?nativeFocus!=='sceneSettings':selection.kind!=="scene")?"active":""} onClick={()=>{showBaseDock('inspector');if(isNative)setNativeFocus(nativeLastFocus.current);else if(selection.kind==='scene')setSelection({kind:'beat',id:beat.id});}}>{tr("Инспектор")}</button>
             <EditorDockTabs area="inspector"/>
             <button
-              className={!inspectorTool&&selection.kind==='scene'?'active':''}
-              onClick={() => {showBaseDock('inspector');setSelection({kind:'scene',id:scene.id});}}
+              className={!inspectorTool&&(isNative?nativeFocus==='sceneSettings':selection.kind==='scene')?'active':''}
+              onClick={() => {showBaseDock('inspector');if(isNative)setNativeFocus('sceneSettings');else setSelection({kind:'scene',id:scene.id});}}
             >
-              {tr("Сабсцена")}</button>
+              {tr(isNative?"Сцена":"Сабсцена")}</button>
             <div className="flex-space" />
             <Button
               icon={inspectorPinned ? "LockKeyhole" : "Pin"}
@@ -2524,7 +2793,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           <EditorDockBody area="inspector"/>
           <DockDropTarget area="inspector"/>
           <div className="inspector-scroll" ref={inspectorScroll}>
-            {selection.kind === "scene" ? (
+            {!isNative&&selection.kind === "scene" ? (
               <SubsceneInspector key={scene.id} project={project} scene={scene} running={running}
                 onPatch={patch=>editSubscene(p=>Object.assign(p.subscenes.find(s=>s.id===scene.id),patch))}
                 onEntry={(id,reroute)=>editSubscene(p=>setSceneEntry(p,scene.id,id,reroute))}
@@ -2541,7 +2810,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           )}
         </aside>
       </div>
-      <footer className="editor-status">
+      <footer className="editor-status">{isNative?<><span>C++ {native.connected?'подключён':'отключён'} · revision {native.context?.revision} · {native.state?.play}</span><span>{native.state?.dirty?'Сцена изменена':''}</span><span role="status">{notice}</span><button onClick={()=>nativeCommand('assets.refresh')}>Обновить AssetRegistry</button></>:<>
         <button className={"diagnostic-status "+(issues.length?"has-issues":"clear")} onClick={() => setDock("issues")}>
           <Icon
             name={issues.length ? "TriangleAlert" : "CheckCheck"}
@@ -2557,7 +2826,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           {selection.kind === "object" ? inspectedObject?.name : selection.kind === "scene" ? scene.name : beatPreview(beat)}
         </span>
 
-      </footer>
+      </>}</footer>
       {serverProjects&&<FloatingWindow active title={tr("Проекты на сервере")} onClose={()=>setServerProjects(null)}>
         {!serverProjects.length&&<p>{tr("Сохранённых проектов пока нет.")}</p>}
         {serverProjects.map(item=><button key={item.id} disabled={projectFileBusy} onClick={()=>selectServerProject(item.id)}>{item.title} · {new Date(item.updatedAt).toLocaleString(localeTag())}</button>)}
@@ -2569,7 +2838,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           className={"editor-menu"+(menu==='Окна'?' windows-menu-container':'')}
           style={menuAnchor}
         >
-          {menu === "Файл" ? (
+          {isNative&&menu === "Файл" ? (<><button onClick={()=>openProjectDialog('new')}>Новый C++ проект…</button><button onClick={openProjectFile}>Открыть C++ проект…</button><button disabled={!native.connected} onClick={saveProject}>Сохранить сцену и историю <kbd>Ctrl S</kbd></button><button disabled={!native.connected} onClick={()=>nativeCommand('project.save',{useCurrentAsStartup:true})}>Использовать текущие сцену и историю при запуске</button><button disabled={!native.connected} onClick={()=>openProjectDialog('sceneNew')}>Новая сцена…</button><button disabled={!native.connected} onClick={()=>openProjectDialog('sceneCopy')}>Сохранить сцену как…</button></>) : menu === "Файл" ? (
             <>
               <button disabled={projectFileBusy} onClick={()=>openProjectDialog('new')}><Icon name="FilePlus2"/>{tr("Новый пустой проект…")}</button>
               {serverStorageEnabled&&window.sacuraDesktop?.isDesktop!==true&&<button disabled={projectFileBusy} onClick={showServerProjects}><Icon name="Database"/>{tr("Открыть с сервера…")}</button>}
@@ -2588,7 +2857,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             </>
           ) : menu === "Правка" ? (
             <><button disabled={running} onClick={()=>editClipboard('copy')}><Icon name="Copy"/>{tr("Копировать ")}<kbd>Ctrl C</kbd></button><button disabled={running||!clipboard.current} onClick={()=>editClipboard('paste')}><Icon name="ClipboardPaste"/>{tr("Вставить ")}<kbd>Ctrl V</kbd></button><button onClick={resetLayout}><Icon name="PanelsTopLeft"/>{tr("Восстановить раскладку")}</button><button
-              disabled={!history.length}
+              disabled={isNative?!(nativeFocus==='story'?native.story?.canUndo:native.state?.canUndo):!history.length}
               onClick={() => {
                 undo();
                 setMenu(null);
@@ -2596,35 +2865,9 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             >
               <Icon name="Undo2" />
               {tr("Отменить ")}<kbd>Ctrl Z</kbd>
-            </button><button disabled={!future.length} onClick={()=>{redo();setMenu(null);}}><Icon name="Redo2"/>{tr("Повторить ")}<kbd>Ctrl Shift Z</kbd></button></>
+            </button><button disabled={isNative?!(nativeFocus==='story'?native.story?.canRedo:native.state?.canRedo):!future.length} onClick={()=>{redo();setMenu(null);}}><Icon name="Redo2"/>{tr("Повторить ")}<kbd>Ctrl Shift Z</kbd></button></>
           ) : menu === "Создать" ? (
-            <>
-              <button disabled={running} onClick={()=>{setMenu(null);setGameplayRequest({createComponent:true,nonce:uid('request')});setDock('gameplay');maximizeWindow('gameplay');}}><Icon name="Puzzle"/>{tr("Компонент")}</button>
-              <button onClick={()=>openSubscenes('create')}><Icon name="PanelsTopLeft"/>{tr("Сабсцена")}</button>
-              <button onClick={()=>openAuthoring('action')}><Icon name="MousePointer2"/>{tr("Действие")}</button>
-              <button onClick={()=>openAuthoring('group')}><Icon name="Columns2"/>{tr("Группа действий")}</button>
-              <button
-                onClick={() => {
-                  setMenu(null);
-                  setPicker({ kind: "beat" });
-                }}
-              >
-                <Icon name="MessageSquare" />
-                {tr("Блок сценария")}</button>
-              <button
-                onClick={() => {
-                  setMenu(null);
-                  createEvent();
-                }}
-              >
-                <Icon name="Layers" />
-                {tr("Событие")}</button>
-              <button
-                onClick={openObjectPicker}
-              >
-                <Icon name="Box" />
-                {tr("Объект")}</button>
-            </>
+            <EditorCreateMenu onCreate={createMenuAction} disabled={id=>isNative?nativeEditing||(['action','group','beat','event'].includes(id)&&native.story?.readOnly):id==='component'&&running}/>
           ) : (
             <EditorWindowsMenu windows={windows} onChange={changeWindows} onClose={closeWorkspace} onSelect={(id,dismiss=true)=>{selectWorkspace(id);if(dismiss)setMenu(null);}}
               eventAvailable={!!event} issueCount={issues.length} hierarchyVisible={hierarchyVisible} inspectorVisible={inspectorVisible} historyOpen={historyOpen}
@@ -2634,7 +2877,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           )}
         </div>
       )}
-      {contextMenu&&<EditorContextMenu x={contextMenu.x} y={contextMenu.y} title={contextMenu.kind==='scene'?tr("Сцена"):tr("Добавить ноду")} items={contextItems()} onClose={closeContextMenu}/>}
+      {contextMenu&&<EditorContextMenu x={contextMenu.x} y={contextMenu.y} className={contextMenu.kind==='scene'?'scene-context-menu':''} title={contextMenu.kind==='native-create-component'?tr('Компонент'):contextMenu.kind==='native-create-object'?tr('Объект'):contextMenu.kind==='native-event'?tr("Добавить событие"):contextMenu.kind==='scene'?tr("Сцена"):tr("Добавить ноду")} items={contextItems()} onClose={closeContextMenu}/>}
       {picker?.kind==='object'&&<SceneObjectMenu anchor={picker.anchor} onClose={()=>setPicker(null)} onGroup={addEmptyGroup} onCamera={()=>createCamera()} onPoint={addStagingPoint} onSound={addSoundEvent} onObject={addObject}/>}
       {picker && picker.kind!=='object' && (
         <div
@@ -2843,7 +3086,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           </div>
         </div>
       )}
-      {projectDialog&&<ProjectDialog key={projectDialog} mode={projectDialog} project={project} templates={projectTemplates} busy={projectFileBusy} error={message(projectFileError)} onSubmit={submitProjectDialog} onClose={()=>setProjectDialog(null)}/>}
+      {projectDialog&&<ProjectDialog nativeMode={isNative} key={projectDialog} mode={projectDialog} project={project} templates={projectTemplates} busy={projectFileBusy} error={message(projectFileError)} onSubmit={submitProjectDialog} onClose={()=>setProjectDialog(null)}/>}
       <input
         hidden
         type="file"

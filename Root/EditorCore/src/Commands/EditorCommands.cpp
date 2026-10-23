@@ -12,16 +12,42 @@
 
 namespace
 {
-GameObject* ResolveObject(Scene* TargetScene, ObjectHandle Target)
+// Undo deserializes objects with the same persistent identity and a new generation.
+// Keep the checked handle for the fast path, and resolve restored instances only
+// inside this command's scene. Never retain an Object pointer across commands.
+struct CommandIdentity
+{
+    ObjectHandle Handle;
+    std::string PersistentId;
+    CommandIdentity& operator=(ObjectHandle Value)
+    {
+        Handle = Value;
+        PersistentId.clear();
+        if (auto* Memory = MemorySubsystem::Get())
+            if (auto* Instance = Memory->ResolveHandle(Value))
+                PersistentId = Instance->GetPersistentId();
+        return *this;
+    }
+    operator ObjectHandle() const { return Handle; }
+    bool IsValid() const { return Handle.IsValid() || !PersistentId.empty(); }
+    bool Matches(const Object* Instance) const
+    {
+        return Instance && (Instance->GetObjectHandle() == Handle ||
+            (!PersistentId.empty() && Instance->GetPersistentId() == PersistentId));
+    }
+};
+
+GameObject* ResolveObject(Scene* TargetScene, const CommandIdentity& Target)
 {
     if (TargetScene == nullptr || !Target.IsValid())
     {
         return nullptr;
     }
-    return TargetScene->FindByHandle(Target);
+    if (auto* Instance = TargetScene->FindByHandle(Target.Handle)) return Instance;
+    return Target.PersistentId.empty() ? nullptr : TargetScene->FindByPersistentId(Target.PersistentId);
 }
 
-Component* ResolveComponent(Scene* TargetScene, ObjectHandle Owner, ObjectHandle ComponentTarget)
+Component* ResolveComponent(Scene* TargetScene, const CommandIdentity& Owner, const CommandIdentity& ComponentTarget)
 {
     GameObject* OwnerObject = ResolveObject(TargetScene, Owner);
     if (OwnerObject == nullptr || !ComponentTarget.IsValid())
@@ -30,7 +56,7 @@ Component* ResolveComponent(Scene* TargetScene, ObjectHandle Owner, ObjectHandle
     }
     for (Component* ComponentInstance : OwnerObject->GetAllComponents())
     {
-        if (ComponentInstance != nullptr && ComponentInstance->GetObjectHandle() == ComponentTarget)
+        if (ComponentTarget.Matches(ComponentInstance))
         {
             return ComponentInstance;
         }
@@ -42,7 +68,7 @@ class RenameObjectCommand : public EditorCommand
 {
 public:
     Scene* TargetScene = nullptr;
-    ObjectHandle Target;
+    CommandIdentity Target;
     std::string OldName;
     std::string NewName;
 
@@ -79,7 +105,7 @@ class SetTransformCommand : public EditorCommand
 {
 public:
     Scene* TargetScene = nullptr;
-    ObjectHandle Target;
+    CommandIdentity Target;
     Transform OldTransform;
     Transform NewTransform;
     bool bCapturedOld = false;
@@ -119,7 +145,7 @@ class SetObjectActiveCommand final : public EditorCommand
 {
 public:
     Scene* TargetScene = nullptr;
-    ObjectHandle Target;
+    CommandIdentity Target;
     bool NewActive = true;
     bool OldActive = true;
     bool bCapturedOld = false;
@@ -142,15 +168,43 @@ public:
     const char* GetDisplayName() const override { return "Set Object Active"; }
 };
 
+class SetComponentEnabledCommand final : public EditorCommand
+{
+public:
+    Scene* TargetScene = nullptr;
+    CommandIdentity Owner;
+    CommandIdentity Target;
+    bool NewEnabled = true;
+    bool OldEnabled = true;
+    bool bCapturedOld = false;
+
+    bool Do() override
+    {
+        auto* Instance = ResolveComponent(TargetScene, Owner, Target);
+        if (!Instance) { return false; }
+        if (!bCapturedOld) { OldEnabled = Instance->IsEnabled(); bCapturedOld = true; }
+        Instance->SetEnabled(NewEnabled);
+        return true;
+    }
+    bool Undo() override
+    {
+        auto* Instance = ResolveComponent(TargetScene, Owner, Target);
+        if (!Instance) { return false; }
+        Instance->SetEnabled(OldEnabled);
+        return true;
+    }
+    const char* GetDisplayName() const override { return "Set Component Enabled"; }
+};
+
 class CreateObjectCommand : public EditorCommand
 {
 public:
     Scene* TargetScene = nullptr;
     std::string Name;
-    ObjectHandle Parent;
-    ObjectHandle Created;
+    CommandIdentity Parent;
+    CommandIdentity Created;
     std::string CapturedSubtree;
-    ObjectHandle CapturedParent;
+    CommandIdentity CapturedParent;
     ObjectHandle* OutCreated = nullptr;
 
     bool Do() override
@@ -241,8 +295,8 @@ class PasteSubtreeCommand : public EditorCommand
 {
 public:
     Scene* TargetScene = nullptr;
-    ObjectHandle Parent;
-    ObjectHandle Created;
+    CommandIdentity Parent;
+    CommandIdentity Created;
     std::string CapturedSubtree;
     ObjectHandle* OutCreated = nullptr;
 
@@ -311,10 +365,10 @@ class DeleteObjectCommand : public EditorCommand
 {
 public:
     Scene* TargetScene = nullptr;
-    ObjectHandle Target;
-    ObjectHandle Parent;
+    CommandIdentity Target;
+    CommandIdentity Parent;
     std::string CapturedSubtree;
-    ObjectHandle RestoredRoot;
+    CommandIdentity RestoredRoot;
 
     bool Do() override
     {
@@ -383,9 +437,9 @@ class ReparentObjectCommand : public EditorCommand
 {
 public:
     Scene* TargetScene = nullptr;
-    ObjectHandle Target;
-    ObjectHandle OldParent;
-    ObjectHandle NewParent;
+    CommandIdentity Target;
+    CommandIdentity OldParent;
+    CommandIdentity NewParent;
     bool bCapturedOld = false;
 
     bool Do() override
@@ -435,9 +489,9 @@ class AddComponentCommand : public EditorCommand
 {
 public:
     Scene* TargetScene = nullptr;
-    ObjectHandle Owner;
+    CommandIdentity Owner;
     TypeId ComponentType;
-    ObjectHandle CreatedComponent;
+    CommandIdentity CreatedComponent;
     std::string CapturedComponent;
     ObjectHandle* OutCreatedComponent = nullptr;
 
@@ -537,10 +591,10 @@ class RemoveComponentCommand : public EditorCommand
 {
 public:
     Scene* TargetScene = nullptr;
-    ObjectHandle Owner;
-    ObjectHandle ComponentTarget;
+    CommandIdentity Owner;
+    CommandIdentity ComponentTarget;
     std::string CapturedComponent;
-    ObjectHandle RestoredComponent;
+    CommandIdentity RestoredComponent;
 
     bool Do() override
     {
@@ -593,67 +647,41 @@ public:
     const char* GetDisplayName() const override { return "Remove Component"; }
 };
 
-Object* ResolvePropertyTarget(Scene* TargetScene, ObjectHandle Target, std::string& TargetPersistentId)
-{
-    if (TargetScene == nullptr)
-    {
-        return nullptr;
-    }
-    if (GameObject* ObjectInstance = ResolveObject(TargetScene, Target))
-    {
-        TargetPersistentId = ObjectInstance->GetPersistentId();
-        return ObjectInstance;
-    }
-    for (GameObject* ObjectInstance : TargetScene->GetAllObjects())
-    {
-        if (ObjectInstance == nullptr)
-        {
-            continue;
-        }
-        for (Component* ComponentInstance : ObjectInstance->GetAllComponents())
-        {
-            if (ComponentInstance != nullptr && ComponentInstance->GetObjectHandle() == Target)
-            {
-                TargetPersistentId = ComponentInstance->GetPersistentId();
-                return ComponentInstance;
-            }
-        }
-    }
-    if (!TargetPersistentId.empty())
-    {
-        for (GameObject* ObjectInstance : TargetScene->GetAllObjects())
-        {
-            if (ObjectInstance->GetPersistentId() == TargetPersistentId)
-            {
-                return ObjectInstance;
-            }
-            for (Component* ComponentInstance : ObjectInstance->GetAllComponents())
-            {
-                if (ComponentInstance->GetPersistentId() == TargetPersistentId)
-                {
-                    return ComponentInstance;
-                }
-            }
-        }
-    }
-    return nullptr;
-}
-
-
 class SetPropertyCommand : public EditorCommand
 {
 public:
     Scene* TargetScene = nullptr;
-    ObjectHandle Target;
-    std::string TargetPersistentId;
+    CommandIdentity Target;
     PropertyId Property;
     ReflectedValue OldValue;
     ReflectedValue NewValue;
     bool bCapturedOld = false;
 
-    Object* ResolveTargetObject()
+    Object* ResolveTargetObject() const
     {
-        return ResolvePropertyTarget(TargetScene, Target, TargetPersistentId);
+        if (TargetScene == nullptr)
+        {
+            return nullptr;
+        }
+        if (GameObject* ObjectInstance = ResolveObject(TargetScene, Target))
+        {
+            return ObjectInstance;
+        }
+        for (GameObject* ObjectInstance : TargetScene->GetAllObjects())
+        {
+            if (ObjectInstance == nullptr)
+            {
+                continue;
+            }
+            for (Component* ComponentInstance : ObjectInstance->GetAllComponents())
+            {
+                if (Target.Matches(ComponentInstance))
+                {
+                    return ComponentInstance;
+                }
+            }
+        }
+        return nullptr;
     }
 
     bool Do() override
@@ -707,15 +735,36 @@ class ResetPropertyCommand : public EditorCommand
 {
 public:
     Scene* TargetScene = nullptr;
-    ObjectHandle Target;
-    std::string TargetPersistentId;
+    CommandIdentity Target;
     PropertyId Property;
     ReflectedValue OldValue;
     bool bCapturedOld = false;
 
-    Object* ResolveTargetObject()
+    Object* ResolveTargetObject() const
     {
-        return ResolvePropertyTarget(TargetScene, Target, TargetPersistentId);
+        if (TargetScene == nullptr)
+        {
+            return nullptr;
+        }
+        if (GameObject* ObjectInstance = ResolveObject(TargetScene, Target))
+        {
+            return ObjectInstance;
+        }
+        for (GameObject* ObjectInstance : TargetScene->GetAllObjects())
+        {
+            if (ObjectInstance == nullptr)
+            {
+                continue;
+            }
+            for (Component* ComponentInstance : ObjectInstance->GetAllComponents())
+            {
+                if (Target.Matches(ComponentInstance))
+                {
+                    return ComponentInstance;
+                }
+            }
+        }
+        return nullptr;
     }
 
     bool Do() override
@@ -807,6 +856,16 @@ std::unique_ptr<EditorCommand> MakeSetObjectActiveCommand(Scene* TargetScene, Ob
     Command->TargetScene = TargetScene;
     Command->Target = Target;
     Command->NewActive = Active;
+    return Command;
+}
+
+std::unique_ptr<EditorCommand> MakeSetComponentEnabledCommand(Scene* TargetScene, ObjectHandle Owner, ObjectHandle Component, bool Enabled)
+{
+    auto Command = std::make_unique<SetComponentEnabledCommand>();
+    Command->TargetScene = TargetScene;
+    Command->Owner = Owner;
+    Command->Target = Component;
+    Command->NewEnabled = Enabled;
     return Command;
 }
 

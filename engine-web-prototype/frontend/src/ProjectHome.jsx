@@ -1,4 +1,4 @@
-import {builtinTemplates,loadBuiltinTemplate,createBuiltinProject} from './builtinTemplates.js';
+import {builtinTemplates,loadBuiltinTemplate,createBuiltinProject,nativeTemplateIds} from './builtinTemplates.js';
 import {instantiateAuthoringTemplate} from './authoringTemplates.js';
 import LanguagePicker from './LanguagePicker.jsx';
 import {t as tr, useLocale, localeTag, message} from './i18n.jsx';
@@ -22,12 +22,27 @@ const templatePresentation={
  'builtin-horror':{art:'horror',label:'Последний обход',detail:'Point & click · Хоррор',icon:'04'},
  'builtin-clicker':{art:'clicker',label:'UI-кликер',detail:'Интерфейс и механики',icon:'05'}
 };
+const nativeTemplateDescriptions={
+ 'builtin-quest':'Сцена с дверью и ключом, история с выбором и открытием двери.',
+ 'builtin-shooter':'Учебная сцена с мишенью и игроком, ветвящийся сценарий.',
+ 'builtin-novel':'Диалог, выбор ответа и две концовки в нативной истории.',
+ 'builtin-horror':'Ночная сцена, запись, пауза и два исхода истории.'
+};
+const nativeTemplateGenres={
+ 'builtin-quest':'Сюжетный квест',
+ 'builtin-shooter':'3D · Учебная сцена',
+ 'builtin-novel':'Диалоги и выборы',
+ 'builtin-horror':'Атмосферная история'
+};
 
-export default function ProjectHome({user=null,onLogout}) {
+export default function ProjectHome({user=null,onLogout,nativeAdapter=null}) {
  useLocale();
- const desktop=window.sacuraDesktop?.isDesktop===true?window.sacuraDesktop:null;
- const [active,setActive]=useState(null),[projects,setProjects]=useState([]),[otherProjects,setOtherProjects]=useState([]),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[creating,setCreating]=useState(false),[name,setName]=useState(()=>tr('Новый проект'));
+ const desktop=nativeAdapter||(window.sacuraDesktop?.isDesktop===true?window.sacuraDesktop:null);
+ const [active,setActive]=useState(null),[projects,setProjects]=useState([]),[otherProjects,setOtherProjects]=useState([]),[loading,setLoading]=useState(true),[operationBusy,setBusy]=useState(false),[error,setError]=useState(''),[creating,setCreating]=useState(false),[name,setName]=useState(()=>tr('Новый проект'));
+ const busy=operationBusy||!!nativeAdapter?.starting;
  const [inviting,setInviting]=useState(false),[guide,setGuide]=useState(null),[search,setSearch]=useState('');
+ const [nativeTemplateId,setNativeTemplateId]=useState('Empty');
+ const [forgetProject,setForgetProject]=useState(null);
  const operation=useRef(false),fileInput=useRef(null),createInput=useRef(null);
  useEffect(()=>{if(creating){createInput.current?.focus();createInput.current?.select();}},[creating]);
  async function refresh(){
@@ -41,7 +56,7 @@ export default function ProjectHome({user=null,onLogout}) {
  }
  useEffect(()=>{refresh();},[]);
  useEffect(()=>{desktop?.ready('home');},[]);
- useEffect(()=>{if(!desktop)return;let alive=true;desktop.listProjects().then(async items=>{if(!items.length||!alive)return;const result=await desktop.openRecent(items[0].id);if(alive&&result?.project)setActive(readProject(result.project));}).catch(()=>{});return()=>{alive=false;};},[]);
+ useEffect(()=>{if(!desktop||nativeAdapter)return;let alive=true;desktop.listProjects().then(async items=>{if(!items.length||!alive)return;const result=await desktop.openRecent(items[0].id);if(alive&&result?.project)setActive(readProject(result.project));}).catch(()=>{});return()=>{alive=false;};},[]);
  async function run(action){
   if(operation.current)return;
   operation.current=true;setBusy(true);setError('');
@@ -49,6 +64,7 @@ export default function ProjectHome({user=null,onLogout}) {
   finally{operation.current=false;setBusy(false);}
  }
  async function open(project,{save=false}={}){
+  if(nativeAdapter)return;
   let next=readProject(project);
   if(desktop){if(save){const result=await desktop.createProject(next);if(result.cancelled)return;next=readProject(result.project);}setCreating(false);setActive(next);return;}
   if(save&&serverStorageEnabled)next=await saveServerProject(next,null);
@@ -61,21 +77,22 @@ export default function ProjectHome({user=null,onLogout}) {
   else rememberLocalProject(accountStorage,project);
   setActive(null);await refresh();
  }
- function beginCreate(){setName(tr('Новый проект'));setCreating(true);setError('');}
- const filteredProjects=projects.filter(project=>project.title.toLocaleLowerCase(localeTag()).includes(search.trim().toLocaleLowerCase(localeTag())));
+ function beginCreate(templateId='Empty'){setName(tr('Новый проект'));setNativeTemplateId(templateId);setCreating(true);setError('');}
+ const filteredProjects=projects.filter(project=>(nativeAdapter?project.title+' '+project.path:project.title).toLocaleLowerCase(localeTag()).includes(search.trim().toLocaleLowerCase(localeTag())));
  const mainTemplates=builtinTemplates.filter(t=>!t.featured&&!t.extra),extraTemplates=builtinTemplates.filter(t=>t.extra);
+ const openTemplate=id=>{if(nativeAdapter){if(!nativeTemplateIds.has(id))throw Error('Для этого шаблона пока нет нативной заготовки.');beginCreate(id);return;}return createBuiltinProject(id).then(project=>open(project,{save:true}));};
  const templateCard=template=>{
   const presentation=templatePresentation[template.id];
   return <article key={template.id} className="project-template-entry">
-   <button className="project-template-open" disabled={busy} aria-label={tr('Открыть шаблон: {0}',[tr(template.name)])} onClick={()=>run(async()=>open(await createBuiltinProject(template.id),{save:true}))}>
+   <button className="project-template-open" disabled={busy||!!nativeAdapter&&!nativeTemplateIds.has(template.id)} aria-label={tr('Открыть шаблон: {0}',[tr(template.name)])} title={nativeAdapter&&!nativeTemplateIds.has(template.id)?'Нативная заготовка пока недоступна':undefined} onClick={()=>nativeAdapter?openTemplate(template.id):run(()=>openTemplate(template.id))}>
     <div className="project-template-art"><ProjectArtwork variant={presentation.art}/><span className="project-template-number">{presentation.icon}</span><span className="project-template-arrow"><ArrowUpRight aria-hidden="true" size={20}/></span></div>
-    <div className="project-template-copy"><span className="project-template-genre">{tr(presentation.detail)}</span><h3>{tr(presentation.label)}</h3><p>{tr(template.description)}</p></div>
+    <div className="project-template-copy"><span className="project-template-genre">{nativeAdapter?nativeTemplateGenres[template.id]||tr(presentation.detail):tr(presentation.detail)}</span><h3>{tr(presentation.label)}</h3><p>{nativeAdapter?nativeTemplateDescriptions[template.id]||'Нативная заготовка пока недоступна.':tr(template.description)}</p></div>
    </button>
-   {template.guide&&<button className="project-template-help" onClick={()=>setGuide(template)}><BookOpen aria-hidden="true" size={14}/>{tr('Разбор шаблона')}<ArrowRight aria-hidden="true" size={14}/></button>}
+   {template.guide&&!nativeAdapter&&<button className="project-template-help" onClick={()=>setGuide(template)}><BookOpen aria-hidden="true" size={14}/>{tr('Разбор шаблона')}<ArrowRight aria-hidden="true" size={14}/></button>}
   </article>;
  };
  if(active)return <Editor key={active.id} initialProject={active} user={user} onLogout={onLogout} onHome={home}/>;
- return <main className="project-home">
+ return <main className="project-home" data-native-launcher={nativeAdapter?true:undefined}>
   <header className="project-home-header">
    <a className="project-home-brand" href="#home-top" aria-label={tr('Sacura — главная')}><span className="project-home-brand-mark"><Flower2 aria-hidden="true" size={27} strokeWidth={1.5}/></span><span>Sacura <small>Novel Studio</small></span></a>
    <nav className="project-home-nav" aria-label={tr('Главная навигация')}><a href="#previous-projects">{tr('Мои проекты')}</a><a href="#project-templates">{tr('Шаблоны')}</a></nav>
@@ -86,16 +103,16 @@ export default function ProjectHome({user=null,onLogout}) {
     <div className="project-home-greeting">
      <h1 id="home-title">{tr('Место для ваших')}<br/><span className="project-home-title-accent">{tr('историй.')}</span></h1>
      <p className="project-home-intro">{tr('От первой сцены до целого мира. Создавайте игры и рассказывайте истории в Sacura.')}</p>
-     <div className="project-home-start-actions"><button className="project-home-primary" disabled={busy} onClick={beginCreate}><Plus aria-hidden="true" size={19}/>{tr('Создать новый проект')}</button><button className="project-home-file" disabled={busy} onClick={()=>desktop?run(async()=>{const result=await desktop.openProject();if(result?.project)await open(result.project);}):fileInput.current?.click()}><FolderOpen aria-hidden="true" size={18}/>{desktop?'Открыть папку проекта':tr('Открыть из файла')}</button></div>
+     <div className="project-home-start-actions"><button className="project-home-primary" disabled={busy} onClick={()=>beginCreate()}><Plus aria-hidden="true" size={19}/>{tr('Создать новый проект')}</button><button className="project-home-file" disabled={busy} onClick={()=>desktop?run(async()=>{const result=await desktop.openProject();if(result?.project)await open(result.project);}):fileInput.current?.click()}><FolderOpen aria-hidden="true" size={18}/>{desktop&&!nativeAdapter?'Открыть папку проекта':tr('Открыть из файла')}</button></div>
     </div>
     <article className="project-home-featured">
      <ProjectArtwork/>
      <div className="project-home-featured-top"><span><BookOpen aria-hidden="true" size={14}/>{tr('Знакомство с движком')}</span><span>3D</span></div>
-     <div className="project-home-featured-caption"><div><p>{tr('СТАНДАРТНЫЙ ШАБЛОН')}</p><h2>{tr('Письма после дождя')}</h2><span>{tr('История, музыка и мир, который можно исследовать.')}</span></div><button disabled={busy} className="project-home-featured-open" aria-label={tr('Открыть «Письма после дождя»')} title={tr('Открыть шаблон')} onClick={()=>run(async()=>open(await createBuiltinProject('builtin-standard'),{save:true}))}><ArrowUpRight aria-hidden="true" size={23}/></button></div>
+     <div className="project-home-featured-caption"><div><p>{tr('СТАНДАРТНЫЙ ШАБЛОН')}</p><h2>{tr('Письма после дождя')}</h2><span>{nativeAdapter?'Сцена и история с выбором для начала работы.':tr('История, музыка и мир, который можно исследовать.')}</span></div><button disabled={busy} className="project-home-featured-open" aria-label={tr('Открыть «Письма после дождя»')} title={tr('Открыть шаблон')} onClick={()=>nativeAdapter?openTemplate('builtin-standard'):run(()=>openTemplate('builtin-standard'))}><ArrowUpRight aria-hidden="true" size={23}/></button></div>
     </article>
    </section>
 
-   {error&&!creating&&<p className="project-home-error" role="alert">{message(error)}</p>}
+   {(error||nativeAdapter?.error)&&!creating&&<p className="project-home-error" role="alert">{message(error||nativeAdapter?.error)}</p>}
    <section id="project-templates" className="project-home-templates" aria-labelledby="templates-title">
     <div className="project-home-section-heading"><div><h2 id="templates-title">{tr('Начните с готовой идеи')}</h2></div><span className="project-home-section-meta">{tr('{0} шаблона · разные жанры',[mainTemplates.length])}</span></div>
     <div className="project-home-template-grid">{mainTemplates.map(templateCard)}</div>
@@ -107,7 +124,7 @@ export default function ProjectHome({user=null,onLogout}) {
     {busy&&<p className="project-home-status" role="status">{tr('Подождите, сохраняем и открываем проект…')}</p>}
     {loading?<div className="project-home-loading" role="status"><span/>{tr('Загрузка проектов…')}</div>:projects.length?filteredProjects.length?<div className="project-home-list">
      <div className="project-home-list-heading" aria-hidden="true"><span>{tr('Название проекта')}</span><span>{tr('Последнее изменение')}</span><span/></div>
-     {filteredProjects.map(project=><button key={project.id} disabled={busy} onClick={()=>run(async()=>open(desktop?(await desktop.openRecent(project.id)).project:serverStorageEnabled?await openServerProject(project.id):project.project))}><span className="project-home-project-icon"><FolderOpen aria-hidden="true" size={21}/></span><strong>{project.title}</strong><time dateTime={project.updatedAt||undefined}><Clock3 aria-hidden="true" size={13}/>{project.updatedAt?new Date(project.updatedAt).toLocaleString(localeTag(),{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):tr('Сохранён в этом браузере')}</time><span className="project-home-open">{tr('Открыть')}<ArrowUpRight aria-hidden="true" size={17}/></span></button>)}
+     {filteredProjects.map(project=><button key={project.id} disabled={busy} title={nativeAdapter?project.path+' · ПКМ — убрать из недавних':undefined} onContextMenu={e=>{if(nativeAdapter&&!busy){e.preventDefault();setForgetProject(project);}}} onClick={()=>run(async()=>nativeAdapter?nativeAdapter.openRecent(project.id):open(desktop?(await desktop.openRecent(project.id)).project:serverStorageEnabled?await openServerProject(project.id):project.project))}><span className="project-home-project-icon"><FolderOpen aria-hidden="true" size={21}/></span><strong>{project.title}{nativeAdapter&&<small>{project.missing?'Файл не найден · ':''}{project.path}</small>}</strong><time dateTime={project.updatedAt||undefined}><Clock3 aria-hidden="true" size={13}/>{project.updatedAt?new Date(project.updatedAt).toLocaleString(localeTag(),{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):tr('Сохранён в этом браузере')}</time><span className="project-home-open">{tr('Открыть')}<ArrowUpRight aria-hidden="true" size={17}/></span></button>)}
     </div>:<div className="project-home-empty"><Search aria-hidden="true" size={25}/><div><h3>{tr('Проекты не найдены')}</h3><p>{tr('Попробуйте другое название или очистите поиск.')}</p></div><button onClick={()=>setSearch('')}>{tr('Очистить поиск')}</button></div>:<div className="project-home-empty"><span className="project-home-empty-icon"><FolderOpen aria-hidden="true" size={27}/></span><div><h3>{tr('Здесь будут ваши проекты')}</h3><p>{tr('Создайте первый проект или откройте сохранённый файл.')}</p></div><button disabled={busy} onClick={()=>desktop?run(async()=>{const result=await desktop.openProject();if(result?.project)await open(result.project);}):fileInput.current?.click()}><Upload aria-hidden="true" size={16}/>{desktop?'Открыть папку проекта':tr('Загрузить проект из файла')}</button></div>}
    </section>
 
@@ -117,8 +134,15 @@ export default function ProjectHome({user=null,onLogout}) {
    <footer className="project-home-footer"><span><Monitor aria-hidden="true" size={14}/>{desktop?'Проекты сохраняются в выбранных папках':serverStorageEnabled?tr('Рабочее пространство Sacura'):tr('Проекты сохраняются в этом браузере')}</span><span>Sacura Novel Studio</span></footer>
    <input ref={fileInput} type="file" hidden accept="application/json,.json" onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(file)run(async()=>open((await parseProjectFile(await file.text())).project,{save:true}));}}/>
   </div>
-  {creating&&<Dialog title={tr('Создать новый проект')} icon={Plus} busy={busy} onClose={()=>setCreating(false)} onSubmit={()=>{if(name.trim())run(()=>open(createEmptyProject(name),{save:true}));}}><label className="field" htmlFor="new-project-name">{tr('Название нового проекта')}<input ref={createInput} id="new-project-name" required maxLength={120} disabled={busy} value={name} onChange={e=>setName(e.target.value)}/></label><p>{tr('Пустая сцена и чистый сценарий для вашей истории.')}</p>{error&&<p className="project-dialog-error" role="alert">{message(error)}</p>}<footer><button disabled={busy} type="button" onClick={()=>setCreating(false)}>{tr('Отмена')}</button><button className="project-home-primary" disabled={busy||!name.trim()} type="submit">{busy?tr('Создаём…'):tr('Создать')}</button></footer></Dialog>}
+  {creating&&<Dialog title={tr('Создать новый проект')} icon={Plus} busy={busy} onClose={()=>setCreating(false)} onSubmit={()=>{if(name.trim())run(async()=>{if(nativeAdapter){if(await nativeAdapter.createProject(name,nativeTemplateId))setCreating(false);}else await open(createEmptyProject(name),{save:true});});}}>
+   <label className="field" htmlFor="new-project-name">{tr('Название нового проекта')}<input ref={createInput} id="new-project-name" required maxLength={120} disabled={busy} value={name} onChange={e=>setName(e.target.value)}/></label>
+   {nativeAdapter&&<label className="field" htmlFor="new-project-template">Шаблон<select id="new-project-template" value={nativeTemplateId} disabled={busy} onChange={e=>setNativeTemplateId(e.target.value)}><option value="Empty">Пустой проект</option>{builtinTemplates.filter(template=>nativeTemplateIds.has(template.id)).map(template=><option key={template.id} value={template.id}>{tr(template.name)}</option>)}</select></label>}
+   <p>{nativeAdapter?nativeTemplateId==='Empty'?'Пустая сцена для нового проекта.':'Создаст независимую нативную сцену, стартовую историю и README с подсказками.':tr('Пустая сцена и чистый сценарий для вашей истории.')}</p>
+   {error&&<p className="project-dialog-error" role="alert">{message(error)}</p>}
+   <footer><button disabled={busy} type="button" onClick={()=>setCreating(false)}>{tr('Отмена')}</button><button className="project-home-primary" disabled={busy||!name.trim()} type="submit">{busy?tr('Создаём…'):tr('Создать')}</button></footer>
+  </Dialog>}
   {guide&&<Dialog title={tr('Разбор шаблона')} icon={BookOpen} onClose={()=>setGuide(null)}><h3 className="project-home-guide-title">{tr(guide.name)}</h3><ol className="project-home-guide-steps">{guide.guide.map(step=><li key={step}>{tr(step)}</li>)}</ol><footer><button type="button" onClick={()=>setGuide(null)}>{tr('Закрыть разбор')}</button></footer></Dialog>}
+  {forgetProject&&<Dialog title="Убрать из недавних?" icon={FolderOpen} busy={busy} onClose={()=>setForgetProject(null)} onSubmit={()=>run(async()=>{await nativeAdapter.forgetProject(forgetProject.id);setForgetProject(null);await refresh();})}><p>{forgetProject.title} · Файлы проекта останутся на диске.</p><footer><button type="button" disabled={busy} onClick={()=>setForgetProject(null)}>Отмена</button><button type="submit" disabled={busy}>Убрать из списка</button></footer></Dialog>}
   {inviting&&<InviteDialog onClose={()=>setInviting(false)}/>}
  </main>;
 }

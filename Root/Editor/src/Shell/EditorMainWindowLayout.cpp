@@ -633,6 +633,20 @@ void EditorMainWindow::BuildUi()
             RunEditorActionByTypeId(Type.c_str());
         }
     };
+    ObjectInspectorPage->RemoveComponentRequested = [this](const QString& Identity) {
+        auto* Selected = GetSelectedGameObject();
+        if (!Selected || !GetEditScene() || BoundEngine.GetPlaySession().IsSimulating()) { return; }
+        for (auto* Component : Selected->GetAllComponents())
+        {
+            if (Component && Component->GetPersistentId() == Identity.toStdString() &&
+                dynamic_cast<MeshRendererComponent*>(Component))
+            {
+                ExecuteCommand(MakeRemoveComponentCommand(GetEditScene(),
+                    Selected->GetObjectHandle(), Component->GetObjectHandle()));
+                return;
+            }
+        }
+    };
     connect(ObjectInspectorPage->ParentObject, &QComboBox::activated, this, [this, ObjectInspectorPage](int Index) {
         auto* Selected = GetSelectedGameObject();
         if (!Selected || !GetEditScene() || BoundEngine.GetPlaySession().IsSimulating()) { return; }

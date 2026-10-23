@@ -72,6 +72,7 @@ class StudioNumberEdit;
 class EditorMainWindow : public QMainWindow
 {
     Q_OBJECT
+    friend struct EditorCompatibilityProbe;
 
 public:
     using AssetEditorHandler = std::function<void(const AssetKey&, const AssetRegistryEntry&, const QString&)>;

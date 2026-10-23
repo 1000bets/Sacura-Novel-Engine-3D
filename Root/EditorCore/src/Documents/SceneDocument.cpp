@@ -26,6 +26,7 @@ bool SceneDocument::AdoptScene(Scene* ExistingScene, const std::filesystem::path
         DocumentPath = AbsolutePath;
         BindDocumentAsset();
         SavedRevision = CurrentRevision;
+        CaptureFingerprint();
         return true;
     }
 
@@ -67,6 +68,7 @@ void SceneDocument::Close()
     BoundScene = {};
     DocumentPath.clear();
     DocumentAsset = {};
+    SavedFingerprint = {};
     SavedRevision = CurrentRevision;
     LastError.clear();
 }
@@ -88,6 +90,7 @@ bool SceneDocument::ReplaceBoundScene(Scene* NewScene, const std::filesystem::pa
     BindDocumentAsset();
     SavedRevision = CurrentRevision;
     LastError.clear();
+    CaptureFingerprint();
     return true;
 }
 
@@ -146,6 +149,12 @@ bool SceneDocument::Save(std::string& OutError)
     }
 
     RefreshAssetPath();
+    if (HasExternalChanges())
+    {
+        OutError = "The scene changed on disk. Reopen it or save a copy; your draft is retained.";
+        LastError = OutError;
+        return false;
+    }
     if (DocumentAsset.IsValid() && !BoundEngine->GetAssetRegistry().Exists(DocumentAsset))
     {
         OutError = "Scene asset was removed; use Save As to choose a new destination";
@@ -164,11 +173,14 @@ bool SceneDocument::Save(std::string& OutError)
     SavedRevision = CurrentRevision;
     BindDocumentAsset();
     PrintString(std::string("SceneDocument: saved ") + DocumentPath.generic_string());
+    CaptureFingerprint();
     return true;
 }
 
 bool SceneDocument::SaveAs(const std::filesystem::path& AbsolutePath, std::string& OutError)
 {
+    if (!DocumentPath.empty() && std::filesystem::weakly_canonical(DocumentPath) == std::filesystem::weakly_canonical(AbsolutePath))
+        return Save(OutError);
     LastError.clear();
     if (GetScene() == nullptr)
     {
@@ -189,8 +201,26 @@ bool SceneDocument::SaveAs(const std::filesystem::path& AbsolutePath, std::strin
     DocumentPath = AbsolutePath;
     BindDocumentAsset();
     SavedRevision = CurrentRevision;
+    CaptureFingerprint();
     PrintString(std::string("SceneDocument: saved as ") + AbsolutePath.generic_string());
     return true;
+}
+
+void SceneDocument::CaptureFingerprint()
+{
+    SavedFingerprint = {};
+    AssetDiagnostic Diagnostic;
+    if (!DocumentPath.empty()) ContentHash::TryHashFile(DocumentPath.string(), SavedFingerprint, Diagnostic);
+}
+
+bool SceneDocument::HasExternalChanges() const
+{
+    if (!IsOpen() || DocumentPath.empty()) return false;
+    ContentHash Current;
+    AssetDiagnostic Diagnostic;
+    const bool Read = ContentHash::TryHashFile(DocumentPath.string(), Current, Diagnostic);
+    if (!SavedFingerprint.IsValid()) { std::error_code Error; return std::filesystem::exists(DocumentPath, Error) || bool(Error); }
+    return !Read || Current != SavedFingerprint;
 }
 
 void SceneDocument::BindDocumentAsset()

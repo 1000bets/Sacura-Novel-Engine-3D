@@ -75,7 +75,7 @@ AssetImportDialog::AssetImportDialog(
     Layout->addWidget(GenerateMissingNormalsCheck);
 
     auto* FormatInformation = new QLabel(
-        tr("GLB без внешних файлов, статический FBX, PNG и JPEG · до 100 МБ на файл. FBX преобразуется в GLB. Пропущено неподдерживаемых файлов: %1.").arg(SkippedFiles),
+        tr("GLB без внешних файлов, FBX (риг импортируется в статической позе), PNG и JPEG · до 100 МБ на файл. FBX преобразуется в GLB. Пропущено неподдерживаемых файлов: %1.").arg(SkippedFiles),
         this);
     FormatInformation->setWordWrap(true);
     Layout->addWidget(FormatInformation);
