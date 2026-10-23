@@ -5,6 +5,7 @@ const {pathToFileURL} = require('node:url');
 const store = require('./project-store.cjs');
 const {hostPath,projectCli,preserveDraft}=require('./native-project.cjs');
 const {NativeRecents}=require('./native-recents.cjs');
+const {NativeMechanics}=require('./native-mechanics.cjs');
 const {setTimeout:delay}=require('node:timers/promises');
 const mimeByExtension = {'.glb': 'model/gltf-binary', '.obj': 'text/plain', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.flac': 'audio/flac', '.webm': 'audio/webm'};
 
@@ -27,6 +28,23 @@ if (process.env.SACURA_GPU_DIAGNOSTIC) {
   app.commandLine.appendSwitch('vmodule', '*shared_image*=2,*d3d*=2');
 }
 let nativeViewport;
+let nativeMechanics=null, nativeMechanicsProject=null, nativeMechanicsLoading=null;
+async function mechanicsForCurrentProject(){
+  const project=nativeViewport?.project;
+  if(!project||!nativeViewport.bridge.connected)throw Error('Откройте C++ проект');
+  const session=nativeViewport.bridge.context?.session,key=project+'\0'+session;
+  if(nativeMechanicsProject!==key){
+    if(nativeMechanicsLoading?.key!==key){
+      const next=new NativeMechanics(project);
+      nativeMechanicsLoading={key,promise:next.load().then(()=>next)};
+    }
+    let next;
+    try{next=await nativeMechanicsLoading.promise;}catch(error){nativeMechanicsLoading=null;throw error;}
+    if(nativeViewport?.project!==project||nativeViewport.bridge.context?.session!==session)throw Error('Проект изменился');
+    nativeMechanics=next;nativeMechanicsProject=key;
+  }
+  return nativeMechanics;
+}
 let releaseNativeProject = async () => {};
 if (nativePrototype && process.env.SACURA_NATIVE_USERDATA) app.setPath('userData', process.env.SACURA_NATIVE_USERDATA);
 if (smoke && process.env.SACURA_DESKTOP_SMOKE_USERDATA) app.setPath('userData', process.env.SACURA_DESKTOP_SMOKE_USERDATA);
@@ -74,7 +92,9 @@ app.whenReady().then(async () => {
         const result=await bridge.request('assets.resolve',{assetId:id});
         if(!result.ok)return new Response(result.error.message,{status:404});
         const file=result.value.absolutePath;
-        if(result.value.typeId!=='Texture'||!['.png','.jpg','.jpeg','.bmp','.webp'].includes(path.extname(file).toLowerCase()))return new Response('No browser preview for this native asset type',{status:415});
+        const extension=path.extname(file).toLowerCase();
+        if(!((result.value.typeId==='Texture'&&['.png','.jpg','.jpeg','.bmp','.webp'].includes(extension))||
+            (result.value.typeId==='Audio'&&extension==='.wav')))return new Response('No browser preview for this native asset type',{status:415});
         return net.fetch(pathToFileURL(file).toString());
       }
       if(url.host==='startup-audio') {
@@ -149,19 +169,58 @@ app.whenReady().then(async () => {
     handle('native-close-project',()=>replaceProject(null));
     handle('bridge-connect', () => ({connected:nativeViewport.bridge.connected,context:nativeViewport.bridge.context,state:nativeViewport.bridge.state}));
     if(nativeSmoke)handle('bridge-test-result',result=>{nativeViewport.bridgeTest=result;return true;});
-    handle('bridge-command', request => {
+    handle('bridge-command', async request => {
       if(!request||typeof request.method!=='string'||!request.context||typeof request.context.session!=='string'||!Number.isSafeInteger(request.context.epoch))return {version:1,type:'bridge.result',id:null,context:nativeViewport.bridge.context,ok:false,error:{code:'INVALID_ARGUMENT',message:'Invalid Bridge request or missing context'}};
-      if(['assets.import','assets.resolve'].includes(request.method))return {version:1,id:null,context:nativeViewport.bridge.context,ok:false,error:{code:'FORBIDDEN',message:'This operation requires the main-process asset capability'}};
-      return nativeViewport.bridge.request(request.method,request.params,request.context);
+      if(['assets.import','assets.resolve','play.mechanicOperation'].includes(request.method))return {version:1,id:null,context:nativeViewport.bridge.context,ok:false,error:{code:'FORBIDDEN',message:'This operation requires a main-process capability'}};
+      const owner=nativeViewport;
+      const result=await owner.bridge.request(request.method,request.params,request.context);
+      if(request.method==='play.start'&&result.ok&&result.value.play==='playing'&&request.context.epoch!==result.context.epoch){
+        try{
+          const mechanics=await mechanicsForCurrentProject();
+          if(owner===nativeViewport){
+            const outcomes=await mechanics.runStart(owner.bridge,result.context);
+            if(owner===nativeViewport)window.webContents.send('native-mechanics-result',outcomes);
+          }
+        }catch(error){if(owner===nativeViewport)window.webContents.send('native-mechanics-result',[{error:error.message}]);}
+      }
+      return result;
+    });
+    handle('native-mechanics',async(action,params={})=>{
+      const owner=nativeViewport,mechanics=await mechanicsForCurrentProject();
+      if(owner!==nativeViewport)throw Error('Проект изменился');
+      if(action==='list')return mechanics.list();
+      const state=await owner.bridge.request('bridge.describe');
+      if(!state.ok)throw Error(state.error.message);
+      if(state.value.play!=='stopped')throw Error('Остановите игру перед редактированием механик');
+      const objectId=action==='update'?params.patch?.objectId:params.objectId;
+      if(objectId){const hierarchy=await owner.bridge.request('scene.getHierarchy');
+        if(!hierarchy.ok)throw Error(hierarchy.error.message);
+        if(!hierarchy.value.some(object=>object.id===objectId))throw Error('Выбранный объект больше не существует');}
+      if(action==='create')return mechanics.create(params.objectId??null);
+      if(action==='update')return mechanics.update(params.id,params.patch);
+      if(action==='compile')return mechanics.compile(params.id);
+      if(action==='remove')return mechanics.remove(params.id);
+      if(action==='export'){
+        const record=mechanics.list().find(item=>item.id===params.id);if(!record)throw Error('Механика не найдена');
+        const chosen=await dialog.showSaveDialog(window,{title:'Экспорт механики',defaultPath:record.name+'.sacura-mechanic.json',filters:[{name:'Sacura mechanic',extensions:['json']}]});
+        if(!chosen.canceled&&chosen.filePath)await mechanics.export(params.id,chosen.filePath);
+        return mechanics.list();
+      }
+      if(action==='import'){
+        const chosen=await dialog.showOpenDialog(window,{title:'Импорт механики',properties:['openFile'],filters:[{name:'Sacura mechanic',extensions:['json']}]});
+        if(chosen.canceled)return mechanics.list();
+        return mechanics.import(chosen.filePaths[0],params.objectId??null);
+      }
+      throw Error('Неизвестная команда механик');
     });
     handle('native-import-assets',async destination=>{
       if(typeof destination!=='string'||destination.length>900)throw Error('Invalid import destination');
       const owner=nativeViewport,context=owner.bridge.context;
-      const picked=await dialog.showOpenDialog(window,{title:'Импорт в C++ AssetRegistry',properties:['openFile','multiSelections'],filters:[{name:'Native Engine assets',extensions:['glb','fbx','png','jpg','jpeg','bmp','tga','hdr']}]});
+      const picked=await dialog.showOpenDialog(window,{title:destination==='Audio'?'Импорт WAV':'Импорт в C++ AssetRegistry',properties:['openFile','multiSelections'],filters:destination==='Audio'?[{name:'WAV audio',extensions:['wav']}]:[{name:'Native Engine assets',extensions:['glb','fbx','png','jpg','jpeg','bmp','tga','hdr','wav']}]});
       if(picked.canceled)return [];
       if(owner!==nativeViewport||context?.session!==owner.bridge.context?.session)throw Error('Project changed during import');
       const results=[];
-      for(const sourcePath of picked.filePaths){const name=path.basename(sourcePath).replace(/\.fbx$/i,'.glb');results.push(await owner.bridge.request('assets.import',{sourcePath,destination:path.posix.join(destination||'Imports',name)},context));}
+      for(const sourcePath of picked.filePaths){const name=path.basename(sourcePath).replace(/\.fbx$/i,'.glb').replace(/\.wav$/i,'.wav');results.push(await owner.bridge.request('assets.import',{sourcePath,destination:path.posix.join(destination||'Imports',name)},context));}
       return results;
     });
     handle('native-input', value => nativeViewport.input(value));

@@ -7,3 +7,4 @@
 .native-dialogue-choices{display:flex;gap:9px;flex-wrap:wrap}
 .native-dialogue-choices button{background:#332934;color:#f5eaf1}
 .native-dialogue small{color:#cbb6c1}
+.native-widget-overlay{position:absolute;inset:0;z-index:30;pointer-events:none}

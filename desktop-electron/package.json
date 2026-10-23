@@ -42,6 +42,7 @@
       "dist-ui/**/*",
       "package.json",
       "native-project.cjs",
+      "native-mechanics.cjs",
       "native-recents.cjs",
       "scripts/compat-roundtrip.cjs"
     ],

@@ -3,20 +3,23 @@ const {randomUUID} = require('node:crypto');
 const {EventEmitter} = require('node:events');
 const contract = require('./contract.json');
 const errorResult = (code,message,context=null) => ({version:1,type:'bridge.result',id:null,ok:false,error:{code,message},context});
-function validJson(value, depth=0) {
+function validJson(value, depth=0, maxString=16384) {
   if(depth>16)throw Error('JSON nesting limit');
   if(typeof value==='number'&&!Number.isFinite(value))throw Error('Non-finite number');
-  if(typeof value==='string'&&(value.length>16384||value.includes('\0')))throw Error('Invalid string');
+  if(typeof value==='string'){
+    if(value.length>maxString||value.includes('\0'))throw Error('Invalid string');
+    if(value.length>16384&&!/^data:image\/(png|jpeg);base64,/.test(value))throw Error('Only embedded images may exceed 16 KiB');
+  }
   if(value && typeof value==='object') {
     if(Object.keys(value).length>4096)throw Error('Collection limit');
-    for(const child of Object.values(value))validJson(child,depth+1);
+    for(const child of Object.values(value))validJson(child,depth+1,maxString);
   } else if(!['string','number','boolean'].includes(typeof value)&&value!==null)throw Error('Not JSON');
 }
 function validate(method, params) {
   const spec=Object.hasOwn(contract.methods,method)&&contract.methods[method];
   if(!spec)throw Error('Unknown method');
   if(!params||typeof params!=='object'||Array.isArray(params))throw Error('params must be an object');
-  validJson(params);const allowed=new Set();
+  validJson(params,0,method==='widgets.apply'?3*1024*1024:16384);const allowed=new Set();
   for(const [field,type] of Object.entries(spec)) {
     const optional=field.endsWith('?'),key=optional?field.slice(0,-1):field;allowed.add(key);
     if(!Object.hasOwn(params,key)){if(!optional)throw Error('Missing '+key);continue;}
@@ -72,7 +75,7 @@ class BridgeTransport extends EventEmitter {
     const id=String(++this.sequence);
     const request={type:'bridge.command',version:1,id,session:context.session,epoch:context.epoch,method,params};
     const body=Buffer.from(JSON.stringify(request));
-    if(body.length>65536)return Promise.resolve(errorResult('INVALID_ARGUMENT','Request exceeds 64 KiB',this.context));
+    if(body.length>4*1024*1024)return Promise.resolve(errorResult('INVALID_ARGUMENT','Request exceeds 4 MiB',this.context));
     const packet=Buffer.alloc(4+body.length);packet.writeUInt32LE(body.length);body.copy(packet,4);
     return new Promise(resolve=>{
       const timer=setTimeout(()=>{this.pending.delete(id);resolve({...errorResult('TIMEOUT','Command outcome unknown; refresh before retrying',this.context),id});},30000);

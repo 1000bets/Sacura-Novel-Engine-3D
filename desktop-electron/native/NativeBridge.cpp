@@ -16,6 +16,9 @@
 #include "Story/StoryDocumentIO.h"
 #include "World/Serialization/SceneSerializer.h"
 #include "Core/Object/MemorySubsystem.h"
+#include "UI/WidgetLayout.h"
+#include <QJsonDocument>
+#include <QString>
 
 using Json = nlohmann::json;
 namespace {
@@ -25,11 +28,15 @@ struct Failure : std::runtime_error {
 };
 void Require(bool Ok,const char* Code,const std::string& Message) { if(!Ok)throw Failure(Code,Message); }
 void Diagnostic(const ReflectionDiagnostic& D) { Require(D.bOk,"PROPERTY_INVALID",D.Message); }
-void ValidateJson(const Json& V,int Depth=0) {
+void ValidateJson(const Json& V,int Depth=0,size_t MaxString=16384) {
     Require(Depth<=16,"INVALID_ARGUMENT","JSON nesting exceeds limit");
     if(V.is_number())Require(std::isfinite(V.get<double>()),"INVALID_ARGUMENT","Non-finite number");
-    if(V.is_string())Require(V.get_ref<const std::string&>().size()<=16384 && V.get_ref<const std::string&>().find('\0')==std::string::npos,"INVALID_ARGUMENT","Invalid string");
-    if(V.is_array()||V.is_object()) {Require(V.size()<=4096,"INVALID_ARGUMENT","Collection exceeds limit");for(const auto& Child:V)ValidateJson(Child,Depth+1);}
+    if(V.is_string()){
+        const auto& S=V.get_ref<const std::string&>();
+        Require(S.size()<=MaxString&&S.find('\0')==std::string::npos,"INVALID_ARGUMENT","Invalid string");
+        if(S.size()>16384)Require(S.rfind("data:image/png;base64,",0)==0||S.rfind("data:image/jpeg;base64,",0)==0,"INVALID_ARGUMENT","Only embedded images may exceed 16 KiB");
+    }
+    if(V.is_array()||V.is_object()) {Require(V.size()<=4096,"INVALID_ARGUMENT","Collection exceeds limit");for(const auto& Child:V)ValidateJson(Child,Depth+1,MaxString);}
 }
 Json TransformJson(const Transform& T) {return {{"position",{T.Position.x,T.Position.y,T.Position.z}},
     {"rotation",{T.Rotation.x,T.Rotation.y,T.Rotation.z,T.Rotation.w}}, {"scale",{T.Scale.x,T.Scale.y,T.Scale.z}}};}
@@ -57,6 +64,10 @@ NativeBridge::NativeBridge(Engine& R,SceneWorkspace& W,ProjectSession& P,const s
     if(P.GetProject()&&!P.GetProject()->StartupStory.empty()) {
         Story.Open(P.GetProject()->StartupStory,StoryError);
     }
+    Widgets.Changed=[this](){++WidgetsRevision;};
+    QString Error;
+    if(!Widgets.Open(WidgetLayout::ProjectFile(QString::fromStdWString(ProjectPaths::Content().wstring())),Error))
+        WidgetError=Error.toStdString();
 }
 void NativeBridge::ObserveWorld() {
     const auto Edit=Runtime.GetEditScene()?Runtime.GetEditScene()->GetObjectHandle():ObjectHandle{};
@@ -76,7 +87,7 @@ Component* NativeBridge::FindComponent(const Json& P) {
 }
 void NativeBridge::ValidateParams(const std::string& M,const Json& P) {
     Require(Contract["methods"].contains(M),"UNKNOWN_METHOD","Unsupported method: "+M);
-    Require(P.is_object(),"INVALID_ARGUMENT","params must be an object");ValidateJson(P);
+    Require(P.is_object(),"INVALID_ARGUMENT","params must be an object");ValidateJson(P,0,M=="widgets.apply"?3*1024*1024:16384);
     std::set<std::string> Allowed;
     for(auto It=Contract["methods"][M].begin();It!=Contract["methods"][M].end();++It) {
         std::string K=It.key();bool Optional=K.back()=='?';if(Optional)K.pop_back();Allowed.insert(K);
@@ -162,21 +173,40 @@ Json NativeBridge::Describe() {
         {"speaker",Playback.GetDisplayedSpeaker()},{"text",Playback.GetDisplayedLine()},
         {"choices",Choices},{"canAdvance",Playback.CanAdvanceDialogue()},
         {"canChoose",Playback.CanSelectChoice()},{"error",Playback.GetLastError()}};
-    return {{"dirty",Workspace.GetDocument().IsDirty()},{"storyDirty",Story.IsDirty()},
+    return {{"dirty",Workspace.GetDocument().IsDirty()},{"storyDirty",Story.IsDirty()},{"widgetsDirty",Widgets.IsDirty()},
         {"externalChanges",Workspace.GetDocument().HasExternalChanges()},{"projectExternalChanges",ProjectChanged()},
         {"path",Workspace.GetDocument().GetDocumentPath().generic_string()},
         {"project",Project.GetProject()?Project.GetProject()->Name:""},
         {"play",Play.GetState()==PlaySessionState::Stopped?"stopped":Play.GetState()==PlaySessionState::Paused?"paused":"playing"},
         {"dialogue",Dialogue},{"startupAudio",Project.GetProject()&&!Project.GetProject()->StartupAudio.empty()},
+        {"startupAudioPath",Project.GetProject()&&!Project.GetProject()->StartupAudio.empty()
+            ?Json(Project.GetProject()->StartupAudio.lexically_relative(ProjectPaths::Content()).generic_string()):Json(nullptr)},
         {"selection",Selected?Json(Selected->GetPersistentId()):Json(nullptr)},
         {"canUndo",Workspace.GetCommands().CanUndo()},{"canRedo",Workspace.GetCommands().CanRedo()},{"assetError",AssetError}};
 }
 Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
     if(M.rfind("story.",0)==0||M.rfind("assets.",0)==0)return DispatchDocuments(M,P);
+    if(M.rfind("widgets.",0)==0) {
+        if(M=="widgets.get")return WidgetSnapshot();
+        Require(!Runtime.GetPlaySession().IsSimulating(),"PLAY_READ_ONLY","Stop Play before editing UI widgets");
+        Require(Widgets.IsOpen(),"WIDGET_ERROR",WidgetError.empty()?"UI widgets are unavailable":WidgetError);
+        QString Error;
+        if(M=="widgets.apply") {
+            const auto Bytes=QByteArray::fromStdString(P.at("library").dump());
+            QJsonParseError Parse;
+            const auto Candidate=QJsonDocument::fromJson(Bytes,&Parse);
+            Require(Parse.error==QJsonParseError::NoError&&Candidate.isObject(),"INVALID_ARGUMENT","Invalid UI library JSON");
+            Require(Widgets.Apply(Candidate.object(),Error),"WIDGET_ERROR",Error.toStdString());
+        } else if(M=="widgets.save")Require(Widgets.Save(Error),"WIDGET_ERROR",Error.toStdString());
+        else if(M=="widgets.undo") {Require(Widgets.CanUndo(),"COMMAND_FAILED","Nothing to undo");Widgets.Undo();}
+        else if(M=="widgets.redo") {Require(Widgets.CanRedo(),"COMMAND_FAILED","Nothing to redo");Widgets.Redo();}
+        else throw Failure("UNKNOWN_METHOD",M);
+        return WidgetSnapshot();
+    }
     auto& Commands=Workspace.GetCommands();auto& Document=Workspace.GetDocument();auto& Play=Runtime.GetPlaySession();
     const bool Read=M=="bridge.describe"||M=="scene.getHierarchy"||M=="object.getComponents"||M=="component.getProperties"||M=="transform.get"||M=="reflection.getComponentTypes"||M=="assets.getScenes"||M=="audio.resolveStartup";
     if(!Read&&M!="selection.set"&&M.rfind("play.",0)!=0)Require(!Play.IsSimulating(),"PLAY_READ_ONLY","Stop play before editing or opening/saving a scene");
-    if(!Read)ResetInput();
+    if(!Read&&M!="play.mechanicOperation")ResetInput();
     if(M=="bridge.describe")return Describe();
     if(M=="scene.getHierarchy")return Hierarchy();
     if(M=="project.save") {
@@ -185,6 +215,7 @@ Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
         std::string Error;
         Require(Document.Save(Error),"IO_ERROR",Error);
         if(Story.IsOpen()&&Story.IsDirty()) Require(Story.Save(Error),"STORY_ERROR",Error);
+        if(Widgets.IsOpen()&&Widgets.IsDirty()) {QString WidgetSaveError;Require(Widgets.Save(WidgetSaveError),"WIDGET_ERROR",WidgetSaveError.toStdString());}
         if(P.value("useCurrentAsStartup",false)) {
             Require(Project.SetStartupDocuments(Document.GetDocumentPath(),Story.IsOpen()?Story.GetPath():Project.GetProject()->StartupStory,Error),"IO_ERROR",Error);
             AssetDiagnostic D; ContentHash::TryHashFile(Project.GetProject()->ProjectFile.u8string(),ProjectFingerprint,D);
@@ -364,6 +395,43 @@ Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
         Require(Path.extension()==".wav"&&std::filesystem::is_regular_file(Path),"NOT_FOUND","Startup WAV is missing");
         return {{"absolutePath",Path.generic_string()}};
     }
+    if(M=="audio.setStartup") {
+        Require(!ProjectChanged(),"EXTERNAL_CHANGES","Project descriptor changed on disk; reopen the project before changing startup audio");
+        std::filesystem::path Audio;
+        if(P.contains("assetId")) {
+            const auto Entry=Asset(P.at("assetId"));
+            Require(Entry.Metadata.Type==AudioAssetType && Entry.Mount==AssetMount::Game,"INVALID_ARGUMENT","Expected project WAV asset");
+            Audio=Entry.AbsolutePath;
+        }
+        std::string Error;
+        Require(Project.SetStartupAudio(Audio,Error),"IO_ERROR",Error);
+        AssetDiagnostic Diagnostic;
+        ContentHash::TryHashFile(Project.GetProject()->ProjectFile.u8string(),ProjectFingerprint,Diagnostic);
+        return Describe();
+    }
+    if(M=="play.mechanicOperation") {
+        Require(Play.GetState()==PlaySessionState::Playing,"INVALID_STATE","Start Play before running a mechanic");
+        auto* Object=Find(P.at("objectId"));const auto Operation=P.at("operation").get<std::string>();
+        const auto& Value=P.at("value");
+        if(Operation=="position") {
+            Require(Value.is_null(),"INVALID_ARGUMENT","Position takes no value");
+            const auto& Position=Object->GetTransform().Position;
+            return Json::array({Position.x,Position.y,Position.z});
+        }
+        if(Operation=="setActive") {
+            Require(Value.is_boolean(),"INVALID_ARGUMENT","setActive expects a boolean");
+            Object->SetActive(Value.get<bool>());return Value;
+        }
+        if(Operation=="translate") {
+            Require(Value.is_array()&&Value.size()==3,"INVALID_ARGUMENT","translate expects x, y, z");
+            auto Transform=Object->GetTransform();
+            for(size_t I=0;I<3;++I)Require(Value[I].is_number()&&std::isfinite(Value[I].get<double>())&&std::abs(Value[I].get<double>())<=1e6,"INVALID_ARGUMENT","Invalid translation");
+            Transform.Position.x+=Value[0].get<float>();Transform.Position.y+=Value[1].get<float>();Transform.Position.z+=Value[2].get<float>();
+            Require(std::isfinite(Transform.Position.x)&&std::isfinite(Transform.Position.y)&&std::isfinite(Transform.Position.z),"INVALID_ARGUMENT","Translation exceeds world range");
+            Object->SetTransform(Transform);return Json::array({Transform.Position.x,Transform.Position.y,Transform.Position.z});
+        }
+        throw Failure("INVALID_ARGUMENT","Unknown mechanic operation");
+    }
     if(M=="play.start") {
         if(Play.GetState()==PlaySessionState::Paused)Play.Resume();
         else {
@@ -408,12 +476,13 @@ Json NativeBridge::Poll(bool Force) {
     // Observe native gizmo/gameplay/property edits too; no JS mirror is authoritative.
     Json Values=Json::array();for(auto* O:World()->GetAllObjects())for(auto* C:O->GetAllComponents())Values.push_back(Properties(C));State["properties"]=std::move(Values);
     auto StoryState=StorySnapshot();StoryState.erase("revision");const auto StoryText=StoryState.dump(),AssetText=Assets().dump();
-    const bool StoryChanged=StoryText!=PreviousStory,AssetsChanged=AssetText!=PreviousAssets;
+    const bool StoryChanged=StoryText!=PreviousStory,WidgetsChanged=WidgetsRevision!=PreviousWidgetsRevision,AssetsChanged=AssetText!=PreviousAssets;
     if(StoryChanged){PreviousStory=StoryText;++StoryRevision;}PreviousAssets=AssetText;
+    PreviousWidgetsRevision=WidgetsRevision;
     auto Serialized=State.dump();const bool SceneChanged=Serialized!=PreviousState;
-    if(!Force&&!SceneChanged&&!StoryChanged&&!AssetsChanged)return nullptr;PreviousState=std::move(Serialized);++Revision;
+    if(!Force&&!SceneChanged&&!StoryChanged&&!WidgetsChanged&&!AssetsChanged)return nullptr;PreviousState=std::move(Serialized);++Revision;
     return {{"type","bridge.event"},{"version",1},{"event","state.changed"},{"context",Context()},{"state",Describe()},
-        {"changes",{{"scene",SceneChanged},{"assets",AssetsChanged},{"story",StoryChanged}}}};
+        {"changes",{{"scene",SceneChanged},{"assets",AssetsChanged},{"story",StoryChanged},{"widgets",WidgetsChanged}}}};
 }
 
 AssetRegistryEntry NativeBridge::Asset(const std::string& Id) {
@@ -443,6 +512,12 @@ Json NativeBridge::StorySnapshot() {
     return {{"open",true},{"revision",StoryRevision},{"document",Json::parse(Text)},{"positions",Positions},
         {"path",Story.GetPath().generic_string()},{"dirty",Story.IsDirty()},{"readOnly",Story.IsReadOnly()},
         {"externalChanges",Story.HasExternalChanges()},{"canUndo",Story.CanUndo()},{"canRedo",Story.CanRedo()}};
+}
+Json NativeBridge::WidgetSnapshot() {
+    if(!Widgets.IsOpen())return {{"open",false},{"error",WidgetError}};
+    const auto Bytes=QJsonDocument(Widgets.GetData()).toJson(QJsonDocument::Compact);
+    return {{"open",true},{"library",Json::parse(Bytes.toStdString())},{"dirty",Widgets.IsDirty()},
+        {"canUndo",Widgets.CanUndo()},{"canRedo",Widgets.CanRedo()}};
 }
 Json NativeBridge::DispatchDocuments(const std::string& M,const Json& P) {
     auto& Registry=Runtime.GetAssetRegistry();std::string Error;

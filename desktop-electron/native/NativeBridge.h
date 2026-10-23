@@ -3,6 +3,7 @@
 #include "Documents/SceneWorkspace.h"
 #include "Project/ProjectSession.h"
 #include "Documents/StoryGraphDocument.h"
+#include "Documents/WidgetDocument.h"
 #include <nlohmann/json.hpp>
 #include <functional>
 
@@ -33,6 +34,7 @@ private:
     Json Assets();
     AssetRegistryEntry Asset(const std::string& Id);
     Json StorySnapshot();
+    Json WidgetSnapshot();
     Json DispatchDocuments(const std::string& Method, const Json& Params);
     std::filesystem::path ContentPath(const std::string& Path);
     Engine& Runtime;
@@ -45,7 +47,9 @@ private:
     uint64_t Epoch = 1, Revision = 0;
     ObjectHandle LastWorld, LastEditWorld;
     StoryGraphDocument Story;
+    WidgetDocument Widgets;
     uint64_t StoryRevision=0;
-    std::string PreviousStory, PreviousAssets, AssetError, StoryError;
+    uint64_t WidgetsRevision=0, PreviousWidgetsRevision=0;
+    std::string PreviousStory, PreviousAssets, AssetError, StoryError, WidgetError;
     std::function<void()> ResetInput;
 };

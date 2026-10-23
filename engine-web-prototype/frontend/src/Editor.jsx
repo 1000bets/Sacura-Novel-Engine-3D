@@ -11,6 +11,7 @@ import {activityValue} from './runtimePresentation.js';
 import InputWorkspace,{InputContextSettings} from './InputWorkspace.jsx';
 import TouchInput from './TouchInput.jsx';
 import GameplayWorkspace from './GameplayWorkspace.jsx';
+import NativeGameplayWorkspace from './NativeGameplayWorkspace.jsx';
 import FunctionScriptsWorkspace from './FunctionScriptsWorkspace.jsx';
 import {newScriptFunction,scriptFunctionType,scriptParameterType} from './scriptFunctions.js';
 import {schemaDefaults} from './valueSchemas.js';
@@ -23,6 +24,7 @@ import {builtinTemplates,loadBuiltinTemplate,createBuiltinProject,nativeTemplate
 import {inputContextsFor,inputHelp} from './inputModel.js';
 import LanguagePicker from './LanguagePicker.jsx';
 import WidgetWorkspace from './WidgetWorkspace.jsx';
+import NativeWidgetWorkspace from './NativeWidgetWorkspace.jsx';
 import WidgetRenderer,{WidgetMenu} from './WidgetRenderer.jsx';
 import WidgetAssignment from './WidgetAssignment.jsx';
 import {resolveWidget,createDialogueVariant,isUnmodifiedDefaultWidget} from './widgetModel.js';
@@ -112,6 +114,7 @@ import FailureLab from "./FailureLab.jsx";
 import SubsceneWorkspace from './SubsceneWorkspace.jsx';
 import CharacterWorkspace from './CharacterWorkspace.jsx';
 import NativeCharacterWorkspace from './NativeCharacterWorkspace.jsx';
+import NativeSoundWorkspace from './NativeSoundWorkspace.jsx';
 import {createCharacter,setCharacterInScene} from './characterModel.js';
 import {createSubscene,cloneSubscene,setSceneEntry,connectSubscene,changeSceneLocation,newSceneDraft,LOCATION_PRIMITIVES} from './subsceneModel.js';
 import EventPlayground from './EventPlayground.jsx';
@@ -387,6 +390,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   useEffect(()=>window.sacuraDesktop?.onNativeTest?.(command=>{
     if(command.action==='layout')setLayout(l=>({...l,left:command.left,right:command.right,height:command.height,
       windows:{...l.windows,position:command.position||'bottom'}}));
+    if(command.action==='open-gameplay')setDock('gameplay');
   }),[]);
   useEffect(()=>{if(!workspaceTabCount)setMaximized(current=>current==='graph'?null:current);},[workspaceTabCount]);
   useEffect(()=>{
@@ -975,7 +979,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     replaceProject(readProject(raw));setNotice('Предыдущий проект восстановлен.');
   });
   const undo = () => {
-    if(isNative){nativeCommand(nativeFocus==='story'?'story.undo':'editor.undo');return;}
+    if(isNative){nativeCommand(nativeFocus==='story'?'story.undo':nativeFocus==='widgets'?'widgets.undo':'editor.undo');return;}
     if (!history.length) return;
     rt?.stop();setCameraPilotId(null);setCameraPreviewId(null);
     setFuture(f=>[...f.slice(-19),project]);
@@ -983,7 +987,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     setHistory((h) => h.slice(0, -1));
   };
   const redo=()=>{
-    if(isNative){nativeCommand(nativeFocus==='story'?'story.redo':'editor.redo');return;}
+    if(isNative){nativeCommand(nativeFocus==='story'?'story.redo':nativeFocus==='widgets'?'widgets.redo':'editor.redo');return;}
     if(!future.length)return;
     rt?.stop();setCameraPilotId(null);setCameraPreviewId(null);
     setHistory(h=>[...h.slice(-19),project]);setProject(future.at(-1));setFuture(f=>f.slice(0,-1));
@@ -1270,7 +1274,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       if(isNative&&!e.defaultPrevented){
         const editing=e.target.isContentEditable||e.target.closest?.('input,textarea,select');
         const ctrl=e.ctrlKey||e.metaKey;
-        if(ctrl&&e.code==='KeyS'){e.preventDefault();nativeCommand(nativeFocus==='story'?'story.save':'scene.save');return;}
+        if(ctrl&&e.code==='KeyS'){e.preventDefault();nativeCommand(nativeFocus==='story'?'story.save':nativeFocus==='widgets'?'widgets.save':'scene.save');return;}
         if(!editing&&ctrl&&['KeyZ','KeyY'].includes(e.code)){e.preventDefault();(e.code==='KeyY'||e.shiftKey?redo:undo)();return;}
         if(!editing&&e.key==='Delete'&&nativeFocus==='scene'&&nativeObject){e.preventDefault();nativeCommand('object.destroy',{objectId:nativeObject.id});return;}
         if(!editing&&e.code==='F5'){e.preventDefault();if(native.connected)nativeCommand(native.state?.play==='stopped'?'play.start':'play.stop');return;}
@@ -2213,6 +2217,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 </details>
               ))}</div>);
   const renderNativeWorkspace=(dock,visible)=>{
+    if(dock==='gameplay')return <NativeGameplayWorkspace session={native.context?.session} objects={native.objects} selectedObjectId={native.state?.selection} playing={nativePlaying} onPlay={()=>nativeCommand('play.start')} onStop={()=>nativeCommand('play.stop')}/>;
+    if(dock==='widgets')return <div style={{height:'100%'}} onPointerDown={()=>setNativeFocus('widgets')}><NativeWidgetWorkspace snapshot={native.widgets} command={(method,params)=>native.adapter.command(method,params,native.context)} running={nativeEditing} onStop={()=>nativeCommand('play.stop')} onPreview={async()=>{if(await nativeCommand('play.start')){setDock('scene');setNativeFocus('scene');}}} request={widgetRequest}/></div>;
     const openAsset=async asset=>{
       if(asset.typeId==='Scene'){if(await nativeCommand('scene.open',{path:asset.relativePath})){setNativeFocus('scene');showBaseDock('scene');}}
       else if(asset.typeId==='Story'){if(await nativeCommand('story.open',{assetId:asset.id})){setNativeFocus('story');setDock('story');}}
@@ -2230,6 +2236,12 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         const mesh=imported?.subassets?.find(item=>item.typeId==='StaticMesh');
         if(results.length&&!mesh)throw Error('В импортированном файле нет статического меша.');
         return mesh?{assetId:imported.id,subAssetId:mesh.id,name:imported.name?.replace(/\.glb$/i,'')}:null;}}/>;
+    if(dock==='sound')return <NativeSoundWorkspace assets={native.assets} session={native.context?.session||''}
+      startupAudioPath={native.state?.startupAudioPath} disabled={nativeEditing}
+      onImport={async()=>{const results=await window.sacuraDesktop.nativeImportAssets('Audio');
+        const failure=results.find(result=>!result.ok);await native.adapter.loadDomain('assets.list','assets');
+        if(failure)throw Error(failure.error.message);}}
+      onSetStartup={assetId=>native.adapter.command('audio.setStartup',assetId?{assetId}:{},native.context)}/>;
     if(dock!=='story'&&dock!=='event')return <p role="status">Эта панель ещё не подключена к C++ Engine. Доступны Hierarchy, Inspector, Сцена, Файлы и История.</p>;
     const doc=native.story?.document;
     const select=value=>{setNativeFocus('story');setNativeStorySelection(!value?null:typeof value==='string'?{nodeId:value}:{nodeId:value.flowBeatId,eventId:value.event?.id,bindingId:value.binding?.id});};
@@ -2514,7 +2526,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         <ThemePicker onOpen={() => setMenu(null)} />
         {logicReturn&&<Button icon="ArrowLeft" onClick={returnToLogicCaller}>{tr('К месту вызова')}</Button>}
       </header>
-      {isNative&&(native.state?.assetError||native.story?.error)&&<div role="alert" className="error-box" style={{flex:'0 0 auto',maxHeight:120,overflow:'auto'}}>{native.state?.assetError||native.story?.error}</div>}
+      {isNative&&(native.state?.assetError||native.story?.error||native.widgets?.error)&&<div role="alert" className="error-box" style={{flex:'0 0 auto',maxHeight:120,overflow:'auto'}}>{native.state?.assetError||native.story?.error||native.widgets?.error}</div>}
       {isNative&&native.error&&<div role="alert" className="error-box" style={{flex:'0 0 auto',maxHeight:120,overflow:'auto'}}>{native.error}<button onClick={()=>native.adapter.clearError()}>Закрыть</button></div>}
       {isNative&&(native.state?.externalChanges||native.state?.projectExternalChanges||native.story?.externalChanges)&&<div role="alert" className="error-box" style={{flex:'0 0 auto',maxHeight:120,overflow:'auto'}}>Файлы проекта изменены вне редактора. Сохранение поверх изменённой версии заблокировано. <button onClick={()=>runFileOperation(()=>window.sacuraDesktop.nativeReloadProject())}>Перечитать проект…</button><button onClick={()=>openProjectDialog('sceneCopy')}>Сохранить копию сцены…</button></div>}
       <div className={'editor-workspace compact-'+compactPanel+(layout.hiddenHierarchy?' hierarchy-hidden':'')+(layout.hiddenInspector?' inspector-hidden':'')+(['scene','graph'].includes(maximized)?' focus-center':maximized==='hierarchy'?' focus-hierarchy':maximized==='inspector'?' focus-inspector':'')}>
@@ -2677,7 +2689,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 onPlayerInteract={()=>rt?.playerInteract()}
                 onInteract={interact}
               />
-              {isNative&&nativePlaying&&<NativeDialogue state={native.state} session={native.context?.session} onAdvance={()=>nativeCommand('play.advanceDialogue')} onChoice={index=>nativeCommand('play.selectChoice',{index})}/>}
+              {isNative&&nativePlaying&&<NativeDialogue state={native.state} session={native.context?.session} widget={native.widgets?.library?.widgets?.find(w=>w.id===native.widgets?.library?.ui?.dialogue)} onAdvance={()=>nativeCommand('play.advanceDialogue')} onChoice={index=>nativeCommand('play.selectChoice',{index})}/>}
               {!isNative&&<>{mode==='game'&&<TouchInput settings={playProject.input} contexts={world.inputContexts||[]} active={world.inputActive} playerMode={world.playerControl?.mode} paused={world.paused||!world.inputReady}/>}
               {positionPick&&<div className="viewport-caption"><strong>{tr("Выберите точку на сцене")}</strong><Button icon="X" onClick={()=>setPositionPick(null)}>{tr("Отмена")}</Button></div>}
               <GameDialogue project={running?rt?.project:project}
@@ -2838,7 +2850,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           className={"editor-menu"+(menu==='Окна'?' windows-menu-container':'')}
           style={menuAnchor}
         >
-          {isNative&&menu === "Файл" ? (<><button onClick={()=>openProjectDialog('new')}>Новый C++ проект…</button><button onClick={openProjectFile}>Открыть C++ проект…</button><button disabled={!native.connected} onClick={saveProject}>Сохранить сцену и историю <kbd>Ctrl S</kbd></button><button disabled={!native.connected} onClick={()=>nativeCommand('project.save',{useCurrentAsStartup:true})}>Использовать текущие сцену и историю при запуске</button><button disabled={!native.connected} onClick={()=>openProjectDialog('sceneNew')}>Новая сцена…</button><button disabled={!native.connected} onClick={()=>openProjectDialog('sceneCopy')}>Сохранить сцену как…</button></>) : menu === "Файл" ? (
+          {isNative&&menu === "Файл" ? (<><button onClick={()=>openProjectDialog('new')}>Новый C++ проект…</button><button onClick={openProjectFile}>Открыть C++ проект…</button><button disabled={!native.connected} onClick={saveProject}>Сохранить сцену, историю и UI <kbd>Ctrl S</kbd></button><button disabled={!native.connected} onClick={()=>nativeCommand('project.save',{useCurrentAsStartup:true})}>Использовать текущие сцену и историю при запуске</button><button disabled={!native.connected} onClick={()=>openProjectDialog('sceneNew')}>Новая сцена…</button><button disabled={!native.connected} onClick={()=>openProjectDialog('sceneCopy')}>Сохранить сцену как…</button></>) : menu === "Файл" ? (
             <>
               <button disabled={projectFileBusy} onClick={()=>openProjectDialog('new')}><Icon name="FilePlus2"/>{tr("Новый пустой проект…")}</button>
               {serverStorageEnabled&&window.sacuraDesktop?.isDesktop!==true&&<button disabled={projectFileBusy} onClick={showServerProjects}><Icon name="Database"/>{tr("Открыть с сервера…")}</button>}
@@ -2857,7 +2869,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             </>
           ) : menu === "Правка" ? (
             <><button disabled={running} onClick={()=>editClipboard('copy')}><Icon name="Copy"/>{tr("Копировать ")}<kbd>Ctrl C</kbd></button><button disabled={running||!clipboard.current} onClick={()=>editClipboard('paste')}><Icon name="ClipboardPaste"/>{tr("Вставить ")}<kbd>Ctrl V</kbd></button><button onClick={resetLayout}><Icon name="PanelsTopLeft"/>{tr("Восстановить раскладку")}</button><button
-              disabled={isNative?!(nativeFocus==='story'?native.story?.canUndo:native.state?.canUndo):!history.length}
+              disabled={isNative?!(nativeFocus==='story'?native.story?.canUndo:nativeFocus==='widgets'?native.widgets?.canUndo:native.state?.canUndo):!history.length}
               onClick={() => {
                 undo();
                 setMenu(null);
@@ -2865,7 +2877,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             >
               <Icon name="Undo2" />
               {tr("Отменить ")}<kbd>Ctrl Z</kbd>
-            </button><button disabled={isNative?!(nativeFocus==='story'?native.story?.canRedo:native.state?.canRedo):!future.length} onClick={()=>{redo();setMenu(null);}}><Icon name="Redo2"/>{tr("Повторить ")}<kbd>Ctrl Shift Z</kbd></button></>
+            </button><button disabled={isNative?!(nativeFocus==='story'?native.story?.canRedo:nativeFocus==='widgets'?native.widgets?.canRedo:native.state?.canRedo):!future.length} onClick={()=>{redo();setMenu(null);}}><Icon name="Redo2"/>{tr("Повторить ")}<kbd>Ctrl Shift Z</kbd></button></>
           ) : menu === "Создать" ? (
             <EditorCreateMenu onCreate={createMenuAction} disabled={id=>isNative?nativeEditing||(['action','group','beat','event'].includes(id)&&native.story?.readOnly):id==='component'&&running}/>
           ) : (

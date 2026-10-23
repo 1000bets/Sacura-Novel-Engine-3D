@@ -6,6 +6,9 @@
 матрица совместимости и ограничения](PROJECT-COMPATIBILITY.md).
 
 **Native Bridge:** [контракт, архитектура, запуск и результаты проверок](NATIVE-BRIDGE.md).
+**Игровые механики:** вкладка Electron теперь сохраняет JavaScript в `Scripts/Mechanics/mechanics.json`, компилирует черновик и запускает последнюю рабочую версию при старте C++ PlaySession. Объект выбирается по имени; `engine.self.translate`, `setActive` и `position` работают с PlayWorld через проверяемые команды Native Bridge. После Stop EditWorld остаётся прежним. Импорт создаёт отдельную отключённую копию, которую нужно просмотреть и скомпилировать; экспорт сохраняет исходник в `*.sacura-mechanic.json`. Проверки: `node --test tests/native-mechanics.test.cjs`, `node --test --test-name-pattern "native mechanic actions" tests/native-bridge.test.cjs` и `node --test tests/native-gameplay-workspace.test.js` в каталоге frontend.
+
+Сейчас native вкладка поддерживает запуск при старте игры и эти три операции над выбранным объектом. JavaScript исполняется в Electron main process и передаёт действия в PlayWorld через C++ Bridge; самостоятельный SakuraPlayer и Qt Editor эти скрипты пока не запускают. Веб-пакеты `*.sacura-package.json`, Events, функции, инвентарь, переменные, сигналы и остальные команды веб-механик ещё не отображаются в C++ проекте и не исполняются этим адаптером. Файл обмена native-механики содержит исходник, но не зависимости веб-пакета.
 **React панели:** [матрица функций, архитектура и проверки](NATIVE-EDITOR-PANELS.md).
 Общие Hierarchy, Inspector, Transform, Content Browser и StoryFlow работают с
 Engine/EditorCore. Play/Pause/Stop/Step используют C++ PlaySession. Web сохраняет

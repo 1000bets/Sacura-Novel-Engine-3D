@@ -19,6 +19,8 @@ class WidgetDocument
     {
         return !Path.isEmpty();
     }
+    bool CanUndo() const { return !Past.isEmpty(); }
+    bool CanRedo() const { return !Future.isEmpty(); }
     const QJsonObject &GetData() const
     {
         return Data;

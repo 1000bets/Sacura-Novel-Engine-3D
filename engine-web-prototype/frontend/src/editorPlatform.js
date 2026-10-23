@@ -7,8 +7,8 @@ export function createWebEditorAdapter(actions){return {kind:'web',...actions};}
 // This store contains read-only server snapshots and UI selection, never a world or simulator.
 export function createDesktopEditorAdapter(client=createNativeBridgeClient()) {
   if(!client)return null;
-  let snapshot={connected:false,context:null,state:null,objects:[],components:[],types:[],assets:[],story:null,error:null};
-  let disposed=false,refreshing=false,dirty=false,serial=0,domains=new Set(['assets','story']),waiters=[];
+  let snapshot={connected:false,context:null,state:null,objects:[],components:[],types:[],assets:[],story:null,widgets:null,error:null};
+  let disposed=false,refreshing=false,dirty=false,serial=0,domains=new Set(['assets','story','widgets']),waiters=[];
   const listeners=new Set();
   const publish=patch=>{snapshot={...snapshot,...patch};for(const listener of listeners)listener();};
   const read=async(method,params={})=>{
@@ -29,15 +29,15 @@ export function createDesktopEditorAdapter(client=createNativeBridgeClient()) {
       const properties=await Promise.all(components.value.map(async component=>({...component,properties:(await read('component.getProperties',{objectId:selected,componentId:component.id})).value})));
       if(generation!==serial)continue;
       const requestedDomains=[...domains];for(const key of requestedDomains)domains.delete(key);
-      const domainPatch={};for(const key of requestedDomains){const value=(await read(key==='assets'?'assets.list':'story.get')).value;domainPatch[key]=same(snapshot[key],value)?snapshot[key]:value;}
+      const domainPatch={};for(const key of requestedDomains){const value=(await read(key==='assets'?'assets.list':key==='story'?'story.get':'widgets.get')).value;domainPatch[key]=same(snapshot[key],value)?snapshot[key]:value;}
       if(generation!==serial)continue;
       publish({...domainPatch,types,connected:true,context:description.context,state:same(snapshot.state,description.value)?snapshot.state:description.value,objects:reconcile(snapshot.objects,hierarchy.value),components:reconcile(snapshot.components,properties)});
     }}catch(error){if(!disposed)publish({error:error.code+': '+error.message});}finally{refreshing=false;for(const resolve of waiters)resolve();waiters=[];if(dirty&&!disposed)queueMicrotask(refresh);}
   }
   const off=client.subscribe(event=>{
-    if(event.event==='disconnected'){serial++;domains=new Set(['assets','story']);publish({connected:false,context:null,state:null,objects:[],components:[],types:[],assets:[],story:null,error:event.message});return;}
-    for(const key of ['assets','story'])if(event.changes?.[key])domains.add(key);
-    if(!snapshot.context||snapshot.context.session!==event.context.session||snapshot.context.epoch!==event.context.epoch){serial++;domains=new Set(['assets','story']);publish({context:event.context,objects:[],components:[],state:null,types:[],assets:[],story:null,error:null});}
+    if(event.event==='disconnected'){serial++;domains=new Set(['assets','story','widgets']);publish({connected:false,context:null,state:null,objects:[],components:[],types:[],assets:[],story:null,widgets:null,error:event.message});return;}
+    for(const key of ['assets','story','widgets'])if(event.changes?.[key])domains.add(key);
+    if(!snapshot.context||snapshot.context.session!==event.context.session||snapshot.context.epoch!==event.context.epoch){serial++;domains=new Set(['assets','story','widgets']);publish({context:event.context,objects:[],components:[],state:null,types:[],assets:[],story:null,widgets:null,error:null});}
     refresh();
   });
   const adapter={kind:'desktop',subscribe:callback=>{listeners.add(callback);return()=>listeners.delete(callback);},getSnapshot:()=>snapshot,
@@ -45,7 +45,7 @@ export function createDesktopEditorAdapter(client=createNativeBridgeClient()) {
     async command(method,params={},context=snapshot.context){
       const result=await client.request(method,params,context);
       if(!result.ok){publish({error:result.error.code+': '+result.error.message});throw Object.assign(Error(result.error.message),{code:result.error.code});}
-      if(method.startsWith('story.'))domains.add('story');if(method.startsWith('assets.'))domains.add('assets');
+      if(method.startsWith('story.'))domains.add('story');if(method.startsWith('assets.'))domains.add('assets');if(method.startsWith('widgets.'))domains.add('widgets');
       publish({error:null});await refresh();return result.value;
     },
     refresh,clearError:()=>publish({error:null}),

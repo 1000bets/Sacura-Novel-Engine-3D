@@ -5,7 +5,9 @@ const path = require('node:path');
 const os = require('node:os');
 const {spawn} = require('node:child_process');
 const {BridgeTransport,validate} = require('../bridge/transport.cjs');
+const {NativeMechanics}=require('../native-mechanics.cjs');
 const {performance} = require('node:perf_hooks');
+const {randomUUID} = require('node:crypto');
 const root=path.resolve(__dirname,'../..');
 const host=process.env.SACURA_NATIVE_HOST||path.join(root,'build/windows-msvc-debug/ElectronNative/Debug/SakuraElectronHost.exe');
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
@@ -33,6 +35,49 @@ test('contract rejects extra fields, unsafe values, methods and malformed transf
   for(const [m,p] of [['eval',{}],['object.destroy',{objectId:'x',pointer:42}],['object.rename',{objectId:'x',name:'\0'}],['component.setProperty',{objectId:'x',componentId:'c',property:'p',value:Infinity}],['transform.set',{objectId:'x',transform:{position:[1],rotation:[],scale:[]}}]])assert.throws(()=>validate(m,p));
   validate('object.create',{name:'日本語 объект'});
 });
+test('native UI widgets edit, undo, persist, and drive the C++ play session', {skip:process.platform!=='win32',timeout:90000},async()=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'sacura-native-widgets-'));
+  await fs.cp(path.join(root,'Samples/SampleProject'),dir,{recursive:true});
+  let app;
+  try{
+    const project=path.join(dir,'SampleProject.project');
+    app=await launch(project);
+    const call=async(method,params={})=>{const result=await app.bridge.request(method,params);assert.equal(result.ok,true,method+': '+JSON.stringify(result));return result.value;};
+    let snapshot=await call('widgets.get');
+    assert.equal(snapshot.open,true);
+    const original=snapshot.library.ui.dialogue;
+    const next=structuredClone(snapshot.library);
+    const source=next.widgets.find(widget=>widget.id===original);
+    const copy=structuredClone(source),ids=new Map(copy.elements.map(element=>[element.id,randomUUID()]));
+    copy.id=randomUUID();copy.name='Bridge dialogue';
+    copy.elements.forEach(element=>{element.parentId=ids.get(element.parentId)||'';element.id=ids.get(element.id);});
+    copy.elements.find(element=>element.role==='dialogueText').style.color='#12ab34';
+    next.widgets.push(copy);next.ui.dialogue=copy.id;
+    snapshot=await call('widgets.apply',{library:next});
+    assert.equal(snapshot.dirty,true);
+    assert.equal(snapshot.library.ui.dialogue,copy.id);
+    await until(()=>app.events.some(event=>event.changes?.widgets),5000);
+    assert.equal((await call('widgets.undo')).library.ui.dialogue,original);
+    assert.equal((await call('widgets.redo')).library.ui.dialogue,copy.id);
+    const invalid=structuredClone(snapshot.library);invalid.widgets.find(widget=>widget.id===copy.id).elements.find(element=>element.role==='dialogueText').action='gameplay';
+    const rejected=await app.bridge.request('widgets.apply',{library:invalid});
+    assert.equal(rejected.ok,false);
+    assert.equal((await call('widgets.get')).library.ui.dialogue,copy.id);
+    await call('widgets.save');
+    const saved=JSON.parse(await fs.readFile(path.join(dir,'Content/UI/Project.widgets'),'utf8'));
+    assert.equal(saved.ui.dialogue,copy.id);
+    assert.equal(saved.widgets.find(widget=>widget.id===copy.id).elements.find(element=>element.role==='dialogueText').style.color,'#12ab34');
+    const changed=structuredClone(saved);changed.widgets.find(widget=>widget.id===copy.id).elements.find(element=>element.role==='dialogueText').style.color='#34ab12';
+    await call('widgets.apply',{library:changed});
+    await call('project.save');
+    assert.equal(JSON.parse(await fs.readFile(path.join(dir,'Content/UI/Project.widgets'),'utf8')).widgets.find(widget=>widget.id===copy.id).elements.find(element=>element.role==='dialogueText').style.color,'#34ab12');
+    const state=await call('play.start');assert.equal(state.play,'playing');
+    const blocked=await app.bridge.request('widgets.apply',{library:changed});assert.equal(blocked.ok,false);assert.equal(blocked.error.code,'PLAY_READ_ONLY');
+    await call('play.stop');await app.close();app=null;
+    app=await launch(project);
+    assert.equal((await call('widgets.get')).library.ui.dialogue,copy.id);
+  }finally{if(app)await app.close();await fs.rm(dir,{recursive:true,force:true,maxRetries:5});}
+});
 test('visual novel template plays dialogue, branches and resolves its WAV cue', {skip:process.platform!=='win32',timeout:120000},async()=>{
   const parent=await fs.mkdtemp(path.join(os.tmpdir(),'sacura-novel-play-'));
   let app;
@@ -58,7 +103,44 @@ test('visual novel template plays dialogue, branches and resolves its WAV cue', 
     state=await call('play.selectChoice',{index:0});assert.equal(state.dialogue.speaker,'Мира');
     state=await call('play.advanceDialogue');assert.equal(state.dialogue.phase,'end');
     state=await call('play.stop');assert.equal(state.dialogue.phase,'idle');
+    const imported=await call('assets.import',{sourcePath:audio,destination:'Audio/Imported.wav'});
+    assert.ok((await call('assets.list')).some(asset=>asset.id===imported.id&&asset.typeId==='Audio'));
+    const invalid=path.join(parent,'invalid.wav');await fs.writeFile(invalid,'not a wave');
+    const rejected=await app.bridge.request('assets.import',{sourcePath:invalid,destination:'Audio/Invalid.wav'});
+    assert.equal(rejected.ok,false);assert.equal(rejected.error.code,'IMPORT_ERROR');
+    assert.equal((await fs.stat(path.join(parent,'NovelDemo','Content','Audio','Imported.wav'))).size,bytes.length);
+    state=await call('audio.setStartup',{assetId:imported.id});
+    assert.equal(state.startupAudioPath,'Audio/Imported.wav');
+    assert.equal((await fs.readFile(project,'utf8')).includes('Content/Audio/Imported.wav'),true);
+    assert.equal((await call('audio.resolveStartup')).absolutePath.replaceAll('\\','/').endsWith('/Audio/Imported.wav'),true);
+    state=await call('audio.setStartup');assert.equal(state.startupAudio,false);
+    assert.equal('startupAudio' in JSON.parse(await fs.readFile(project,'utf8')),false);
   }finally{if(app)await app.close();await fs.rm(parent,{recursive:true,force:true,maxRetries:5});}
+});
+test('native mechanic actions change PlayWorld and leave the edit scene intact', {skip:process.platform!=='win32',timeout:60000},async()=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'sacura-mechanic-play-'));
+  await fs.cp(path.join(root,'Samples/SampleProject'),dir,{recursive:true});
+  let app;
+  try{
+    app=await launch(path.join(dir,'SampleProject.project'));
+    const call=async(method,params={})=>{const result=await app.bridge.request(method,params);assert.equal(result.ok,true,method+': '+JSON.stringify(result));return result.value;};
+    const object=await call('object.create',{name:'Mechanic target'});
+    const original=(await call('scene.getHierarchy')).find(item=>item.id===object.id);
+    assert.equal(original.active,true);
+    const mechanics=new NativeMechanics(path.join(dir,'SampleProject.project'));await mechanics.load();
+    const [record]=await mechanics.create(object.id);
+    await mechanics.update(record.id,{source:'async function main({engine}) { await engine.self.translate(0, 2, 0); await engine.self.setActive(false); }'});
+    await mechanics.compile(record.id);
+    const stopped=await app.bridge.request('play.mechanicOperation',{objectId:object.id,operation:'setActive',value:false});
+    assert.equal(stopped.ok,false);assert.equal(stopped.error.code,'INVALID_STATE');
+    await call('play.start');
+    assert.deepEqual(await mechanics.runStart(app.bridge,app.bridge.context),[{id:record.id,ok:true}]);
+    const during=(await call('scene.getHierarchy')).find(item=>item.id===object.id);
+    assert.equal(during.active,false);assert.equal(during.transform.position[1],original.transform.position[1]+2);
+    await call('play.stop');
+    const after=(await call('scene.getHierarchy')).find(item=>item.id===object.id);
+    assert.equal(after.active,true);assert.deepEqual(after.transform,original.transform);
+  }finally{if(app)await app.close();await fs.rm(dir,{recursive:true,force:true,maxRetries:5});}
 });
 test('right mouse drag turns the native viewport toward the drag direction', {skip:process.platform!=='win32',timeout:30000},async()=>{
   const dir=await fs.mkdtemp(path.join(os.tmpdir(),'sacura-camera-input-'));

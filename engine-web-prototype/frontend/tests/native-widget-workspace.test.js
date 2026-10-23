@@ -1,0 +1,33 @@
+import test,{after,afterEach} from 'node:test';
+import assert from 'node:assert/strict';
+import {JSDOM} from 'jsdom';
+import {createServer} from 'vite';
+import {fileURLToPath} from 'node:url';
+import React from 'react';
+const dom=new JSDOM('<html><body></body></html>',{url:'http://localhost/'});
+for(const key of ['window','document','navigator','HTMLElement','localStorage'])Object.defineProperty(globalThis,key,{configurable:true,value:dom.window[key]});
+globalThis.ResizeObserver=class{observe(){}disconnect(){}};
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+const {render,screen,fireEvent,cleanup,waitFor}=await import('@testing-library/react');
+const server=await createServer({root:fileURLToPath(new URL('..',import.meta.url)),server:{middlewareMode:true,watch:null,hmr:false,ws:false}});
+const {default:NativeWidgetWorkspace}=await server.ssrLoadModule('/src/NativeWidgetWorkspace.jsx');
+const {createWidget}=await server.ssrLoadModule('/src/widgetModel.js');
+afterEach(cleanup);after(async()=>{await server.close();dom.window.close();});
+
+test('native widget workspace sends edits to C++ document and offers only supported actions',async()=>{
+  const widgets=['dialogue','mainMenu','pauseMenu','hud'].map(kind=>createWidget('test-'+kind,kind));
+  const library={format:'sakura.widgets',version:1,widgets,ui:Object.fromEntries(widgets.map(w=>[w.kind,w.id]))};
+  const calls=[];
+  const command=async(method,params={})=>{calls.push([method,params]);return {open:true,library:params.library||library,dirty:method==='widgets.apply',canUndo:true,canRedo:false};};
+  render(React.createElement(NativeWidgetWorkspace,{snapshot:{open:true,library,dirty:false,canUndo:false,canRedo:false},command,running:false}));
+  assert.ok(screen.getByText('Редактор виджетов · C++ Engine'));
+  assert.ok(screen.getByRole('button',{name:'Проверить в игре'}));
+  fireEvent.click(screen.getByRole('button',{name:'Имя персонажа'}));
+  fireEvent.change(screen.getAllByLabelText('Название')[0],{target:{value:'Диалог пользователя'}});
+  await waitFor(()=>assert.ok(calls.some(([method])=>method==='widgets.apply')));
+  const applied=calls.find(([method])=>method==='widgets.apply')[1].library;
+  assert.equal(applied.widgets[0].name,'Диалог пользователя');
+  fireEvent.click(screen.getByRole('button',{name:'Продолжить'}));
+  assert.ok(screen.getByRole('option',{name:'Продолжить диалог'}));
+  assert.equal(screen.queryByRole('option',{name:'Игровая команда'}),null);
+});

@@ -96,6 +96,11 @@ contextBridge.exposeInMainWorld('sacuraDesktop', Object.freeze({
   nativeCreateProject: (name,templateId='Empty') => ipcRenderer.invoke('desktop:native-create-project',name,templateId),
   nativeReloadProject: () => ipcRenderer.invoke('desktop:native-reload-project'),
   nativeImportAssets: destination => ipcRenderer.invoke('desktop:native-import-assets',destination),
+  nativeMechanics: (action,params) => ipcRenderer.invoke('desktop:native-mechanics',action,params),
+  onNativeMechanicsResult: callback => {
+    const listener=(_,result)=>callback(result);ipcRenderer.on('native-mechanics-result',listener);
+    return ()=>ipcRenderer.removeListener('native-mechanics-result',listener);
+  },
   onNativeTest: process.argv.includes('--native-smoke') ? callback => {
     const listener = (_, command) => callback(command); ipcRenderer.on('native-test',listener);
     return () => ipcRenderer.removeListener('native-test',listener);

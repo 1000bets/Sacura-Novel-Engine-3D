@@ -13,7 +13,8 @@ React хранит полученные снимки и состояние пр�
 Общие HierarchyTree, TransformInspector, ComponentInstancesInspector,
 AssetExplorer, StoryFlow и NodeAnswer используются на обеих платформах.
 Web сохраняет прежние обработчики и Three.js. Desktop не создаёт PreviewRuntime,
-не монтирует Web viewport, Web dialogue/HUD и JS StoryRuntime.
+не монтирует Web viewport, Web HUD и JS StoryRuntime. Диалог отображается
+общим WidgetRenderer из данных C++ `WidgetDocument` и состояния C++ `StoryRuntime`.
 Начальный пустой Web shape нужен существующему Editor для его shell/layout
 defaults; native панели его не отображают, не сохраняют и не симулируют.
 Запуск desktop сразу открывает Editor; промежуточный Web project.json не нужен.
@@ -36,8 +37,10 @@ defaults; native панели его не отображают, не сохра�
 | Story Graph: Events, сохранение, Undo/Redo | Работает полностью | Создание/удаление размещения, изменение определения Event, Actions, фаз и порядка групп, native history; .story и layout сохраняет EditorCore. |
 | Story Graph: удобство редактирования Actions/Events | Работает частично | Definition/actions/choices можно редактировать как JSON с native schema validation. Перенос Event реализован внутри одной ноды. Несколько соединений/удалений дают несколько native Undo шагов. |
 | Story Graph: clipboard, перенос Event между нодами, Web Blueprint/variables/functions | Не реализовано | Не исполняются в JS вместо C++. Доступны четыре runtime-типа нод и действия текущего C++ формата. |
+| Виджеты UI: библиотека, назначения, холст, элементы, оформление, Undo/Redo, сохранение | Работает в нативном профиле | React-вкладка редактирует `WidgetDocument` через bridge. C++ `WidgetLayout` проверяет каждое изменение, `Project.widgets` читается Player и Qt `WidgetSurface`. Доступны panel/text/button/image/choices; в диалоге исполняются продолжение и выбор ответа. Web CSS, игровые привязки, шкала и инвентарь пока не поддерживаются нативным профилем. |
+| Виджеты UI: предпросмотр диалога в Play | Работает | UI использует назначенный нативный виджет и состояние C++ `StoryRuntime`; кнопка и выбор ответа вызывают команды C++ PlaySession. Предпросмотр остальных типов в игре пока недоступен. |
 | Simulation: Play / Pause / Resume / Stop / Step | Работает полностью | Настоящий cloned PlayWorld, Step = 1/60 s в Paused. Редактирование scene/assets/story во время Play отклоняется. Play загружает startupStory проекта; открытие другого графа не меняет .project. Сохраните историю перед Play. |
-| Dialogue interaction и отображение состояния StoryRuntime в React | Не реализовано | Нет Advance/Choice runtime-панели и native HUD. Старые Web widgets не показываются вместо native состояния. |
+| Dialogue interaction и отображение состояния StoryRuntime в React | Работает для диалога | Назначенный нативный виджет показывает реплику и ответы C++ StoryRuntime. HUD и меню требуют отдельного runtime-хоста. |
 | Новый проект, Save As, export, прочие authoring panels | Не реализовано | Эта задача не переносит весь редактор. Существующие неподключённые панели показывают ограничение. |
 | Web-only ноды/игровые механики, отсутствующие в native схеме | Требует изменений C++ Engine | Для них нужны native схема, команды и исполнение; включение JS runtime в desktop не является решением. |
 
