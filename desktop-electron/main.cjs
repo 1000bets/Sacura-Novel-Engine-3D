@@ -77,6 +77,14 @@ app.whenReady().then(async () => {
         if(result.value.typeId!=='Texture'||!['.png','.jpg','.jpeg','.bmp','.webp'].includes(path.extname(file).toLowerCase()))return new Response('No browser preview for this native asset type',{status:415});
         return net.fetch(pathToFileURL(file).toString());
       }
+      if(url.host==='startup-audio') {
+        const [session,resource]=url.pathname.split('/').filter(Boolean);
+        const bridge=nativeViewport?.bridge;
+        if(!bridge?.connected||session!==bridge.context?.session||resource!=='cue.wav')return new Response('Expired audio session',{status:410});
+        const result=await bridge.request('audio.resolveStartup',{});
+        if(!result.ok)return new Response(result.error.message,{status:404});
+        return net.fetch(pathToFileURL(result.value.absolutePath).toString());
+      }
       if (url.host !== 'app') return new Response('Not found', {status: 404});
       const relative = decodeURIComponent(url.pathname).replace(/^\/+/, '') || 'index.html';
       const file = path.resolve(uiRoot, relative);

@@ -1,4 +1,5 @@
 import React,{useEffect,useState} from 'react';
+import {ChevronRight,Plus,Puzzle,Trash2} from 'lucide-react';
 import {SchemaValue} from './SchemaFields.jsx';
 export function DocumentJsonField({label,value,onCommit,disabled}){
  const serialized=JSON.stringify(value,null,2),[text,setText]=useState(serialized),[error,setError]=useState('');
@@ -25,13 +26,14 @@ export function ReflectedValueField({property,onChange,disabled,project,assets=[
 }
 export function ReflectedComponents({reflection,project,running}){
  const [type,setType]=useState(''),[selected,setSelected]=useState(null);
- const {components,types,onAdd,onRemove,onProperty,onAsset,assets}=reflection;
- return <section className="component-instances-inspector" aria-label="Компоненты C++">
-  <header className="component-inspector-heading"><strong>Компоненты · {components.length}</strong></header>
-  <select aria-label="Тип компонента" value={type} disabled={running} onChange={e=>setType(e.target.value)}><option value="">Добавить компонент…</option>{types.map(t=><option key={t.typeId} value={t.typeId}>{t.typeId}</option>)}</select>
-  <button disabled={running||!type} onClick={()=>onAdd(type)}>Добавить</button>
-  {components.map(component=><div key={component.id}><button className="component-instance-row" aria-expanded={selected===component.id} onClick={()=>setSelected(selected===component.id?null:component.id)}>{component.typeId}</button>
-   {selected===component.id&&<div className="component-instance-properties">{component.properties.map(p=><ReflectedValueField key={p.id} property={p} project={project} assets={assets} onAsset={onAsset?value=>onAsset(component.id,p.id,value):undefined} disabled={running} onChange={value=>onProperty(component.id,p.id,value)}/>)}<button disabled={running} onClick={()=>onRemove(component.id)}>Удалить компонент</button></div>}
-  </div>)}
+ const {components,types,onAdd,onRemove,onEnabled,onProperty,onAsset,assets}=reflection;
+ return <section className="component-instances component-instances-inspector" aria-label="Компоненты C++">
+  <header className="component-inspector-heading"><h3>Компоненты <span>{components.length}</span></h3></header>
+  <div className="component-instance-list">{components.map(component=><div key={component.id}><button className="component-instance-row" aria-expanded={selected===component.id} onClick={()=>setSelected(selected===component.id?null:component.id)}><ChevronRight size={13} aria-hidden="true"/><Puzzle size={15} aria-hidden="true"/><span><strong>{component.typeId}</strong><small>Системный</small></span></button>
+   {selected===component.id&&<div className="component-instance-properties">{onEnabled&&<label className="component-enabled"><input type="checkbox" aria-label={'Компонент '+component.typeId+' включён'} checked={component.enabled!==false} disabled={running} onChange={e=>onEnabled(component.id,e.target.checked)}/>Включён</label>}{component.properties.map(p=><ReflectedValueField key={p.id} property={p} project={project} assets={assets} onAsset={onAsset?value=>onAsset(component.id,p.id,value):undefined} disabled={running} onChange={value=>onProperty(component.id,p.id,value)}/>)}<button disabled={running} onClick={()=>onRemove(component.id)}><Trash2 size={14} aria-hidden="true"/>Удалить компонент</button></div>}
+  </div>)}</div>
+  {!components.length&&<p className="component-empty">Нет компонентов</p>}
+  <div className="component-add-form"><label className="component-property-field"><span>Компонент</span><select aria-label="Тип компонента" value={type} disabled={running} onChange={e=>setType(e.target.value)}><option value="">Выберите компонент…</option>{types.map(t=><option key={t.typeId} value={t.typeId}>{t.typeId}</option>)}</select></label>
+   <button className="component-add-button" disabled={running||!type} onClick={()=>onAdd(type)}><Plus size={15} aria-hidden="true"/>Добавить</button></div>
  </section>;
 }

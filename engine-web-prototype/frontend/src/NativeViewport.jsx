@@ -1,8 +1,10 @@
 import React, {useEffect, useRef, useState} from 'react';
+import {nativeScenePlacement} from './nativeScenePlacement.js';
 
 const modifiers = e => ({ctrl: !!(e.ctrlKey || e.metaKey), alt: !!e.altKey, shift: !!e.shiftKey});
-export default function NativeViewport({blocked = false, editTool, editSpace, snap, showGrid, focusRequest, onActivate, onCreateProject}) {
+export default function NativeViewport({blocked = false, editing = false, onContext, editTool, editSpace, snap, showGrid, focusRequest, onActivate, onCreateProject}) {
   const surface = useRef(null);
+  const rightGesture = useRef(null);
   const [status, setStatus] = useState({phase: 'starting'});
   const [hidden, setHidden] = useState(false);
   const hiddenRef = useRef(hidden); hiddenRef.current = hidden;
@@ -10,7 +12,7 @@ export default function NativeViewport({blocked = false, editTool, editSpace, sn
   const ready = status.phase === 'ready';
   const fail = error => setStatus(s => ({...s, error: error.message}));
   const input = event => api.nativeInput(event).catch(fail);
-  const reset = () => input({kind: 'reset'});
+  const reset = () => {rightGesture.current=null;input({kind: 'reset'});};
   useEffect(() => {api.nativeTools({tool: editTool || 'translate', space: editSpace || 'local', snap: !!snap, grid: !!showGrid}).catch(fail);}, [editTool, editSpace, snap, showGrid]);
   useEffect(() => {if (focusRequest) {input({kind:'key',code:'KeyF',down:true}); input({kind:'key',code:'KeyF',down:false});}}, [focusRequest]);
   useEffect(() => {if (blocked || hidden) reset();}, [blocked, hidden]);
@@ -54,16 +56,28 @@ export default function NativeViewport({blocked = false, editTool, editSpace, sn
     if (blocked || hidden || !ready) return;
     e.stopPropagation(); e.preventDefault();
     if (phase === 'down') {onActivate?.();e.currentTarget.focus(); e.currentTarget.setPointerCapture(e.pointerId);}
+    if (phase === 'down' && e.button === 2) rightGesture.current={id:e.pointerId,x:e.clientX,y:e.clientY,moved:false};
+    if (phase === 'move' && rightGesture.current?.id === e.pointerId && Math.hypot(e.clientX-rightGesture.current.x,e.clientY-rightGesture.current.y)>5) rightGesture.current.moved=true;
+    const click=phase === 'up' && e.button === 2 && rightGesture.current?.id === e.pointerId && !rightGesture.current.moved && !e.altKey && editing;
+    if (phase === 'up' && e.button === 2) rightGesture.current=null;
     const r = e.currentTarget.getBoundingClientRect(), scale = window.devicePixelRatio;
     input({kind: 'pointer', phase, x: (e.clientX-r.left)*scale, y: (e.clientY-r.top)*scale,
       button: e.button, buttons: e.buttons, ...modifiers(e)});
     if (phase === 'up' && e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+    if (click) {
+      const clientX=e.clientX,clientY=e.clientY,width=r.width,height=r.height,x=clientX-r.left,y=clientY-r.top;
+      api.nativeStatus().then(snapshot=>{
+        if(snapshot.phase!=='ready')return;
+        onContext?.({x:clientX,y:clientY,...(nativeScenePlacement(snapshot.viewport?.data,x,y,width,height)||{})});
+      }).catch(fail);
+    }
   }
   function key(e, down) {
     if (blocked || hidden || !ready) return;
     // Saving belongs to the focused editor domain, not the camera's S key.
     if ((e.ctrlKey || e.metaKey) && e.code === 'KeyS') return;
     if (!['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','KeyR','KeyF','KeyZ','KeyY','Escape','ShiftLeft','ShiftRight','AltLeft','AltRight','ControlLeft','ControlRight'].includes(e.code)) return;
+    if (down && rightGesture.current && ['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE'].includes(e.code)) rightGesture.current.moved=true;
     e.preventDefault(); e.stopPropagation(); input({kind:'key', code:e.code, down, repeat:e.repeat, ...modifiers(e)});
   }
   const metrics = status.presentation || {};

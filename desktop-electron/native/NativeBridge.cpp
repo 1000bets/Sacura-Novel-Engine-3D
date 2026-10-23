@@ -154,18 +154,27 @@ bool NativeBridge::ProjectChanged() const {
 }
 Json NativeBridge::Describe() {
     auto* Selected=Workspace.GetSelectedObject(World());auto& Play=Runtime.GetPlaySession();
+    auto& Playback=Runtime.GetStoryRuntime();
+    Json Choices=Json::array();
+    for(size_t I=0;I<Playback.GetChoiceCount();++I) Choices.push_back(Playback.GetChoice(I).Label);
+    const auto Phase=Playback.GetPlaybackPhase();
+    Json Dialogue={{"phase",Phase==StoryPlaybackPhase::Line?"line":Phase==StoryPlaybackPhase::Choice?"choice":Phase==StoryPlaybackPhase::Action?"action":Phase==StoryPlaybackPhase::End?"end":Phase==StoryPlaybackPhase::Failed?"failed":"idle"},
+        {"speaker",Playback.GetDisplayedSpeaker()},{"text",Playback.GetDisplayedLine()},
+        {"choices",Choices},{"canAdvance",Playback.CanAdvanceDialogue()},
+        {"canChoose",Playback.CanSelectChoice()},{"error",Playback.GetLastError()}};
     return {{"dirty",Workspace.GetDocument().IsDirty()},{"storyDirty",Story.IsDirty()},
         {"externalChanges",Workspace.GetDocument().HasExternalChanges()},{"projectExternalChanges",ProjectChanged()},
         {"path",Workspace.GetDocument().GetDocumentPath().generic_string()},
         {"project",Project.GetProject()?Project.GetProject()->Name:""},
         {"play",Play.GetState()==PlaySessionState::Stopped?"stopped":Play.GetState()==PlaySessionState::Paused?"paused":"playing"},
+        {"dialogue",Dialogue},{"startupAudio",Project.GetProject()&&!Project.GetProject()->StartupAudio.empty()},
         {"selection",Selected?Json(Selected->GetPersistentId()):Json(nullptr)},
         {"canUndo",Workspace.GetCommands().CanUndo()},{"canRedo",Workspace.GetCommands().CanRedo()},{"assetError",AssetError}};
 }
 Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
     if(M.rfind("story.",0)==0||M.rfind("assets.",0)==0)return DispatchDocuments(M,P);
     auto& Commands=Workspace.GetCommands();auto& Document=Workspace.GetDocument();auto& Play=Runtime.GetPlaySession();
-    const bool Read=M=="bridge.describe"||M=="scene.getHierarchy"||M=="object.getComponents"||M=="component.getProperties"||M=="transform.get"||M=="reflection.getComponentTypes"||M=="assets.getScenes";
+    const bool Read=M=="bridge.describe"||M=="scene.getHierarchy"||M=="object.getComponents"||M=="component.getProperties"||M=="transform.get"||M=="reflection.getComponentTypes"||M=="assets.getScenes"||M=="audio.resolveStartup";
     if(!Read&&M!="selection.set"&&M.rfind("play.",0)!=0)Require(!Play.IsSimulating(),"PLAY_READ_ONLY","Stop play before editing or opening/saving a scene");
     if(!Read)ResetInput();
     if(M=="bridge.describe")return Describe();
@@ -202,16 +211,79 @@ Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
     }
     if(M=="object.create") {
         ObjectHandle Created,Parent;if(P.contains("parentId")&&!P["parentId"].is_null())Parent=Find(P["parentId"])->GetObjectHandle();
-        Commit(MakeCreateObjectCommand(World(),P["name"],Parent,&Created));auto* O=World()->FindByHandle(Created);
+        const bool Compound=P.contains("transform")||P.contains("componentType")||P.contains("primitive");
+        TypeId ComponentType;
+        if(P.contains("componentType")) {
+            ComponentType=TypeId{P["componentType"].get<std::string>()};
+        }
+        AssetKey PrimitiveKey;
+        if(P.contains("primitive")) {
+            const std::string Shape=P["primitive"];
+            const std::string Path=Shape=="cube"?"/Engine/Models/StarterBlock.glb"
+                :Shape=="sphere"?"/Engine/Models/PrimitiveSphere.glb"
+                :Shape=="cylinder"?"/Engine/Models/PrimitiveCylinder.glb":"";
+            Require(!Path.empty()&&(!ComponentType.IsValid()||ComponentType==TypeId{"engine.MeshRendererComponent"}),
+                "INVALID_ARGUMENT","Unknown primitive or incompatible component");
+            ComponentType=TypeId{"engine.MeshRendererComponent"};
+            AssetRegistryEntry Entry;
+            Require(Runtime.GetAssetRegistry().TryGetByPath(Path,Entry)&&Entry.Metadata.SubAssets.size()==1
+                &&Entry.Metadata.SubAssets.front().Type==StaticMeshAssetType,"NOT_FOUND","Built-in primitive mesh is unavailable");
+            PrimitiveKey={Entry.Metadata.Guid,Entry.Metadata.SubAssets.front().Id};
+        }
+        if(ComponentType.IsValid()) {
+            auto* Type=ReflectionSubsystem::Get().FindClass(ComponentType);
+            Require(Type&&Type->IsConcrete()&&Type->IsA(TypeId{"engine.Component"}),"INVALID_ARGUMENT","Not a concrete component type");
+        }
+        if(P.contains("cameraAspect"))Require(ComponentType==TypeId{"engine.CameraComponent"}
+            &&P["cameraAspect"].get<double>()>0.01&&P["cameraAspect"].get<double>()<100,
+            "INVALID_ARGUMENT","cameraAspect requires a camera component and a positive aspect ratio");
+        const bool HasPrimaryCamera=ComponentType==TypeId{"engine.CameraComponent"}&&World()->FindPrimaryCamera()!=nullptr;
+        if(Compound)Commands.BeginGroup("Create Object");
+        try {
+            Commit(MakeCreateObjectCommand(World(),P["name"],Parent,&Created));
+            if(P.contains("transform"))Commit(MakeSetTransformCommand(World(),Created,ParseTransform(P["transform"])));
+            if(ComponentType.IsValid()) {
+                ObjectHandle CreatedComponent;
+                Commit(MakeAddComponentCommand(World(),Created,ComponentType,&CreatedComponent));
+                if(PrimitiveKey.IsValid()) {
+                    Commit(MakeSetPropertyCommand(World(),CreatedComponent,PropertyId{"mesh_asset_id"},
+                        ReflectedValue::MakeString(PrimitiveKey.Asset.ToString())));
+                    Commit(MakeSetPropertyCommand(World(),CreatedComponent,PropertyId{"mesh_sub_asset_id"},
+                        ReflectedValue::MakeString(PrimitiveKey.SubAsset->ToString())));
+                }
+                if(ComponentType==TypeId{"engine.LightComponent"})Commit(MakeSetPropertyCommand(World(),CreatedComponent,
+                    PropertyId{"light_type"},ReflectedValue::MakeInt64(1)));
+                if(HasPrimaryCamera)Commit(MakeSetPropertyCommand(World(),CreatedComponent,
+                    PropertyId{"primary"},ReflectedValue::MakeBool(false)));
+                if(P.contains("cameraAspect"))Commit(MakeSetPropertyCommand(World(),CreatedComponent,
+                    PropertyId{"aspect_ratio"},ReflectedValue::MakeFloat(P["cameraAspect"].get<float>())));
+            }
+            if(Compound)Commands.EndGroup();
+        } catch(...) {if(Compound)Commands.CancelGroup();throw;}
+        auto* O=World()->FindByHandle(Created);
         Require(O!=nullptr,"COMMAND_FAILED","Created object unavailable");return {{"id",O->GetPersistentId()}};
+    }
+    if(M=="object.duplicate") {
+        auto* Source=Find(P["objectId"]);std::string Subtree;
+        auto Result=SceneSerializer::SerializeSubtreeToJson(*Source,Subtree);
+        Require(Result.bOk,"COMMAND_FAILED",Result.Error);
+        const ObjectHandle Parent=Source->GetParent()?Source->GetParent()->GetObjectHandle():ObjectHandle{};
+        ObjectHandle Created;Commit(MakePasteSubtreeCommand(World(),std::move(Subtree),Parent,&Created));
+        auto* O=World()->FindByHandle(Created);
+        Require(O!=nullptr,"COMMAND_FAILED","Duplicated object unavailable");return {{"id",O->GetPersistentId()}};
     }
     if(M=="object.destroy"){auto* O=Find(P["objectId"]);Commit(MakeDeleteObjectCommand(World(),O->GetObjectHandle()));return nullptr;}
     if(M=="object.rename"){auto* O=Find(P["objectId"]);Commit(MakeRenameObjectCommand(World(),O->GetObjectHandle(),P["name"]));return nullptr;}
+    if(M=="object.setActive"){auto* O=Find(P["objectId"]);Commit(MakeSetObjectActiveCommand(World(),O->GetObjectHandle(),P["active"]));return nullptr;}
     if(M=="object.setParent") {
         auto* O=Find(P["objectId"]);auto* Parent=P["parentId"].is_null()?nullptr:Find(P["parentId"]);
         Require(!O->WouldCreateParentCycle(Parent),"INVALID_ARGUMENT","Parent cycle");Commit(MakeReparentObjectCommand(World(),O->GetObjectHandle(),Parent?Parent->GetObjectHandle():ObjectHandle{}));return nullptr;
     }
     if(M=="object.getComponents")return Components(Find(P["objectId"]));
+    if(M=="component.setEnabled"){
+        auto* O=Find(P["objectId"]);auto* C=FindComponent(P);
+        Commit(MakeSetComponentEnabledCommand(World(),O->GetObjectHandle(),C->GetObjectHandle(),P["enabled"]));return nullptr;
+    }
     if(M=="object.addComponent") {
         auto* O=Find(P["objectId"]);auto* Type=ReflectionSubsystem::Get().FindClass(TypeId{P["typeId"]});
         Require(Type&&Type->IsConcrete()&&Type->IsA(TypeId{"engine.Component"}),"INVALID_ARGUMENT","Not a concrete component type");
@@ -261,10 +333,29 @@ Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
     if(M=="selection.set"){if(P["objectId"].is_null())Workspace.ClearSelection();else Workspace.Select(World(),Find(P["objectId"])->GetObjectHandle());return Describe();}
     if(M=="editor.undo"){Require(Commands.Undo(),"COMMAND_FAILED","Nothing to undo or stale command");return Describe();}
     if(M=="editor.redo"){Require(Commands.Redo(),"COMMAND_FAILED","Nothing to redo or stale command");return Describe();}
-    if(M=="play.start") {if(Play.GetState()==PlaySessionState::Paused)Play.Resume();else Require(Play.StartPlay(),"COMMAND_FAILED","PlaySession failed to start");Workspace.ClearSelection();return Describe();}
+    if(M=="audio.resolveStartup") {
+        Require(Project.GetProject()&&!Project.GetProject()->StartupAudio.empty(),"NOT_FOUND","No startup audio");
+        const auto Relative=Project.GetProject()->StartupAudio.lexically_relative(ProjectPaths::Content());
+        const auto Path=ContentPath(Relative.generic_string());
+        Require(Path.extension()==".wav"&&std::filesystem::is_regular_file(Path),"NOT_FOUND","Startup WAV is missing");
+        return {{"absolutePath",Path.generic_string()}};
+    }
+    if(M=="play.start") {
+        if(Play.GetState()==PlaySessionState::Paused)Play.Resume();
+        else {
+            Require(Play.StartPlay(),"COMMAND_FAILED","PlaySession failed to start");
+            auto& Playback=Runtime.GetStoryRuntime();Playback.BindScene(Play.GetPlayWorld());
+            const bool HasStory=Story.IsOpen()||(Project.GetProject()&&!Project.GetProject()->StartupStory.empty());
+            const bool Loaded=!HasStory||(Story.IsOpen()?Playback.LoadDocument(Story.GetStory()):Playback.LoadFromFile(Project.GetProject()->StartupStory));
+            if(!Loaded){const auto Error=Playback.GetLastError();Playback.BindScene(nullptr);Play.StopPlay();throw Failure("STORY_ERROR",Error);}
+        }
+        Workspace.ClearSelection();return Describe();
+    }
+    if(M=="play.advanceDialogue") {Require(Play.GetState()==PlaySessionState::Playing,"INVALID_STATE","Play is not running");Require(Runtime.GetStoryRuntime().AdvanceDialogue(),"INVALID_STATE","Dialogue cannot advance");return Describe();}
+    if(M=="play.selectChoice") {Require(Play.GetState()==PlaySessionState::Playing,"INVALID_STATE","Play is not running");const auto Index=P.at("index").get<double>();Require(Index>=0&&std::floor(Index)==Index&&Index<Runtime.GetStoryRuntime().GetChoiceCount(),"INVALID_ARGUMENT","Invalid choice index");Require(Runtime.GetStoryRuntime().SelectChoice(size_t(Index)),"INVALID_STATE","Choice is unavailable");return Describe();}
     if(M=="play.pause"){Require(Play.IsSimulating(),"INVALID_STATE","Play is stopped");Play.Pause();return Describe();}
     if(M=="play.step"){Require(Play.GetState()==PlaySessionState::Paused,"INVALID_STATE","Pause before Step");Play.StepFrame(1.f/60.f);return Describe();}
-    if(M=="play.stop"){Play.StopPlay();Workspace.ClearSelection();return Describe();}
+    if(M=="play.stop"){Runtime.GetStoryRuntime().BindScene(nullptr);Play.StopPlay();Workspace.ClearSelection();return Describe();}
     if(M=="reflection.getComponentTypes") {
         Json A=Json::array();for(auto* C:ReflectionSubsystem::Get().GetPublishedCatalog().Classes)if(C->IsConcrete()&&C->IsA(TypeId{"engine.Component"}))A.push_back({{"typeId",C->Id.Value},{"version",C->SchemaVersion}});return A;
     }
@@ -393,7 +484,7 @@ Json NativeBridge::DispatchDocuments(const std::string& M,const Json& P) {
         auto Encoded=StorySnapshot().at("document");bool Found=false;
         if(M=="story.updateNode") {
             const auto& Patch=P.at("patch");Require(Patch.is_object(),"INVALID_ARGUMENT","Expected node fields");
-            const std::set<std::string> Allowed={"speaker","text","prompt","choices","actions"};
+            const std::set<std::string> Allowed={"kind","speaker","text","prompt","choices","actions"};
             for(auto It=Patch.begin();It!=Patch.end();++It)Require(Allowed.count(It.key())!=0,"INVALID_ARGUMENT","Unsupported node field");
             for(auto& Node:Encoded["nodes"])if(Node.at("id")==P.at("nodeId")){Node.update(Patch);Found=true;break;}
         } else {
@@ -405,6 +496,23 @@ Json NativeBridge::DispatchDocuments(const std::string& M,const Json& P) {
         if(M=="story.updateNode"){for(const auto& N:Decoded.Nodes)if(N.Id==P.at("nodeId")){Require(Story.ReplaceNode(N,Error),"STORY_ERROR",Error);break;}}
         else for(const auto& E:Decoded.Events)if(E.Id==P.at("eventId")){Require(Story.ReplaceEvent(E,Error),"STORY_ERROR",Error);break;}
         return StorySnapshot();
+    }
+    if(M=="story.setOverrides") {
+        const auto& Actions=P.at("actions");Require(Actions.is_array(),"INVALID_ARGUMENT","Expected actions array");
+        auto Encoded=StorySnapshot().at("document");bool Found=false;
+        for(auto& Node:Encoded["nodes"])if(Node.at("id")==P.at("nodeId")&&Node.contains("bindings"))
+            for(auto& Binding:Node["bindings"])if(Binding.at("id")==P.at("bindingId")){
+                Binding["actionOverrides"]=Json::object();
+                for(const auto& Action:Actions){Require(Action.is_object()&&Action.contains("id")&&Action.at("id").is_string(),"INVALID_ARGUMENT","Override needs an action ID");Binding["actionOverrides"][Action.at("id").get<std::string>()]=Action;}
+                Found=true;break;
+            }
+        Require(Found,"NOT_FOUND","Story placement no longer exists");StoryDocument Decoded;
+        const auto D=StoryDocumentIO::LoadFromJson(Encoded.dump(),Decoded);Require(D.bOk,"STORY_ERROR",D.Error);
+        for(const auto& Node:Decoded.Nodes)if(Node.Id==P.at("nodeId"))for(const auto& Batch:Node.EventBatches)
+            for(const auto& Binding:Batch.Bindings)if(Binding.Id==P.at("bindingId")){
+                Require(Story.SetEventOverrides(Node.Id,Binding.Id,Binding.ActionOverrides,Error),"STORY_ERROR",Error);return StorySnapshot();
+            }
+        throw Failure("NOT_FOUND","Story placement no longer exists");
     }
     auto Phase=[&](){const std::string S=P.at("phase");if(S=="BEFORE")return StoryEventPhase::Before;if(S=="ON_START")return StoryEventPhase::OnStart;Require(S=="AFTER","INVALID_ARGUMENT","Unknown event phase");return StoryEventPhase::After;};
     if(M=="story.addEvent"){

@@ -181,6 +181,20 @@ bool ProjectDescriptor::TryLoadFromFile(
         }
     }
 
+    if (Document.contains("startupAudio"))
+    {
+        const auto& Field = Document.at("startupAudio");
+        if (!Field.is_string()) { OutError = "Project field 'startupAudio' must be a string"; return false; }
+        const std::string Relative = Field.get<std::string>();
+        if (!Relative.empty())
+        {
+            const auto Absolute = (Parsed.ProjectRoot / std::filesystem::u8path(Relative)).lexically_normal();
+            if (!IsPathInsideRoot(Parsed.ProjectRoot / "Content", Absolute) || Absolute.extension() != ".wav")
+            { OutError = "startupAudio must be a WAV inside project Content"; return false; }
+            Parsed.StartupAudio = Absolute;
+        }
+    }
+
     OutDescriptor = std::move(Parsed);
     return true;
 }
@@ -232,6 +246,16 @@ bool ProjectDescriptor::TrySaveToFile(std::string& OutError) const
             return false;
         }
         Document["startupStory"] = RelativeStartup.generic_string();
+    }
+
+    if (!StartupAudio.empty())
+    {
+        if (!IsPathInsideRoot(ProjectRoot / "Content", StartupAudio) || StartupAudio.extension() != ".wav")
+        { OutError = "startupAudio must be a WAV inside project Content"; return false; }
+        std::error_code RelativeError;
+        auto Relative = std::filesystem::relative(StartupAudio, ProjectRoot, RelativeError);
+        if (RelativeError) { OutError = "Failed to relativize startupAudio"; return false; }
+        Document["startupAudio"] = Relative.generic_string();
     }
 
     return AtomicFileWriter::WriteText(ProjectFile, Document.dump(2), OutError);

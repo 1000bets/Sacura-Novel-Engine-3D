@@ -35,6 +35,7 @@ struct AssetTypeHash
 inline const AssetType UnknownAssetType{};
 inline const AssetType SceneAssetType{"Scene"};
 inline const AssetType StoryAssetType{"Story"};
+inline const AssetType AudioAssetType{"Audio"};
 inline const AssetType ModelAssetType{"Model"};
 inline const AssetType TextureAssetType{"Texture"};
 inline const AssetType MaterialAssetType{"Material"};

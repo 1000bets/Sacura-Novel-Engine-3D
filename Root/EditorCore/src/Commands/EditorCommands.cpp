@@ -168,6 +168,34 @@ public:
     const char* GetDisplayName() const override { return "Set Object Active"; }
 };
 
+class SetComponentEnabledCommand final : public EditorCommand
+{
+public:
+    Scene* TargetScene = nullptr;
+    CommandIdentity Owner;
+    CommandIdentity Target;
+    bool NewEnabled = true;
+    bool OldEnabled = true;
+    bool bCapturedOld = false;
+
+    bool Do() override
+    {
+        auto* Instance = ResolveComponent(TargetScene, Owner, Target);
+        if (!Instance) { return false; }
+        if (!bCapturedOld) { OldEnabled = Instance->IsEnabled(); bCapturedOld = true; }
+        Instance->SetEnabled(NewEnabled);
+        return true;
+    }
+    bool Undo() override
+    {
+        auto* Instance = ResolveComponent(TargetScene, Owner, Target);
+        if (!Instance) { return false; }
+        Instance->SetEnabled(OldEnabled);
+        return true;
+    }
+    const char* GetDisplayName() const override { return "Set Component Enabled"; }
+};
+
 class CreateObjectCommand : public EditorCommand
 {
 public:
@@ -828,6 +856,16 @@ std::unique_ptr<EditorCommand> MakeSetObjectActiveCommand(Scene* TargetScene, Ob
     Command->TargetScene = TargetScene;
     Command->Target = Target;
     Command->NewActive = Active;
+    return Command;
+}
+
+std::unique_ptr<EditorCommand> MakeSetComponentEnabledCommand(Scene* TargetScene, ObjectHandle Owner, ObjectHandle Component, bool Enabled)
+{
+    auto Command = std::make_unique<SetComponentEnabledCommand>();
+    Command->TargetScene = TargetScene;
+    Command->Owner = Owner;
+    Command->Target = Component;
+    Command->NewEnabled = Enabled;
     return Command;
 }
 

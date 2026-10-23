@@ -202,6 +202,16 @@ bool ProjectSession::ApplyOpenedProject()
         }
     }
 
+    if (!Descriptor.StartupAudio.empty() && !std::filesystem::is_regular_file(Descriptor.StartupAudio))
+    {
+        LastError = "Startup audio file is missing";
+        Health = ProjectSessionHealth::Degraded;
+        Diagnostics.push_back(AssetDiagnostic::Fail(AssetErrorCode::InvalidData,
+            "StartupAudio", LastError, {}, Descriptor.StartupAudio.generic_string()));
+        ++IssueCount;
+        PrintString("ProjectSession: startupAudio missing: " + Descriptor.StartupAudio.generic_string());
+    }
+
     if (!Descriptor.StartupScene.empty())
     {
         Scene* LoadedScene = nullptr;

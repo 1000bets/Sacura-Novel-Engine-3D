@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "guid": "a56f6708-42db-5662-94e0-68eb35d524e4",
+  "assetType": "Model",
+  "sourceFingerprint": "cf18cc85e2762e96",
+  "loadSettings": {},
+  "importInfo": {},
+  "subAssets": [
+    {
+      "id": "41a769d2-11db-5952-bb68-dbe868261892",
+      "type": "StaticMesh",
+      "name": "PrimitiveCylinder",
+      "selector": {
+        "kind": "mesh",
+        "index": 0
+      }
+    }
+  ]
+}

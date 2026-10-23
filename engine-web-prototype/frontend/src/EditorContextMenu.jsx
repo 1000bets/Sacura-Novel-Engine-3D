@@ -4,7 +4,7 @@ import {createPortal} from 'react-dom';
 import {Icon} from './StudioParts.jsx';
 import './editorContextMenu.css';
 
-export default function EditorContextMenu({x,y,title,items,onClose}){
+export default function EditorContextMenu({x,y,title,items,onClose,className=''}){
  useLocale();
  const ref=useRef(),[query,setQuery]=useState(''),[submenu,setSubmenu]=useState(null),[submenuPosition,setSubmenuPosition]=useState({}),subRef=useRef(),[position,setPosition]=useState({left:x,top:y});
  const searched=items.flatMap(item=>item.children?[item,...item.children.map(child=>({...child,group:item.label}))]:[item]);
@@ -13,7 +13,7 @@ export default function EditorContextMenu({x,y,title,items,onClose}){
  const openSubmenu=(item,trigger,focus=false)=>{const rect=trigger.getBoundingClientRect();setSubmenu({item,trigger,focus,top:rect.top});};
  useLayoutEffect(()=>{if(!submenu||!subRef.current)return;const box=subRef.current.getBoundingClientRect(),parent=ref.current.getBoundingClientRect();setSubmenuPosition({left:parent.right+box.width+8<=window.innerWidth?parent.right+3:Math.max(8,parent.left-box.width-3),top:Math.max(8,Math.min(submenu.top,window.innerHeight-box.height-8))});if(submenu.focus)subRef.current.querySelector('button')?.focus();},[submenu,position]);
  useEffect(()=>{const previous=document.activeElement;ref.current.querySelector('input')?.focus();const dismiss=e=>{if(!ref.current?.contains(e.target))onClose();};const close=()=>onClose();window.addEventListener('pointerdown',dismiss,true);window.addEventListener('resize',close);window.addEventListener('blur',close);return()=>{window.removeEventListener('pointerdown',dismiss,true);window.removeEventListener('resize',close);window.removeEventListener('blur',close);if(previous?.isConnected)previous.focus({preventScroll:true});};},[onClose]);
- return createPortal(<div className="editor-context-menu" ref={ref} style={position} role="dialog" aria-label={tr(title)} onContextMenu={e=>e.preventDefault()} onKeyDown={e=>{
+ return createPortal(<div className={'editor-context-menu '+className} ref={ref} style={position} role="dialog" aria-label={tr(title)} onContextMenu={e=>e.preventDefault()} onKeyDown={e=>{
   if(e.key==='Escape'){e.preventDefault();e.stopPropagation();onClose();}
   if(e.key==='ArrowRight'){const item=items.find(item=>item.label===e.target.dataset.submenu);if(item){e.preventDefault();openSubmenu(item,e.target,true);}}
   if(e.key==='ArrowLeft'&&submenu){e.preventDefault();submenu.trigger.focus();setSubmenu(null);}

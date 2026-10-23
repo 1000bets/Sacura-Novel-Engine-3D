@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "guid": "ede42642-5e3d-5edf-8939-10286fca38b6",
+  "assetType": "Model",
+  "sourceFingerprint": "cb632bb8adcfa5d2",
+  "loadSettings": {},
+  "importInfo": {},
+  "subAssets": [
+    {
+      "id": "1fc2591a-4db6-522c-9d3d-03259b2cd7eb",
+      "type": "StaticMesh",
+      "name": "PrimitiveSphere",
+      "selector": {
+        "kind": "mesh",
+        "index": 0
+      }
+    }
+  ]
+}

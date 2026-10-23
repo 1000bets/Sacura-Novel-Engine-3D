@@ -7,6 +7,8 @@
 #include <fstream>
 #include <algorithm>
 #include <cctype>
+#include <cmath>
+#include <cstdint>
 #include <nlohmann/json.hpp>
 
 namespace
@@ -82,6 +84,32 @@ std::string MakeEmptySceneJson(const std::string& SceneName)
 {
     return nlohmann::json{{"format",SceneSerializer::FormatId},{"formatVersion",SceneSerializer::FormatVersion},
         {"name",SceneName},{"objects",nlohmann::json::array()}}.dump(2);
+}
+
+bool WriteNovelCue(const std::filesystem::path& Path)
+{
+    constexpr uint32_t Rate = 22050, Frames = Rate * 4;
+    std::ofstream Output(Path, std::ios::binary);
+    if (!Output) return false;
+    const auto U16 = [&](uint16_t Value) { Output.put(char(Value & 255)); Output.put(char(Value >> 8)); };
+    const auto U32 = [&](uint32_t Value) { U16(uint16_t(Value)); U16(uint16_t(Value >> 16)); };
+    Output.write("RIFF", 4); U32(36 + Frames * 2); Output.write("WAVEfmt ", 8);
+    U32(16); U16(1); U16(1); U32(Rate); U32(Rate * 2); U16(2); U16(16);
+    Output.write("data", 4); U32(Frames * 2);
+    constexpr double Tau = 6.283185307179586;
+    constexpr double Notes[] = {261.63, 329.63, 392.00, 523.25};
+    for (uint32_t Frame = 0; Frame < Frames; ++Frame)
+    {
+        const double Seconds = double(Frame) / Rate;
+        const int Note = std::min(3, int(Seconds));
+        const double Local = Seconds - Note;
+        const double Envelope = std::min(1.0, Local * 12.0) * std::min(1.0, (1.0 - Local) * 2.5);
+        const double Frequency = Notes[Note];
+        const double Wave = std::sin(Tau * Frequency * Seconds) * 0.75
+            + std::sin(Tau * Frequency * 2.0 * Seconds) * 0.15;
+        U16(uint16_t(int16_t(std::lround(Wave * Envelope * 4500.0))));
+    }
+    return bool(Output);
 }
 }
 
@@ -216,6 +244,12 @@ bool ProjectGenerator::CreateProject(
             {
                 OutError = GuideWritten.Error;
                 return false;
+            }
+            if (TemplateId == "builtin-novel" || TemplateId == "VisualNovel")
+            {
+                Parsed.StartupAudio = ProjectRoot / "Content" / "Audio" / "RainTheme.wav";
+                if (!WriteNovelCue(Parsed.StartupAudio))
+                { OutError = "Failed to write visual novel audio cue"; return false; }
             }
         }
     }

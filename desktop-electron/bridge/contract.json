@@ -12,7 +12,14 @@
     "scene.getHierarchy": {},
     "object.create": {
       "name": "string",
-      "parentId?": "nullableId"
+      "parentId?": "nullableId",
+      "transform?": "transform",
+      "componentType?": "id",
+      "primitive?": "id",
+      "cameraAspect?": "number"
+    },
+    "object.duplicate": {
+      "objectId": "id"
     },
     "object.destroy": {
       "objectId": "id"
@@ -25,6 +32,10 @@
       "objectId": "id",
       "parentId": "nullableId"
     },
+    "object.setActive": {
+      "objectId": "id",
+      "active": "boolean"
+    },
     "object.getComponents": {
       "objectId": "id"
     },
@@ -35,6 +46,11 @@
     "object.removeComponent": {
       "objectId": "id",
       "componentId": "id"
+    },
+    "component.setEnabled": {
+      "objectId": "id",
+      "componentId": "id",
+      "enabled": "boolean"
     },
     "component.getProperties": {
       "objectId": "id",
@@ -59,11 +75,14 @@
     "editor.undo": {},
     "editor.redo": {},
     "play.start": {},
+    "play.advanceDialogue": {},
+    "play.selectChoice": {"index": "number"},
     "play.pause": {},
     "play.stop": {},
     "reflection.getComponentTypes": {},
     "assets.getScenes": {},
     "play.step": {},
+    "audio.resolveStartup": {},
     "assets.list": {},
     "assets.refresh": {},
     "assets.resolve": {
@@ -118,6 +137,11 @@
     "story.updateEvent": {
       "eventId": "id",
       "event": "json"
+    },
+    "story.setOverrides": {
+      "nodeId": "id",
+      "bindingId": "id",
+      "actions": "json"
     },
     "story.placeEvent": {
       "nodeId": "id",

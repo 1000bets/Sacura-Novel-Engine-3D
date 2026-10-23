@@ -16,9 +16,54 @@ const {default:TransformInspector}=await server.ssrLoadModule('/src/TransformIns
 const {default:Components}=await server.ssrLoadModule('/src/ComponentInstancesInspector.jsx');
 const {default:AssetExplorer}=await server.ssrLoadModule('/src/AssetExplorer.jsx');
 const {default:NativeViewport}=await server.ssrLoadModule('/src/NativeViewport.jsx');
+const {default:NativeDialogue}=await server.ssrLoadModule('/src/NativeDialogue.jsx');
+const {default:NativeStoryInspector}=await server.ssrLoadModule('/src/NativeStoryInspector.jsx');
 const {default:ProjectHome}=await server.ssrLoadModule('/src/ProjectHome.jsx');
 const {default:LoadingScreen}=await server.ssrLoadModule('/src/LoadingScreen.jsx');
 afterEach(cleanup);after(async()=>{await server.close();dom.window.close();});
+test('native inspector clears to the shared empty state and edits a line through story commands',()=>{
+ const calls=[],command=(method,params)=>{calls.push([method,params]);return Promise.resolve({});};
+ const story={document:{name:'Demo',startNodeId:'line',nodes:[{id:'line',kind:'Line',speaker:'Narrator',text:'Hello',nextNodeId:'end'},{id:'end',kind:'End'}],events:[]}};
+ const view=render(React.createElement(NativeStoryInspector,{story,selection:null,command,objects:[]}));
+ assert.ok(screen.getByText('Ничего не выбрано'));
+ view.rerender(React.createElement(NativeStoryInspector,{story,selection:{nodeId:'line'},command,objects:[]}));
+ assert.ok(view.container.querySelector('.story-inspector-heading strong')?.textContent==='Реплика');
+ fireEvent.change(screen.getByLabelText('Текст выбранной реплики'),{target:{value:'Updated'}});
+ fireEvent.blur(screen.getByLabelText('Текст выбранной реплики'));
+ fireEvent.change(screen.getByLabelText('Продолжение реплики'),{target:{value:''}});
+ assert.deepEqual(calls,[['story.updateNode',{nodeId:'line',patch:{text:'Updated'}}],['story.connect',{sourceId:'line',port:-1,targetId:null}]]);
+});
+test('native inspector edits choices and selected event placement with native IDs',()=>{
+ const calls=[],command=(method,params)=>{calls.push([method,params]);return Promise.resolve({});};
+ const node={id:'choice',kind:'Choice',prompt:'Where?',choices:[{id:'answer',label:'Left',nextNodeId:'end'}],bindings:[{id:'binding',eventId:'event',join:'EVENT_END'}],batches:{BEFORE:[{id:'batch',bindingIds:['binding']}]}};
+ const story={document:{name:'Demo',startNodeId:'choice',nodes:[node,{id:'end',kind:'End'}],events:[{id:'event',name:'Open door',groups:[{id:'group',name:'Actions',actions:[{id:'action',kind:'Wait',durationSeconds:1}]}]}]}};
+ const view=render(React.createElement(NativeStoryInspector,{story,selection:{nodeId:'choice'},command,objects:[]}));
+ fireEvent.change(screen.getByLabelText('Продолжение ответа 1'),{target:{value:''}});
+ assert.equal(calls[0][0],'story.updateNode');assert.equal(calls[0][1].patch.choices[0].nextNodeId,'');
+ view.rerender(React.createElement(NativeStoryInspector,{story,selection:{nodeId:'choice',eventId:'event',bindingId:'binding'},command,objects:[]}));
+ fireEvent.change(screen.getByLabelText('Когда запустить'),{target:{value:'AFTER'}});
+ assert.deepEqual(calls.at(-1),['story.placeEvent',{nodeId:'choice',bindingId:'binding',phase:'AFTER',join:'EVENT_END'}]);
+ fireEvent.change(screen.getByLabelText('Длительность, сек'),{target:{value:'2'}});
+ assert.deepEqual(calls.at(-1),['story.setOverrides',{nodeId:'choice',bindingId:'binding',actions:[{id:'action',kind:'Wait',durationSeconds:2}]}]);
+});
+test('native dialogue advances, offers choices and pauses its startup cue',async()=>{
+ const calls=[];const oldAudio=globalThis.Audio;
+ globalThis.Audio=class{constructor(src){this.src=src;calls.push(['source',src]);}play(){calls.push(['play']);return Promise.resolve();}pause(){calls.push(['pause']);}};
+ try{
+  const base={play:'playing',startupAudio:true};
+  const line={phase:'line',speaker:'Мира',text:'Откроем письмо?',choices:[],canAdvance:true,canChoose:false,error:''};
+  const commands=[];
+  const view=render(React.createElement(NativeDialogue,{state:{...base,dialogue:line},session:'session',onAdvance:()=>commands.push('next'),onChoice:i=>commands.push(i)}));
+  fireEvent.click(screen.getByText('Дальше →'));assert.deepEqual(commands,['next']);
+  assert.ok(calls.some(([kind,src])=>kind==='source'&&src==='sacura://startup-audio/session/cue.wav'));
+  assert.ok(calls.some(([kind])=>kind==='play'));
+  view.rerender(React.createElement(NativeDialogue,{state:{...base,dialogue:{...line,phase:'choice',choices:['Да','Позже'],canAdvance:false,canChoose:true}},session:'session',onAdvance:()=>{},onChoice:i=>commands.push(i)}));
+  fireEvent.click(screen.getByText('Позже'));assert.deepEqual(commands,['next',1]);
+  view.rerender(React.createElement(NativeDialogue,{state:{...base,play:'paused',dialogue:line},session:'session',onAdvance:()=>{},onChoice:()=>{}}));
+  assert.ok(calls.some(([kind])=>kind==='pause'));
+  assert.equal(screen.getByText('Дальше →').disabled,true);
+ }finally{globalThis.Audio=oldAudio;}
+});
 test('loading overlay reports the real stage and blocks shortcuts only while mounted',()=>{
  const {unmount}=render(React.createElement(LoadingScreen,{label:'Загружаем сцену и запускаем движок…',project:'My project'}));
  assert.equal(screen.getByRole('status').textContent,'Загружаем сцену и запускаем движок…');
@@ -55,11 +100,11 @@ test('existing TransformInspector emits position/rotation/scale drafts; quaterni
  const angles=[20,30,-40];quaternionToEuler(eulerToQuaternion(angles)).forEach((v,i)=>assert.ok(Math.abs(v-angles[i])<1e-6));
 });
 test('same component inspector edits reflected properties and removes components',()=>{
- const calls=[],reflection={components:[{id:'c',typeId:'engine.LightComponent',properties:[{id:'intensity',label:'Intensity',typeId:'engine.float',value:2,editable:true}]}],types:[{typeId:'engine.LightComponent'}],onAdd:t=>calls.push(['add',t]),onProperty:(...p)=>calls.push(['property',...p]),onRemove:id=>calls.push(['remove',id])};
+ const calls=[],reflection={components:[{id:'c',typeId:'engine.LightComponent',enabled:true,properties:[{id:'intensity',label:'Intensity',typeId:'engine.float',value:2,editable:true}]}],types:[{typeId:'engine.LightComponent'}],onAdd:t=>calls.push(['add',t]),onProperty:(...p)=>calls.push(['property',...p]),onRemove:id=>calls.push(['remove',id]),onEnabled:(...p)=>calls.push(['enabled',...p])};
  render(React.createElement(Components,{project:{objects:[]},reflection}));
  fireEvent.change(screen.getByLabelText('Тип компонента'),{target:{value:'engine.LightComponent'}});fireEvent.click(screen.getByText('Добавить'));
- fireEvent.click(screen.getByRole('button',{name:'engine.LightComponent'}));const input=screen.getByLabelText('Intensity');fireEvent.change(input,{target:{value:'3'}});fireEvent.blur(input);fireEvent.click(screen.getByText('Удалить компонент'));
- assert.deepEqual(calls,[['add','engine.LightComponent'],['property','c','intensity',3],['remove','c']]);
+ fireEvent.click(screen.getByRole('button',{name:/engine.LightComponent/}));fireEvent.click(screen.getByLabelText('Компонент engine.LightComponent включён'));const input=screen.getByLabelText('Intensity');fireEvent.change(input,{target:{value:'3'}});fireEvent.blur(input);fireEvent.click(screen.getByText('Удалить компонент'));
+ assert.deepEqual(calls,[['add','engine.LightComponent'],['enabled','c',false],['property','c','intensity',3],['remove','c']]);
 });
 
 test('Hierarchy search preserves the entire ancestor path of a native match',()=>{
@@ -97,6 +142,33 @@ test('native viewport lets Ctrl+S reach editor shortcuts and sends camera keys t
   await waitFor(()=>assert.ok(mounted.container.querySelector('[data-native-overlay]')));
   fireEvent.keyDown(surface,{code:'KeyS',ctrlKey:true});fireEvent.keyDown(surface,{code:'KeyW'});
   assert.deepEqual(keys,['KeyS']);assert.ok(commands.some(c=>c.kind==='key'&&c.code==='KeyW'));assert.ok(!commands.some(c=>c.code==='KeyS'));
+  mounted.unmount();
+ }finally{delete window.sacuraDesktop;delete globalThis.requestAnimationFrame;delete globalThis.cancelAnimationFrame;}
+});
+
+test('native viewport opens scene menu on right click, but not camera flight or drag',async()=>{
+ const menus=[],commands=[];
+ globalThis.requestAnimationFrame=()=>1;globalThis.cancelAnimationFrame=()=>{};
+ window.sacuraDesktop={nativeInput:async value=>commands.push(value),nativeTools:async()=>{},nativeBounds:async()=>{},nativeDetach:async()=>{},
+  nativeStatus:async()=>({phase:'ready',viewport:{data:{cameraPosition:[4,3,6],cameraTarget:[0,0,0]}}}),nativeHeartbeat:async()=>{}};
+ try{
+  const mounted=render(React.createElement(NativeViewport,{editing:true,onContext:point=>menus.push(point)}));
+  const surface=mounted.container.querySelector('[tabindex="0"]');
+  surface.setPointerCapture=()=>{};surface.releasePointerCapture=()=>{};surface.hasPointerCapture=()=>false;
+  surface.getBoundingClientRect=()=>({left:0,top:0,width:800,height:600});
+  await waitFor(()=>assert.ok(mounted.container.querySelector('[data-native-overlay]')));
+  fireEvent.pointerDown(surface,{pointerId:1,button:2,buttons:2,clientX:400,clientY:300});
+  fireEvent.pointerUp(surface,{pointerId:1,button:2,buttons:0,clientX:400,clientY:300});
+  await waitFor(()=>assert.equal(menus.length,1));
+  assert.ok(menus[0].cameraTransform&&menus[0].worldPosition);
+  fireEvent.pointerDown(surface,{pointerId:2,button:2,buttons:2,clientX:400,clientY:300});
+  fireEvent.pointerMove(surface,{pointerId:2,button:2,buttons:2,clientX:430,clientY:300});
+  fireEvent.pointerUp(surface,{pointerId:2,button:2,buttons:0,clientX:430,clientY:300});
+  fireEvent.pointerDown(surface,{pointerId:3,button:2,buttons:2,clientX:400,clientY:300});
+  fireEvent.keyDown(surface,{code:'KeyW'});
+  fireEvent.pointerUp(surface,{pointerId:3,button:2,buttons:0,clientX:400,clientY:300});
+  assert.equal(menus.length,1);
+  assert.ok(commands.some(value=>value.kind==='pointer'&&value.phase==='up'&&value.button===2));
   mounted.unmount();
  }finally{delete window.sacuraDesktop;delete globalThis.requestAnimationFrame;delete globalThis.cancelAnimationFrame;}
 });

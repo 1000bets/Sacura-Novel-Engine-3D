@@ -8,7 +8,8 @@ export interface ComponentInfo {id:Id;typeId:string;enabled:boolean}
 export interface ObjectInfo {id:Id;name:string;parentId:Id|null;active:boolean;transform:Transform;components:ComponentInfo[]}
 export interface PropertyInfo {id:string;typeId:string;editable:boolean;assetTypes?:string[];subAssetId?:Id|null;label:string;category:string;value:JsonValue;error?:string;range?:[number,number]}
 /** engine.int64 is represented by a decimal string, including inside reflected arrays/structs. */
-export interface State {dirty:boolean;storyDirty:boolean;externalChanges:boolean;projectExternalChanges:boolean;path:string;project:string;play:'stopped'|'playing'|'paused';selection:Id|null;canUndo:boolean;canRedo:boolean;assetError?:string}
+export interface DialogueState {phase:'idle'|'line'|'choice'|'action'|'end'|'failed';speaker:string;text:string;choices:string[];canAdvance:boolean;canChoose:boolean;error:string}
+export interface State {dirty:boolean;storyDirty:boolean;externalChanges:boolean;projectExternalChanges:boolean;path:string;project:string;play:'stopped'|'playing'|'paused';dialogue:DialogueState;startupAudio:boolean;selection:Id|null;canUndo:boolean;canRedo:boolean;assetError?:string}
 export interface AssetInfo {id:Id;name:string;path:string;relativePath:string;typeId:string;builtin:boolean;bytes:number;version:string;subassets:JsonValue[]}
 export interface StorySnapshot {open:boolean;revision:number;error?:string;dirty?:boolean;readOnly?:boolean;externalChanges?:boolean;canUndo?:boolean;canRedo?:boolean;path?:string;document?:JsonValue;positions?:Record<string,{x:number;y:number}>}
 export interface Commands {
@@ -16,6 +17,9 @@ export interface Commands {
   'project.save': {params:{useCurrentAsStartup?:boolean};result:State};
   'scene.create': {params:{path:string};result:State};
   'play.step': {params:Record<string,never>;result:State};
+  'play.advanceDialogue': {params:Record<string,never>;result:State};
+  'play.selectChoice': {params:{index:number};result:State};
+  'audio.resolveStartup': {params:Record<string,never>;result:{absolutePath:string}};
   'assets.list': {params:Record<string,never>;result:AssetInfo[]};
   'assets.refresh': {params:Record<string,never>;result:JsonValue};
   'assets.resolve': {params:{assetId:Id};result:Pick<AssetInfo,'id'|'path'|'relativePath'|'typeId'|'builtin'> & {absolutePath:string}};
@@ -32,6 +36,7 @@ export interface Commands {
   'story.addEvent': {params:{nodeId:Id;phase:string;eventId?:Id;actionKind?:string;batchId?:Id};result:StorySnapshot};
   'story.removeEvent': {params:{nodeId:Id;bindingId:Id};result:StorySnapshot};
   'story.updateEvent': {params:{eventId:Id;event:JsonValue};result:StorySnapshot};
+  'story.setOverrides': {params:{nodeId:Id;bindingId:Id;actions:JsonValue};result:StorySnapshot};
   'story.placeEvent': {params:{nodeId:Id;bindingId:Id;phase:string;join:string;batchId?:string;beforeId?:string};result:StorySnapshot};
   'story.batchMode': {params:{nodeId:Id;batchId:Id;parallel:boolean};result:StorySnapshot};
   'story.save': {params:Record<string,never>;result:StorySnapshot};
@@ -42,13 +47,16 @@ export interface Commands {
   'scene.open': {params:{path:string;discard?:boolean};result:State};
   'scene.save': {params:{path?:string};result:State};
   'scene.getHierarchy': {params:Record<string,never>;result:ObjectInfo[]};
-  'object.create': {params:{name:string;parentId?:Id|null};result:{id:Id}};
+  'object.create': {params:{name:string;parentId?:Id|null;transform?:Transform;componentType?:string;primitive?:string;cameraAspect?:number};result:{id:Id}};
+  'object.duplicate': {params:{objectId:Id};result:{id:Id}};
   'object.destroy': {params:{objectId:Id};result:null};
   'object.rename': {params:{objectId:Id;name:string};result:null};
   'object.setParent': {params:{objectId:Id;parentId:Id|null};result:null};
+  'object.setActive': {params:{objectId:Id;active:boolean};result:null};
   'object.getComponents': {params:{objectId:Id};result:ComponentInfo[]};
   'object.addComponent': {params:{objectId:Id;typeId:string};result:{id:Id}};
   'object.removeComponent': {params:{objectId:Id;componentId:Id};result:null};
+  'component.setEnabled': {params:{objectId:Id;componentId:Id;enabled:boolean};result:null};
   'component.getProperties': {params:{objectId:Id;componentId:Id};result:PropertyInfo[]};
   'component.setProperty': {params:{objectId:Id;componentId:Id;property:string;value:JsonValue};result:PropertyInfo[]};
   'transform.get': {params:{objectId:Id};result:Transform};

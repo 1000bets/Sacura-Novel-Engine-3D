@@ -77,6 +77,7 @@ function Canvas({model:providedModel,nativeMode=false,running=false,onVariableEd
  const model=useMemo(()=>providedModel||buildStoryFlow(project),[providedModel,project,language]);
  const layout=useMemo(()=>arrangeStoryFlow(model.nodes,model.edges),[model]);
  const [nodes,setNodes]=useState([]),[minimap,setMinimap]=useState(false),[edgeId,setEdgeId]=useState(null),[missingId,setMissingId]=useState(null),[trace,setTrace]=useState(null);
+ const didFitNative=useRef(false);
  useEffect(()=>{const selectionChanged=selectionKey.current!==selectedId;selectionKey.current=selectedId;setNodes(previous=>layout.map(n=>({...n,height:undefined,position:previous.find(p=>p.id===n.id)?.dragging?previous.find(p=>p.id===n.id).position:positions?.[n.id]||n.position,dragging:previous.find(p=>p.id===n.id)?.dragging,measured:previous.find(p=>p.id===n.id)?.measured,style:{width:n.width},dragHandle:'.moment-grab',selected:selectionChanged?n.id===selectedId:(previous.find(p=>p.id===n.id)?.selected??n.id===selectedId),data:{...n.data,onTrace:setTrace,onReveal:id=>{onSelect(id);api.fitView({nodes:[{id}],padding:.3,maxZoom:.8,duration:200});},onRemove:()=>onConnect({changes:model.edges.filter(e=>e.target===n.id).map(e=>({source:e.source,sourceHandle:e.sourceHandle,target:null}))}),issue:issues.find(i=>i.beatId===n.id),running,selectionId,preview,onSelect,onOpen,onAdd,onBatch,onMoveBinding,onScene,onLogicChange,onVariable,onChoice,onInspectVariable,onConnect,project,variables:project.variables}})));},[running,layout,positions,selectedId,selectionId,preview,issues,onSelect,onOpen,onAdd,onBatch,onMoveBinding,onScene,onLogicChange,onVariable,onChoice,onInspectVariable,onConnect,project]);
  const focus=useCallback((id=selectedId)=>{
   const node=api.getNode(id);if(!node?.measured?.width || !node?.measured?.height)return false;
@@ -101,6 +102,22 @@ function Canvas({model:providedModel,nativeMode=false,running=false,onVariableEd
  useEffect(()=>{if(!initialized)return;const signature=model.nodes.map(n=>n.id).join('|');if(measuredSignature.current===signature)return;measuredSignature.current=signature;
   if(!nativeMode&&!Object.keys(positions||{}).length){const arranged=arrangeStoryFlow(api.getNodes(),model.edges);onPositions(Object.fromEntries(arranged.map(n=>[n.id,n.position])));}
  },[initialized,model,positions,api,onPositions,nativeMode]);
+ useEffect(()=>{
+  if(!nativeMode||!initialized||!nodes.length||didFitNative.current)return;
+  let frame=0;
+  const fit=()=>{
+   if(didFitNative.current||!container.current)return;
+   const {width,height}=container.current.getBoundingClientRect();
+   if(width<80||height<80)return;
+   frame=requestAnimationFrame(()=>{
+    if(!didFitNative.current&&api.fitView({padding:.15,minZoom:.08,maxZoom:.8}))didFitNative.current=true;
+   });
+  };
+  const observer=new ResizeObserver(fit);
+  if(container.current)observer.observe(container.current);
+  fit();
+  return()=>{observer.disconnect();cancelAnimationFrame(frame);};
+ },[nativeMode,initialized,nodes.length,api]);
  useEffect(()=>{onReady?.({clipboard:()=>({nodes:api.getNodes(),graphKey:'flow:all'}),focus,arrange,addVariableNode:(variable,kind)=>onVariableAdd(variable,kind,{position:api.screenToFlowPosition({x:container.current.getBoundingClientRect().left+80,y:container.current.getBoundingClientRect().top+80}),graphKey:'flow:all'}),fit:()=>api.fitView({padding:.12,minZoom:.02,maxZoom:.8,duration:250})});},[focus,arrange,api,onReady,onVariableAdd]);
  const displayedNodes=useMemo(()=>nodes.map(n=>({...n,className:trace&&model.edges.some(e=>e.id===trace&&(e.source===n.id||e.target===n.id))?'story-traced-node':''})),[nodes,trace,model.edges]);
  const connecting=useRef(null);
@@ -163,7 +180,7 @@ function Canvas({model:providedModel,nativeMode=false,running=false,onVariableEd
      onContext?.({kind:'wire-drop',pin,valueType,x:point.clientX,y:point.clientY,position:api.screenToFlowPosition({x:point.clientX,y:point.clientY}),graphKey:'flow:all'});
    }}
    onNodesChange={changes=>{if(changes.some(c=>c.type==='select'&&c.selected)){setEdgeId(null);setMissingId(null);}setNodes(ns=>applyNodeChanges(changes,ns));}} onNodeDragStop={(_,n)=>onPositions({...positions,[n.id]:n.position})}
-   onNodeClick={(e,n)=>{setEdgeId(null);setMissingId(n.type==='missing'?n.id:null);if(n.data.beat)onSelect(n.id);if(!e.target.closest('input,textarea,select,button,[contenteditable="true"]'))container.current.focus({preventScroll:true});}} onConnect={connect} onReconnect={(edge,c)=>onConnect({changes:[{source:edge.source,sourceHandle:edge.sourceHandle,target:edge.data?.valueWire?edge.target:null,targetHandle:edge.targetHandle,disconnect:edge.data?.valueWire},c]})} isValidConnection={c=>nativeMode?true:!connectionError(project,[c])} onEdgeMouseEnter={(_,e)=>setTrace(e.id)} onEdgeMouseLeave={()=>setTrace(null)} onEdgeClick={(_,e)=>{setMissingId(null);setEdgeId(e.id);container.current.focus();}} onPaneClick={()=>{setMissingId(null);setEdgeId(null);container.current.focus({preventScroll:true});}}
+   onNodeClick={(e,n)=>{setEdgeId(null);setMissingId(n.type==='missing'?n.id:null);if(n.data.beat)onSelect(n.id);if(!e.target.closest('input,textarea,select,button,[contenteditable="true"]'))container.current.focus({preventScroll:true});}} onConnect={connect} onReconnect={(edge,c)=>onConnect({changes:[{source:edge.source,sourceHandle:edge.sourceHandle,target:edge.data?.valueWire?edge.target:null,targetHandle:edge.targetHandle,disconnect:edge.data?.valueWire},c]})} isValidConnection={c=>nativeMode?true:!connectionError(project,[c])} onEdgeMouseEnter={(_,e)=>setTrace(e.id)} onEdgeMouseLeave={()=>setTrace(null)} onEdgeClick={(_,e)=>{setMissingId(null);setEdgeId(e.id);container.current.focus();}} onPaneClick={()=>{setMissingId(null);setEdgeId(null);if(nativeMode)onSelect(null);container.current.focus({preventScroll:true});}}
    onNodeContextMenu={nativeMode?(e,n)=>{e.preventDefault();e.stopPropagation();if(!running&&!panGesture.current?.moved)onContext?.({nodeId:n.id,x:e.clientX,y:e.clientY,position:api.screenToFlowPosition({x:e.clientX,y:e.clientY}),graphKey:'flow:all'});}:undefined}
    onPaneContextMenu={e=>{e.preventDefault();if(!panGesture.current?.moved)onContext?.({x:e.clientX,y:e.clientY,position:api.screenToFlowPosition({x:e.clientX,y:e.clientY}),graphKey:'flow:all'});}}
    deleteKeyCode={null} minZoom={.02} maxZoom={1.5} panOnScroll={false} panOnDrag={[1,2]} selectionOnDrag zoomOnScroll reconnectRadius={18} connectionRadius={28} connectOnClick={false} zoomActivationKeyCode="Control" colorMode="dark">

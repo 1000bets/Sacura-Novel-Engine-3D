@@ -15,6 +15,8 @@ import FunctionScriptsWorkspace from './FunctionScriptsWorkspace.jsx';
 import {newScriptFunction,scriptFunctionType,scriptParameterType} from './scriptFunctions.js';
 import {schemaDefaults} from './valueSchemas.js';
 import GameHUD from './GameHUD.jsx';
+import NativeDialogue from './NativeDialogue.jsx';
+import NativeStoryInspector,{NativeInspectorEmpty} from './NativeStoryInspector.jsx';
 import {exportPlayableGame} from './gameExport.js';
 import {instantiateAuthoringTemplate} from './authoringTemplates.js';
 import {builtinTemplates,loadBuiltinTemplate,createBuiltinProject,nativeTemplateIds} from './builtinTemplates.js';
@@ -101,6 +103,8 @@ import {nativeStoryMenu} from "./nativeStoryMenu.js";
 import EditorGraph from "./EditorGraph.jsx";
 import EditorContextMenu from "./EditorContextMenu.jsx";
 import SceneObjectMenu from './SceneObjectMenu.jsx';
+import {nativeSceneMenuItems} from './nativeSceneMenu.js';
+import EditorCreateMenu from './EditorCreateMenu.jsx';
 import ActionFields from "./ActionFields.jsx";
 import EventSelectionInspector from './EventSelectionInspector.jsx';
 import {exportLocation,importLocation} from "./locationFiles.js";
@@ -125,7 +129,6 @@ import StoryFlow from './StoryFlow.jsx';
 import {useEditorPlatform} from './useEditorPlatform.js';
 import {presentationObject,eulerToQuaternion} from './editorPlatform.js';
 import {nativeStoryPresentation} from './nativeStoryPresentation.js';
-import {DocumentJsonField} from './ReflectedFields.jsx';
 import EditorWorkspace, {EditorWindowsMenu, EditorDockTabs} from './EditorWorkspace.jsx';
 import {EditorDockProvider, EditorDockStrip, EditorDockBody, DockDropTarget} from './EditorDocking.jsx';
 import {defaultWindows, restoreWindows, openWindow, closeWindow, dockTabs, windowArea, activeDockWindow, selectDockBase} from './editorWindows.js';
@@ -260,6 +263,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
  const native=useEditorPlatform(),isNative=!!native.adapter;
  const nativeRendered=useRef(native);nativeRendered.current=native;
  const [nativeFocus,setNativeFocus]=useState('scene');
+ const nativeLastFocus=useRef('scene');
+ useEffect(()=>{if(nativeFocus!=='sceneSettings')nativeLastFocus.current=nativeFocus;},[nativeFocus]);
  const [nativeAssetId,setNativeAssetId]=useState(null),[nativeStorySelection,setNativeStorySelection]=useState(null),[nativeStoryPath,setNativeStoryPath]=useState('New.story');
  const nativeFlow=useMemo(()=>nativeStoryPresentation(native.story,native.objects),[native.story,native.objects]);
  const nativeFiles=useMemo(()=>native.assets.map(a=>({...a,path:a.path.replace(/^\//,''),kind:a.typeId==='Texture'&&/\.(png|jpe?g|bmp|webp)$/i.test(a.path)?'image':a.typeId==='Model'?'model':'file',src:`sacura://native-asset/${native.context?.session}/${a.id}?v=${encodeURIComponent(a.version||'')}`,users:[]})),[native.assets,native.context?.session]);
@@ -285,10 +290,18 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
      used.add(path.toLowerCase());
      let index=2;while(used.has(`new${index}.story`))index++;
      setNativeStoryPath(`New${index}.story`);
+     return result;
    }finally{setNativeStoryCreating(false);}
  };
  const selectNative=id=>{setNativeFocus('scene');return nativeCommand('selection.set',{objectId:id});};
- const createNative=async()=>{const result=await nativeCommand('object.create',{name:'GameObject'});if(result)selectNative(result.id);};
+ const createNativeObject=async(name='GameObject',typeId)=>{
+   const result=await nativeCommand('object.create',{name});
+   if(!result)return;
+   if(typeId&&!await nativeCommand('object.addComponent',{objectId:result.id,typeId}))return;
+   await selectNative(result.id);
+   return result;
+ };
+ const createNative=()=>createNativeObject();
  useEffect(()=>{if(native.state?.selection)setNativeFocus('scene');},[native.state?.selection]);
  useEffect(()=>{if(window.sacuraDesktop?.isDesktop===true)window.sacuraDesktop.ready('editor');},[]);
   const clipboard=useRef(null);
@@ -462,7 +475,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   if(rt)rt.physicsApi=physicsApi;
   previewRef.current = preview;
   const inspectorScroll=useRef(null);
-  useEffect(()=>{if(inspectorScroll.current)inspectorScroll.current.scrollTop=0;},[selection.kind,selection.id,eventContext?.bindingId]);
+  useEffect(()=>{if(inspectorScroll.current)inspectorScroll.current.scrollTop=0;},[selection.kind,selection.id,eventContext?.bindingId,nativeFocus,native.state?.selection,nativeStorySelection?.nodeId,nativeStorySelection?.bindingId]);
   const nodes = useMemo(() => allBeats(project), [project]),
     beat = nodes.find((b) => b.id === selectedBeat) || nodes[0]||{id:null,kind:'gameplay',text:'',speaker:'',choices:[],bindings:[],batches:{}},
     scene = sceneFor(project, beat.id),
@@ -1340,37 +1353,27 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   const moveBinding=(sourceId,id,targetId,phase,batchId,beforeId)=>{if(rt?.running)return;mutate(p=>moveEventBinding(p,sourceId,id,targetId,phase,batchId,beforeId));if(eventContext?.bindingId===id){setEventContext(c=>({...c,beatId:targetId}));setSelectedBeat(targetId);}};
   const renderInspector = () => {
     if(isNative){
+      if(nativeFocus==='sceneSettings')return <div className="story-inspector native-scene-inspector"><div className="story-inspector-heading"><Icon name="Clapperboard" size={16}/><strong>Сцена</strong><small>{native.state?.project}</small></div><div className="inspector-primary-fields"><Field label="Файл"><output>{native.state?.path||'Не открыт'}</output></Field><Field label="Объектов"><output>{native.objects.length}</output></Field><Button icon="Save" disabled={nativeEditing||!native.state?.dirty} onClick={()=>nativeCommand('scene.save')}>Сохранить сцену</Button></div></div>;
       if(nativeFocus==='asset'){
         const asset=nativeFiles.find(a=>a.id===nativeAssetId);return asset?<><h3>{asset.name}</h3><p>{asset.typeId} · {asset.path}</p><p>{asset.id}</p>{asset.kind==='image'&&<img style={{maxWidth:'100%'}} src={asset.src} alt={asset.name}/>}<pre style={{whiteSpace:'pre-wrap'}}>{JSON.stringify(asset.subassets,null,2)}</pre>{asset.kind==='model'&&<p>3D preview и размещение модели пока не подключены. Импорт и subassets читаются из AssetRegistry.</p>}</>:<p>Ресурс удалён или больше не зарегистрирован.</p>;
       }
       if(nativeFocus==='story'){
-        const doc=native.story?.document,selected=nativeStorySelection;
-        if(!doc||!selected)return <p>Выберите ноду или событие StoryGraphDocument.</p>;
-        const node=doc.nodes.find(n=>n.id===selected.nodeId),event=doc.events?.find(e=>e.id===selected.eventId);
-        if(!node)return <p>Нода удалена.</p>;
-        const edit=patch=>nativeCommand('story.updateNode',{nodeId:node.id,patch});
-        if(event)return <><h3>Event · {event.name}</h3><p>Изменяется определение C++ события; все его размещения используют это определение.</p><DocumentJsonField label="Event" value={event} disabled={nativeEditing} onCommit={event=>nativeCommand('story.updateEvent',{eventId:event.id,event})}/><button disabled={nativeEditing} onClick={()=>nativeCommand('story.removeEvent',{nodeId:node.id,bindingId:selected.bindingId})}>Удалить размещение</button></>;
-        return <><h3>{node.kind} · {node.id}</h3><button disabled={nativeEditing} onClick={()=>nativeCommand('story.setStart',{nodeId:node.id})}>Сделать начальной</button><button disabled={nativeEditing} onClick={()=>nativeCommand('story.deleteNode',{nodeId:node.id})}>Удалить ноду</button>
-          {(node.kind==='Line'?['speaker','text']:node.kind==='Choice'?['prompt']:[]).map(field=><Field key={field} label={field}><textarea disabled={nativeEditing} aria-label={'Story '+field} key={node.id+field+node[field]} defaultValue={node[field]||''} onBlur={e=>{if(e.target.value!==node[field])edit({[field]:e.target.value});}}/></Field>)}
-          {node.kind==='Action'&&<><p>C++ действия: Wait, MoveTo, CameraCut, NavigateTo. targetObjectId — persistent ID объекта сцены.</p><DocumentJsonField label="Actions" disabled={nativeEditing} value={node.actions||[]} onCommit={actions=>edit({actions})}/></>}
-          {node.kind==='Choice'&&<DocumentJsonField label="Choices" disabled={nativeEditing} value={node.choices||[]} onCommit={choices=>edit({choices})}/>}
-          {['Line','Choice'].includes(node.kind)&&<div>{['BEFORE','ON_START','AFTER'].map(phase=><button key={phase} disabled={nativeEditing} onClick={()=>openNativeEvents({nodeId:node.id,phase})}>+ Event {phase}</button>)}</div>}
-        </>;
+        return <NativeStoryInspector story={native.story} selection={nativeStorySelection} objects={native.objects} disabled={nativeEditing||native.story?.readOnly} command={nativeCommand} onSelect={setNativeStorySelection} onEvents={openNativeEvents} onFocus={()=>graphApi.current?.focus(nativeStorySelection?.nodeId)}/>;
       }
-      if(!nativeObject)return <p>Выберите объект C++ в Hierarchy или viewport.</p>;
+      if(!nativeObject)return <NativeInspectorEmpty>Выберите объект в иерархии или сцене.</NativeInspectorEmpty>;
       const id=nativeObject.id;
-      return <>
-        <Field label="Имя"><input aria-label="Имя объекта" key={id+nativeObject.name} defaultValue={nativeObject.name} disabled={nativeEditing} onBlur={e=>{if(e.target.value!==nativeObject.name)nativeCommand('object.rename',{objectId:id,name:e.target.value});}}/></Field>
-        <Field label="Parent"><select value={nativeObject.parentId||''} disabled={nativeEditing} onChange={e=>nativeCommand('object.setParent',{objectId:id,parentId:e.target.value||null})}><option value="">Корень</option>{native.objects.filter(o=>o.id!==id).map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select></Field>
+      return <div className="object-inspector native-object-inspector">
+        <div className="inspector-identity"><span className="identity-icon"><Icon name="Box" size={28}/></span><div><input aria-label="Имя объекта" key={id+nativeObject.name} defaultValue={nativeObject.name} disabled={nativeEditing} onBlur={e=>{if(e.target.value!==nativeObject.name)nativeCommand('object.rename',{objectId:id,name:e.target.value});}}/><small>Объект сцены</small></div><input type="checkbox" aria-label="Объект активен" title="Объект активен" checked={nativeObject.active} disabled={nativeEditing} onChange={e=>nativeCommand('object.setActive',{objectId:id,active:e.target.checked})}/></div>
+        <Fold title="Иерархия" open={false}><Field label="Родитель"><select value={nativeObject.parentId||''} disabled={nativeEditing} onChange={e=>nativeCommand('object.setParent',{objectId:id,parentId:e.target.value||null})}><option value="">Корень</option>{native.objects.filter(o=>o.id!==id).map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select></Field></Fold>
         <TransformInspector compact object={presentationObject(nativeObject)} scene={nativeScene} disabled={nativeEditing}
           onChange={t=>nativeCommand('transform.set',{objectId:id,transform:{position:t.position.map(Number),rotation:eulerToQuaternion(t.rotation),scale:t.scale.map(Number)}})}
           onReset={()=>nativeCommand('transform.set',{objectId:id,transform:{position:[0,0,0],rotation:[0,0,0,1],scale:[1,1,1]}})} onFocus={()=>setFocusRequest({nonce:uid('focus')})}
           onDelete={()=>nativeCommand('object.destroy',{objectId:id})}/>
         <ComponentInstancesInspector project={project} running={nativeEditing} reflection={{components:native.components,types:native.types,
           assets:native.assets,onAsset:(componentId,property,{assetId,subAssetId})=>nativeCommand('component.setAsset',{objectId:id,componentId,property,assetId,subAssetId}),
-          onAdd:typeId=>nativeCommand('object.addComponent',{objectId:id,typeId}),onRemove:componentId=>nativeCommand('object.removeComponent',{objectId:id,componentId}),
+          onAdd:typeId=>nativeCommand('object.addComponent',{objectId:id,typeId}),onRemove:componentId=>nativeCommand('object.removeComponent',{objectId:id,componentId}),onEnabled:(componentId,enabled)=>nativeCommand('component.setEnabled',{objectId:id,componentId,enabled}),
           onProperty:(componentId,property,value)=>nativeCommand('component.setProperty',{objectId:id,componentId,property,value})}}/>
-      </>;
+      </div>;
     }
     if(selection.kind==='point'){
       const point=sceneStagingPoints(scene,project.objects).find(p=>p.id===selection.id);
@@ -1987,6 +1990,52 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     const rect=document.activeElement?.getBoundingClientRect?.();
     setNativeFocus('story');setContextMenu({kind:'native-event',nodeId,phase,batchId,x:x??rect?.left??300,y:y??rect?.bottom??300});
   };
+  const nativeCreateStoryDocument=async()=>native.story?.document||(await createNativeStory())?.document;
+  const nativeCreateNode=async kind=>{
+    const doc=await nativeCreateStoryDocument();if(!doc)return;
+    const before=new Set(doc.nodes.map(node=>node.id));
+    const offset=doc.nodes.length*56;
+    const result=await nativeCommand('story.addNode',{kind,x:80+offset,y:80+offset});
+    const node=result?.document?.nodes.find(item=>!before.has(item.id));
+    if(node){setNativeStorySelection({nodeId:node.id});setNativeFocus('story');setDock('story');}
+  };
+  const nativeEventNode=async()=>{
+    const doc=await nativeCreateStoryDocument();if(!doc)return null;
+    const selected=doc.nodes.find(node=>node.id===nativeStorySelection?.nodeId&&['Line','Choice'].includes(node.kind));
+    const node=selected||doc.nodes.find(item=>['Line','Choice'].includes(item.kind));
+    if(node)return node;
+    const before=new Set(doc.nodes.map(item=>item.id));
+    const result=await nativeCommand('story.addNode',{kind:'Line',x:80,y:80});
+    return result?.document?.nodes.find(item=>!before.has(item.id))||null;
+  };
+  const nativeCreateFromMenu=async id=>{
+    setMenu(null);
+    const x=menuAnchor.left+24,y=menuAnchor.top+12;
+    if(id==='component'||id==='object'||id==='beat'){
+      if(id==='beat'&&!await nativeCreateStoryDocument())return;
+      setContextMenu({kind:'native-create-'+id,x,y});return;
+    }
+    if(id==='subscene'){openProjectDialog('sceneNew');return;}
+    if(id==='action'){await nativeCreateNode('Action');return;}
+    const node=await nativeEventNode();if(!node)return;
+    setNativeStorySelection({nodeId:node.id});setNativeFocus('story');setDock('story');
+    if(id==='event'){openNativeEvents({nodeId:node.id,phase:'ON_START',x,y});return;}
+    if(id==='group'){
+      const before=new Set(node.bindings?.map(binding=>binding.id));
+      const result=await nativeCommand('story.addEvent',{nodeId:node.id,phase:'ON_START',actionKind:'Wait'});
+      const binding=result?.document?.nodes.find(item=>item.id===node.id)?.bindings?.find(item=>!before.has(item.id));
+      if(binding)setNativeStorySelection({nodeId:node.id,bindingId:binding.id,eventId:binding.eventId});
+    }
+  };
+  const createMenuAction=(id,event)=>{
+    if(isNative)return nativeCreateFromMenu(id);
+    if(id==='component'){setMenu(null);setGameplayRequest({createComponent:true,nonce:uid('request')});setDock('gameplay');maximizeWindow('gameplay');}
+    else if(id==='subscene')openSubscenes('create');
+    else if(id==='action'||id==='group')openAuthoring(id);
+    else if(id==='beat'){setMenu(null);setPicker({kind:'beat'});}
+    else if(id==='event'){setMenu(null);createEvent();}
+    else if(id==='object')openObjectPicker(event);
+  };
   const nativeMenuItems=context=>nativeStoryMenu({context,story:native.story,selection:nativeStorySelection,disabled:nativeEditing||native.story?.readOnly,command:nativeCommand,
     onSelect:value=>{setNativeStorySelection(value);setNativeFocus('story');},onEvents:openNativeEvents});
   useEffect(()=>window.sacuraDesktop?.onNativeTest?.(async message=>{
@@ -1998,6 +2047,26 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     }catch(error){await window.sacuraDesktop.bridgeTestResult({action:'story-menu',token:message.token,ok:false,error:error.message});}
   }),[native.context,native.story,nativeStorySelection,nativeEditing]);
   const contextItems=()=>{
+    if(isNative&&contextMenu?.kind==='scene')return nativeSceneMenuItems({context:contextMenu,selection:native.state?.selection,objects:native.objects,
+      editing:!nativeEditing,editSpace,showGrid,command:nativeCommand,select:selectNative,
+      focus:()=>setFocusRequest({nonce:uid('focus')}),setEditSpace,setShowGrid});
+    if(isNative&&contextMenu?.kind==='native-create-component')return native.types.map(type=>({
+      label:({'engine.CameraComponent':'Камера','engine.LightComponent':'Источник освещения','engine.MeshRendererComponent':'Меш','engine.PhysicsBodyComponent':'Физическое тело'}[type.typeId]||type.typeId.replace(/^.*\./,'')),
+      icon:'Puzzle',group:'Компоненты C++',searchText:type.typeId,action:async()=>{
+        let objectId=native.state?.selection;
+        if(!objectId)objectId=(await createNativeObject())?.id;
+        if(objectId)await nativeCommand('object.addComponent',{objectId,typeId:type.typeId});
+      }
+    }));
+    if(isNative&&contextMenu?.kind==='native-create-object')return [
+      {label:'Пустой объект',icon:'Box',action:()=>createNativeObject('GameObject')},
+      {label:'Камера',icon:'Video',action:()=>createNativeObject('Camera','engine.CameraComponent')},
+      {label:'Источник освещения',icon:'Lightbulb',action:()=>createNativeObject('Light','engine.LightComponent')},
+    ];
+    if(isNative&&contextMenu?.kind==='native-create-beat')return [
+      ['Line','Реплика','MessageSquare'],['Choice','Выбор игрока','GitFork'],
+      ['Action','Действие','Zap'],['End','Концовка','Flag']
+    ].map(([kind,label,icon])=>({label,icon,action:()=>nativeCreateNode(kind)}));
     if(isNative)return nativeMenuItems(contextMenu);
     const scripting=()=>{const type=contextMenu?.valueType,fromSource=contextMenu?.pin?.handleType==='source';return {label:'Скриптинг',icon:'Code2',children:[{label:'Создать JavaScript-функцию…',icon:'FilePlus2',action:()=>{const fn=newScriptFunction(project,type);addBeat('script-function',{...contextMenu,functionId:fn.id,scriptFunction:fn,wireType:type});}},...project.functions.filter(f=>f.functionScript&&(!type||type==='any'||(fromSource?f.parameters.some(a=>scriptParameterType(a)===type):scriptFunctionType(f)===type))).map(fn=>({label:fn.name,icon:'Code2',action:()=>addBeat('script-function',{...contextMenu,functionId:fn.id,wireType:type,argumentName:fn.parameters.find(a=>scriptParameterType(a)===type)?.name})}))]};};
     if(contextMenu?.kind==='wire-drop'){
@@ -2151,7 +2220,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     if(dock==='files')return <AssetExplorer project={project} audioAssets={[]} disabled={nativeEditing} onSelectFile={id=>{setNativeAssetId(id);setNativeFocus('asset');}} adapter={{files:nativeFiles,open:openAsset,import:async folder=>{if(folder.startsWith('Engine'))throw Error('Engine Content доступен только для чтения');const results=await window.sacuraDesktop.nativeImportAssets(folder.replace(/^Game\/?/,''));await native.adapter.loadDomain('assets.list','assets');const failure=results.find(r=>!r.ok);if(failure)throw Error(failure.error.message);}}}/>;
     if(dock!=='story'&&dock!=='event')return <p role="status">Эта панель ещё не подключена к C++ Engine. Доступны Hierarchy, Inspector, Сцена, Файлы и История.</p>;
     const doc=native.story?.document;
-    const select=value=>{setNativeFocus('story');setNativeStorySelection(typeof value==='string'?{nodeId:value}:{nodeId:value.flowBeatId,eventId:value.event?.id,bindingId:value.binding?.id});};
+    const select=value=>{setNativeFocus('story');setNativeStorySelection(!value?null:typeof value==='string'?{nodeId:value}:{nodeId:value.flowBeatId,eventId:value.event?.id,bindingId:value.binding?.id});};
     const connect=async value=>{const changes=value.changes||[value];for(const c of changes){const node=doc.nodes.find(n=>n.id===c.source);if(!node)continue;const port=c.sourceHandle==='next'?-1:(node.choices||[]).findIndex(p=>'choice:'+p.id===c.sourceHandle);await nativeCommand('story.connect',{sourceId:c.source,port,targetId:c.target||null});}};
     return <div style={{height:'100%',display:'flex',flexDirection:'column'}} onPointerDown={()=>setNativeFocus('story')}>
       <div className="dock-toolbar"><select aria-label="Story asset" value={native.assets.find(a=>a.typeId==='Story'&&native.story?.path?.replaceAll('\\','/').endsWith('/'+a.relativePath))?.id||''} onChange={e=>nativeCommand('story.open',{assetId:e.target.value})}><option value="">Открыть историю…</option>{native.assets.filter(a=>a.typeId==='Story').map(a=><option key={a.id} value={a.id}>{a.path}</option>)}</select>
@@ -2570,7 +2639,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             >
               <SceneViewport onCreateProject={()=>openProjectDialog('new')} onActivate={()=>setNativeFocus('scene')} blocked={!!(contextMenu || picker || projectDialog || detailEditor || menu || running || positionPick)}
                 sceneId={displayScene.id}
-                editTool={editTool} editSpace={editSpace} snap={snap} focusRequest={cameraPilotId?0:focusRequest} editing={!running&&!cameraPilotId&&!positionPick} onTransform={transformObject} onTransforms={transformObjects}
+                editTool={editTool} editSpace={editSpace} snap={snap} focusRequest={cameraPilotId?0:focusRequest} editing={!running&&!cameraPilotId&&!positionPick&&(!isNative||!nativeEditing)} onTransform={transformObject} onTransforms={transformObjects}
                 cameraScene={displayScene} selectedCameraId={selection.kind==='camera'?selection.id:null} cameraPreviewId={cameraPreviewId} cameraPilotId={cameraPilotId} onCameraChange={changeCamera} onCameraSelect={selectCamera} cameraApi={cameraApi} physicsApi={physicsApi}
                 kind={displayScene.kind}
                 objects={objects}
@@ -2587,7 +2656,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                   setPositionPick(null);setNotice(tr("Координаты выбраны: {0}", [value.join(', ')]));
                 }:undefined}
                 onSelect={selectObject}
-                onContext={point=>{if(!rt?.running)setContextMenu({...point,kind:'scene'});}}
+                onContext={point=>{if(!rt?.running&&(!isNative||!nativeEditing))setContextMenu({...point,kind:'scene'});}}
                 inputSettings={playProject.input}
                 onInputAction={event=>rt?.inputAction(event)}
                 onInputDevices={setInputDevices}
@@ -2596,6 +2665,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 onPlayerInteract={()=>rt?.playerInteract()}
                 onInteract={interact}
               />
+              {isNative&&nativePlaying&&<NativeDialogue state={native.state} session={native.context?.session} onAdvance={()=>nativeCommand('play.advanceDialogue')} onChoice={index=>nativeCommand('play.selectChoice',{index})}/>}
               {!isNative&&<>{mode==='game'&&<TouchInput settings={playProject.input} contexts={world.inputContexts||[]} active={world.inputActive} playerMode={world.playerControl?.mode} paused={world.paused||!world.inputReady}/>}
               {positionPick&&<div className="viewport-caption"><strong>{tr("Выберите точку на сцене")}</strong><Button icon="X" onClick={()=>setPositionPick(null)}>{tr("Отмена")}</Button></div>}
               <GameDialogue project={running?rt?.project:project}
@@ -2691,13 +2761,13 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         <aside data-dock-root="inspector" className={"inspector-panel dockable-region"+(inspectorTool?" has-docked-tool":"")}>
           <button className="panel-restore" aria-label={tr("Показать инспектор")} title={tr("Показать инспектор")} onClick={()=>setLayout(l=>({...l,hiddenInspector:false}))}><Icon name="PanelRightOpen" size={18}/><span>{tr("Инспектор")}</span></button>
           <EditorDockStrip area="inspector" className="panel-tabs">
-            <button data-dock-base="inspector" className={!inspectorTool&&selection.kind!=="scene"?"active":""} onClick={()=>{showBaseDock('inspector');if(selection.kind==='scene')setSelection({kind:'beat',id:beat.id});}}>{tr("Инспектор")}</button>
+            <button data-dock-base="inspector" className={!inspectorTool&&(isNative?nativeFocus!=='sceneSettings':selection.kind!=="scene")?"active":""} onClick={()=>{showBaseDock('inspector');if(isNative)setNativeFocus(nativeLastFocus.current);else if(selection.kind==='scene')setSelection({kind:'beat',id:beat.id});}}>{tr("Инспектор")}</button>
             <EditorDockTabs area="inspector"/>
             <button
-              className={!inspectorTool&&selection.kind==='scene'?'active':''}
-              onClick={() => {showBaseDock('inspector');setSelection({kind:'scene',id:scene.id});}}
+              className={!inspectorTool&&(isNative?nativeFocus==='sceneSettings':selection.kind==='scene')?'active':''}
+              onClick={() => {showBaseDock('inspector');if(isNative)setNativeFocus('sceneSettings');else setSelection({kind:'scene',id:scene.id});}}
             >
-              {tr("Сабсцена")}</button>
+              {tr(isNative?"Сцена":"Сабсцена")}</button>
             <div className="flex-space" />
             <Button
               icon={inspectorPinned ? "LockKeyhole" : "Pin"}
@@ -2784,34 +2854,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
               <Icon name="Undo2" />
               {tr("Отменить ")}<kbd>Ctrl Z</kbd>
             </button><button disabled={isNative?!(nativeFocus==='story'?native.story?.canRedo:native.state?.canRedo):!future.length} onClick={()=>{redo();setMenu(null);}}><Icon name="Redo2"/>{tr("Повторить ")}<kbd>Ctrl Shift Z</kbd></button></>
-          ) : isNative&&menu === "Создать" ? (<><button disabled={nativeEditing} onClick={()=>{createNative();setMenu(null);}}>GameObject</button><button onClick={()=>{setDock('files');setMenu(null);}}>Открыть AssetRegistry</button><button onClick={()=>{setDock('story');setNativeFocus('story');setMenu(null);}}>StoryGraphDocument</button></>) : menu === "Создать" ? (
-            <>
-              <button disabled={running} onClick={()=>{setMenu(null);setGameplayRequest({createComponent:true,nonce:uid('request')});setDock('gameplay');maximizeWindow('gameplay');}}><Icon name="Puzzle"/>{tr("Компонент")}</button>
-              <button onClick={()=>openSubscenes('create')}><Icon name="PanelsTopLeft"/>{tr("Сабсцена")}</button>
-              <button onClick={()=>openAuthoring('action')}><Icon name="MousePointer2"/>{tr("Действие")}</button>
-              <button onClick={()=>openAuthoring('group')}><Icon name="Columns2"/>{tr("Группа действий")}</button>
-              <button
-                onClick={() => {
-                  setMenu(null);
-                  setPicker({ kind: "beat" });
-                }}
-              >
-                <Icon name="MessageSquare" />
-                {tr("Блок сценария")}</button>
-              <button
-                onClick={() => {
-                  setMenu(null);
-                  createEvent();
-                }}
-              >
-                <Icon name="Layers" />
-                {tr("Событие")}</button>
-              <button
-                onClick={openObjectPicker}
-              >
-                <Icon name="Box" />
-                {tr("Объект")}</button>
-            </>
+          ) : menu === "Создать" ? (
+            <EditorCreateMenu onCreate={createMenuAction} disabled={id=>isNative?nativeEditing||(['action','group','beat','event'].includes(id)&&native.story?.readOnly):id==='component'&&running}/>
           ) : (
             <EditorWindowsMenu windows={windows} onChange={changeWindows} onClose={closeWorkspace} onSelect={(id,dismiss=true)=>{selectWorkspace(id);if(dismiss)setMenu(null);}}
               eventAvailable={!!event} issueCount={issues.length} hierarchyVisible={hierarchyVisible} inspectorVisible={inspectorVisible} historyOpen={historyOpen}
@@ -2821,7 +2865,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           )}
         </div>
       )}
-      {contextMenu&&<EditorContextMenu x={contextMenu.x} y={contextMenu.y} title={contextMenu.kind==='native-event'?tr("Добавить событие"):contextMenu.kind==='scene'?tr("Сцена"):tr("Добавить ноду")} items={contextItems()} onClose={closeContextMenu}/>}
+      {contextMenu&&<EditorContextMenu x={contextMenu.x} y={contextMenu.y} className={contextMenu.kind==='scene'?'scene-context-menu':''} title={contextMenu.kind==='native-create-component'?tr('Компонент'):contextMenu.kind==='native-create-object'?tr('Объект'):contextMenu.kind==='native-event'?tr("Добавить событие"):contextMenu.kind==='scene'?tr("Сцена"):tr("Добавить ноду")} items={contextItems()} onClose={closeContextMenu}/>}
       {picker?.kind==='object'&&<SceneObjectMenu anchor={picker.anchor} onClose={()=>setPicker(null)} onGroup={addEmptyGroup} onCamera={()=>createCamera()} onPoint={addStagingPoint} onSound={addSoundEvent} onObject={addObject}/>}
       {picker && picker.kind!=='object' && (
         <div

@@ -25,6 +25,30 @@ test('contract rejects extra fields, unsafe values, methods and malformed transf
   for(const [m,p] of [['eval',{}],['object.destroy',{objectId:'x',pointer:42}],['object.rename',{objectId:'x',name:'\0'}],['component.setProperty',{objectId:'x',componentId:'c',property:'p',value:Infinity}],['transform.set',{objectId:'x',transform:{position:[1],rotation:[],scale:[]}}]])assert.throws(()=>validate(m,p));
   validate('object.create',{name:'日本語 объект'});
 });
+test('visual novel template plays dialogue, branches and resolves its WAV cue', {skip:process.platform!=='win32',timeout:120000},async()=>{
+  const parent=await fs.mkdtemp(path.join(os.tmpdir(),'sacura-novel-play-'));
+  let app;
+  try{
+    const created=spawn(host,['--project-create',parent,'NovelDemo','builtin-novel'],{windowsHide:true});
+    let output='';created.stdout.on('data',chunk=>output+=chunk);created.stderr.on('data',chunk=>output+=chunk);
+    const code=await new Promise(resolve=>created.once('exit',resolve));
+    assert.equal(code,0,output);
+    const project=path.join(parent,'NovelDemo','NovelDemo.project');
+    app=await launch(project);
+    const call=async(method,params={})=>{const result=await app.bridge.request(method,params);assert.equal(result.ok,true,method+': '+JSON.stringify(result));return result.value;};
+    const initial=await call('bridge.describe');assert.equal(initial.startupAudio,true);
+    assert.ok((await call('assets.list')).some(asset=>asset.typeId==='Audio'&&asset.name==='RainTheme.wav'));
+    assert.equal((await call('story.get')).document.nodes.length,6);
+    const audio=(await call('audio.resolveStartup')).absolutePath;
+    const bytes=await fs.readFile(audio);assert.equal(bytes.toString('ascii',0,4),'RIFF');assert.equal(bytes.toString('ascii',8,12),'WAVE');
+    let state=await call('play.start');assert.equal(state.dialogue.phase,'line');assert.match(state.dialogue.text,/Дождь/);
+    state=await call('play.advanceDialogue');assert.equal(state.dialogue.speaker,'Мира');
+    state=await call('play.advanceDialogue');assert.equal(state.dialogue.phase,'choice');assert.equal(state.dialogue.choices.length,2);
+    state=await call('play.selectChoice',{index:0});assert.equal(state.dialogue.speaker,'Мира');
+    state=await call('play.advanceDialogue');assert.equal(state.dialogue.phase,'end');
+    state=await call('play.stop');assert.equal(state.dialogue.phase,'idle');
+  }finally{if(app)await app.close();await fs.rm(parent,{recursive:true,force:true,maxRetries:5});}
+});
 test('real Engine / EditorCore bridge, errors, events and restart', {skip:process.platform!=='win32',timeout:120000}, async t=>{
   const dir=await fs.mkdtemp(path.join(os.tmpdir(),'sacura-bridge-test-'));
   await fs.cp(path.join(root,'Samples/SampleProject'),dir,{recursive:true});
@@ -34,6 +58,40 @@ test('real Engine / EditorCore bridge, errors, events and restart', {skip:proces
     const call=async(method,params={})=>{const start=performance.now();const r=await bridge.request(method,params);timings.push(performance.now()-start);assert.equal(r.ok,true,method+': '+JSON.stringify(r));return r.value;};
     const fail=async(method,params,code,context)=>{const r=await bridge.request(method,params,context);assert.equal(r.ok,false,JSON.stringify(r));assert.equal(r.error.code,code);};
     const initial=await call('scene.getHierarchy');assert.ok(initial.length>0);
+    const placed={position:[2,0,3],rotation:[0,0,0,1],scale:[1,1,1]};
+    const light=await call('object.create',{name:'Menu light',transform:placed,componentType:'engine.LightComponent'});
+    const lightInfo=(await call('scene.getHierarchy')).find(o=>o.id===light.id);
+    assert.deepEqual(lightInfo.transform,placed);
+    assert.ok(lightInfo.components.some(c=>c.typeId==='engine.LightComponent'));
+    assert.equal((await call('component.getProperties',{objectId:light.id,componentId:lightInfo.components.find(c=>c.typeId==='engine.LightComponent').id})).find(p=>p.id==='light_type').value,'1');
+    const builtins=await call('assets.list');
+    for(const [shape,path] of [['cube','StarterBlock'],['sphere','PrimitiveSphere'],['cylinder','PrimitiveCylinder']]){
+      const asset=builtins.find(item=>item.path===`/Engine/Models/${path}.glb`);
+      assert.ok(asset?.subassets?.some(item=>item.typeId==='StaticMesh'),`Missing ${shape} mesh asset`);
+      const created=await call('object.create',{name:shape,transform:placed,primitive:shape});
+      const component=(await call('scene.getHierarchy')).find(item=>item.id===created.id).components.find(item=>item.typeId==='engine.MeshRendererComponent');
+      assert.ok(component,`Missing ${shape} renderer`);
+      const properties=await call('component.getProperties',{objectId:created.id,componentId:component.id});
+      assert.equal(properties.find(item=>item.id==='mesh_asset_id').value,asset.id);
+    }
+    for(let index=0;index<3;index++)await call('editor.undo');
+    for(const typeId of ['engine.MeshRendererComponent','engine.ArrowComponent','engine.CameraComponent']){
+      const created=await call('object.create',{name:typeId,transform:placed,componentType:typeId,...(typeId==='engine.CameraComponent'?{cameraAspect:4/3}:{})});
+      const component=(await call('scene.getHierarchy')).find(o=>o.id===created.id).components.find(c=>c.typeId===typeId);
+      assert.ok(component);
+      if(typeId==='engine.CameraComponent')assert.ok(Math.abs((await call('component.getProperties',{objectId:created.id,componentId:component.id})).find(p=>p.id==='aspect_ratio').value-4/3)<1e-6);
+    }
+    for(let index=0;index<3;index++)await call('editor.undo');
+    await call('editor.undo');assert.ok(!(await call('scene.getHierarchy')).some(o=>o.id===light.id));
+    await call('editor.redo');assert.ok((await call('scene.getHierarchy')).some(o=>o.id===light.id));
+    const copied=await call('object.duplicate',{objectId:light.id});
+    assert.notEqual(copied.id,light.id);
+    const copyInfo=(await call('scene.getHierarchy')).find(o=>o.id===copied.id);
+    assert.deepEqual(copyInfo.transform,placed);
+    assert.ok(copyInfo.components.some(c=>c.typeId==='engine.LightComponent'));
+    await call('editor.undo');assert.ok(!(await call('scene.getHierarchy')).some(o=>o.id===copied.id));
+    await fail('object.create',{name:'Bad menu object',componentType:'engine.NotAComponent'},'INVALID_ARGUMENT');
+    await fail('object.create',{name:'Bad primitive',primitive:'torus'},'INVALID_ARGUMENT');
     assert.ok((await call('reflection.getComponentTypes')).some(c=>c.typeId==='engine.LightComponent'));
     assert.ok((await call('assets.getScenes')).length>0);
     const {id}=await call('object.create',{name:'Bridge object'});
@@ -108,6 +166,19 @@ test('panel domains: actual AssetRegistry, StoryGraphDocument and PlaySession', 
  try{
   app=await launch(path.join(dir,'SampleProject.project'));const call=async(m,p={})=>{const r=await app.bridge.request(m,p);assert.equal(r.ok,true,m+': '+JSON.stringify(r));return r.value;};
   let assets,createdStory,line,end,eventId,binding;
+  await t.test('Inspector edits object active state through native Undo',async()=>{
+   const object=await call('object.create',{name:'Inspector object'});
+   await call('object.setActive',{objectId:object.id,active:false});
+   assert.equal((await call('scene.getHierarchy')).find(o=>o.id===object.id).active,false);
+   await call('editor.undo');
+   assert.equal((await call('scene.getHierarchy')).find(o=>o.id===object.id).active,true);
+   const component=await call('object.addComponent',{objectId:object.id,typeId:'engine.LightComponent'});
+   await call('component.setEnabled',{objectId:object.id,componentId:component.id,enabled:false});
+   assert.equal((await call('scene.getHierarchy')).find(o=>o.id===object.id).components.find(c=>c.id===component.id).enabled,false);
+   await call('editor.undo');
+   assert.equal((await call('scene.getHierarchy')).find(o=>o.id===object.id).components.find(c=>c.id===component.id).enabled,true);
+   await call('object.destroy',{objectId:object.id});
+  });
   await t.test('Content Browser lists real assets and imports a texture without touching source',async()=>{
    assets=await call('assets.list');assert.ok(assets.some(a=>a.typeId==='Story'));assert.ok(assets.some(a=>a.builtin));
    const source=path.join(dir,'source.png');await fs.writeFile(source,Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==','base64'));
@@ -132,6 +203,8 @@ test('panel domains: actual AssetRegistry, StoryGraphDocument and PlaySession', 
    let s=await call('story.addNode',{kind:'Line',x:10,y:20});line=s.document.nodes.at(-1).id;
    s=await call('story.addNode',{kind:'End',x:400,y:20});end=s.document.nodes.find(n=>n.kind==='End').id;
    await call('story.updateNode',{nodeId:line,patch:{speaker:'Native speaker',text:'Written by React adapter'}});
+   s=await call('story.updateNode',{nodeId:line,patch:{kind:'Choice'}});assert.equal(s.document.nodes.find(n=>n.id===line).kind,'Choice');
+   s=await call('story.updateNode',{nodeId:line,patch:{kind:'Line'}});assert.equal(s.document.nodes.find(n=>n.id===line).kind,'Line');
    await call('story.connect',{sourceId:line,port:-1,targetId:end});
    s=await call('story.moveNodes',{positions:{[line]:{x:120,y:80}}});assert.equal(s.positions[line].x,120);
    await call('story.undo');s=await call('story.get');assert.equal(s.positions[line].x,10);await call('story.redo');
@@ -159,6 +232,9 @@ test('panel domains: actual AssetRegistry, StoryGraphDocument and PlaySession', 
    let s=await call('story.addEvent',{nodeId:line,phase:'BEFORE'});const n=s.document.nodes.find(n=>n.id===line);binding=n.bindings[0].id;eventId=n.bindings[0].eventId;
    const event=s.document.events.find(e=>e.id===eventId);event.name='Bridge native event';event.groups[0].actions[0].durationSeconds=.125;
    await call('story.updateEvent',{eventId,event});
+   const overridden={...event.groups[0].actions[0],durationSeconds:.75};
+   s=await call('story.setOverrides',{nodeId:line,bindingId:binding,actions:[overridden]});
+   assert.equal(s.document.nodes.find(n=>n.id===line).bindings[0].actionOverrides[overridden.id].durationSeconds,.75);
    s=await call('story.placeEvent',{nodeId:line,bindingId:binding,phase:'ON_START',join:'STARTED'});assert.equal(s.document.nodes.find(n=>n.id===line).bindings[0].hook,'ON_START');
    await call('story.undo');s=await call('story.get');assert.equal(s.document.nodes.find(n=>n.id===line).bindings[0].hook,'BEFORE');await call('story.redo');
    const batch=s.document.nodes.find(n=>n.id===line).batches.BEFORE?.[0];

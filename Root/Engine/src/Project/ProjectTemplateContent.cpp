@@ -121,6 +121,7 @@ bool BuildProjectTemplateContent(const std::string& TemplateId,
     const bool bShooter = TemplateId == "builtin-shooter";
     const bool bHorror = TemplateId == "builtin-horror";
     const bool bKinetic = TemplateId == "KineticNovel";
+    const bool bNovel = TemplateId == "builtin-novel" || TemplateId == "VisualNovel";
     const bool bStandard = TemplateId == "builtin-standard";
     const std::string FocusId = Guid::Generate().ToString();
 
@@ -135,14 +136,24 @@ bool BuildProjectTemplateContent(const std::string& TemplateId,
         Json::array({0.0, -0.75, -1.0}), Json::array({BlockMesh()}),
         Json::array({8.0, 0.15, 8.0})));
     Objects.push_back(SceneObject(bQuest ? "Locked Door" : bShooter ? "Training Target"
-        : bHorror ? "Exit Door" : "Story Focus", FocusId,
-        Json::array({0.0, 0.0, 0.0}), Json::array({BlockMesh()}),
-        Json::array({bQuest || bHorror ? 0.5 : 1.0, bQuest || bHorror ? 2.0 : 1.0, 0.5})));
+        : bHorror ? "Exit Door" : bNovel ? "Mira" : "Story Focus", FocusId,
+        bNovel ? Json::array({-1.05, 0.0, -1.0}) : Json::array({0.0, 0.0, 0.0}), Json::array({BlockMesh()}),
+        Json::array({bQuest || bHorror ? 0.5 : bNovel ? 0.7 : 1.0,
+            bQuest || bHorror ? 2.0 : bNovel ? 1.6 : 1.0, bNovel ? 0.35 : 0.5})));
     if (bQuest || bShooter || bHorror)
     {
         Objects.push_back(SceneObject(bQuest ? "Key" : bShooter ? "Player Start" : "Recorder",
             Guid::Generate().ToString(), Json::array({-2.0, 0.0, -1.0}),
             Json::array({BlockMesh()}), Json::array({0.3, 0.3, 0.3})));
+    }
+    if (bNovel)
+    {
+        Objects.push_back(SceneObject("Window Frame", Guid::Generate().ToString(),
+            Json::array({0.0, 1.1, -3.0}), Json::array({BlockMesh()}), Json::array({3.0, 2.2, 0.12})));
+        Objects.push_back(SceneObject("Writing Desk", Guid::Generate().ToString(),
+            Json::array({0.0, -0.25, 0.5}), Json::array({BlockMesh()}), Json::array({2.4, 0.15, 1.2})));
+        Objects.push_back(SceneObject("Letter", Guid::Generate().ToString(),
+            Json::array({0.0, -0.13, 0.5}), Json::array({BlockMesh()}), Json::array({0.55, 0.02, 0.4})));
     }
     OutSceneJson = Json{{"format", SceneSerializer::FormatId},
         {"formatVersion", SceneSerializer::FormatVersion},
@@ -198,6 +209,20 @@ bool BuildProjectTemplateContent(const std::string& TemplateId,
             Line("line2", "Mira", "I thought I would never find this place again.", "line3"),
             Line("line3", "Narrator", "The story is just beginning.", "end"), End("end")};
         OutGuide = "# Kinetic novel starter\n\nEdit the linear dialogue in Content/Stories/Opening.story. The story has no choices.\n";
+    }
+    else if (bNovel)
+    {
+        OutStory.Name = "Письмо после дождя";
+        OutStory.Nodes = {
+            Line("intro", "Рассказчик", "Дождь стих. На столе лежит письмо, а за окном ещё мерцают капли.", "greeting"),
+            Line("greeting", "Мира", "Ты здесь. Я боялась открывать его одна.", "reply"),
+            Choice("reply", "Что ответить Мире?", {{"Давай прочитаем вместе", "kind"}, {"Мне нужно немного времени", "pause"}}),
+            Line("kind", "Мира", "Спасибо. Тогда начнём с первой строки.", "end"),
+            Line("pause", "Рассказчик", "Мира кивает и оставляет письмо на столе до завтра.", "end"), End("end")};
+        OutGuide = "# Визуальная новелла — тестовая сцена\n\n"
+            "При запуске Play показывается окно диалога. Нажмите «Дальше», затем выберите ответ. "
+            "Content/Stories/Opening.story содержит развилку; стартовая сцена — камеру, свет, окно, стол и письмо. "
+            "Content/Audio/RainTheme.wav — короткая музыкальная заставка, которая звучит при запуске Play в настольном редакторе.\n";
     }
     else
     {
