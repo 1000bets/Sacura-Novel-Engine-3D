@@ -15,11 +15,13 @@ public:
     void Tick(float Dt);
     void SetAssetPreview(NativeBridge* Value) { AssetPreview = Value; }
     nlohmann::json Status() const;
+    nlohmann::json PickMesh(float Horizontal, float Vertical) const;
     void ResetInput();
     void SetTool(const nlohmann::json& Options);
     SceneWorkspace& GetWorkspace() { return Workspace; }
 private:
     void Pick(float X, float Y);
+    GameObject* FindMeshAt(float Horizontal, float Vertical) const;
     void BuildAssetOverlay();
     NativeBridge* AssetPreview = nullptr;
     bool bPreviewFramed = false;
@@ -34,6 +36,7 @@ private:
     ImGuiContext* Gui = nullptr;
     Vector3 Position{4.f, 3.f, 6.f}, Target{0.f, 0.f, 0.f};
     float Width = 64, Height = 64, Scale = 1;
+    float CameraSpeed = 4.f;
     float MouseX = 0, MouseY = 0, PressX = 0, PressY = 0;
     int Buttons = 0, Navigation = 0, Operation = 0;
     bool Alt = false, Shift = false, Ctrl = false, DraggingGizmo = false, WorldAxes = false, Snap = false, Grid = true;

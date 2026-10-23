@@ -1,90 +1,219 @@
-import React, {createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState} from 'react';
+import React, {createContext, useContext, useEffect, useLayoutEffect, useRef, useState} from 'react';
+import {RegisterWorkspaceDocument} from './workspaceDocuments.js';
 import {createPortal} from 'react-dom';
-import {t as tr, useLocale} from './i18n.jsx';
-import {DOCK_AREAS, activeDockWindow, dockWindow, isWindowOpen, windowLabel} from './editorWindows.js';
+import {activeDockWindow, dockWindow, dockTabs, isWindowOpen, windowArea, floatWindow, SplitDockGroup} from './editorWindows.js';
 
-export const TAB_DRAG_TYPE = 'application/sacura-editor-window';
 const DockingContext = createContext(null);
 export const useDocking = () => useContext(DockingContext);
-export const acceptsWindowDrag = event => Array.from(event.dataTransfer?.types || []).includes(TAB_DRAG_TYPE);
-export function dockDestinationAt(x, y) {
-  const element = document.elementFromPoint?.(x, y);
-  const target = element?.closest('[data-dock-target], [data-dock-strip], [data-dock-root]');
-  if (!target) return null;
-  return {area: target.dataset.dockTarget || target.dataset.dockStrip || target.dataset.dockRoot, beforeId: element.closest('[data-dock-window]')?.dataset.dockWindow};
+export function dockDestinationAt(Horizontal, Vertical, OwnerDocument = document) {
+  const Element = OwnerDocument.elementFromPoint?.(Horizontal, Vertical);
+  const Target = Element?.closest('[data-dock-target], [data-dock-strip], [data-dock-root]');
+  if (!Target) {
+    return null;
+  }
+  return {area:Target.dataset.dockTarget || Target.dataset.dockStrip || Target.dataset.dockRoot, beforeId:Element.closest('[data-dock-window]')?.dataset.dockWindow};
 }
-
-export function EditorDockProvider({windows, onChange, onSelect, onClose, onPlace, children}) {
-  const hosts = useRef({}), [drag, setDrag] = useState(null);
-  const place = (id, area, beforeId) => {
-    onChange(current => dockWindow(current, id, beforeId, area));
-    onPlace?.(area); setDrag(null);
-    queueMicrotask(() => document.getElementById('editor-tab-' + id)?.focus());
-  };
+export function EditorDockProvider({windows:Windows, onChange:Change, onSelect:Select, onClose:Close, onPlace:Placed, children:Children}) {
+  useEffect(() => RegisterWorkspaceDocument(window), []);
+  const Hosts = useRef({});
+  const Popups = useRef(new Map());
+  const [Drag, SetDrag] = useState(null);
+  const [Revision, SetRevision] = useState(0);
+  const Latest = useRef(Windows);
+  const CancelDrag = useRef(null);
+  useEffect(() => () => CancelDrag.current?.(), []);
+  Latest.current = Windows;
+  function Place(Identifier, Area, BeforeIdentifier) {
+    Change(Current => dockWindow(Current, Identifier, BeforeIdentifier, Area));
+    Placed?.(Area);
+    SetDrag(null);
+  }
+  function Detach(Identifier, Position = {}) {
+    Change(Current => floatWindow(Current, Identifier, {width:1200,height:820,...Position}));
+    SetDrag(null);
+  }
+  function Split(Identifier, Area, Direction) {
+    Change(Current => SplitDockGroup(Current, Identifier, Area, Direction));
+    SetDrag(null);
+  }
+  function RegisterHost(Area, Element) {
+    if (Hosts.current[Area] !== Element) {
+      Hosts.current[Area] = Element;
+      SetRevision(Value => Value + 1);
+    }
+  }
+  function StartDrag(Event, Identifier) {
+    if (Event.button !== 0) {
+      return;
+    }
+    CancelDrag.current?.();
+    const Button = Event.currentTarget;
+    const Owner = Button.ownerDocument.defaultView;
+    const PointerIdentifier = Event.pointerId;
+    const Start = {x:Event.screenX,y:Event.screenY};
+    const Origin = {x:Event.screenX - Event.clientX,y:Event.screenY - Event.clientY};
+    let Surfaces = null;
+    let Started = false;
+    let Finished = false;
+    window.sacuraDesktop?.workspaceDragSurfaces?.().then(Value => {Surfaces = Value;});
+    function Destination(Pointer) {
+      const Owners = new Set([Owner, ...Popups.current.values(), window]);
+      for (const Candidate of Owners) {
+        if (Candidate.closed) {
+          continue;
+        }
+        const Surface = Surfaces?.find(Entry => Entry.name === Candidate.name);
+        if (Surface && !Surface.visible) {
+          continue;
+        }
+        const Border = (Candidate.outerWidth - Candidate.innerWidth) / 2;
+        let Horizontal = Candidate.screenX + Border;
+        let Vertical = Candidate.screenY + Candidate.outerHeight - Candidate.innerHeight - Border;
+        if (Candidate === Owner) {
+          Horizontal = Origin.x;
+          Vertical = Origin.y;
+        }
+        if (Surface) {
+          Horizontal = Surface.bounds.x;
+          Vertical = Surface.bounds.y;
+        }
+        const ClientHorizontal = Pointer.screenX - Horizontal;
+        const ClientVertical = Pointer.screenY - Vertical;
+        const Target = dockDestinationAt(ClientHorizontal, ClientVertical, Candidate.document);
+        if (Target) {
+          const Group = Hosts.current[Target.area]?.closest('[data-dock-root]');
+          const Bounds = Group?.getBoundingClientRect();
+          Target.direction = 'center';
+          if (Bounds && !Candidate.document.elementFromPoint(ClientHorizontal, ClientVertical)?.closest('[data-dock-strip]')) {
+            if (ClientHorizontal > Bounds.right - Math.min(80, Bounds.width * .2)) {
+              Target.direction = 'right';
+            } else if (ClientVertical > Bounds.bottom - Math.min(65, Bounds.height * .2)) {
+              Target.direction = 'bottom';
+            }
+          }
+          return Target;
+        }
+      }
+      return null;
+    }
+    function Move(Pointer) {
+      if (Pointer.pointerId !== PointerIdentifier) {
+        return;
+      }
+      if (!Started && Math.hypot(Pointer.screenX - Start.x, Pointer.screenY - Start.y) < 5) {
+        return;
+      }
+      Started = true;
+      Pointer.preventDefault();
+      SetDrag({id:Identifier,target:Destination(Pointer)});
+    }
+    function Finish(Pointer) {
+      if (Pointer.pointerId !== PointerIdentifier) {
+        return;
+      }
+      const Target = Destination(Pointer);
+      Cleanup();
+      if (!Started) {
+        return;
+      }
+      const SuppressClick = Click => {Click.preventDefault();Click.stopPropagation();};
+      Owner.document.addEventListener('click', SuppressClick, {capture:true,once:true});
+      Owner.setTimeout(() => Owner.document.removeEventListener('click', SuppressClick, true), 0);
+      if (Target) {
+        if (Target.direction !== 'center' && dockTabs(Latest.current, Target.area).some(Entry => Entry !== Identifier)) {
+          Split(Identifier, Target.area, Target.direction);
+        } else {
+          Place(Identifier, Target.area, Target.beforeId);
+        }
+      } else {
+        Detach(Identifier, {x:Pointer.screenX - 100,y:Pointer.screenY - 20});
+      }
+    }
+    function KeyDown(Key) {
+      if (Key.key === 'Escape') {
+        Key.preventDefault();
+        Key.stopPropagation();
+        Cleanup();
+      }
+    }
+    function Cleanup() {
+      if (Finished) {
+        return;
+      }
+      Finished = true;
+      Button.removeEventListener('pointermove', Move);
+      Button.removeEventListener('pointerup', Finish);
+      Button.removeEventListener('pointercancel', Cleanup);
+      Button.removeEventListener('lostpointercapture', Cleanup);
+      Owner.document.removeEventListener('keydown', KeyDown, true);
+      if (Button.hasPointerCapture(PointerIdentifier)) {
+        Button.releasePointerCapture(PointerIdentifier);
+      }
+      Button.style.cursor = '';
+      SetDrag(null);
+      CancelDrag.current = null;
+    }
+    Button.setPointerCapture(PointerIdentifier);
+    Button.style.cursor = 'grabbing';
+    Button.addEventListener('pointermove', Move);
+    Button.addEventListener('pointerup', Finish);
+    Button.addEventListener('pointercancel', Cleanup);
+    Button.addEventListener('lostpointercapture', Cleanup);
+    Owner.document.addEventListener('keydown', KeyDown, true);
+    CancelDrag.current = Cleanup;
+  }
   useEffect(() => {
-    if (!drag) return;
-    const cancel = () => setDrag(null);
-    const escape = e => {if (e.key === 'Escape') {e.preventDefault(); e.stopPropagation(); cancel();}};
-    window.addEventListener('dragend', cancel); window.addEventListener('drop', cancel); if (drag.kind === 'float') window.addEventListener('blur', cancel); window.addEventListener('keydown', escape, true);
-    return () => {window.removeEventListener('dragend', cancel); window.removeEventListener('drop', cancel); window.removeEventListener('blur', cancel); window.removeEventListener('keydown', escape, true);};
-  }, [drag]);
-  return <DockingContext.Provider value={{windows, onChange, onSelect, onClose, hosts, drag, setDrag, place}}>{children}
-    {drag?.point && <div className="dock-drag-preview" aria-hidden="true" style={{left:drag.point.x + 14, top:drag.point.y + 14}}>{tr(windowLabel(drag.id))}</div>}
-  </DockingContext.Provider>;
+    return window.sacuraDesktop?.onWorkspaceClose?.(async Area => {
+      const DescendsFrom = Candidate => {
+        if (Candidate === Area) {
+          return true;
+        }
+        const Parent = Latest.current.containers[Candidate]?.parent;
+        return Boolean(Parent && DescendsFrom(Parent));
+      };
+      for (const Identifier of Latest.current.tabs.filter(Entry => DescendsFrom(windowArea(Latest.current, Entry)))) {
+        const Result = await Close(Identifier);
+        if (Result === false) {
+          return;
+        }
+      }
+    });
+  }, [Close]);
+  return <DockingContext.Provider value={{windows:Windows,onChange:Change,onSelect:Select,onClose:Close,hosts:Hosts,popups:Popups,revision:Revision,registerHost:RegisterHost,drag:Drag,setDrag:SetDrag,startDrag:StartDrag,place:Place,detach:Detach,split:Split}}>{Children}</DockingContext.Provider>;
 }
-
-export function EditorDockBody({area}) {
-  const docking = useDocking();
-  const register = useCallback(element => {docking.hosts.current[area] = element;}, [docking.hosts, area]);
-  return <div className="dock-region-content" hidden={!activeDockWindow(docking.windows, area)} ref={register}/>;
-}
-
-export function EditorDockStrip({area, className, children}) {
-  const docking = useDocking();
-  return <div className={className} data-dock-strip={area} onDragOver={e => {if (acceptsWindowDrag(e)) {e.preventDefault(); e.dataTransfer.dropEffect = 'move';}}} onDrop={e => {
-    if (!acceptsWindowDrag(e)) return;
-    e.preventDefault(); e.stopPropagation();
-    const id = e.dataTransfer.getData(TAB_DRAG_TYPE);
-    if (isWindowOpen(docking.windows, id)) docking.place(id, area);
-  }}>{children}</div>;
-}
-
-export function DockDropTarget({area}) {
-  useLocale();
-  const docking = useDocking(), [over, setOver] = useState(false);
-  useEffect(() => {if (!docking.drag) setOver(false);}, [docking.drag]);
-  if (!docking.drag) return null;
-  const label = tr(DOCK_AREAS.find(([id]) => id === area)[1]);
-  return <div className={'dock-drop-target' + (over || docking.drag.area === area ? ' drag-over' : '') + (docking.drag.kind === 'float' ? ' pointer-dock-target' : '')}
-    data-dock-target={area} role="region" aria-label={tr('Закрепить в области «{0}»', [label])}
-    onDragOver={e => {if (acceptsWindowDrag(e)) {e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move'; setOver(true);}}}
-    onDragLeave={e => {if (!e.currentTarget.contains(e.relatedTarget)) setOver(false);}}
-    onDrop={e => {
-      if (!acceptsWindowDrag(e)) return;
-      e.preventDefault(); e.stopPropagation(); const id = e.dataTransfer.getData(TAB_DRAG_TYPE);
-      if (id === docking.drag.id) docking.place(id, area);
-      setOver(false);
-    }}>
-    <span data-dock-target={area}>{tr('Закрепить здесь')}<strong>{label}</strong></span>
-  </div>;
-}
-
-export function DockPanelMount({area, floating, visible, children}) {
-  const {hosts} = useDocking();
-  const [container] = useState(() => {const element = document.createElement('div'); element.className = 'editor-panel-mount'; return element;});
+export function EditorDockBody({area:Area}) {
+  const Docking = useDocking();
+  const Element = useRef(null);
   useLayoutEffect(() => {
-    let canceled = false;
-    const attach = () => {
-      const target = hosts.current[floating ? 'floating' : area];
-      if (target && container.parentNode !== target) target.appendChild(container);
-      container.hidden = !floating && !visible;
-      return !!target;
-    };
-    // A region later in the React tree (the inspector) registers its ref after this effect.
-    if (!attach()) queueMicrotask(() => {if (!canceled) attach();});
-    return () => {canceled = true;};
-  }, [hosts, area, floating, visible, container]);
-  useLayoutEffect(() => () => container.remove(), [container]);
-  // The portal's container stays the same when its host changes, preserving drafts and selection.
-  return createPortal(children, container);
+    Docking.registerHost(Area, Element.current);
+    return () => Docking.registerHost(Area, null);
+  }, [Area]);
+  return <div className="dock-region-content" ref={Element}/>;
+}
+export function EditorDockStrip({area:Area, className:ClassName, children:Children}) {
+  return <div className={ClassName} data-dock-strip={Area}>{Children}</div>;
+}
+export function DockDropTarget() {
+  return null;
+}
+export function DockPanelMount({id:Identifier, area:Area, visible:Visible, children:Children}) {
+  const Docking = useDocking();
+  const [Container] = useState(() => {
+    const Element = document.createElement('div');
+    Element.className = 'editor-panel-mount';
+    return Element;
+  });
+  if (Identifier) {
+    Area = windowArea(Docking.windows, Identifier);
+    Visible = isWindowOpen(Docking.windows, Identifier) && activeDockWindow(Docking.windows, Area) === Identifier;
+  }
+  useLayoutEffect(() => {
+    const Target = Docking.hosts.current[Area];
+    if (Target && Container.parentNode !== Target) {
+      Target.appendChild(Container);
+    }
+    Container.hidden = !Visible;
+  }, [Area, Visible, Container, Docking.revision]);
+  useLayoutEffect(() => () => Container.remove(), [Container]);
+  return createPortal(Children, Container);
 }

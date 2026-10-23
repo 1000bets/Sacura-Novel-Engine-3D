@@ -32,3 +32,15 @@
 .widget-assignment-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .widget-assignment-actions>button{min-height:30px;margin:0;display:inline-flex;align-items:center;gap:6px;padding:5px 8px;font-size:12px}
 .object-inspector :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.transform-vector .scale-axis-lock{display:inline-flex;align-items:center;justify-content:center;flex:0 0 18px;width:18px;min-height:20px;padding:0;border:0;background:transparent;color:var(--text-muted);cursor:pointer}
+.transform-vector .scale-axis-lock[aria-pressed=true]{color:var(--accent)}
+.transform-vector .scale-axis-lock:hover{background:var(--surface-hover)}
+.transform-vector .scale-axis-lock:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+.transform-vector{position:relative}
+.numeric-input-control{position:static;display:block;flex:1;min-width:0}
+.numeric-input-control>input{cursor:ew-resize}
+.numeric-input-control>input:focus{cursor:text}
+.numeric-input-control>input[aria-invalid=true]{outline:1px solid var(--danger,#d66)}
+.numeric-input-error{position:absolute;z-index:90;right:0;top:100%;width:220px;padding:7px;border:1px solid var(--divider);border-radius:4px;background:var(--bg-panel);color:var(--text-primary);font-size:11px;white-space:normal;box-shadow:0 3px 12px #0006}

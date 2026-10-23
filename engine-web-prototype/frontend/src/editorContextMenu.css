@@ -11,6 +11,10 @@
 
 .editor-context-submenu { position:fixed; z-index:1001; width:200px; max-height:calc(100vh - 16px); overflow:auto; padding:5px; border:1px solid var(--border-subtle); border-radius:6px; background:var(--surface-1); box-shadow:0 8px 32px #0006; }
 .editor-context-menu button[aria-expanded=true] { background:var(--surface-hover); }
+.editor-context-menu.component-add-menu { display:flex; flex-direction:column; box-sizing:border-box; width:320px; max-height:min(420px,calc(100vh - 16px)); overflow:hidden; }
+.component-add-menu>strong,.component-add-menu>label { flex-shrink:0; }
+.component-add-menu>[role=menu] { min-height:0; overflow:auto; }
+.component-add-menu button:hover { background:var(--surface-hover); }
 .editor-context-menu.scene-context-menu { width:350px; padding:10px; }
 .editor-context-menu.scene-context-menu>strong { padding:6px 8px 13px; font-size:14px; }
 .editor-context-menu.scene-context-menu>label { padding:6px 8px; margin-bottom:7px; }

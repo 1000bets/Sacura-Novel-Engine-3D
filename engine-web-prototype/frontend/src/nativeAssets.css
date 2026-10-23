@@ -10,8 +10,6 @@
 .native-asset-options>button:hover{background:var(--surface-hover)}
 .native-asset-options input{width:100%;box-sizing:border-box}
 .asset-file-tile>.native-asset-thumbnail{width:100px!important;height:100px!important}
-.native-component-overview{display:flex;flex-direction:column;gap:3px}
-.native-component-overview button[aria-pressed=true]{border-color:var(--accent);color:var(--accent)}
 .native-mesh-section{padding:8px 0}
 .native-mesh-section h4{margin:8px 0}
 .native-mesh-slot{margin:8px 0}
@@ -37,3 +35,15 @@
 
 .native-ui-material-preview {height:100%;display:grid;place-items:center;background:var(--bg-panel)}
 .native-ui-material-preview img {max-width:100%;max-height:100%;object-fit:contain}
+
+.component-instances .native-component-card{min-width:0;margin-bottom:10px;border:1px solid var(--divider);border-left:3px solid var(--accent);border-radius:6px;background:var(--bg-panel)}
+.component-instances .native-component-header>.component-instance-row{margin:0;border:0;border-radius:4px 4px 0 0;background:var(--surface-hover)}
+.component-instances .native-component-header>.component-instance-row[aria-expanded=false]{border-radius:4px}
+.component-instances .native-component-card>.component-instance-properties{margin:0;padding:10px 10px 12px;border-top:1px solid var(--divider)}
+.native-component-card .component-property-field:has(>.native-asset-field){grid-template-columns:minmax(0,1fr)}
+.native-component-card .native-asset-picker{min-width:0}
+
+.component-instances .native-component-header{display:flex;align-items:center;gap:4px;padding-right:6px;border-radius:4px;background:var(--surface-hover)}
+.component-instances .native-component-header:has([aria-expanded=true]){background:var(--surface-active);border-radius:4px 4px 0 0}
+.component-instances .native-component-header>.component-instance-row{flex:1;min-width:0;width:auto;background:transparent}
+.component-instances .native-component-header>.component-remove{flex:0 0 28px;width:28px;height:28px;padding:0;display:flex;align-items:center;justify-content:center}

@@ -114,6 +114,7 @@ int main(int Argc, char** Argv)
     std::unique_ptr<NativeBridge> Bridge;
     if(Control) {
         Bridge=std::make_unique<NativeBridge>(Runtime, Controller->GetWorkspace(), Session, std::filesystem::absolute(Argv[0]).parent_path()/"BridgeContract.json", [&]{Controller->ResetInput();});
+        Bridge->PickViewportMesh = [&](float Horizontal, float Vertical) { return Controller->PickMesh(Horizontal, Vertical); };
         Control->Send(Bridge->Poll(true));
     }
     // Projects are loaded as authored; only the launcher creates an isolated fixture.

@@ -159,7 +159,16 @@ export default function NativeShaderEditor({
       })]
     });
     View.current = Editor;
+    let OwnerDocument = Editor.dom.ownerDocument;
+    const OwnerTimer = setInterval(() => {
+      if (OwnerDocument !== Editor.dom.ownerDocument) {
+        OwnerDocument = Editor.dom.ownerDocument;
+        Editor.setRoot(OwnerDocument);
+        Editor.requestMeasure();
+      }
+    }, 100);
     return () => {
+      clearInterval(OwnerTimer);
       View.current = null;
       Editor.destroy();
     };

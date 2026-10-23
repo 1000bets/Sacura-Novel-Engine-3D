@@ -55,7 +55,7 @@ function MaterialDivider({
     }
   }} />;
 }
-export default function NativeAssetEditorRoot() {
+export default function NativeAssetEditorRoot({desktop:Desktop = window.sacuraDesktop}) {
   const [Snapshot, SetSnapshot] = useState(null);
   const [Assets, SetAssets] = useState([]);
   const [Session, SetSession] = useState('');
@@ -74,7 +74,7 @@ export default function NativeAssetEditorRoot() {
   const Queue = useRef(Promise.resolve());
   const SourceDraft = useRef(null);
   const SourceTimer = useRef(null);
-  const Identity = window.sacuraDesktop.assetEditorIdentity;
+  const Identity = Desktop.assetEditorIdentity;
   function Execute(Operation, Value) {
     const Work = Queue.current.catch(() => {}).then(async () => {
       if (!Client.current || !Latest.current) {
@@ -143,7 +143,7 @@ export default function NativeAssetEditorRoot() {
   }
   useEffect(() => {
     let Disposed = false;
-    const Bridge = createNativeBridgeClient();
+    const Bridge = createNativeBridgeClient(Desktop);
     Client.current = Bridge;
     async function Load() {
       const Connection = await Bridge.connect();
@@ -177,7 +177,7 @@ export default function NativeAssetEditorRoot() {
         Execute('get');
       }
     }, 500);
-    const Unsubscribe = window.sacuraDesktop.onAssetEditorAction(Operation => {
+    const Unsubscribe = Desktop.onAssetEditorAction(Operation => {
       if (Operation === 'fit') {
         SetFocus(Value => Value + 1);
         return;
@@ -185,7 +185,7 @@ export default function NativeAssetEditorRoot() {
       return Execute(Operation);
     });
     const Keyboard = Event => {
-      if (Event.defaultPrevented) {
+      if (Event.defaultPrevented || Event.target.closest('[data-document-tab]')?.dataset.documentTab !== Desktop.documentId) {
         return;
       }
       if (!(Event.ctrlKey || Event.metaKey)) {
@@ -219,6 +219,9 @@ export default function NativeAssetEditorRoot() {
       Bridge.dispose();
     };
   }, []);
+  if (!Snapshot) {
+    return <p role="status">{ErrorMessage || 'Открытие документа…'}</p>;
+  }
   if (Snapshot?.type === 'Texture') {
     return <NativeTextureEditor snapshot={Snapshot} asset={Assets.find(Entry => Entry.id === Snapshot.assetId)} focusRequest={Focus} error={ErrorMessage} />;
   }
@@ -235,7 +238,7 @@ export default function NativeAssetEditorRoot() {
         });
         SetFocus(Value => Value + 1);
       }}><option value="Sphere">Сфера</option><option value="Cube">Куб</option><option value="Plane">Плоскость</option></select>}
-      </nav><div className="native-asset-editor-surface">{Snapshot?.previewDomain === 'UserInterface' && <div className="native-ui-material-preview">{Snapshot.previewPng && <img src={'data:image/png;base64,' + Snapshot.previewPng} alt="Предпросмотр UI-материала" />}{!Snapshot.previewPng && <p>Подготовка предпросмотра…</p>}</div>}{Snapshot?.previewDomain !== 'UserInterface' && <NativeViewport assetPreview editing editTool={Tool} showGrid focusRequest={Focus} />}</div></div>;
+      </nav><div className="native-asset-editor-surface">{Snapshot?.previewDomain === 'UserInterface' && <div className="native-ui-material-preview">{Snapshot.previewPng && <img src={'data:image/png;base64,' + Snapshot.previewPng} alt="Предпросмотр UI-материала" />}{!Snapshot.previewPng && <p>Подготовка предпросмотра…</p>}</div>}{Snapshot?.previewDomain !== 'UserInterface' && <NativeViewport desktop={Desktop} assetPreview editing editTool={Tool} showGrid focusRequest={Focus} />}</div></div>;
   let ClassName = 'native-asset-editor-root';
   let Status = 'HLSL';
   if (IsMaterial) {
@@ -247,10 +250,19 @@ export default function NativeAssetEditorRoot() {
   return <NativeAssetsContext.Provider value={{
     assets: Assets,
     session: Session,
-    open: Asset => window.sacuraDesktop.nativeOpenAssetEditor(Asset).catch(ErrorValue => SetErrorMessage(ErrorValue.message)),
-    reveal: Asset => window.sacuraDesktop.nativeRevealAsset(Asset)
+    open: Asset => Desktop.nativeOpenAssetEditor(Asset).catch(ErrorValue => SetErrorMessage(ErrorValue.message)),
+    reveal: Asset => Desktop.nativeRevealAsset(Asset)
   }}>
-    <main className={ClassName}>
+    <main className={ClassName} data-document-tab={Desktop.documentId} onKeyDown={Event => {
+      if (!Event.defaultPrevented && (Event.ctrlKey || Event.metaKey) && ['KeyS','KeyZ','KeyY'].includes(Event.code)) {
+        Event.preventDefault();
+        Event.stopPropagation();
+        let Operation = 'save';
+        if (Event.code === 'KeyZ') { Operation = 'undo'; }
+        if (Event.code === 'KeyY' || Event.code === 'KeyZ' && Event.shiftKey) { Operation = 'redo'; }
+        Execute(Operation);
+      }
+    }}>
       {IsMaterial && <>
         <header className="native-material-toolbar native-document-toolbar">
           <Icon name="Box" /><span className="native-material-path" title={Asset?.path}>{Asset?.path || Asset?.name}</span>

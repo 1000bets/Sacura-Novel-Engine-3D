@@ -2,7 +2,7 @@ const FileSystem = require('node:fs/promises');
 const Path = require('node:path');
 const {setTimeout: Delay} = require('node:timers/promises');
 
-exports.run = async ({app: Application, editors: Editors, getViewport: GetViewport, output: Output}) => {
+exports.run = async ({app: Application, window: Window, windows: Windows, editors: Editors, getViewport: GetViewport, output: Output}) => {
   try {
     const Deadline = Date.now() + 60000;
     while (!GetViewport()?.bridge.connected) {
@@ -23,6 +23,7 @@ exports.run = async ({app: Application, editors: Editors, getViewport: GetViewpo
     }
     await Editors.open({assetId: Material.id});
     const Editor = Array.from(Editors.values()).find(Entry => Entry.identity.assetId === Material.id);
+    const EditorWindow = await require('./workspace-capture.cjs').DetachDocument(Window, Windows, Editor.identifier);
     if (process.env.SACURA_MATERIAL_CAPTURE_SHAPE)
     {
       const Selection = await Editor.viewport.bridge.request('assetDocument.execute', {
@@ -34,7 +35,7 @@ exports.run = async ({app: Application, editors: Editors, getViewport: GetViewpo
       }
       console.log('Material capture shape:', process.env.SACURA_MATERIAL_CAPTURE_SHAPE);
     }
-    Editor.window.setSize(1600, 1000);
+    EditorWindow.setSize(1600, 1000);
     let Document;
     do
     {
@@ -54,11 +55,11 @@ exports.run = async ({app: Application, editors: Editors, getViewport: GetViewpo
     console.log('Material preview frame:', JSON.stringify(Editor.viewport.state.stats));
     const Destination = Path.resolve(Output);
     await FileSystem.mkdir(Path.dirname(Destination), {recursive: true});
-    await FileSystem.writeFile(Destination, (await Editor.window.webContents.capturePage()).toPNG());
-    Editor.window.setSize(900, 700);
+    await FileSystem.writeFile(Destination, (await EditorWindow.webContents.capturePage()).toPNG());
+    EditorWindow.setSize(900, 700);
     await Delay(1500);
     const CompactDestination = Path.join(Path.dirname(Destination), Path.parse(Destination).name + '-compact.png');
-    await FileSystem.writeFile(CompactDestination, (await Editor.window.webContents.capturePage()).toPNG());
+    await FileSystem.writeFile(CompactDestination, (await EditorWindow.webContents.capturePage()).toPNG());
     console.log('Material capture saved:', Destination, CompactDestination);
     await Editors.closeAll();
     await Delay(200);

@@ -197,6 +197,10 @@
       "objectId": "id",
       "componentId": "id"
     },
+    "scene.pickMesh": {
+      "horizontal": "number",
+      "vertical": "number"
+    },
     "mesh.material": {
       "objectId": "id",
       "componentId": "id",
@@ -253,6 +257,12 @@
     },
     "assets.deleteFolder": {
       "folder": "string"
+    },
+    "transform.edit": {
+      "objectId": "id",
+      "transaction": "id",
+      "operation": "string",
+      "transform?": "transform"
     }
   }
 }

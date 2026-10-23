@@ -9,16 +9,17 @@ const {BridgeTransport} = require('./bridge/transport.cjs');
 
 // Binary frame metadata only; pixels stay on the GPU. JSON carries input/status.
 class NativeViewport {
-  static async create(window, project = process.env.SACURA_NATIVE_PROJECT) {
+  static async create(window, project = process.env.SACURA_NATIVE_PROJECT, DocumentIdentifier = null) {
     const server = net.createServer();
     const pipe = '\\\\.\\pipe\\sacura-gpu-' + randomUUID();
     await new Promise((resolve, reject) => {server.once('error', reject); server.listen(pipe, resolve);});
     const bridge = await BridgeTransport.listen();
-    return new NativeViewport(window, project, server, pipe, bridge);
+    return new NativeViewport(window, project, server, pipe, bridge, DocumentIdentifier);
   }
-  constructor(window, project, server, pipe, bridge) {
+  constructor(window, project, server, pipe, bridge, DocumentIdentifier) {
+    this.documentId = DocumentIdentifier;
     this.bridge = bridge;
-    bridge.on('event', event => {if(!window.isDestroyed()&&!window.webContents.isDestroyed())window.webContents.send('native-bridge-event',event);});
+    bridge.on('event', event => {if(!window.isDestroyed()&&!window.webContents.isDestroyed())window.webContents.send(this.documentId ? 'native-document-event' : 'native-bridge-event',event,this.documentId);});
     this.window = window;
     this.project = project;
     this.server = server;
@@ -111,7 +112,7 @@ class NativeViewport {
     this.imports++;
     this.pendingFrames.set(Token,{acknowledge,resource:Resource});
     try {
-      await sharedTexture.sendSharedTexture({frame: this.window.webContents.mainFrame, importedSharedTexture: Resource.imported}, packet);
+      await sharedTexture.sendSharedTexture({frame: this.window.webContents.mainFrame, importedSharedTexture: Resource.imported}, Buffer.concat([packet, Buffer.from(this.documentId || "")]));
       this.state.transport.frames++;
     } catch (ErrorValue) {
       this.frameConsumed(Token);
@@ -152,7 +153,13 @@ class NativeViewport {
   }
   tools(value) {
     if (!value || !['translate','move','rotate','scale','select'].includes(value.tool) || !['world','local'].includes(value.space)) throw new Error('Invalid tools');
+    if (value.cameraSpeed !== undefined && (!Number.isFinite(value.cameraSpeed) || value.cameraSpeed < 0.1 || value.cameraSpeed > 100)) {
+      throw new Error('Camera speed must be between 0.1 and 100 metres per second');
+    }
     this.lastTools={tool:value.tool==='move'?'translate':value.tool,space:value.space,snap:!!value.snap,grid:!!value.grid};
+    if (value.cameraSpeed !== undefined) {
+      this.lastTools.cameraSpeed = value.cameraSpeed;
+    }
     if (typeof value.visualization === 'string') { this.lastTools.visualization = value.visualization; }
     if (Number.isFinite(value.depthRange) && value.depthRange >= 0.01 && value.depthRange <= 100000) { this.lastTools.depthRange = value.depthRange; }
     this.send({type:'tools',...this.lastTools});
@@ -168,7 +175,7 @@ class NativeViewport {
     if (!Number.isFinite(scale) || scale<0.25 || scale>8) throw new Error('Invalid DPI scale');
     const bounds = {type: 'bounds', seq: ++this.sequence, x: value.x, y: value.y, width: value.width, height: value.height,
       scale, interactive:!!value.interactive,
-      visible: value.visible && this.window.isVisible() && !this.window.isMinimized()};
+      visible: value.visible};
     this.lastBounds = bounds;
     this.send(bounds);
     return bounds.seq;

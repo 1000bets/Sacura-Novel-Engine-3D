@@ -47,7 +47,7 @@ export function stagingPointOptions(scene,objects,value){
 export function isObjectInScene(o,scene){return (!o.subsceneId||o.subsceneId===scene.id)&&!scene.excludedObjectIds?.includes(o.id)&&(!o.kitKind||o.kitKind===scene.kind)&&(!BUILTIN_KINDS[o.builtin||o.id]||BUILTIN_KINDS[o.builtin||o.id]===scene.kind);}
 export function cleanTransform(t){
  const vector=(key,fallback)=>fallback.map((v,i)=>Number.isFinite(Number(t?.[key]?.[i]))?Number(t[key][i]):v);
- return {position:vector('position',[0,0,0]),rotation:vector('rotation',[0,0,0]),scale:vector('scale',[1,1,1]).map(v=>Math.max(.05,Math.min(30,v)))};
+ return {position:vector('position',[0,0,0]),rotation:vector('rotation',[0,0,0]),scale:vector('scale',[1,1,1])};
 }
 export function objectTransform(o,sceneId,kind='living'){
  const base=BUILTIN_TRANSFORMS[o.builtin||o.id];

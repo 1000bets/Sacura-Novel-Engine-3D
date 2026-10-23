@@ -51,7 +51,7 @@ import {copySceneObjects,pasteSceneObjects,cloneStoryNodes,clipboardCommand} fro
 import {copyAction,copyGroup} from './authoringModel.js';
 import {playbackStartId,deleteStoryNode,insertStoryNode,changeStoryNodeKind,STORY_NODE_KINDS} from './storyEditing.js';
 import {applyConnections,connectionError} from './storyConnections.js';
-import {InfoView, FloatingWindow} from './EditorHelp.jsx';
+import {InfoView} from './EditorHelp.jsx';
 import './editorHelp.css';
 import './objectInspector.css';
 import './storyInspector.css';
@@ -133,9 +133,11 @@ import StoryFlow from './StoryFlow.jsx';
 import {useEditorPlatform} from './useEditorPlatform.js';
 import {presentationObject,eulerToQuaternion} from './editorPlatform.js';
 import {nativeStoryPresentation} from './nativeStoryPresentation.js';
-import EditorWorkspace, {EditorWindowsMenu, EditorDockTabs} from './EditorWorkspace.jsx';
-import {EditorDockProvider, EditorDockStrip, EditorDockBody, DockDropTarget} from './EditorDocking.jsx';
-import {defaultWindows, restoreWindows, openWindow, closeWindow, dockTabs, windowArea, activeDockWindow, selectDockBase} from './editorWindows.js';
+import {ListenWorkspaceEvent} from './workspaceDocuments.js';
+import WorkspaceDocument from './WorkspaceDocument.jsx';
+import EditorWorkspace, {EditorWindowsMenu, EditorDockTabs, EditorDockArea} from './EditorWorkspace.jsx';
+import {EditorDockProvider, EditorDockStrip, EditorDockBody, DockDropTarget, DockPanelMount} from './EditorDocking.jsx';
+import {defaultWindows, restoreWindows, openWindow, closeWindow, dockTabs, windowArea, activeDockWindow, selectDockBase, RegisterEditorTab} from './editorWindows.js';
 
 const PROJECT_KEY = "sacura-studio-v2",
   LAYOUT_KEY = "sacura-workspace-v3";
@@ -321,6 +323,19 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
    await selectNative(Created.id);
    return Created;
  };
+ const DropNativeAsset = async (Identity, Placement, Coordinates) => {
+   if (Identity.kind !== 'material') {
+     return PlaceNativeMesh(Identity, Placement);
+   }
+   const Target = await native.adapter.command('scene.pickMesh', Coordinates, native.context);
+   if (!Target) {
+     setNotice('Перетащите материал на объект со статическим мешем.');
+     return;
+   }
+   await native.adapter.command('mesh.material', {...Target,slot:-1,assetId:Identity.assetId}, native.context);
+   await selectNative(Target.objectId);
+   setNotice('Материал назначен всем слотам объекта. Ctrl+Z — отменить.');
+ };
 
  const createNativeObject=async(name='GameObject',typeId)=>{
    const result=await nativeCommand('object.create',{name});
@@ -361,6 +376,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     [mode, setMode] = useState("scene"),
     [showDialogue, setShowDialogue] = useState(true),
     [showGrid, setShowGrid] = useState(true),
+    [CameraSpeed, SetCameraSpeed] = useState(4),
     [maximized, setMaximized] = useState(!window.sacuraDesktop?.nativeViewport && dockTabs(layout.windows).length && defaultWindowId === "gameplay" ? "graph" : null),
     [preview, setPreview] = useState(null),
     [componentDraft,setComponentDraft]=useState(null),
@@ -463,6 +479,63 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     const next=typeof value==='function'?value(current.windows):value;
     return next===current.windows?current:{...current,windows:next};
   }),[]);
+  useEffect(() => {
+    if (historyOpen) {
+      changeWindows(Current => openWindow(Current, 'history'));
+    }
+  }, [historyOpen]);
+
+  const [LiveDocuments, SetLiveDocuments] = useState({});
+  useEffect(() => {
+    if (!isNative) {
+      return;
+    }
+    let Disposed = false;
+    function OpenDocument(Descriptor) {
+      if (Disposed || !Descriptor) {
+        return;
+      }
+      RegisterEditorTab(Descriptor.id, Descriptor);
+      SetLiveDocuments(Current => ({...Current,[Descriptor.id]:Descriptor}));
+      changeWindows(Current => openWindow({...Current,documents:{...Current.documents,[Descriptor.id]:Descriptor}}, Descriptor.id));
+    }
+    const UnsubscribeOpen = window.sacuraDesktop.onDocumentOpen(OpenDocument);
+    const UnsubscribeClose = window.sacuraDesktop.onDocumentClosed(Identifier => {
+      SetLiveDocuments(Current => {
+        const Next = {...Current};
+        delete Next[Identifier];
+        return Next;
+      });
+      changeWindows(Current => closeWindow(Current, Identifier));
+    });
+    async function RestoreDocuments() {
+      const Session = await window.sacuraDesktop.nativeSession();
+      for (const Descriptor of await window.sacuraDesktop.nativeDocuments()) {
+        OpenDocument(Descriptor);
+      }
+      for (const Identifier of windowPreferences.current.tabs) {
+        const Descriptor = windowPreferences.current.documents?.[Identifier];
+        if (Descriptor) {
+          if (Descriptor.project?.replaceAll('\\','/').toLowerCase() !== Session.project?.replaceAll('\\','/').toLowerCase()) {
+            changeWindows(Current => closeWindow(Current, Identifier));
+            continue;
+          }
+          try {
+            await window.sacuraDesktop.nativeOpenAssetEditor(Descriptor.identity);
+          } catch (Failure) {
+            setNotice(Failure.message);
+            changeWindows(Current => closeWindow(Current, Identifier));
+          }
+        }
+      }
+    }
+    RestoreDocuments().catch(Failure => setNotice(Failure.message));
+    return () => {
+      Disposed = true;
+      UnsubscribeOpen();
+      UnsubscribeClose();
+    };
+  }, [isNative]);
   const revealDockArea=useCallback(area=>{
     setMaximized(null);
     if(area==='hierarchy')setLayout(current=>({...current,hiddenHierarchy:false}));
@@ -476,10 +549,29 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   const showBaseDock=area=>changeWindows(current=>selectDockBase(current,area));
   const maximizeWindow=id=>setMaximized(({workspace:'graph',scene:'scene',hierarchy:'hierarchy',inspector:'inspector'})[windowArea(windowPreferences.current,id)]);
   const selectWorkspace=id=>{
+    if (id.startsWith('asset:') && !LiveDocuments[id]) {
+      const Descriptor = windowPreferences.current.documents[id];
+      if (Descriptor) {
+        window.sacuraDesktop.nativeOpenAssetEditor(Descriptor.identity).catch(Failure => setNotice(Failure.message));
+      }
+      return;
+    }
     setDock(id);setDetailEditor(false);setMaximized(null);
     if(id==='characters'){if(runtime.current?.running)runtime.current.stop();setMode('scene');}
   };
-  const closeWorkspace=id=>{
+  const closeWorkspace=async id=>{
+    if (id.startsWith('asset:')) {
+      try {
+        if (!await window.sacuraDesktop.nativeCloseDocument(id)) {
+          return false;
+        }
+      } catch (Failure) {
+        setNotice(Failure.message);
+        return false;
+      }
+    }
+    if (id === 'history') { setHistoryOpen(false); }
+    if (id === 'server-projects') { setServerProjects(null); }
     changeWindows(current=>closeWindow(current,id));
     if(workspaceTabCount===1&&dockTabs(windows)[0]===id)setMaximized(null);
   };
@@ -975,6 +1067,11 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     setProjectDialog(null);
   });
   const [serverProjects,setServerProjects]=useState(null);
+  useEffect(() => {
+    if (serverProjects) {
+      changeWindows(Current => openWindow(Current, 'server-projects'));
+    }
+  }, [serverProjects]);
   const showServerProjects=()=>runFileOperation(async()=>{setMenu(null);setServerProjects(await listServerProjects());});
   const selectServerProject=id=>runFileOperation(async()=>{replaceProject(readProject(await openServerProject(id)));setServerProjects(null);setNotice('Проект открыт с сервера.');});
   const openProjectFile = () => {
@@ -1317,22 +1414,27 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
       right: 280,
       height: defaultSceneHeight(),
       hiddenHierarchy:false,hiddenInspector:false,
-      windows:defaultWindows(defaultWindowId),
+      windows:{...defaultWindows(defaultWindowId), documents:l.windows.documents,
+        tabs:[...defaultWindows(defaultWindowId).tabs,...l.windows.tabs.filter(Identifier => Identifier.startsWith('asset:'))]},
     }));
     setMaximized(null);
     setMenu(null);
   };
   useEffect(() => {
     const listener = (e) => {
+      if (e.target.closest?.('[data-document-tab]')) { return; }
       if(isNative&&!e.defaultPrevented){
-        const editing=e.target.isContentEditable||e.target.closest?.('input,textarea,select');
+        const editing=e.target.isContentEditable||e.target.closest?.('input,textarea,select,[role="textbox"],[role="dialog"]');
+        if (contextMenu || picker || projectDialog || detailEditor || menu) {
+          return;
+        }
         const ctrl=e.ctrlKey||e.metaKey;
         if(ctrl&&e.code==='KeyS'){e.preventDefault();nativeCommand(nativeFocus==='story'?'story.save':'scene.save');return;}
         if(!editing&&ctrl&&['KeyZ','KeyY'].includes(e.code)){e.preventDefault();(e.code==='KeyY'||e.shiftKey?redo:undo)();return;}
-        if(!editing&&e.key==='Delete'&&nativeFocus==='scene'&&nativeObject){e.preventDefault();nativeCommand('object.destroy',{objectId:nativeObject.id});return;}
+        if(!editing&&!nativeEditing&&!e.repeat&&e.key==='Delete'&&nativeFocus==='scene'&&nativeObject){e.preventDefault();nativeCommand('object.destroy',{objectId:nativeObject.id});return;}
         if(!editing&&ctrl&&e.code==='KeyD'&&nativeFocus==='scene'){e.preventDefault();duplicateObjects();return;}
         if(!editing&&e.code==='F5'){e.preventDefault();if(native.connected)nativeCommand(native.state?.play==='stopped'?'play.start':'play.stop');return;}
-        if(!editing&&ctrl&&['KeyC','KeyX','KeyV'].includes(e.code)&&!e.target.closest?.('.react-flow')){e.preventDefault();objectClipboard(({KeyC:'copy',KeyX:'cut',KeyV:'paste'})[e.code]);return;}
+        if(!editing&&ctrl&&nativeFocus==='scene'&&['KeyC','KeyX','KeyV'].includes(e.code)&&!e.target.closest?.('.react-flow')){e.preventDefault();objectClipboard(({KeyC:'copy',KeyX:'cut',KeyV:'paste'})[e.code]);return;}
       }
       const command=clipboardCommand(e);
       if(command&&!e.target.closest?.('.react-flow, .widget-workspace')&&!contextMenu&&!picker&&!projectDialog&&!detailEditor&&!menu&&!running&&mode==='scene'&&(selection.kind==='object'||e.target.closest?.('.scene-viewport,.hierarchy'))){e.preventDefault();objectClipboard(command);return;}
@@ -1379,14 +1481,21 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
       }
     };
     const nativeClipboard=e=>{
+      if (e.target.closest?.('[data-document-tab]')) { return; }
       if(e.defaultPrevented||running||mode!=='scene'||contextMenu||picker||projectDialog||detailEditor||menu||e.target.isContentEditable||e.target.closest?.('input,textarea,select,[role="textbox"],[role="dialog"],.react-flow,.widget-workspace'))return;
-      if(selection.kind!=='object'&&!e.target.closest?.('.scene-viewport,.hierarchy'))return;
+      if (isNative) {
+        if (nativeEditing || nativeFocus !== 'scene') {
+          return;
+        }
+      } else if(selection.kind!=='object'&&!e.target.closest?.('.scene-viewport,.hierarchy')) {
+        return;
+      }
       e.preventDefault();objectClipboard(e.type==='copy'?'copy':'paste');
       if(e.type==='copy')e.clipboardData?.setData('text/plain','Sacura · объекты сцены');
     };
-    window.addEventListener("keydown", listener);window.addEventListener('copy',nativeClipboard);window.addEventListener('paste',nativeClipboard);
-    return () => {window.removeEventListener("keydown", listener);window.removeEventListener('copy',nativeClipboard);window.removeEventListener('paste',nativeClipboard);};
-  }, [history,future,project,projectDialog,mode,running,selection,picker,detailEditor,cameraPilotId,menu,displayScene,contextMenu,dock]);
+    const Unsubscribe = [ListenWorkspaceEvent('keydown', listener), ListenWorkspaceEvent('copy',nativeClipboard), ListenWorkspaceEvent('paste',nativeClipboard)];
+    return () => { for (const Remove of Unsubscribe) { Remove(); } };
+  }, [history,future,project,projectDialog,mode,running,selection,picker,detailEditor,cameraPilotId,menu,displayScene,contextMenu,dock,isNative,native,nativeFocus]);
 
   const updateVariable = (id,patch) => {
     if(rt?.running)return 'Остановите игру, чтобы редактировать переменные.';
@@ -1424,8 +1533,15 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
       return <div className="object-inspector native-object-inspector">
         <div className="inspector-identity"><span className="identity-icon"><Icon name="Box" size={28}/></span><div><input aria-label="Имя объекта" key={id+nativeObject.name} defaultValue={nativeObject.name} disabled={nativeEditing} onBlur={e=>{if(e.target.value!==nativeObject.name)nativeCommand('object.rename',{objectId:id,name:e.target.value});}}/><small>Объект сцены</small></div><input type="checkbox" aria-label="Объект активен" title="Объект активен" checked={nativeObject.active} disabled={nativeEditing} onChange={e=>nativeCommand('object.setActive',{objectId:id,active:e.target.checked})}/></div>
         <Fold title="Иерархия" open={false}><Field label="Родитель"><select value={nativeObject.parentId||''} disabled={nativeEditing} onChange={e=>nativeCommand('object.setParent',{objectId:id,parentId:e.target.value||null})}><option value="">Корень</option>{native.objects.filter(o=>o.id!==id).map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select></Field></Fold>
-        <TransformInspector compact object={presentationObject(nativeObject)} scene={nativeScene} disabled={nativeEditing}
-          onChange={t=>nativeCommand('transform.set',{objectId:id,transform:{position:t.position.map(Number),rotation:eulerToQuaternion(t.rotation),scale:t.scale.map(Number)}})}
+        <TransformInspector key={id} compact object={presentationObject(nativeObject)} scene={nativeScene} disabled={nativeEditing}
+          onInteraction={(Operation, Transaction, TransformValue) => {
+            const Params = {objectId:id,transaction:Transaction,operation:Operation};
+            if (TransformValue) {
+              Params.transform = {position:TransformValue.position.map(Number),rotation:eulerToQuaternion(TransformValue.rotation),scale:TransformValue.scale.map(Number)};
+            }
+            return native.adapter.command('transform.edit',Params,native.context);
+          }}
+          onChange={t=>native.adapter.command('transform.set',{objectId:id,transform:{position:t.position.map(Number),rotation:eulerToQuaternion(t.rotation),scale:t.scale.map(Number)}},native.context)}
           onReset={()=>nativeCommand('transform.set',{objectId:id,transform:{position:[0,0,0],rotation:[0,0,0,1],scale:[1,1,1]}})} onFocus={()=>setFocusRequest({nonce:uid('focus')})}
           onDelete={()=>nativeCommand('object.destroy',{objectId:id})}/>
         <ComponentInstancesInspector project={project} running={nativeEditing} reflection={{components:native.components,types:native.types,
@@ -2344,7 +2460,14 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
       /></div>:<p>Откройте настоящий .story из AssetRegistry или создайте новый.</p>}
     </div>;
   };
-  const renderWorkspace=(dock,visible)=>isNative?renderNativeWorkspace(dock,visible):<>
+  const renderWorkspace=(dock,visible)=>{
+    if (dock.startsWith('asset:')) {
+      if (!LiveDocuments[dock]) { return <p>Открытие документа…</p>; }
+      return <WorkspaceDocument descriptor={LiveDocuments[dock]}/>;
+    }
+    if (dock === 'history') { return renderHistory(); }
+    if (dock === 'server-projects') { return <div>{(serverProjects || []).map(Item => <button key={Item.id} onClick={() => selectServerProject(Item.id)}>{Item.title}</button>)}</div>; }
+    return isNative?renderNativeWorkspace(dock,visible):<>
             {["story", "timeline", "staging", "event"].includes(dock) && !detailEditor && (
               <div className="graph-toolbar">
                 {dock==='event'?<><Button icon="ArrowLeft" title={tr("Вернуться в поток истории")} onClick={()=>setDock('story')}/><span className="graph-breadcrumb">{event?.name}</span></>:<><Icon name="Route" size={15}/><span className="flow-toolbar-context">{project.subscenes.length} {tr("сабсцены · ")}{nodes.length} {tr("реплик · единый поток")}</span><Button icon="Focus" onClick={()=>graphApis.current[dock]?.focus(beat.id)}>{tr("К реплике")}</Button><Button icon="Scan" onClick={()=>graphApis.current[dock]?.fit()}>{tr("Вся история")}</Button></>}
@@ -2519,6 +2642,7 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
               )}
             </div>
   </>;
+  };
   return (
     <NativeAssetsContext.Provider value={{assets:native.assets,session:native.context?.session,
       open:OpenNativeAsset,reveal:RevealNativeAsset}}>
@@ -2614,17 +2738,10 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
         <nav className="compact-panel-tabs" aria-label={tr("Панели редактора")}>
           {[['hierarchy','ListTree','Объекты сцены'],['workspace','PanelsTopLeft','Рабочая область'],['inspector','Settings2','Свойства']].map(([id,icon,label])=><button key={id} aria-pressed={compactPanel===id} onClick={()=>{if(['hierarchy','inspector'].includes(maximized))setMaximized(null);setCompactPanel(id);}}><Icon name={icon} size={13}/>{tr(label)}</button>)}
         </nav>
-        <aside data-dock-root="hierarchy" className={"hierarchy-panel dockable-region"+(hierarchyTool?" has-docked-tool":"")}>
+        <aside data-dock-root="hierarchy" className={"hierarchy-panel dockable-region"}>
           <button className="panel-restore" aria-label={tr("Показать иерархию")} title={tr("Показать иерархию")} onClick={()=>setLayout(l=>({...l,hiddenHierarchy:false}))}><Icon name="PanelLeftOpen" size={18}/><span>{tr("Иерархия")}</span></button>
-          <EditorDockStrip area="hierarchy" className="panel-tabs">
-            <button data-dock-base="hierarchy" className={!hierarchyTool?"active":""} onClick={()=>showBaseDock('hierarchy')}>{tr("Иерархия")}</button>
-            <EditorDockTabs area="hierarchy"/>
-            <div className="flex-space" />
-            <Button icon={maximized==='hierarchy'?'Minimize2':'Maximize2'} title={maximized==='hierarchy'?tr("Восстановить иерархию"):tr("Развернуть иерархию")} onClick={()=>setMaximized(v=>v==='hierarchy'?null:'hierarchy')}/>
-            <Button icon="PanelLeftClose" title={tr("Свернуть иерархию")} onClick={()=>{setMaximized(null);setLayout(l=>({...l,hiddenHierarchy:true}));setCompactPanel('workspace');}}/>
-          </EditorDockStrip>
-          <EditorDockBody area="hierarchy"/>
-          <DockDropTarget area="hierarchy"/>
+          <EditorDockArea area="hierarchy"/>
+          <DockPanelMount id="hierarchy-view"><div className="universal-hierarchy-content">
           <div className="hierarchy-toolbar">
             <Button className="hierarchy-add" icon="Plus" title={tr("Добавить объект")} aria-haspopup="menu" aria-expanded={picker?.kind==='object'&&picker.anchor===root.current?.querySelector('.hierarchy-add')} disabled={isNative?nativeEditing:running} onClick={isNative?createNative:openObjectPicker}/>
             <div className="panel-search">
@@ -2652,6 +2769,7 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
             {isNative?native.objects.length:objects.length} {tr("объектов")}<span />
             {isNative?native.story?.document?.nodes.length||0:nodes.length} {tr("блоков")}</div>
           <InfoView />
+          </div></DockPanelMount>
         </aside>
         <ResizeBar
           axis="x"
@@ -2669,7 +2787,9 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
                 : "")
           }
         >
-          <section data-dock-root="scene" className={"viewport-panel dockable-region"+(sceneTool?" has-docked-tool":"")}>
+          <section data-dock-root="scene" className={"viewport-panel dockable-region"}>
+            <EditorDockArea area="scene"/>
+            <DockPanelMount id="scene-view"><div className="universal-scene-content">
             <EditorDockStrip area="scene" className="panel-tabs viewport-tabs">
               <button
                 data-dock-base="scene"
@@ -2687,7 +2807,7 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
               >
                 <Icon name="Gamepad2" size={15} />
                 {tr("Игра")}</button>
-              <EditorDockTabs area="scene"/>
+
               <div className="flex-space" />
               <Button disabled={isNative} icon="PanelsTopLeft" title={isNative?"Редактор игрового UI пока не подключён":tr("Редактор интерфейса игры")} onClick={()=>openWidgets(resolveWidget(project,'dialogue',beat).id)}/>
               {!isNative&&mode==='game'&&<Button icon="Menu" title={tr("Главное меню игры")} onClick={()=>{rt?.stop();setGameMenu('mainMenu');setPreviewWidgetId(null);}}>{tr("Меню")}</Button>}
@@ -2713,13 +2833,32 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
                 />
               </button>
             </EditorDockStrip>
-            <EditorDockBody area="scene"/>
-            <DockDropTarget area="scene"/>
+
             <div className="viewport-commandbar" aria-label={tr("Инструменты сцены")}>
               {mode==='scene'&&!cameraPilotId&&<div className="scene-edit-bar">
                 {[['select','MousePointer2','Выбор','Q'],['translate','Move','Сдвиг','W'],['rotate','Rotate3D','Поворот','E'],['scale','Scaling','Масштаб','R']].map(([tool,icon,label,key])=><button key={tool} disabled={(isNative?nativeEditing:running)||(selection.kind==='camera'&&(tool==='scale'||(tool==='rotate'&&displayScene.cameras?.find(c=>c.id===selection.id)?.mode==='follow')))} title={tr(label)+' · '+key} aria-pressed={editTool===tool} className={'transform-tool '+(editTool===tool?'active':'')} onClick={()=>setEditTool(tool)}><Icon name={icon} size={14}/><span className="tool-label">{tr(label)} · {key}</span></button>)}
                 <button title={tr("Привязка: 0,25 м / 15° / 0,1×")} aria-pressed={snap} className={snap?'active':''} onClick={()=>setSnap(v=>!v)}><Icon name="Magnet" size={14}/></button>
                 <Button icon="Grid3X3" title={tr("Сетка сцены")} aria-pressed={showGrid} className={showGrid?"active":""} onClick={()=>setShowGrid(v=>!v)}/>
+                {isNative && <details className="viewport-help viewport-camera-speed" onKeyDown={Event => {
+                  if (Event.key === 'Escape') {
+                    Event.currentTarget.open = false;
+                    Event.currentTarget.querySelector('summary').focus();
+                  }
+                }}>
+                  <summary title={tr("Скорость камеры")} aria-label={tr("Скорость камеры")}><Icon name="Gauge" size={15}/></summary>
+                  <div>
+                    <label htmlFor="viewport-camera-speed">{tr("Скорость полёта, м/с")}</label>
+                    <input id="viewport-camera-speed" type="number" min="0.1" max="100" step="0.1" value={CameraSpeed} disabled={nativeEditing} onChange={Event => {
+                      const RequestedSpeed = Event.target.valueAsNumber;
+                      if (Number.isFinite(RequestedSpeed) && RequestedSpeed >= 0.1 && RequestedSpeed <= 100) {
+                        SetCameraSpeed(RequestedSpeed);
+                      }
+                    }}/>
+                    <input aria-label={tr("Скорость камеры: ползунок")} type="range" min="0.1" max="100" step="0.1" value={CameraSpeed} disabled={nativeEditing} onChange={Event => SetCameraSpeed(Event.target.valueAsNumber)}/>
+                    <span>{tr("ПКМ + WASD / QE. Shift — ускорение ×3.")}</span>
+                    <button disabled={nativeEditing} onClick={() => SetCameraSpeed(4)}>{tr("Сбросить до 4 м/с")}</button>
+                  </div>
+                </details>}
               </div>}
               {cameraPilotId&&mode==='scene'&&<div className="camera-pilot-bar"><Icon name="Video"/><span>{tr("Настройка: ")}{displayScene.cameras?.find(c=>c.id===cameraPilotId)?.name}<small>{tr("Обзор мышью · правая кнопка — сдвиг · колесо — приближение")}</small></span><Button icon="Check" onClick={()=>captureCamera(cameraPilotId)}>{tr("Сохранить ракурс")}</Button><Button icon="X" title={tr("Вернуться без сохранения")} onClick={()=>setCameraPilotId(null)}/></div>}
               {!isNative&&(mode==='game'||(cameraPreviewId&&!cameraPilotId))&&<div className="camera-view-badge"><Icon name={resolveCamera(displayScene,world,objects,cameraPreviewId).mode==='follow'?'UserRoundCheck':'Video'} size={14}/><span className="camera-view-name">{resolveCamera(displayScene,world,objects,cameraPreviewId).name}</span>{cameraPreviewId&&<button onClick={()=>setCameraPreviewId(null)}>{mode==='game'?tr("По сценарию"):tr("Вернуться к сцене")} <Icon name="X" size={12}/></button>}</div>}
@@ -2742,7 +2881,7 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
                 }
               }}
             >
-              <SceneViewport onAssetDrop={PlaceNativeMesh} onCreateProject={()=>openProjectDialog('new')} onActivate={()=>setNativeFocus('scene')} blocked={!!(contextMenu || picker || projectDialog || detailEditor || menu || running || positionPick)}
+              <SceneViewport onAssetDrop={DropNativeAsset} onCreateProject={()=>openProjectDialog('new')} onActivate={()=>setNativeFocus('scene')} blocked={!!(contextMenu || picker || projectDialog || detailEditor || menu || running || positionPick)}
                 sceneId={displayScene.id}
                 editTool={editTool} editSpace={editSpace} snap={snap} focusRequest={cameraPilotId?0:focusRequest} editing={!running&&!cameraPilotId&&!positionPick&&(!isNative||!nativeEditing)} onTransform={transformObject} onTransforms={transformObjects}
                 cameraScene={displayScene} selectedCameraId={selection.kind==='camera'?selection.id:null} cameraPreviewId={cameraPreviewId} cameraPilotId={cameraPilotId} onCameraChange={changeCamera} onCameraSelect={selectCamera} cameraApi={cameraApi} physicsApi={physicsApi}
@@ -2753,6 +2892,7 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
                 selectedIds={objectSelectionIds}
                 mode={mode}
                 showGrid={showGrid}
+                CameraSpeed={CameraSpeed}
                 actionPosition={(()=>{if(selection.kind==='point')return sceneStagingPoints(displayScene,objects).find(p=>p.id===selection.id)?.position;const a=inspectedAction||(binding?bindingActions(project,binding):event?.groups.flatMap(g=>g.actions))?.find(a=>a.type==='move');return a?.type==='move'&&Array.isArray(a.value)?a.value:null;})()}
                 onPickPosition={positionPick?value=>{
                   const request=positionPick;
@@ -2843,6 +2983,7 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
                 {tr("Управление ")}<Icon name="ChevronRight" size={12} />
               </button>
             </div>}
+            </div></DockPanelMount>
           </section>
           <ResizeBar
             axis={sideWorkspace?'x':'y'}
@@ -2863,11 +3004,13 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
           onMove={(d) => resize("right", -d)}
           onReset={() => setLayout((l) => ({ ...l, right: 280 }))}
         />
-        <aside data-dock-root="inspector" className={"inspector-panel dockable-region"+(inspectorTool?" has-docked-tool":"")}>
+        <aside data-dock-root="inspector" className={"inspector-panel dockable-region"}>
           <button className="panel-restore" aria-label={tr("Показать инспектор")} title={tr("Показать инспектор")} onClick={()=>setLayout(l=>({...l,hiddenInspector:false}))}><Icon name="PanelRightOpen" size={18}/><span>{tr("Инспектор")}</span></button>
+          <EditorDockArea area="inspector"/>
+          <DockPanelMount id="inspector-view"><div className="universal-inspector-content">
           <EditorDockStrip area="inspector" className="panel-tabs">
             <button data-dock-base="inspector" className={!inspectorTool&&(isNative?nativeFocus!=='sceneSettings':selection.kind!=="scene")?"active":""} onClick={()=>{showBaseDock('inspector');if(isNative)setNativeFocus(nativeLastFocus.current);else if(selection.kind==='scene')setSelection({kind:'beat',id:beat.id});}}>{tr("Инспектор")}</button>
-            <EditorDockTabs area="inspector"/>
+
             <button
               className={!inspectorTool&&(isNative?nativeFocus==='sceneSettings':selection.kind==='scene')?'active':''}
               onClick={() => {showBaseDock('inspector');if(isNative)setNativeFocus('sceneSettings');else setSelection({kind:'scene',id:scene.id});}}
@@ -2883,8 +3026,7 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
             <Button icon={maximized==='inspector'?'Minimize2':'Maximize2'} title={maximized==='inspector'?tr("Восстановить инспектор"):tr("Развернуть инспектор")} onClick={()=>setMaximized(v=>v==='inspector'?null:'inspector')}/>
             <Button icon="PanelRightClose" title={tr("Свернуть инспектор")} onClick={()=>{setMaximized(null);setLayout(l=>({...l,hiddenInspector:true}));setCompactPanel('workspace');}}/>
           </EditorDockStrip>
-          <EditorDockBody area="inspector"/>
-          <DockDropTarget area="inspector"/>
+
           <div className="inspector-scroll" ref={inspectorScroll}>
             {!isNative&&selection.kind === "scene" ? (
               <SubsceneInspector key={scene.id} project={project} scene={scene} running={running}
@@ -2901,9 +3043,10 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
               <Icon name="Info" size={13} />
               {tr("Изменения — для следующего запуска")}</div>
           )}
+          </div></DockPanelMount>
         </aside>
       </div>
-      <footer className="editor-status">{isNative?<><span>C++ {native.connected?'подключён':'отключён'} · revision {native.context?.revision} · {native.state?.play}</span><span>{native.state?.dirty?'Сцена изменена':''}</span><span role="status">{notice}</span><button onClick={()=>nativeCommand('assets.refresh')}>Обновить AssetRegistry</button></>:<>
+      <footer className="editor-status">{isNative?<span role="status">{notice}</span>:<>
         <button className={"diagnostic-status "+(issues.length?"has-issues":"clear")} onClick={() => setDock("issues")}>
           <Icon
             name={issues.length ? "TriangleAlert" : "CheckCheck"}
@@ -2920,12 +3063,6 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
         </span>
 
       </>}</footer>
-      {serverProjects&&<FloatingWindow active title={tr("Проекты на сервере")} onClose={()=>setServerProjects(null)}>
-        {!serverProjects.length&&<p>{tr("Сохранённых проектов пока нет.")}</p>}
-        {serverProjects.map(item=><button key={item.id} disabled={projectFileBusy} onClick={()=>selectServerProject(item.id)}>{item.title} · {new Date(item.updatedAt).toLocaleString(localeTag())}</button>)}
-        {projectFileError&&<p role="alert">{message(projectFileError)}</p>}
-      </FloatingWindow>}
-      {historyOpen && <FloatingWindow active title={tr("История")} onClose={()=>setHistoryOpen(false)}>{renderHistory()}</FloatingWindow>}
       {menu && (
         <div
           className={"editor-menu"+(menu==='Окна'?' windows-menu-container':'')}

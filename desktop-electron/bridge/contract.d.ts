@@ -30,6 +30,7 @@ export interface Commands {
   'assets.place': {params:{assetId:Id;subAssetId:Id;transform?:Transform};result:{id:Id}};
   'mesh.inspect': {params:{objectId:Id;componentId:Id};result:JsonValue};
   'mesh.material': {params:{objectId:Id;componentId:Id;slot:number;assetId:Id|null};result:JsonValue};
+  'scene.pickMesh': {params:{horizontal:number;vertical:number};result:{objectId:Id;componentId:Id}|null};
   'mesh.physics': {params:{objectId:Id;componentId:Id;enabled:boolean;simulate:boolean};result:JsonValue};
   'assetDocument.execute': {params:{assetId:Id;subAssetId?:Id|null;operation:string;value?:JsonValue;revision?:number};result:JsonValue};
   'component.setAsset': {params:{objectId:Id;componentId:Id;property:string;assetId:Id|null;subAssetId?:Id|null};result:PropertyInfo[]};
@@ -81,6 +82,7 @@ export interface Commands {
   'component.setEnabled': {params:{objectId:Id;componentId:Id;enabled:boolean};result:null};
   'component.getProperties': {params:{objectId:Id;componentId:Id};result:PropertyInfo[]};
   'component.setProperty': {params:{objectId:Id;componentId:Id;property:string;value:JsonValue};result:PropertyInfo[]};
+  'transform.edit': {params:{objectId:Id;transaction:Id;operation:string;transform?:Transform};result:Transform|null};
   'transform.get': {params:{objectId:Id};result:Transform};
   'transform.set': {params:{objectId:Id;transform:Transform};result:Transform};
   'selection.set': {params:{objectId:Id|null};result:State};

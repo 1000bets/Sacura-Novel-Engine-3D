@@ -1,19 +1,39 @@
 const {contextBridge, ipcRenderer, sharedTexture} = require('electron');
 const presentation = {frames: 0, frameIndex: 0, readyToDrawMs: 0, error: null};
 let blit;
+const WorkspaceDocuments = new Map();
+const SurfaceBlits = new Map();
+const DocumentPresentation = new Map();
+const SurfaceTimings = new Map();
+function FindCanvas(Identifier) {
+  const Documents = [document, ...Array.from(WorkspaceDocuments.values()).filter(Popup => !Popup.closed).map(Popup => Popup.document)];
+  for (const OwnerDocument of Documents) {
+    for (const Canvas of OwnerDocument.querySelectorAll('canvas[data-native-surface]')) {
+      if ((Canvas.dataset.nativeOwner || '') === Identifier) {
+        return Canvas;
+      }
+    }
+  }
+  return null;
+}
 let lastDraw = 0, periodStart = 0, periodFrames = 0;
 const intervals = [], latencies = [], inputLatencies = [];
-function disposeBlit() {
-  if (blit) {
-    blit.gl.clearColor(.09,.106,.14,1);blit.gl.clear(blit.gl.COLOR_BUFFER_BIT);blit.gl.flush();
-    blit.gl.deleteTexture(blit.texture); blit.gl.deleteProgram(blit.program); blit = null;
+function disposeBlit(Identifier) {
+  for (const [Canvas, Surface] of SurfaceBlits) {
+    if (typeof Identifier === 'string' && (Canvas.dataset.nativeOwner || '') !== Identifier) {
+      continue;
+    }
+    Surface.gl.deleteTexture(Surface.texture);
+    Surface.gl.deleteProgram(Surface.program);
+    SurfaceBlits.delete(Canvas);
   }
+  blit = null;
   lastDraw = 0;
 }
 ipcRenderer.on('native-reset-presentation', () => {disposeBlit(); presentation.error=null;});
 window.addEventListener('pagehide', disposeBlit);
 function drawNativeFrame(canvas, frame) {
-  if (blit && blit.canvas !== canvas) disposeBlit();
+  blit = SurfaceBlits.get(canvas);
   if (!blit || blit.canvas !== canvas) {
     const gl = canvas.getContext('webgl2', {alpha: false, antialias: false, depth: false, preserveDrawingBuffer: false});
     if (!gl) throw new Error('GPU VideoFrame presentation requires WebGL2');
@@ -30,6 +50,7 @@ function drawNativeFrame(canvas, frame) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     blit = {canvas, gl, texture, program};
+    SurfaceBlits.set(canvas, blit);
   }
   const {gl} = blit;
   gl.viewport(0, 0, canvas.width, canvas.height);
@@ -39,43 +60,105 @@ function drawNativeFrame(canvas, frame) {
 }
 if (process.argv.includes('--native-viewport')) sharedTexture.setSharedTextureReceiver(async ({importedSharedTexture}, bytes) => {
   let frame;
+  const Identifier = new TextDecoder().decode(bytes.subarray(56));
+  let Metrics = presentation;
+  if (Identifier) {
+    Metrics = DocumentPresentation.get(Identifier) || {frames:0,received:0};
+  }
+  Metrics.received = (Metrics.received || 0) + 1;
+  const Timing = SurfaceTimings.get(Identifier) || {lastDraw:0,periodStart:0,periodFrames:0,intervals:[],latencies:[],inputLatencies:[]};
+  SurfaceTimings.set(Identifier, Timing);
+  DocumentPresentation.set(Identifier, Metrics);
   try {
     frame = importedSharedTexture.getVideoFrame();
-    const canvas = document.querySelector('canvas[data-native-surface]');
-    if (canvas && !document.hidden && canvas.checkVisibility({visibilityProperty:true})) {
+    const canvas = FindCanvas(Identifier);
+    Metrics.canvasFound = Boolean(canvas);
+    Metrics.visible = Boolean(canvas?.checkVisibility({visibilityProperty:true}));
+    if (canvas && !canvas.ownerDocument.hidden && canvas.checkVisibility({visibilityProperty:true})) {
       if (canvas.width !== frame.codedWidth) canvas.width = frame.codedWidth;
       if (canvas.height !== frame.codedHeight) canvas.height = frame.codedHeight;
       drawNativeFrame(canvas, frame);
       const packet = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-      presentation.frames++;
-      presentation.frameIndex = Number(packet.getBigUint64(32, true));
-      presentation.readyToDrawMs = performance.timeOrigin + performance.now() - Number(packet.getBigUint64(40, true)) / 1000;
+      Metrics.frames++;
+      Metrics.frameIndex = Number(packet.getBigUint64(32, true));
+      Metrics.readyToDrawMs = performance.timeOrigin + performance.now() - Number(packet.getBigUint64(40, true)) / 1000;
       const now = performance.now();
-      if (lastDraw && now-lastDraw<250) {intervals.push(now-lastDraw); if(intervals.length>600) intervals.shift();}
-      lastDraw=now; periodFrames++;
-      if (!periodStart) periodStart=now;
-      if (now-periodStart>=1000) {presentation.fps=periodFrames*1000/(now-periodStart); periodStart=now;periodFrames=0;}
-      latencies.push(presentation.readyToDrawMs); if(latencies.length>600) latencies.shift();
+      if (Timing.lastDraw && now-Timing.lastDraw<250) {Timing.intervals.push(now-Timing.lastDraw); if(Timing.intervals.length>600) Timing.intervals.shift();}
+      Timing.lastDraw=now; Timing.periodFrames++;
+      if (!Timing.periodStart) Timing.periodStart=now;
+      if (now-Timing.periodStart>=1000) {Metrics.fps=Timing.periodFrames*1000/(now-Timing.periodStart); Timing.periodStart=now;Timing.periodFrames=0;}
+      Timing.latencies.push(Metrics.readyToDrawMs); if(Timing.latencies.length>600) Timing.latencies.shift();
       const inputTime=Number(packet.getBigUint64(48,true));
-      if (inputTime && presentation.lastInputTime!==inputTime) {
-        presentation.lastInputTime=inputTime;
-        inputLatencies.push(performance.timeOrigin+now-inputTime/1000); if(inputLatencies.length>100) inputLatencies.shift();
+      if (inputTime && Metrics.lastInputTime!==inputTime) {
+        Metrics.lastInputTime=inputTime;
+        Timing.inputLatencies.push(performance.timeOrigin+now-inputTime/1000); if(Timing.inputLatencies.length>100) Timing.inputLatencies.shift();
       }
       const percentile=(a,p)=>a.length?[...a].sort((a,b)=>a-b)[Math.floor((a.length-1)*p)]:0;
-      Object.assign(presentation,{frameMs:percentile(intervals,.5),frameP95Ms:percentile(intervals,.95),readyToDrawP50Ms:percentile(latencies,.5),readyToDrawP95Ms:percentile(latencies,.95),inputToDrawP50Ms:percentile(inputLatencies,.5),inputToDrawP95Ms:percentile(inputLatencies,.95)});
+      Object.assign(Metrics,{frameMs:percentile(Timing.intervals,.5),frameP95Ms:percentile(Timing.intervals,.95),readyToDrawP50Ms:percentile(Timing.latencies,.5),readyToDrawP95Ms:percentile(Timing.latencies,.95),inputToDrawP50Ms:percentile(Timing.inputLatencies,.5),inputToDrawP95Ms:percentile(Timing.inputLatencies,.95)});
     }
-  } catch (error) {presentation.error = error.message;}
+  } catch (error) {Metrics.error = error.message; Metrics.error = error.message;}
   finally {
     frame?.close();
     importedSharedTexture.release();
     const Packet = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    await ipcRenderer.invoke('desktop:native-frame-consumed', Packet.getBigUint64(16, true).toString());
+    if (Identifier) {
+      await ipcRenderer.invoke('desktop:document-call', Identifier, 'native-frame-consumed', Packet.getBigUint64(16, true).toString()).catch(() => {});
+    } else {
+      await ipcRenderer.invoke('desktop:native-frame-consumed', Packet.getBigUint64(16, true).toString());
+    }
   }
 });
 
 // Only narrow, user-initiated project operations cross the isolated context.
 contextBridge.exposeInMainWorld('sacuraDesktop', Object.freeze({
   isDesktop: true,
+  workspaceDragSurfaces: () => ipcRenderer.invoke('desktop:workspace-drag-surfaces'),
+  registerWorkspaceWindow: Name => {
+    if (!/^sacura-window-[a-f0-9-]+$/.test(Name)) {
+      throw Error('Invalid workspace window');
+    }
+    WorkspaceDocuments.set(Name, window.open('', Name));
+    return true;
+  },
+  closeWorkspaceWindow: Name => {
+    WorkspaceDocuments.delete(Name);
+    return ipcRenderer.invoke('desktop:workspace-close-window', Name);
+  },
+  onWorkspaceClose: Callback => {
+    const Listener = (_, Area) => Callback(Area);
+    ipcRenderer.on('workspace-close-request', Listener);
+    return () => ipcRenderer.removeListener('workspace-close-request', Listener);
+  },
+  nativeDocumentCall: (Identifier, Channel, Value) => {
+    if (Channel === 'native-detach') {
+      disposeBlit(Identifier);
+      DocumentPresentation.delete(Identifier);
+      SurfaceTimings.delete(Identifier);
+    }
+    return ipcRenderer.invoke('desktop:document-call', Identifier, Channel, Value);
+  },
+  nativeDocumentStatus: async Identifier => ({...await ipcRenderer.invoke('desktop:document-call', Identifier, 'native-status'),presentation:DocumentPresentation.get(Identifier) || {frames:0}}),
+  nativeDocuments: () => ipcRenderer.invoke('desktop:document-list'),
+  nativeCloseDocument: Identifier => ipcRenderer.invoke('desktop:document-close', Identifier),
+  onDocumentOpen: Callback => {
+    const Listener = (_, Descriptor) => Callback(Descriptor);
+    ipcRenderer.on('workspace-document-open', Listener);
+    return () => ipcRenderer.removeListener('workspace-document-open', Listener);
+  },
+  onDocumentClosed: Callback => {
+    const Listener = (_, Identifier) => Callback(Identifier);
+    ipcRenderer.on('workspace-document-closed', Listener);
+    return () => ipcRenderer.removeListener('workspace-document-closed', Listener);
+  },
+  onDocumentEvent: (Identifier, Callback) => {
+    const Listener = (_, Event, Owner) => {
+      if (Owner === Identifier) {
+        Callback(Event);
+      }
+    };
+    ipcRenderer.on('native-document-event', Listener);
+    return () => ipcRenderer.removeListener('native-document-event', Listener);
+  },
   bridge: Object.freeze({
     connect: () => ipcRenderer.invoke('desktop:bridge-connect'),
     request: request => ipcRenderer.invoke('desktop:bridge-command',request),
@@ -88,8 +171,11 @@ contextBridge.exposeInMainWorld('sacuraDesktop', Object.freeze({
   nativeCopyText: Text => ipcRenderer.invoke('desktop:native-copy-text', Text),
   nativeOpenAssetEditor: Identity => ipcRenderer.invoke('desktop:native-open-asset-editor', Identity),
   nativeRevealAsset: Identity => ipcRenderer.invoke('desktop:native-reveal-asset', Identity),
-  onAssetEditorAction: Callback => {
-    const Listener = async (Event, Action, RequestId) => {
+  onAssetEditorAction: (Callback, Identifier = null) => {
+    const Listener = async (Event, Action, RequestId, Owner = null) => {
+      if (Identifier !== Owner) {
+        return;
+      }
       let Completed = false;
       try {
         Completed = Boolean(await Callback(Action));
@@ -115,7 +201,7 @@ contextBridge.exposeInMainWorld('sacuraDesktop', Object.freeze({
   nativeHeartbeat: () => ipcRenderer.invoke('desktop:native-heartbeat', {...presentation}),
   nativeInput: event => ipcRenderer.invoke('desktop:native-input', event),
   nativeTools: value => ipcRenderer.invoke('desktop:native-tools', value),
-  nativeDetach: () => {disposeBlit();return ipcRenderer.invoke('desktop:native-detach');},
+  nativeDetach: () => {disposeBlit('');return ipcRenderer.invoke('desktop:native-detach');},
   nativeOpenProject: () => ipcRenderer.invoke('desktop:native-open-project'),
   nativeCreateProject: (name,templateId='Empty') => ipcRenderer.invoke('desktop:native-create-project',name,templateId),
   nativeReloadProject: () => ipcRenderer.invoke('desktop:native-reload-project'),

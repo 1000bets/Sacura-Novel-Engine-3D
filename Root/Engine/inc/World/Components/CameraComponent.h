@@ -12,7 +12,7 @@ public:
     std::string MaterialDiagnostic;
     std::string GetMaterialDiagnostic() const { return MaterialDiagnostic; }
     ENGINE_REFLECT_READONLY(CameraComponent, MaterialDiagnosticProperty, "material_diagnostic",
-        std::string, GetMaterialDiagnostic, RF_EDITOR_READONLY, RF_DISPLAY_NAME("Material Diagnostic"))
+        std::string, GetMaterialDiagnostic, RF_EDITOR_READONLY, RF_EDITOR_HIDDEN, RF_DISPLAY_NAME("Material Diagnostic"))
     float FieldOfViewDegrees = 60.f;
     float NearPlane = 0.1f;
     float FarPlane = 1000.f;

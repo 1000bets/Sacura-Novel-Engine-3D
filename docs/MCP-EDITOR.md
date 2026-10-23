@@ -125,3 +125,9 @@ React использует соответствующие typed Bridge-кома�
 ### React texture inspection
 
 Detached React texture windows use read-only `assetDocument.execute` open/get/preview snapshots through the existing typed Electron bridge. Texture pixels are decoded by Engine TextureLoader; compression and mip mutations are unavailable. Channel, background, zoom and pan controls are UI-only and excluded from MCP mutations. See [Texture editor](TEXTURE-EDITOR.md).
+
+### Числовые поля трансформации Electron
+
+Поля положения, поворота и масштаба поддерживают арифметику (`+`, `-`, `*`, `/`, `%`, `^`, `**`, скобки), десятичную запятую, научную запись и относительные операции `+=`, `-=`, `*=`, `/=`. Выражения разбираются локально без выполнения JavaScript. В команды передаются только вычисленные числа.
+
+Перетаскивание использует типизированную Bridge-команду `transform.edit` с `objectId`, `transaction`, `operation` (`begin`, `update`, `commit`, `cancel`) и `transform` для update/commit. Предпросмотр не создаёт записей истории; commit восстанавливает исходное состояние и выполняет одну существующую EditorCore-команду. Отмена, смена выбора и другие мутации возвращают исходную трансформацию. Play запрещает редактирование. Выражения, чувствительность мыши и замок масштаба — UI-only; отдельные MCP-команды для этих настроек не нужны.

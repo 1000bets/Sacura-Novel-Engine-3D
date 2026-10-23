@@ -1,5 +1,12 @@
 export const NativeAssetDragMimeType = 'application/x-sacura-native-asset';
 
+export function GetNativeAssetDrop(Asset) {
+  if (Asset?.typeId === 'Material' || Asset?.typeId === 'MaterialInstance') {
+    return {assetId:Asset.id,kind:'material'};
+  }
+  return GetNativeMeshPlacement(Asset);
+}
+
 export function GetNativeMeshPlacement(Asset) {
   const Mesh = Asset?.subassets?.find(Subasset => Subasset.typeId === 'StaticMesh');
   if (!Mesh) {

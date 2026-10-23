@@ -32,6 +32,7 @@ public:
     Json Poll(bool Force = false);
     Json Context() const;
     void ScanAssets();
+    std::function<Json(float, float)> PickViewportMesh;
 private:
     struct AssetDocumentState
     {
@@ -77,6 +78,11 @@ private:
     void ValidateParams(const std::string& Method, const Json& Params);
     void Commit(std::unique_ptr<EditorCommand> Command);
     void ObserveWorld();
+    void CancelTransformEdit();
+    std::string TransformTransaction;
+    std::string TransformObjectId;
+    ObjectHandle TransformWorld;
+    Transform TransformBefore;
     Json Assets();
     AssetRegistryEntry Asset(const std::string& Id);
     Json StorySnapshot();

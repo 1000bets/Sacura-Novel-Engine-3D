@@ -1,4 +1,4 @@
-import {NativeAssetDragMimeType, GetNativeMeshPlacement} from './nativeScenePlacement.js';
+import {NativeAssetDragMimeType, GetNativeAssetDrop} from './nativeScenePlacement.js';
 import NativeAssetOperationDialog from './NativeAssetOperationDialog.jsx';
 import EditorContextMenu from './EditorContextMenu.jsx';
 import NativeAssetCreateDialog from './NativeAssetCreateDialog.jsx';
@@ -81,7 +81,7 @@ export default function AssetExplorer({project,audioAssets,onImport,onCreateFold
   setSelected(Created.id);onSelectFile?.(Created.id);
  };
  const StartNativeAssetDrag = (Event, Asset) => {
-  const Placement = GetNativeMeshPlacement(Asset);
+  const Placement = GetNativeAssetDrop(Asset);
   if (!adapter || disabled || busy || !Placement) {
    Event.preventDefault();
    return;
@@ -194,7 +194,7 @@ export default function AssetExplorer({project,audioAssets,onImport,onCreateFold
   <div className="asset-explorer-body"><nav className="asset-folder-tree" aria-label={tr("Папки проекта")}><button className={'asset-root '+(!path?'selected':'')} onClick={()=>navigate('')}><Icon name="FolderOpen" size={16}/>Assets</button>{tree()}</nav>
    <div className="asset-file-area">
     <div className="asset-file-grid" aria-label={tr("Файлы и папки")}>{contents.folders.map(item=><button key={item} data-asset-folder={item} className={'asset-file-tile folder'+(SelectedFolder===item?' selected':'')} onClick={()=>{SetSelectedFolder(item);setSelected(null);}} onDoubleClick={()=>navigate(item)}><Icon name="Folder" size={34}/><strong>{item.split('/').at(-1)}</strong><small>{tr("Папка")}</small></button>)}
-     {contents.files.map(item=><button key={item.id} data-asset-id={item.id} draggable={!!adapter && !disabled && !busy && !!GetNativeMeshPlacement(item)} onDragStart={Event=>StartNativeAssetDrag(Event,item)} className={'asset-file-tile '+(selected===item.id?'selected':'')} aria-pressed={selected===item.id} onClick={()=>{SetSelectedFolder(null);setSelected(item.id);if(item.logicResourceId)onLogic?.(item.logicResourceId);else onSelectFile?.(item.id);}} onDoubleClick={()=>!disabled&&open(item)}>
+     {contents.files.map(item=><button key={item.id} data-asset-id={item.id} draggable={!!adapter && !disabled && !busy && !!GetNativeAssetDrop(item)} onDragStart={Event=>StartNativeAssetDrag(Event,item)} className={'asset-file-tile '+(selected===item.id?'selected':'')} aria-pressed={selected===item.id} onClick={()=>{SetSelectedFolder(null);setSelected(item.id);if(item.logicResourceId)onLogic?.(item.logicResourceId);else onSelectFile?.(item.id);}} onDoubleClick={()=>!disabled&&open(item)}>
       {adapter?<AssetThumbnail assetId={item.id} type={item.typeId}/>:item.kind==='image'&&!/\.svg$/i.test(item.name)?<img src={item.src} alt=""/>:<Icon name={icons[item.kind]||'File'} size={32}/>}<strong>{item.name}</strong><small>{item.builtin?tr("Встроенный файл"):item.bytes!=null?tr("{0} КБ", [(item.bytes/1024).toFixed(1)]):tr("Файл проекта")}</small>{search&&<small>{item.path}</small>}
      </button>)}
     </div>

@@ -106,6 +106,15 @@ void ViewportController::SetTool(const Json& Options)
 {
     AssertGameThread();
     const std::string Tool = Options.value("tool", "translate");
+    if (Options.contains("cameraSpeed"))
+    {
+        const float RequestedSpeed = Options.at("cameraSpeed").get<float>();
+        if (!std::isfinite(RequestedSpeed) || RequestedSpeed < 0.1f || RequestedSpeed > 100.f)
+        {
+            throw std::invalid_argument("Camera speed must be between 0.1 and 100 metres per second");
+        }
+        CameraSpeed = RequestedSpeed;
+    }
     Operation = Tool == "rotate" ? 1 : Tool == "scale" ? 2 : Tool == "select" ? 3 : 0;
     Snap = Options.value("snap", false); WorldAxes = Options.value("space", "local") == "world";
     Grid = Options.value("grid", true);
@@ -229,28 +238,81 @@ void ViewportController::Pick(float X, float Y)
         if (Distance < LightDistance) { LightDistance = Distance; SelectedLight = Object; }
     }
     if (SelectedLight) { Workspace.Select(Runtime.GetActiveScene(), SelectedLight->GetObjectHandle()); return; }
-    const Matrix Inv = C.ViewProjection.Invert();
-    const Vector3 Near = Vector3::Transform(Vector3(X / Width * 2 - 1, 1 - Y / Height * 2, 0), Inv);
-    const Vector3 Far = Vector3::Transform(Vector3(X / Width * 2 - 1, 1 - Y / Height * 2, 1), Inv);
-    Vector3 Direction = Far - Near; Direction.Normalize();
-    GameObject* Selected = nullptr; float Closest = std::numeric_limits<float>::max();
-    for (auto* Object : Runtime.GetActiveScene()->GetAllObjects()) {
-        auto* Mesh = Object->GetComponent<MeshRendererComponent>();
-        if (!Object->IsActiveInHierarchy() || !Object->IsVisual() || !Mesh || !Mesh->bVisible || !Mesh->IsEnabled()) continue;
-        const Matrix Inverse = Object->GetWorldMatrix().Invert();
-        const Vector3 Origin = Vector3::Transform(Near, Inverse), Ray = Vector3::TransformNormal(Direction, Inverse);
-        float Low = 0, High = Closest;
-        const float O[3]{Origin.x, Origin.y, Origin.z}, D[3]{Ray.x, Ray.y, Ray.z};
-        const float Min[3]{Mesh->LocalBounds.Minimum.x, Mesh->LocalBounds.Minimum.y, Mesh->LocalBounds.Minimum.z};
-        const float Max[3]{Mesh->LocalBounds.Maximum.x, Mesh->LocalBounds.Maximum.y, Mesh->LocalBounds.Maximum.z};
-        bool Hit = true;
-        for (int I = 0; I < 3; ++I) {
-            if (std::abs(D[I]) < 1e-7f) { if (O[I] < Min[I] || O[I] > Max[I]) Hit = false; }
-            else { float A = (Min[I] - O[I]) / D[I], B = (Max[I] - O[I]) / D[I]; if (A > B) std::swap(A, B); Low = std::max(Low, A); High = std::min(High, B); }
-        }
-        if (Hit && Low <= High && Low < Closest) { Closest = Low; Selected = Object; }
+    auto* Selected = FindMeshAt(X, Y);
+    if (Selected)
+    {
+        Workspace.Select(Runtime.GetActiveScene(), Selected->GetObjectHandle());
     }
-    if (Selected) Workspace.Select(Runtime.GetActiveScene(), Selected->GetObjectHandle()); else Workspace.ClearSelection();
+    else
+    {
+        Workspace.ClearSelection();
+    }
+}
+nlohmann::json ViewportController::PickMesh(float Horizontal, float Vertical) const
+{
+    AssertGameThread();
+    auto* Object = FindMeshAt(Horizontal * Width, Vertical * Height);
+    if (!Object)
+    {
+        return nullptr;
+    }
+    return {{"objectId", Object->GetPersistentId()},
+        {"componentId", Object->GetComponent<MeshRendererComponent>()->GetPersistentId()}};
+}
+GameObject* ViewportController::FindMeshAt(float Horizontal, float Vertical) const
+{
+    const Matrix InverseViewProjection = Camera().ViewProjection.Invert();
+    const Vector3 Near = Vector3::Transform(Vector3(Horizontal / Width * 2 - 1, 1 - Vertical / Height * 2, 0), InverseViewProjection);
+    const Vector3 Far = Vector3::Transform(Vector3(Horizontal / Width * 2 - 1, 1 - Vertical / Height * 2, 1), InverseViewProjection);
+    Vector3 Direction = Far - Near;
+    Direction.Normalize();
+    GameObject* Selected = nullptr;
+    float Closest = std::numeric_limits<float>::max();
+    for (auto* Object : Runtime.GetActiveScene()->GetAllObjects())
+    {
+        auto* Mesh = Object->GetComponent<MeshRendererComponent>();
+        if (!Object->IsActiveInHierarchy() || !Object->IsVisual() || !Mesh || !Mesh->bVisible || !Mesh->IsEnabled())
+        {
+            continue;
+        }
+        const Matrix Inverse = Object->GetWorldMatrix().Invert();
+        const Vector3 Origin = Vector3::Transform(Near, Inverse);
+        const Vector3 Ray = Vector3::TransformNormal(Direction, Inverse);
+        float Low = 0.f;
+        float High = Closest;
+        const float Origins[3]{Origin.x, Origin.y, Origin.z};
+        const float Directions[3]{Ray.x, Ray.y, Ray.z};
+        const float Minimum[3]{Mesh->LocalBounds.Minimum.x, Mesh->LocalBounds.Minimum.y, Mesh->LocalBounds.Minimum.z};
+        const float Maximum[3]{Mesh->LocalBounds.Maximum.x, Mesh->LocalBounds.Maximum.y, Mesh->LocalBounds.Maximum.z};
+        bool bHit = true;
+        for (int Axis = 0; Axis < 3; ++Axis)
+        {
+            if (std::abs(Directions[Axis]) < 1e-7f)
+            {
+                if (Origins[Axis] < Minimum[Axis] || Origins[Axis] > Maximum[Axis])
+                {
+                    bHit = false;
+                }
+            }
+            else
+            {
+                float Entry = (Minimum[Axis] - Origins[Axis]) / Directions[Axis];
+                float Exit = (Maximum[Axis] - Origins[Axis]) / Directions[Axis];
+                if (Entry > Exit)
+                {
+                    std::swap(Entry, Exit);
+                }
+                Low = std::max(Low, Entry);
+                High = std::min(High, Exit);
+            }
+        }
+        if (bHit && Low <= High && Low < Closest)
+        {
+            Closest = Low;
+            Selected = Object;
+        }
+    }
+    return Selected;
 }
 void ViewportController::Tick(float Dt)
 {
@@ -262,7 +324,17 @@ void ViewportController::Tick(float Dt)
         if (Keys.count("KeyW")) Move += Forward; if (Keys.count("KeyS")) Move -= Forward;
         if (Keys.count("KeyD")) Move += Right; if (Keys.count("KeyA")) Move -= Right;
         if (Keys.count("KeyE")) Move += Vector3::Up; if (Keys.count("KeyQ")) Move -= Vector3::Up;
-        if (Move.LengthSquared() > 0) { Move.Normalize(); Move *= Dt * (Shift ? 12.f : 4.f); Position += Move; Target += Move; }
+        if (Move.LengthSquared() > 0)
+        {
+            Move.Normalize();
+            Move *= Dt * CameraSpeed;
+            if (Shift)
+            {
+                Move *= 3.f;
+            }
+            Position += Move;
+            Target += Move;
+        }
     }
     if (AssetPreview)
     {
@@ -334,6 +406,7 @@ Json ViewportController::Status() const
 {
     AssertGameThread();
     Json Result{{"cameraPosition", V(Position)}, {"cameraTarget", V(Target)}, {"inputCount", InputCount}, {"edits", Edits},
+        {"cameraSpeed", CameraSpeed},
         {"preview", AssetPreview && AssetPreview->GetPreviewScene()}, {"selectedCollision", AssetPreview ? AssetPreview->GetSelectedCollision() : -1}, {"tool", Operation}, {"navigation", Navigation}, {"heldKeys", Keys.size()}, {"canUndo", const_cast<SceneWorkspace&>(Workspace).GetCommands().CanUndo()}, {"selection", nullptr}, {"pickTargets",Json::array()}, {"lightIcons",Json::array()}};
     const auto C = Camera();
     Result["collisionTargets"] = Json::array();

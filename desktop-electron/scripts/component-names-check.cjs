@@ -20,9 +20,6 @@ exports.run = async ({app: Application, window: Window, getViewport: GetViewport
     await Delay(250);
     await FileSystem.writeFile(Path.join(Output, Name + '.png'), (await Window.webContents.capturePage()).toPNG());
   }
-  async function Search(Value) {
-    await Evaluate(`(()=>{const Input=document.querySelector('input[aria-label="Поиск компонентов"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(Input,${JSON.stringify(Value)});Input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
-  }
   try {
     await FileSystem.mkdir(Output, {recursive: true});
     setTimeout(async () => { await Report('Global timeout'); await Capture('Timeout'); await GetViewport()?.stop(); Application.exit(1); }, 90000).unref();
@@ -44,22 +41,19 @@ exports.run = async ({app: Application, window: Window, getViewport: GetViewport
     await Evaluate("document.querySelector('[data-menu-id=\"editor.CreateStaticMeshObjectAction\"]').click()");
     await Wait(() => Evaluate("document.querySelector('.component-instance-row strong')?.textContent==='Статический меш'"));
     Assert.equal(await Evaluate("document.querySelector('.component-instance-row').title"), 'engine.MeshRendererComponent');
-    Assert.equal(await Evaluate("document.querySelector('option[value=\"engine.CameraComponent\"]').textContent"), 'Камера');
+    Assert.equal(await Evaluate("!!document.querySelector('.native-component-header > .component-remove[title]')"), true);
     await Capture('Inspector');
-    for (const Value of ['Статический меш', 'engine.MeshRendererComponent', 'NoMatchingComponent']) {
-      await Search(Value);
-      const ExpectedCount = Number(Value !== 'NoMatchingComponent');
-      await Wait(async () => await Evaluate("document.querySelectorAll('.native-component-overview button').length") === ExpectedCount);
-    }
-    await Capture('EmptySearch');
-    await Search('');
     await Evaluate("document.querySelector('.component-instance-row').click()");
     await Wait(() => Evaluate("document.querySelector('.component-instance-row').getAttribute('aria-expanded')==='false'"));
     await Capture('Collapsed');
     await Evaluate("document.querySelector('.component-instance-row').click()");
     await Wait(() => Evaluate("document.querySelector('.component-instance-row').getAttribute('aria-expanded')==='true'"));
-    await Report('PASS: captions, search, metadata and disclosure');
-    console.log('PASS: component captions, metadata, search, type identity and disclosure. ' + Output);
+    await Evaluate("document.querySelector('.component-instance-row').click()");
+    await Evaluate("document.querySelector('.native-component-header > .component-remove').click()");
+    await Wait(() => Evaluate("document.querySelectorAll('.native-component-card').length===0"));
+    await Capture('Removed');
+    await Report('PASS: captions, header removal and disclosure');
+    console.log('PASS: component captions, header removal and disclosure. ' + Output);
     await GetViewport().stop();
     Application.exit(0);
   } catch (Failure) {

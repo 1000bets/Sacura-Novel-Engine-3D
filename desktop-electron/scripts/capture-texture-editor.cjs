@@ -3,8 +3,9 @@ const Path = require('node:path');
 const Assert = require('node:assert/strict');
 const {setTimeout: Delay} = require('node:timers/promises');
 
-exports.run = async ({app: Application, window: Window, editors: Editors, getViewport: GetViewport, output: Output}) => {
+exports.run = async ({app: Application, window: Window, windows: Windows, editors: Editors, getViewport: GetViewport, output: Output}) => {
   let Editor;
+  let EditorWindow;
   const Destination = Path.resolve(Output);
   const Errors = [];
   async function Wait(Predicate) {
@@ -28,14 +29,15 @@ exports.run = async ({app: Application, window: Window, editors: Editors, getVie
     Window.webContents.send('native-reveal-asset', {assetId: Texture.id});
     await Wait(() => Window.webContents.executeJavaScript('!!document.querySelector(".asset-file-tile.selected")'));
     await Window.webContents.executeJavaScript('document.querySelector(".asset-file-tile.selected").dispatchEvent(new MouseEvent("dblclick",{bubbles:true}))');
-    await Wait(() => Array.from(Editors.values()).some(Entry => Entry.identity.assetId === Texture.id && Entry.actions['bridge-command']));
+    await Wait(() => Array.from(Editors.values()).some(Entry => Entry.identity.assetId === Texture.id && Entry.ready));
     Editor = Array.from(Editors.values()).find(Entry => Entry.identity.assetId === Texture.id);
-    Editor.window.webContents.on('console-message', Details => {
+    EditorWindow = await require('./workspace-capture.cjs').DetachDocument(Window, Windows, Editor.identifier);
+    EditorWindow.webContents.on('console-message', Details => {
       if (Details.level === 'error') {
         Errors.push(Details.message);
       }
     });
-    const Evaluate = Source => Editor.window.webContents.executeJavaScript(Source);
+    const Evaluate = Source => EditorWindow.webContents.executeJavaScript(Source);
     await Wait(() => Evaluate('!!document.querySelector(".native-texture-image-area canvas")?.width'));
     await Editors.open({assetId: Texture.id});
     Assert.equal(Array.from(Editors.values()).filter(Entry => Entry.identity.assetId === Texture.id).length, 1);
@@ -60,14 +62,14 @@ exports.run = async ({app: Application, window: Window, editors: Editors, getVie
     await Evaluate('document.querySelector("select[aria-label=Фон]").value="light";document.querySelector("select[aria-label=Фон]").dispatchEvent(new Event("change",{bubbles:true}))');
     await Wait(() => Evaluate('!!document.querySelector(".native-texture-surface.light")'));
     await Evaluate('document.querySelector("select[aria-label=Каналы]").value="RGBA";document.querySelector("select[aria-label=Каналы]").dispatchEvent(new Event("change",{bubbles:true}));document.querySelector("select[aria-label=Фон]").value="checker";document.querySelector("select[aria-label=Фон]").dispatchEvent(new Event("change",{bubbles:true}));Array.from(document.querySelectorAll("button")).find(Button=>Button.textContent==="Вписать").click()');
-    Editor.window.setSize(1500, 950);
+    EditorWindow.setSize(1500, 950);
     await Delay(500);
-    await FileSystem.writeFile(Destination, (await Editor.window.webContents.capturePage()).toPNG());
-    Editor.window.setSize(800, 650);
+    await FileSystem.writeFile(Destination, (await EditorWindow.webContents.capturePage()).toPNG());
+    EditorWindow.setSize(800, 650);
     await Delay(500);
     Assert.equal(await Evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
     const Compact = Path.join(Path.dirname(Destination), Path.parse(Destination).name + '-compact.png');
-    await FileSystem.writeFile(Compact, (await Editor.window.webContents.capturePage()).toPNG());
+    await FileSystem.writeFile(Compact, (await EditorWindow.webContents.capturePage()).toPNG());
     Assert.deepEqual(Errors.filter(Message => /Uncaught|TypeError|ReferenceError/.test(Message)), []);
     Assert.equal(await Editors.closeAll(), true);
     await Wait(() => Editors.size === 0);
@@ -75,8 +77,9 @@ exports.run = async ({app: Application, window: Window, editors: Editors, getVie
     if (Broken) {
       await Editors.open({assetId: Broken.id});
       const BrokenEditor = Array.from(Editors.values()).find(Entry => Entry.identity.assetId === Broken.id);
-      await Wait(() => BrokenEditor.window.webContents.executeJavaScript('!!document.querySelector("[role=alert]")?.textContent'));
-      Assert.equal(await BrokenEditor.window.webContents.executeJavaScript('!!document.querySelector("canvas")'), false);
+      const BrokenWindow = await require('./workspace-capture.cjs').DetachDocument(Window, Windows, BrokenEditor.identifier);
+      await Wait(() => BrokenWindow.webContents.executeJavaScript('!!document.querySelector("[role=alert]")?.textContent'));
+      Assert.equal(await BrokenWindow.webContents.executeJavaScript('!!document.querySelector("canvas")'), false);
       Assert.equal(await Editors.closeAll(), true);
       await Wait(() => Editors.size === 0);
     }
@@ -86,8 +89,8 @@ exports.run = async ({app: Application, window: Window, editors: Editors, getVie
     Application.exit(0);
   } catch (Failure) {
     console.error('Texture editor check failed:', Failure);
-    if (Editor && !Editor.window.isDestroyed()) {
-      await FileSystem.writeFile(Path.join(Path.dirname(Destination), 'TextureEditor-failure.png'), (await Editor.window.webContents.capturePage()).toPNG()).catch(() => {});
+    if (EditorWindow && !EditorWindow.isDestroyed()) {
+      await FileSystem.writeFile(Path.join(Path.dirname(Destination), 'TextureEditor-failure.png'), (await EditorWindow.webContents.capturePage()).toPNG()).catch(() => {});
     }
     for (const Entry of Editors.values()) {
       await Entry.viewport?.stop();

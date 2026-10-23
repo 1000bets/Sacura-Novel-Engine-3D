@@ -455,3 +455,7 @@ button:focus-visible { outline-color: var(--accent); }
 .viewport-commandbar .viewport-help { position: static; margin: 0; padding: 0; border: 0; }
 .viewport-commandbar .viewport-help summary { margin: 0; }
 .viewport-commandbar .viewport-help>div { top: 100%; left: 8px; right: 8px; width: auto; max-width: 290px; max-height: min(260px, 40dvh); overflow: auto; overflow-wrap: anywhere; z-index: 20; }
+.viewport-commandbar .viewport-camera-speed>div { display: grid; gap: 8px; max-width: 260px; }
+.viewport-camera-speed input { width: 100%; min-width: 0; box-sizing: border-box; }
+.viewport-camera-speed span { color: var(--text-secondary); line-height: 1.5; }
+.viewport-camera-speed[open] summary { color: var(--accent); background: var(--surface-active); }

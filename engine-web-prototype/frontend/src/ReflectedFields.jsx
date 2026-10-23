@@ -1,9 +1,31 @@
 import {AssetReferenceField} from './NativeAssets.jsx';
 import NativeMeshInspector from './NativeMeshInspector.jsx';
-import React,{useEffect,useState} from 'react';
+import React,{useCallback,useEffect,useState} from 'react';
 import {ChevronRight,Plus,Puzzle,Trash2} from 'lucide-react';
 import {SchemaValue} from './SchemaFields.jsx';
 import ColorField from './ColorField.jsx';
+import EditorContextMenu from './EditorContextMenu.jsx';
+
+function ComponentAddButton({Types,OnAdd,Disabled}){
+ const [Anchor,SetAnchor]=useState(null);
+ const Close=useCallback(()=>{SetAnchor(null);},[]);
+ useEffect(()=>{
+  if(Disabled){
+   Close();
+  }
+ },[Disabled,Close]);
+ return <div className="component-add-form">
+  <button className="component-add-button" disabled={Disabled} aria-haspopup="dialog" aria-expanded={!!Anchor} onClick={Event=>{
+   if(Anchor){
+    Close();
+    return;
+   }
+   const Bounds=Event.currentTarget.getBoundingClientRect();
+   SetAnchor({Document:Event.currentTarget.ownerDocument,Left:Bounds.left,Top:Bounds.bottom+4});
+  }}><Plus size={15} aria-hidden="true"/>Добавить компонент</button>
+  {Anchor&&!Disabled&&<EditorContextMenu x={Anchor.Left} y={Anchor.Top} ownerDocument={Anchor.Document} title="Добавить компонент" className="component-add-menu" onClose={Close} items={Types.map(ComponentType=>({id:ComponentType.typeId,label:ComponentType.displayName||ComponentType.typeId,searchText:ComponentType.typeId,icon:'Puzzle',action:()=>OnAdd(ComponentType.typeId)}))}/>}
+ </div>;
+}
 export function DocumentJsonField({label,value,onCommit,disabled}){
  const serialized=JSON.stringify(value,null,2),[text,setText]=useState(serialized),[error,setError]=useState('');
  useEffect(()=>{setText(serialized);setError('');},[serialized]);
@@ -34,18 +56,15 @@ export function ReflectedValueField({property,onChange,disabled,project,assets=[
  </fieldset>;
 }
 export function ReflectedComponents({reflection,project,running}){
- const [type,setType]=useState(''),[selected,setSelected]=useState([]),[search,setSearch]=useState(''),[collapsed,setCollapsed]=useState([]);
+ const [collapsed,setCollapsed]=useState([]);
  const {components,types,onAdd,onRemove,onEnabled,onProperty,onAsset,assets,objectId,command,revision}=reflection;
- useEffect(()=>{setSelected([]);setCollapsed([]);},[objectId]);
+ useEffect(()=>{setCollapsed([]);},[objectId]);
  return <section className="component-instances component-instances-inspector" aria-label="Компоненты C++">
   <header className="component-inspector-heading"><h3>Компоненты <span>{components.length}</span></h3></header>
-  <input aria-label="Поиск компонентов" placeholder="Поиск компонентов…" value={search} onChange={Event=>setSearch(Event.target.value)}/>
-  <div className="native-component-overview">{components.filter(Component=>(Component.displayName+" "+Component.typeId).toLowerCase().includes(search.toLowerCase())).map(Component=><button key={Component.id} title={Component.typeId} aria-pressed={selected.includes(Component.id)} onClick={()=>setSelected(Previous=>{if(Previous.includes(Component.id)){return Previous.filter(Identity=>Identity!==Component.id);}return [...Previous,Component.id];})}><Puzzle size={13}/>{Component.displayName || Component.typeId}</button>)}</div>
-  <div className="component-instance-list">{components.map(component=><div key={component.id}><button className="component-instance-row" title={component.typeId} aria-expanded={!collapsed.includes(component.id)} onClick={()=>setCollapsed(Previous=>{if(Previous.includes(component.id)){return Previous.filter(Identity=>Identity!==component.id);}return [...Previous,component.id];})}><ChevronRight size={13} aria-hidden="true"/><Puzzle size={15} aria-hidden="true"/><span><strong>{component.displayName || component.typeId}</strong><small>Системный</small></span></button>
-   {!collapsed.includes(component.id)&&(selected.length===0||selected.includes(component.id))&&<div className="component-instance-properties">{onEnabled&&<label className="component-enabled"><input type="checkbox" aria-label={'Компонент '+(component.displayName || component.typeId)+' включён'} checked={component.enabled!==false} disabled={running} onChange={e=>onEnabled(component.id,e.target.checked)}/>Включён</label>}{component.typeId==='engine.MeshRendererComponent'&&<NativeMeshInspector component={component} objectId={objectId} command={command} revision={revision} disabled={running}/>}{component.properties.filter(Property=>component.typeId!=='engine.MeshRendererComponent'||!['material_slots','material_asset_id'].includes(Property.id)).map(p=><ReflectedValueField key={p.id} property={p} project={project} assets={assets} onAsset={onAsset?value=>onAsset(component.id,p.id,value):undefined} disabled={running} onChange={value=>onProperty(component.id,p.id,value)}/>)}<button disabled={running} onClick={()=>onRemove(component.id)}><Trash2 size={14} aria-hidden="true"/>Удалить компонент</button></div>}
-  </div>)}</div>
+  <div className="component-instance-list">{components.map(component=><section className="native-component-card" aria-label={component.displayName || component.typeId} key={component.id}><div className="native-component-header"><button type="button" className="component-instance-row" title={component.typeId} aria-expanded={!collapsed.includes(component.id)} onClick={()=>setCollapsed(Previous=>{if(Previous.includes(component.id)){return Previous.filter(Identity=>Identity!==component.id);}return [...Previous,component.id];})}><ChevronRight size={13} aria-hidden="true"/><Puzzle size={15} aria-hidden="true"/><span><strong>{component.displayName || component.typeId}</strong><small>Системный</small></span></button><button type="button" className="component-icon-button component-remove" aria-label={'Удалить компонент '+(component.displayName || component.typeId)} title="Удалить компонент" disabled={running} onClick={()=>onRemove(component.id)}><Trash2 size={14} aria-hidden="true"/></button></div>
+   {!collapsed.includes(component.id)&&<div className="component-instance-properties">{onEnabled&&<label className="component-enabled"><input type="checkbox" aria-label={'Компонент '+(component.displayName || component.typeId)+' включён'} checked={component.enabled!==false} disabled={running} onChange={e=>onEnabled(component.id,e.target.checked)}/>Включён</label>}{component.typeId==='engine.MeshRendererComponent'&&<NativeMeshInspector component={component} objectId={objectId} command={command} revision={revision} disabled={running}/>}{component.properties.filter(Property=>component.typeId!=='engine.MeshRendererComponent'||!['material_slots','material_asset_id'].includes(Property.id)).map(p=><ReflectedValueField key={p.id} property={p} project={project} assets={assets} onAsset={onAsset?value=>onAsset(component.id,p.id,value):undefined} disabled={running} onChange={value=>onProperty(component.id,p.id,value)}/>)}</div>}
+  </section>)}</div>
   {!components.length&&<p className="component-empty">Нет компонентов</p>}
-  <div className="component-add-form"><label className="component-property-field"><span>Компонент</span><select aria-label="Тип компонента" value={type} disabled={running} onChange={e=>setType(e.target.value)}><option value="">Выберите компонент…</option>{types.map(t=><option key={t.typeId} value={t.typeId} title={t.typeId}>{t.displayName || t.typeId}</option>)}</select></label>
-   <button className="component-add-button" disabled={running||!type} onClick={()=>onAdd(type)}><Plus size={15} aria-hidden="true"/>Добавить</button></div>
+  <ComponentAddButton key={objectId} Types={types} OnAdd={onAdd} Disabled={running}/>
  </section>;
 }

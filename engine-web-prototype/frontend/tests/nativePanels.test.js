@@ -102,8 +102,8 @@ test('existing TransformInspector emits position/rotation/scale drafts; quaterni
 test('same component inspector edits reflected properties and removes components',()=>{
  const calls=[],reflection={components:[{id:'c',typeId:'engine.LightComponent',enabled:true,properties:[{id:'intensity',label:'Intensity',typeId:'engine.float',value:2,editable:true}]}],types:[{typeId:'engine.LightComponent'}],onAdd:t=>calls.push(['add',t]),onProperty:(...p)=>calls.push(['property',...p]),onRemove:id=>calls.push(['remove',id]),onEnabled:(...p)=>calls.push(['enabled',...p])};
  render(React.createElement(Components,{project:{objects:[]},reflection}));
- fireEvent.change(screen.getByLabelText('Тип компонента'),{target:{value:'engine.LightComponent'}});fireEvent.click(screen.getByText('Добавить'));
- fireEvent.click(screen.getByRole('button',{name:/engine.LightComponent/}));fireEvent.click(screen.getByLabelText('Компонент engine.LightComponent включён'));const input=screen.getByLabelText('Intensity');fireEvent.change(input,{target:{value:'3'}});fireEvent.blur(input);fireEvent.click(screen.getByText('Удалить компонент'));
+ fireEvent.click(screen.getByText('Добавить компонент'));fireEvent.click(screen.getByRole('menuitem',{name:'engine.LightComponent',exact:true}));
+ fireEvent.click(screen.getByLabelText('Компонент engine.LightComponent включён'));const input=screen.getByLabelText('Intensity');fireEvent.change(input,{target:{value:'3'}});fireEvent.blur(input);const Header=screen.getByTitle('engine.LightComponent');fireEvent.click(Header);const Remove=screen.getByRole('button',{name:'Удалить компонент engine.LightComponent'});assert.ok(Remove.closest('.native-component-header'));fireEvent.click(Remove);assert.equal(Header.getAttribute('aria-expanded'),'false');
  assert.deepEqual(calls,[['add','engine.LightComponent'],['enabled','c',false],['property','c','intensity',3],['remove','c']]);
 });
 

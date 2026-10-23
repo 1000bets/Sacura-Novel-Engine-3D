@@ -74,12 +74,33 @@ NativeBridge::NativeBridge(Engine& R,SceneWorkspace& W,ProjectSession& P,const s
     }
 }
 void NativeBridge::ObserveWorld() {
+    if (!TransformTransaction.empty() && (!Runtime.GetEditScene() || Runtime.GetEditScene()->GetObjectHandle() != TransformWorld || Runtime.GetPlaySession().IsSimulating()))
+    {
+        CancelTransformEdit();
+    }
     const auto Edit=Runtime.GetEditScene()?Runtime.GetEditScene()->GetObjectHandle():ObjectHandle{};
     if(Edit!=LastEditWorld){Workspace.GetCommands().Clear();Workspace.ClearSelection();LastEditWorld=Edit;}
     const auto Active=Runtime.GetActiveScene()?Runtime.GetActiveScene()->GetObjectHandle():ObjectHandle{};
     if(Active!=LastWorld){LastWorld=Active;++Epoch;Workspace.ClearSelection();}
 }
 Json NativeBridge::Context() const {return {{"session",Session},{"epoch",Epoch},{"revision",Revision}};}
+void NativeBridge::CancelTransformEdit()
+{
+    auto* EditScene = Runtime.GetEditScene();
+    if (!TransformTransaction.empty() && EditScene && EditScene->GetObjectHandle() == TransformWorld)
+    {
+        for (auto* SceneObject : EditScene->GetAllObjects())
+        {
+            if (SceneObject->GetPersistentId() == TransformObjectId && !SceneObject->IsPendingDestroy())
+            {
+                SceneObject->SetTransform(TransformBefore);
+                break;
+            }
+        }
+    }
+    TransformTransaction.clear();
+    TransformObjectId.clear();
+}
 Scene* NativeBridge::World() {auto* S=Runtime.GetActiveScene();Require(S!=nullptr,"NO_SCENE","No scene is open");return S;}
 GameObject* NativeBridge::Find(const std::string& Id) {
     for(auto* O:World()->GetAllObjects())if(O->GetPersistentId()==Id&&!O->IsPendingDestroy())return O;
@@ -193,6 +214,15 @@ Json NativeBridge::Describe() {
         {"canUndo",Workspace.GetCommands().CanUndo()},{"canRedo",Workspace.GetCommands().CanRedo()},{"assetError",AssetError}};
 }
 Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
+    if (M == "scene.pickMesh")
+    {
+        Require(!Runtime.GetPlaySession().IsSimulating() && !GetPreviewScene(), "PLAY_READ_ONLY", "Material drops require the editable main scene");
+        const float Horizontal = P.at("horizontal");
+        const float Vertical = P.at("vertical");
+        Require(Horizontal >= 0.f && Horizontal <= 1.f && Vertical >= 0.f && Vertical <= 1.f, "INVALID_ARGUMENT", "Viewport coordinates must be normalized");
+        Require(static_cast<bool>(PickViewportMesh), "UNAVAILABLE", "Viewport picking is unavailable");
+        return PickViewportMesh(Horizontal, Vertical);
+    }
     if (M == "assetDocument.execute") { return AssetDocumentTools(P); }
     if(M.rfind("mesh.",0)==0 || M=="assets.place") { return MeshTools(M, P); }
     if(M.rfind("story.",0)==0||M.rfind("assets.",0)==0)return DispatchDocuments(M,P);
@@ -463,6 +493,49 @@ Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
             for(const auto& Child:V.Values)CheckAssets(Child);};CheckAssets(Value);
         Commit(MakeSetPropertyCommand(World(),C->GetObjectHandle(),Property->Id,std::move(Value)));return Properties(C);
     }
+    if (M == "transform.edit")
+    {
+        const std::string Operation = P.at("operation");
+        const std::string Transaction = P.at("transaction");
+        const std::string ObjectId = P.at("objectId");
+        if (Operation == "begin")
+        {
+            Require(TransformTransaction.empty(), "BUSY", "A transform edit is already active");
+            auto* SceneObject = Find(ObjectId);
+            TransformBefore = SceneObject->GetTransform();
+            TransformTransaction = Transaction;
+            TransformObjectId = ObjectId;
+            TransformWorld = World()->GetObjectHandle();
+            return TransformJson(TransformBefore);
+        }
+        if (Operation == "cancel" && TransformTransaction.empty())
+        {
+            return nullptr;
+        }
+        Require(Transaction == TransformTransaction && ObjectId == TransformObjectId, "STALE_EDIT", "Transform edit is no longer active");
+        if (Operation == "cancel")
+        {
+            CancelTransformEdit();
+            return nullptr;
+        }
+        Require(Operation == "update" || Operation == "commit", "INVALID_ARGUMENT", "Unknown transform edit operation");
+        const auto Updated = ParseTransform(P.at("transform"));
+        auto* SceneObject = Find(ObjectId);
+        if (Operation == "update")
+        {
+            SceneObject->SetTransform(Updated);
+        }
+        else
+        {
+            const bool Changed = TransformJson(Updated) != TransformJson(TransformBefore);
+            CancelTransformEdit();
+            if (Changed)
+            {
+                Commit(MakeSetTransformCommand(World(), SceneObject->GetObjectHandle(), Updated));
+            }
+        }
+        return TransformJson(SceneObject->GetTransform());
+    }
     if(M=="transform.get")return TransformJson(Find(P["objectId"])->GetTransform());
     if(M=="transform.set"){auto* O=Find(P["objectId"]);Commit(MakeSetTransformCommand(World(),O->GetObjectHandle(),ParseTransform(P["transform"])));return TransformJson(O->GetTransform());}
     if(M=="selection.set"){if(P["objectId"].is_null())Workspace.ClearSelection();else Workspace.Select(World(),Find(P["objectId"])->GetObjectHandle());return Describe();}
@@ -507,6 +580,10 @@ Json NativeBridge::Execute(const Json& Request) {
         Require(Request.at("session")==Session,"STALE_SESSION","Engine process has changed");
         Require(Request.at("epoch")==Epoch,"STALE_SCENE","Scene/world has changed; refresh context");
         const std::string M=Request.at("method");ValidateParams(M,Request.at("params"));
+        if (!TransformTransaction.empty() && M != "transform.edit" && M != "transform.get" && M != "bridge.describe" && M != "scene.getHierarchy" && M != "object.getComponents" && M != "component.getProperties" && M != "reflection.getComponentTypes" && M != "assets.list" && M != "assets.getScenes" && M != "editor.actions" && M != "mesh.inspect" && M != "story.get" && M != "assets.folders" && M != "assets.creationTypes" && M != "assets.resolve" && M != "assets.thumbnail" && M != "audio.resolveStartup")
+        {
+            CancelTransformEdit();
+        }
         Result["value"]=Dispatch(M,Request.at("params"));Result["ok"]=true;
     }catch(const Failure& E){Result["error"]={{"code",E.Code},{"message",E.what()}};}
     catch(const std::exception& E){Result["error"]={{"code","INVALID_ARGUMENT"},{"message",E.what()}};}
@@ -1175,6 +1252,7 @@ Json NativeBridge::AssetDocumentTools(const Json& Params)
 
 NativeBridge::~NativeBridge()
 {
+    CancelTransformEdit();
     if (PreviewScene)
     {
         Runtime.SetRenderSurfaceScene(RenderSurfaceId{1}, nullptr);

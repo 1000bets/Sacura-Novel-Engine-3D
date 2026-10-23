@@ -12,10 +12,10 @@ export default function EditorSelect({value,options,onChange,label}){
  const choose=index=>{if(options[index])onChange(options[index][0]);close();};
  useEffect(()=>{
   if(!open)return;
-  const place=()=>{const r=trigger.current.getBoundingClientRect();setRect({left:Math.max(8,Math.min(r.left,window.innerWidth-288)),top:r.bottom+4,width:Math.min(Math.max(r.width,280),window.innerWidth-16),maxHeight:Math.max(100,window.innerHeight-r.bottom-16)});};
+  const place=()=>{const r=trigger.current.getBoundingClientRect();setRect({left:Math.max(8,Math.min(r.left,(trigger.current?.ownerDocument.defaultView || window).innerWidth-288)),top:r.bottom+4,width:Math.min(Math.max(r.width,280),(trigger.current?.ownerDocument.defaultView || window).innerWidth-16),maxHeight:Math.max(100,(trigger.current?.ownerDocument.defaultView || window).innerHeight-r.bottom-16)});};
   const outside=e=>{if(!trigger.current?.contains(e.target)&&!popup.current?.contains(e.target))setOpen(false);};
-  place();document.addEventListener('pointerdown',outside);window.addEventListener('resize',place);window.addEventListener('scroll',place,true);
-  return()=>{document.removeEventListener('pointerdown',outside);window.removeEventListener('resize',place);window.removeEventListener('scroll',place,true);};
+  place();const OwnerDocument = trigger.current.ownerDocument; const OwnerWindow = OwnerDocument.defaultView; OwnerDocument.addEventListener('pointerdown',outside);OwnerWindow.addEventListener('resize',place);OwnerWindow.addEventListener('scroll',place,true);
+  return()=>{OwnerDocument.removeEventListener('pointerdown',outside);OwnerWindow.removeEventListener('resize',place);OwnerWindow.removeEventListener('scroll',place,true);};
  },[open]);
  useEffect(()=>{if(open)popup.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({block:'nearest'});},[active,open]);
  const keyDown=e=>{
@@ -29,6 +29,6 @@ export default function EditorSelect({value,options,onChange,label}){
   if(open&&['Enter',' '].includes(e.key))choose(active);
  };
  return <><button ref={trigger} className="scene-selector" role="combobox" aria-label={tr(label)} aria-expanded={open} aria-controls={open?id:undefined} aria-activedescendant={open?id+'-'+active:undefined} aria-haspopup="listbox" onKeyDown={keyDown} onClick={()=>{setActive(selected);setOpen(v=>!v);}}><span>{optionLabel(options[selected]?.[1])||tr("Выберите сабсцену")}</span><Icon name="ChevronDown" size={14}/></button>
-  {open&&rect&&createPortal(<div id={id} role="listbox" aria-label={tr(label)} ref={popup} className="editor-select-popup" style={rect}>{options.map(([optionValue,text],i)=><button key={optionValue} id={id+'-'+i} role="option" aria-selected={i===active} tabIndex={-1} className={value===optionValue?'chosen':''} onMouseEnter={()=>setActive(i)} onPointerDown={e=>e.preventDefault()} onClick={()=>choose(i)}><span>{optionLabel(text)}</span>{value===optionValue&&<Icon name="Check" size={14}/>}</button>)}</div>,document.body)}
+  {open&&rect&&createPortal(<div id={id} role="listbox" aria-label={tr(label)} ref={popup} className="editor-select-popup" style={rect}>{options.map(([optionValue,text],i)=><button key={optionValue} id={id+'-'+i} role="option" aria-selected={i===active} tabIndex={-1} className={value===optionValue?'chosen':''} onMouseEnter={()=>setActive(i)} onPointerDown={e=>e.preventDefault()} onClick={()=>choose(i)}><span>{optionLabel(text)}</span>{value===optionValue&&<Icon name="Check" size={14}/>}</button>)}</div>,trigger.current.ownerDocument.body)}
  </>;
 }

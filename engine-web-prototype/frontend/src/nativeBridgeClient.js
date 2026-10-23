@@ -1,6 +1,6 @@
 // No native fallback/polyfill in web. This module only wraps the isolated preload.
-export function createNativeBridgeClient() {
-  const api=globalThis.window?.sacuraDesktop?.isDesktop && window.sacuraDesktop.bridge;
+export function createNativeBridgeClient(Desktop = globalThis.window?.sacuraDesktop) {
+  const api=Desktop?.isDesktop && Desktop.bridge;
   if(!api)return null;
   let context=null,connected=false,disposed=false,eventGeneration=0;
   const listeners=new Set();

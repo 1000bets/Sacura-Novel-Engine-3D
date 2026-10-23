@@ -1,4 +1,12 @@
-const {app, BrowserWindow, dialog, ipcMain, net, protocol, clipboard} = require('electron');
+for (const Output of [process.stdout, process.stderr]) {
+  Output.on('error', Failure => {
+    if (Failure.code !== 'EPIPE') {
+      throw Failure;
+    }
+  });
+}
+
+const {app, BrowserWindow, dialog, ipcMain, net, protocol, clipboard, screen} = require('electron');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const {pathToFileURL} = require('node:url');
@@ -16,12 +24,18 @@ const smoke = process.argv.includes('--desktop-smoke');
 const nativePrototype = true;
 const compatibilityTest=process.argv.includes('--compat-roundtrip');
 const assetTransferTest=process.argv.includes('--asset-transfer-check');
+const AssetReferenceCheck = process.argv.includes('--asset-reference-check');
 const ComponentNamesCheck = process.argv.includes('--component-names-check');
+const WorkspaceTabsRestore = process.argv.includes('--workspace-tabs-restore-check');
+const WorkspaceTabsCheck = WorkspaceTabsRestore || process.argv.includes('--workspace-tabs-check');
+const CameraSpeedCheck = process.argv.includes('--camera-speed-check');
+const SceneShortcutsCheck = process.argv.includes('--scene-shortcuts-check');
+const MaterialDropCheck = process.argv.includes('--material-drop-check');
 const MaterialCapture = process.argv.find(Argument => Argument.startsWith('--screenshot-material='));
 const nativeSmoke = process.argv.includes('--native-smoke')||compatibilityTest||assetTransferTest;
 // CLI rendering checks must keep Chromium producing frames when another app
 // covers the test window. Production keeps normal background/visibility policy.
-if(nativeSmoke || MaterialCapture || ComponentNamesCheck){
+if(AssetReferenceCheck || WorkspaceTabsCheck || nativeSmoke || MaterialCapture || ComponentNamesCheck || CameraSpeedCheck || SceneShortcutsCheck || MaterialDropCheck){
   app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
   app.commandLine.appendSwitch('disable-features','CalculateNativeWinOcclusion');
 }
@@ -31,6 +45,7 @@ if (process.env.SACURA_GPU_DIAGNOSTIC) {
 }
 let nativeViewport;
 let AssetWindows;
+const WorkspaceWindows = new Map();
 let releaseNativeProject = async () => {};
 if (nativePrototype && process.env.SACURA_NATIVE_USERDATA) app.setPath('userData', process.env.SACURA_NATIVE_USERDATA);
 if (smoke && process.env.SACURA_DESKTOP_SMOKE_USERDATA) app.setPath('userData', process.env.SACURA_DESKTOP_SMOKE_USERDATA);
@@ -47,18 +62,12 @@ async function remember(root, info) {
   await fs.writeFile(recentFile(), JSON.stringify(list.slice(0, 30), null, 2));
 }
 function trusted(event) {
-  if (event.sender.isDestroyed() || event.senderFrame !== event.sender.mainFrame || (event.sender !== window?.webContents && !AssetWindows?.has(event.sender.id))) throw new Error('Untrusted IPC sender');
+  if (!window || window.isDestroyed() || event.sender.isDestroyed() || event.senderFrame !== event.sender.mainFrame || event.sender !== window.webContents) throw new Error('Untrusted IPC sender');
   const url = event.senderFrame.url;
   if (devUrl ? url !== devUrl : !url.startsWith('sacura://app/')) throw new Error('Untrusted IPC origin');
 }
 function handle(channel, action) {
   ipcMain.handle('desktop:' + channel, async (event, ...args) => {trusted(event);
-    const Editor = AssetWindows?.get(event.sender.id);
-    if (Editor) {
-      const Action = Editor.actions[channel];
-      if (!Action) { throw Error('Operation is not available in an asset editor'); }
-      return Action(...args);
-    }
     return action(...args);});
 }
 async function openRoot(root) {
@@ -118,7 +127,7 @@ app.whenReady().then(async () => {
       if(nativeSmoke&&process.env.SACURA_TEST_BOOT_DELAY==='1'&&!delayedBoot&&/^main-.*\.js$/.test(path.basename(file))){delayedBoot=true;await delay(3000);}
       try {return await net.fetch(pathToFileURL(file).toString());} catch {return new Response('Not found', {status: 404});}
     });
-  window = new BrowserWindow({width: 1500, height: 950, minWidth: 900, minHeight: 650, show: !smoke, backgroundColor:'#11121b', webPreferences: {preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: !nativeSmoke, additionalArguments: ['--native-viewport', ...(nativeSmoke?['--native-smoke']:[])]}});
+  window = new BrowserWindow({width: 1500, height: 950, minWidth: 900, minHeight: 650, show: !smoke, backgroundColor:'#11121b', webPreferences: {preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false, additionalArguments: ['--native-viewport', ...(nativeSmoke?['--native-smoke']:[])]}});
   if (nativePrototype) {
     window.once('ready-to-show', () => window.show());
     window.webContents.on('console-message', details => console.log('React:', details.message));
@@ -138,6 +147,18 @@ app.whenReady().then(async () => {
     AssetWindows = require('./asset-windows.cjs').createAssetWindows({app, BrowserWindow, dialog, NativeViewport, waitForNative,
       getMainWindow: () => window, getViewport: () => nativeViewport, devUrl, uiRoot, nativeSmoke: nativeSmoke || Boolean(MaterialCapture)});
     handle('native-open-asset-editor', Identity => AssetWindows.open(Identity));
+    handle('document-call', (Identifier, Channel, Value) => AssetWindows.call(Identifier, Channel, Value));
+    handle('document-list', () => AssetWindows.list());
+    handle('document-close', Identifier => AssetWindows.close(Identifier));
+    handle('workspace-drag-surfaces', () => [...WorkspaceWindows.entries(), ['', window]].filter(([, Surface]) => !Surface.isDestroyed()).map(([Name, Surface]) => ({name:Name,bounds:Surface.getContentBounds(),visible:Surface.isVisible() && !Surface.isMinimized()})));
+    handle('workspace-close-window', Name => {
+      const Child = WorkspaceWindows.get(Name);
+      if (Child) {
+        WorkspaceWindows.delete(Name);
+        Child.destroy();
+      }
+      return true;
+    });
     handle('native-reveal-asset', Identity => {window.webContents.send('native-reveal-asset', Identity); window.show(); window.focus(); return true;});
     const rememberNative=async()=>{try{await nativeRecents.remember(nativeViewport.project,nativeViewport.bridge.state?.project||path.basename(nativeViewport.project,'.project'));}catch(error){console.error('Recent project preference:',error.message);}};
     if(nativeViewport.project)waitForNative(nativeViewport).then(rememberNative).catch(error=>console.error(error.message));
@@ -222,8 +243,7 @@ app.whenReady().then(async () => {
       nativeViewport.send({type: 'animate', value}); return true;
     });
     handle('native-heartbeat', presentation => {nativeViewport.heartbeat = (nativeViewport.heartbeat || 0) + 1; nativeViewport.state.presentation = presentation; return true;});
-    for (const event of ['minimize', 'hide']) window.on(event, () => nativeViewport.send({type: 'bounds', x: 0, y: 0, width: 0, height: 0, visible: false}));
-    for (const event of ['restore', 'show']) window.on(event, () => {const bounds=requestedBounds||nativeViewport.lastBounds;if(bounds)nativeViewport.bounds(bounds);});
+
     let closed = false;
     window.on('close', event => {
       if (closed) return;
@@ -231,11 +251,21 @@ app.whenReady().then(async () => {
       if (closing) return;
       closing = true;
       replacement.catch(()=>{}).then(async()=>{
-        if(!await AssetWindows.closeAll() || !await guard()){closing=false;return;}
-        await nativeViewport.stop();closed=true;window.close();
+        if(!await guard() || !await AssetWindows.closeAll(true)){closing=false;return;}
+        await nativeViewport.stop();
+        for (const Child of WorkspaceWindows.values()) { Child.destroy(); }
+        WorkspaceWindows.clear();
+        closed=true;window.close();
       }).catch(error=>{closing=false;dialog.showErrorBox('Проект остаётся открытым',error.message);});
     });
+    if (AssetReferenceCheck) require('./scripts/asset-reference-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
     if (ComponentNamesCheck) require('./scripts/component-names-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
+    if (WorkspaceTabsCheck) {
+      require('./scripts/workspace-tabs-check.cjs').run({app,window,editors:AssetWindows,windows:WorkspaceWindows,getViewport:()=>nativeViewport,createNativeProject,restore:WorkspaceTabsRestore});
+    }
+    if (CameraSpeedCheck) require('./scripts/camera-speed-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
+    if (SceneShortcutsCheck) require('./scripts/scene-shortcuts-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
+    if (MaterialDropCheck) require('./scripts/material-drop-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
     if (assetTransferTest) require('./scripts/asset-transfer-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
     if (compatibilityTest) require('./scripts/compat-roundtrip.cjs').run({app,window,getViewport:()=>nativeViewport,replaceProject,createNativeProject});
     else if (nativeSmoke && !assetTransferTest && !process.argv.some(Argument => Argument.startsWith('--screenshot-texture='))) require('./scripts/native-smoke-main.cjs').run({app, window, getViewport:()=>nativeViewport, replaceProject});
@@ -249,7 +279,27 @@ app.whenReady().then(async () => {
       clearTimeout(deadline); console.log('Desktop smoke: ' + stage + ' mounted with Electron preload'); setTimeout(() => app.quit(), 100); return true;
     });
   } else handle('renderer-ready', async () => true);
-  window.webContents.setWindowOpenHandler(() => ({action: 'deny'}));
+  window.webContents.setWindowOpenHandler(Details => {
+    if (Details.url !== 'about:blank' || !/^sacura-window-[a-f0-9-]+$/.test(Details.frameName)) {
+      return {action:'deny'};
+    }
+    return {action:'allow',overrideBrowserWindowOptions:{minWidth:360,minHeight:240,backgroundColor:'#191923',autoHideMenuBar:true,webPreferences:{preload:undefined,contextIsolation:true,nodeIntegration:false,sandbox:true,backgroundThrottling:false}}};
+  });
+  window.webContents.on('did-create-window', (Child, Details) => {
+    WorkspaceWindows.set(Details.frameName, Child);
+    const Bounds = Child.getBounds();
+    const WorkArea = screen.getDisplayMatching(Bounds).workArea;
+    if (Bounds.x + Bounds.width < WorkArea.x + 80 || Bounds.x > WorkArea.x + WorkArea.width - 80 || Bounds.y < WorkArea.y || Bounds.y > WorkArea.y + WorkArea.height - 40) {
+      Child.setPosition(WorkArea.x + 40, WorkArea.y + 40);
+    }
+    Child.setMenu(null);
+    Child.webContents.setWindowOpenHandler(() => ({action:'deny'}));
+    Child.webContents.on('will-navigate', Event => Event.preventDefault());
+    Child.on('close', Event => {
+      Event.preventDefault();
+      window.webContents.send('workspace-close-request', Details.frameName.slice('sacura-'.length));
+    });
+  });
   window.webContents.on('will-navigate', (event, url) => {
     if (devUrl ? url !== devUrl : !url.startsWith('sacura://app/')) event.preventDefault();
   });
@@ -304,11 +354,11 @@ app.whenReady().then(async () => {
   if(nativeSmoke)console.log('Native smoke: loading React');
   if (devUrl) await window.loadURL(devUrl); else await window.loadURL('sacura://app/index.html');
   if (MaterialCapture) {
-    require('./scripts/capture-material-editor.cjs').run({app, window, editors: AssetWindows, getViewport: () => nativeViewport, output: MaterialCapture.slice('--screenshot-material='.length)});
+    require('./scripts/capture-material-editor.cjs').run({app, window, editors: AssetWindows, windows:WorkspaceWindows, getViewport: () => nativeViewport, output: MaterialCapture.slice('--screenshot-material='.length)});
   }
   const TextureCapture = process.argv.find(Argument => Argument.startsWith('--screenshot-texture='));
   if (TextureCapture) {
-    require('./scripts/capture-texture-editor.cjs').run({app, window, editors: AssetWindows, getViewport: () => nativeViewport, output: TextureCapture.slice('--screenshot-texture='.length)});
+    require('./scripts/capture-texture-editor.cjs').run({app, window, editors: AssetWindows, windows:WorkspaceWindows, getViewport: () => nativeViewport, output: TextureCapture.slice('--screenshot-texture='.length)});
   }
   if(nativeSmoke)console.log('Native smoke: React document loaded');
   if (nativePrototype && !window.isDestroyed()) await window.webContents.setVisualZoomLevelLimits(1, 1);

@@ -2,7 +2,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import {nativeScenePlacement, NativeAssetDragMimeType} from './nativeScenePlacement.js';
 
 const modifiers = e => ({ctrl: !!(e.ctrlKey || e.metaKey), alt: !!e.altKey, shift: !!e.shiftKey});
-export default function NativeViewport({assetPreview = false, blocked = false, editing = false, onContext, onAssetDrop, editTool, editSpace, snap, showGrid, focusRequest, onActivate, onCreateProject}) {
+export default function NativeViewport({desktop:Desktop = window.sacuraDesktop, CameraSpeed = 4, assetPreview = false, blocked = false, editing = false, onContext, onAssetDrop, editTool, editSpace, snap, showGrid, focusRequest, onActivate, onCreateProject}) {
   const surface = useRef(null);
   const rightGesture = useRef(null);
   const [status, setStatus] = useState({phase: 'starting'});
@@ -11,27 +11,41 @@ export default function NativeViewport({assetPreview = false, blocked = false, e
   const [DepthRange, SetDepthRange] = useState(10);
   const Modes = [['lit','Освещение'],['base_color','Цвет материала'],['world_normal','Нормали'],['roughness','Шероховатость'],['metallic','Металличность'],['ambient_occlusion','Окклюзия материала'],['emissive','Свечение'],['linear_depth','Глубина'],['scene_color_hdr','Цвет сцены HDR'],['shadow_atlas','Атлас теней'],['transparency_accumulation','Накопление прозрачности'],['transparency_revealage','Пропускание прозрачности'],['opacity','Непрозрачность']];
   const hiddenRef = useRef(hidden); hiddenRef.current = hidden;
-  const api = window.sacuraDesktop;
+  const api = Desktop;
   const ready = status.phase === 'ready';
+  const CanDropAssets = ready && editing && !blocked && !hidden && !assetPreview && Boolean(onAssetDrop) && Boolean(status.viewport?.data?.cameraPosition);
   const fail = error => setStatus(s => ({...s, error: error.message}));
   const input = event => api.nativeInput(event).catch(fail);
   const reset = () => {rightGesture.current=null;input({kind: 'reset'});};
-  useEffect(() => {api.nativeTools({tool: editTool || 'translate', space: editSpace || 'local', snap: !!snap, grid: !!showGrid, visualization:Visualization, depthRange:DepthRange}).catch(fail);}, [editTool, editSpace, snap, showGrid, Visualization, DepthRange]);
+  useEffect(() => {api.nativeTools({tool: editTool || 'translate', space: editSpace || 'local', snap: !!snap, grid: !!showGrid, visualization:Visualization, depthRange:DepthRange, cameraSpeed:CameraSpeed}).catch(fail);}, [editTool, editSpace, snap, showGrid, Visualization, DepthRange, CameraSpeed, ready]);
   useEffect(() => {if (focusRequest) {input({kind:'key',code:'KeyF',down:true}); input({kind:'key',code:'KeyF',down:false});}}, [focusRequest]);
   useEffect(() => {if (blocked || hidden) reset();}, [blocked, hidden]);
   useEffect(() => {
     let disposed = false, frame, previous = '', pending = false, extent = '', lastResize = 0;
+    let OwnerWindow = null;
+    const Blur = () => reset();
+    const Resume = () => { previous = ''; };
     function update() {
       if (disposed) return;
       const element = surface.current;
       if (element) {
-        const r = element.getBoundingClientRect(), scale = window.devicePixelRatio;
+        if (OwnerWindow !== element.ownerDocument.defaultView) {
+          OwnerWindow?.removeEventListener('blur', Blur);
+          OwnerWindow?.removeEventListener('focus', Resume);
+          OwnerWindow?.document.removeEventListener('visibilitychange', Resume);
+          OwnerWindow = element.ownerDocument.defaultView;
+          OwnerWindow.addEventListener('blur', Blur);
+          OwnerWindow.addEventListener('focus', Resume);
+          OwnerWindow.document.addEventListener('visibilitychange', Resume);
+          previous = '';
+        }
+        const r = element.getBoundingClientRect(), scale = element.ownerDocument.defaultView.devicePixelRatio;
         const nextExtent = `${r.width}:${r.height}:${scale}`;
         if (nextExtent !== extent) {extent=nextExtent;lastResize=performance.now();}
         // Chromium clips the image. Do not distort projection when partially clipped.
         const bounds = {x: Math.max(0, Math.round(r.left * scale)), y: Math.max(0, Math.round(r.top * scale)),
           width: Math.max(0, Math.round(r.width * scale)), height: Math.max(0, Math.round(r.height * scale)), scale, interactive:performance.now()-lastResize<120,
-          visible: !hiddenRef.current && !document.hidden && r.width > 0 && r.height > 0 && element.checkVisibility({visibilityProperty: true})};
+          visible: !hiddenRef.current && !element.ownerDocument.hidden && r.width > 0 && r.height > 0 && element.checkVisibility({visibilityProperty: true})};
         const key = JSON.stringify(bounds);
         if (!pending && key !== previous) {
           previous = key; pending = true;
@@ -45,16 +59,13 @@ export default function NativeViewport({assetPreview = false, blocked = false, e
       try {const value = await api.nativeStatus(); if (!disposed) setStatus(value); await api.nativeHeartbeat();}
       catch (error) {if (!disposed) fail(error);}
     }, 500);
-    const blur = () => reset(); window.addEventListener('blur', blur);
-    const Resume = () => { previous = ''; };
-    document.addEventListener('visibilitychange', Resume);
-    window.addEventListener('focus', Resume);
+
     const untest = api.onNativeTest?.(command => {
       if (command.action === 'visibility') setHidden(!command.value);
       if (command.action === 'input') input(command.event);
     });
     return () => {
-      disposed = true; cancelAnimationFrame(frame); clearInterval(poll); window.removeEventListener('blur', blur); document.removeEventListener('visibilitychange', Resume); window.removeEventListener('focus', Resume); untest?.();
+      disposed = true; cancelAnimationFrame(frame); clearInterval(poll); OwnerWindow?.removeEventListener('blur', Blur); OwnerWindow?.document.removeEventListener('visibilitychange', Resume); OwnerWindow?.removeEventListener('focus', Resume); untest?.();
       reset(); api.nativeDetach().catch(() => {});
     };
   }, []);
@@ -66,7 +77,7 @@ export default function NativeViewport({assetPreview = false, blocked = false, e
     if (phase === 'move' && rightGesture.current?.id === e.pointerId && Math.hypot(e.clientX-rightGesture.current.x,e.clientY-rightGesture.current.y)>5) rightGesture.current.moved=true;
     const click=phase === 'up' && e.button === 2 && rightGesture.current?.id === e.pointerId && !rightGesture.current.moved && !e.altKey && editing;
     if (phase === 'up' && e.button === 2) rightGesture.current=null;
-    const r = e.currentTarget.getBoundingClientRect(), scale = window.devicePixelRatio;
+    const r = e.currentTarget.getBoundingClientRect(), scale = e.currentTarget.ownerDocument.defaultView.devicePixelRatio;
     input({kind: 'pointer', phase, x: (e.clientX-r.left)*scale, y: (e.clientY-r.top)*scale,
       button: e.button, buttons: e.buttons, ...modifiers(e)});
     if (phase === 'up' && e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
@@ -85,7 +96,7 @@ export default function NativeViewport({assetPreview = false, blocked = false, e
     Event.preventDefault();
     Event.stopPropagation();
     Event.dataTransfer.dropEffect = 'none';
-    if (ready && editing && !blocked && !hidden && !assetPreview && onAssetDrop) {
+    if (CanDropAssets) {
       Event.dataTransfer.dropEffect = 'copy';
     }
   }
@@ -95,7 +106,7 @@ export default function NativeViewport({assetPreview = false, blocked = false, e
     }
     Event.preventDefault();
     Event.stopPropagation();
-    if (!ready || !editing || blocked || hidden || assetPreview || !onAssetDrop) {
+    if (!CanDropAssets) {
       return;
     }
     const Bounds = Event.currentTarget.getBoundingClientRect();
@@ -111,9 +122,10 @@ export default function NativeViewport({assetPreview = false, blocked = false, e
       if (!Placement) {
         throw Error('Не удалось определить точку размещения во viewport.');
       }
-      await onAssetDrop(Identity, Placement);
+      await onAssetDrop(Identity, Placement, {horizontal:Horizontal / Bounds.width,vertical:Vertical / Bounds.height});
       surface.current?.focus();
     } catch (Failure) {
+      console.error('Native asset drop failed:', Failure.message);
       fail(Failure);
     }
   }
@@ -130,12 +142,12 @@ export default function NativeViewport({assetPreview = false, blocked = false, e
   const metrics = status.presentation || {};
   return <div style={{position:'absolute',inset:0,background:'#171b24'}}>
 
-    <div ref={surface} tabIndex={0} style={{position:'absolute',inset:0,outline:'none',touchAction:'none'}}
+    <div ref={surface} data-native-drop-enabled={CanDropAssets} tabIndex={0} style={{position:'absolute',inset:0,outline:'none',touchAction:'none'}}
       onDragEnter={DragAsset} onDragOver={DragAsset} onDrop={DropAsset}
       onFocus={onActivate} onPointerDown={e=>pointer(e,'down')} onPointerMove={e=>pointer(e,'move')} onPointerUp={e=>pointer(e,'up')}
       onPointerCancel={reset} onLostPointerCapture={reset} onBlur={reset} onKeyDown={e=>key(e,true)} onKeyUp={e=>key(e,false)}
       onContextMenu={e=>e.preventDefault()} onWheel={e=>{if (ready&&!blocked&&!hidden) {e.stopPropagation();input({kind:'wheel',delta:e.deltaY*(e.deltaMode===1?16:1),...modifiers(e)});}}}>
-      <canvas data-native-surface style={{width:'100%',height:'100%',display:hidden?'none':'block'}}/>
+      <canvas data-native-surface data-native-owner={Desktop.documentId || ""} style={{width:'100%',height:'100%',display:hidden?'none':'block'}}/>
     </div>
     {ready && !assetPreview && <div data-native-overlay style={{position:'absolute',left:10,top:10,padding:'5px 8px',background:'#174e38',color:'#fff',fontSize:11,pointerEvents:'none',borderRadius:4}}>
       C++ · Diligent D3D12 · {Number(metrics.fps||0).toFixed(1)} FPS · {Number(metrics.frameMs||0).toFixed(1)} ms
@@ -155,7 +167,6 @@ export default function NativeViewport({assetPreview = false, blocked = false, e
       {!assetPreview && <button onClick={()=>api.nativeOpenProject().catch(fail)}>Открыть C++ проект…</button>}
       {ready && <button onClick={()=>setHidden(v=>!v)}>{hidden?'Показать':'Скрыть'}</button>}
     </div>
-    {ready && <div style={{position:'absolute',bottom:8,left:10,pointerEvents:'none',fontSize:11,color:'#ddd',background:'#171b24b0'}}>ЛКМ: выбор · Alt+ЛКМ: орбита · СКМ: панорама · ПКМ+WASD/QE: полёт · F: фокус · W/E/R: gizmo · Ctrl+Z/Y</div>}
     {(status.error||metrics.error) && <p role="alert" style={{position:'absolute',top:65,left:12,color:'#ff8d8d',background:'#20151d'}}>Engine: {status.error||metrics.error}</p>}
   </div>;
 }
