@@ -25,6 +25,8 @@ class NativeViewport {
     this.state = {phase: 'starting'};
     this.sequence = 0;
     this.imports = 0;
+    this.sharedImports = new Map();
+    this.pendingFrames = new Map();
     this.state.transport = {frames: 0, released: 0};
     server.on('connection', socket => {
       if (this.socket) {socket.destroy(); return;}
@@ -83,19 +85,50 @@ class NativeViewport {
     if (this.stopping || this.window.isDestroyed() || this.window.webContents.isDestroyed()) {acknowledge(); return;}
     const width = packet.readUInt32LE(4), height = packet.readUInt32LE(8);
     if (!width || !height || width > 8192 || height > 8192 || width * height > 33554432) {acknowledge(); throw new Error('Invalid GPU texture size');}
-    let imported;
-    this.imports++;
-    try {
-      imported = sharedTexture.importSharedTexture({textureInfo: {
+    const Identifier = packet.readBigUInt64LE(24).toString() + ':' + width + ':' + height;
+    const Token = packet.readBigUInt64LE(16).toString();
+    let Resource = this.sharedImports.get(Identifier);
+    if (Resource) {
+      // Native slots change in place; Chromium must acquire their new contents.
+      Resource.imported.release();
+      this.sharedImports.delete(Identifier);
+      Resource = null;
+    }
+    if (!Resource) {
+      const Imported = sharedTexture.importSharedTexture({textureInfo: {
         pixelFormat: 'rgba', codedSize: {width, height}, handle: {ntHandle: Buffer.from(packet.subarray(24, 32))},
         timestamp: Number(packet.readBigUInt64LE(40))
-      }, allReferencesReleased: () => {this.imports--; this.state.transport.released++; acknowledge();}});
-    } catch (error) {this.imports--; acknowledge(); throw error;}
+      }});
+      Resource = {imported:Imported,width,height};
+      this.sharedImports.set(Identifier,Resource);
+    }
+    for (const [PreviousIdentifier, PreviousResource] of this.sharedImports) {
+      if (PreviousIdentifier !== Identifier && (PreviousResource.width !== width || PreviousResource.height !== height)) {
+        const Pending = Array.from(this.pendingFrames.values()).some(Frame => Frame.resource === PreviousResource);
+        if (!Pending) {PreviousResource.imported.release();this.sharedImports.delete(PreviousIdentifier);}
+      }
+    }
+    this.imports++;
+    this.pendingFrames.set(Token,{acknowledge,resource:Resource});
     try {
-      await sharedTexture.sendSharedTexture({frame: this.window.webContents.mainFrame, importedSharedTexture: imported}, packet);
+      await sharedTexture.sendSharedTexture({frame: this.window.webContents.mainFrame, importedSharedTexture: Resource.imported}, packet);
       this.state.transport.frames++;
-    } finally {imported.release();}
+    } catch (ErrorValue) {
+      this.frameConsumed(Token);
+      throw ErrorValue;
+    }
   }
+  frameConsumed(Token) {
+    if (typeof Token !== 'string') {throw Error('Invalid frame token');}
+    const Frame = this.pendingFrames.get(Token);
+    if (!Frame) {return false;}
+    this.pendingFrames.delete(Token);
+    this.imports--;
+    this.state.transport.released++;
+    Frame.acknowledge();
+    return true;
+  }
+
   send(message) {
     if (!this.stopping && this.child?.stdin.writable) this.child.stdin.write(JSON.stringify(message) + '\n');
   }
@@ -120,6 +153,8 @@ class NativeViewport {
   tools(value) {
     if (!value || !['translate','move','rotate','scale','select'].includes(value.tool) || !['world','local'].includes(value.space)) throw new Error('Invalid tools');
     this.lastTools={tool:value.tool==='move'?'translate':value.tool,space:value.space,snap:!!value.snap,grid:!!value.grid};
+    if (typeof value.visualization === 'string') { this.lastTools.visualization = value.visualization; }
+    if (Number.isFinite(value.depthRange) && value.depthRange >= 0.01 && value.depthRange <= 100000) { this.lastTools.depthRange = value.depthRange; }
     this.send({type:'tools',...this.lastTools});
     return true;
   }
@@ -145,6 +180,8 @@ class NativeViewport {
     this.bridge.disconnect('Native host is stopping');
     const drainUntil = Date.now() + 5000;
     while (this.imports && Date.now() < drainUntil) await delay(10);
+    for (const Resource of this.sharedImports.values()) {Resource.imported.release();}
+    this.sharedImports.clear();
     if (this.child.stdin.writable) this.child.stdin.write('{"type":"shutdown"}\n');
     // Graceful Render-thread join happens before Electron destroys the parent HWND.
     const timeout = setTimeout(() => {console.error('Native host shutdown timed out'); this.child.kill();}, 10000);

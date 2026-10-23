@@ -6,7 +6,7 @@
 
 class CharacterComponent : public MeshRendererComponent
 {
-    ENGINE_CLASS(CharacterComponent, MeshRendererComponent, "engine.CharacterComponent")
+    ENGINE_CLASS(CharacterComponent, MeshRendererComponent, "engine.CharacterComponent", "Персонаж")
 public:
     std::string Description;
     ENGINE_REFLECT_FIELD(CharacterComponent, Description, "description", RF_EDITOR_EDITABLE, RF_SERIALIZABLE, RF_SCRIPT_READ_WRITE, RF_DISPLAY_NAME("Description"))

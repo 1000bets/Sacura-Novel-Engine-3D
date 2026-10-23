@@ -792,3 +792,9 @@ void Engine::RegisterMaterialWidgetBinding(const std::shared_ptr<MaterialWidgetB
     AssertGameThread();
     MaterialWidgetBindings.push_back(Binding);
 }
+
+bool Engine::UpdateMaterialImage(std::shared_ptr<MaterialImageRequest> Image)
+{
+    AssertGameThread();
+    return Render.UpdateMaterialImage(std::move(Image));
+}

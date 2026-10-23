@@ -6,7 +6,7 @@ using namespace DirectX::SimpleMath;
 
 class SkySphereComponent : public Component
 {
-    ENGINE_CLASS(SkySphereComponent, Component, "engine.SkySphereComponent")
+    ENGINE_CLASS(SkySphereComponent, Component, "engine.SkySphereComponent", "Небесная сфера")
 public:
     std::string GetEditorIconPath() const override { return ":/component-icons/sun.png"; }
     Color ZenithColor = Color(0.35f, 0.55f, 1.1f, 1.f);

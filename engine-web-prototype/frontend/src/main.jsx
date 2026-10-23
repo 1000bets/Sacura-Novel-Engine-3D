@@ -5,6 +5,7 @@ import {createRoot} from 'react-dom/client';
 import AuthGate from './AuthGate.jsx';
 import ProjectHome from './ProjectHome.jsx';
 import NativeProjectHome from './NativeProjectHome.jsx';
+import NativeAssetEditorRoot from './NativeAssetEditorRoot.jsx';
 import './editor.css';
 initializeTheme();
 // Match the requested web reference once; later theme choices remain user-owned.
@@ -18,7 +19,7 @@ const root=createRoot(document.getElementById('root'),{onUncaughtError:error=>co
 // Native panels read exclusively from the Bridge. The empty legacy shape supplies
 // existing shell/layout defaults; it is never saved or simulated in desktop.
 root.render(window.sacuraDesktop?.nativeViewport
-  ? <NativeProjectHome/>
+  ? (window.sacuraDesktop.assetEditorIdentity ? <NativeAssetEditorRoot/> : <NativeProjectHome/>)
   : window.sacuraDesktop?.isDesktop===true?<ProjectHome/>:<AuthGate/>);
 
 import "./editorTheme.css";

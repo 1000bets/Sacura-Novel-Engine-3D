@@ -20,7 +20,7 @@
 .component-instance-row strong{display:block;font-weight:500;font-size:12px;overflow-wrap:anywhere;line-height:1.4}
 .component-instance-row small{font-size:10px;line-height:1.4;color:var(--text-muted)}
 .component-instance-row .component-disabled-label{flex:0 0 auto;font-size:10px}
-.component-instances .component-instance-properties{border:0;border-top:1px solid var(--divider);margin:2px 0 10px;padding:10px 0 0;min-width:0}
+.component-instances .component-instance-properties{border:0;border-top:1px solid var(--divider);margin:2px 0 10px;padding:10px 8px 0 28px;min-width:0}
 .component-instances fieldset{min-width:0;padding:0;margin:0;border:0}
 .component-instances .mesh-inspector legend{display:none}
 .component-instances label{font-size:12px;min-width:0;margin:0}

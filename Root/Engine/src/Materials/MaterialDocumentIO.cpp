@@ -143,9 +143,7 @@ AssetDiagnostic MaterialDocumentIO::Resolve(const AssetRegistry& Registry, const
     ResolvedMaterial Result;
     std::string DocumentIdentity;
     std::set<std::string> Visiting;
-    std::set<std::string> IncludeStack;
     std::function<void(const AssetKey&)> ResolveDocument;
-    std::function<std::string(const AssetRegistryEntry&)> ReadSource;
     try
     {
         auto ReadKey = [](const nlohmann::json& Value)
@@ -157,70 +155,6 @@ AssetDiagnostic MaterialDocumentIO::Resolve(const AssetRegistry& Registry, const
                 throw std::runtime_error("Invalid asset reference");
             }
             return Parsed;
-        };
-        ReadSource = [&](const AssetRegistryEntry& Entry) -> std::string
-        {
-            if (!IncludeStack.insert(Entry.AbsolutePath).second)
-            {
-                throw std::runtime_error("Shader include cycle: " + Entry.VirtualPath);
-            }
-            std::ifstream File(Entry.AbsolutePath);
-            const auto EditedSource = Sources.find(Entry.Metadata.Guid.ToString());
-            if (!File && EditedSource == Sources.end())
-            {
-                throw std::runtime_error("Shader source not found: " + Entry.VirtualPath);
-            }
-            Result.Definition.SourceFiles.push_back(Entry.AbsolutePath);
-            Result.Definition.Dependencies.push_back(AssetKey{Entry.Metadata.Guid, {}});
-            std::string Contents;
-            if (EditedSource != Sources.end())
-            {
-                Contents = EditedSource->second;
-            }
-            else
-            {
-                Contents.assign(std::istreambuf_iterator<char>(File), std::istreambuf_iterator<char>());
-            }
-            if (Contents.compare(0, 3, "\xEF\xBB\xBF") == 0)
-            {
-                Contents.erase(0, 3);
-            }
-            std::istringstream SourceInput(Contents);
-            std::ostringstream Expanded;
-            Expanded << "\n#line 1 \"" << Entry.VirtualPath << "\"\n";
-            const std::regex IncludePattern(R"(^\s*#\s*include\s*[\"<]([^\">]+)[\">]\s*(?://.*)?$)");
-            std::string Line;
-            size_t LineNumber = 0;
-            while (std::getline(SourceInput, Line))
-            {
-                ++LineNumber;
-                std::smatch Match;
-                if (std::regex_match(Line, Match, IncludePattern))
-                {
-                    std::string IncludePath = Match[1].str();
-                    if (IncludePath.rfind("Sakura/", 0) == 0)
-                    {
-                        Expanded << Line << '\n';
-                        continue;
-                    }
-                    if (IncludePath.front() != '/')
-                    {
-                        IncludePath = (std::filesystem::path(Entry.VirtualPath).parent_path() / IncludePath).lexically_normal().generic_string();
-                    }
-                    AssetRegistryEntry Included;
-                    if (!Registry.TryGetByPath(IncludePath, Included) || Included.Metadata.Type != ShaderSourceAssetType)
-                    {
-                        throw std::runtime_error("Shader include not found: " + IncludePath);
-                    }
-                    Expanded << ReadSource(Included) << "\n#line " << LineNumber + 1 << " \"" << Entry.VirtualPath << "\"\n";
-                }
-                else
-                {
-                    Expanded << Line << '\n';
-                }
-            }
-            IncludeStack.erase(Entry.AbsolutePath);
-            return Expanded.str();
         };
         ResolveDocument = [&](const AssetKey& Current)
         {
@@ -402,22 +336,27 @@ AssetDiagnostic MaterialDocumentIO::Resolve(const AssetRegistry& Registry, const
                 }
                 if (Document.contains("source"))
                 {
-                    Result.Definition.Source = ReadKey(Document.at("source"));
-                    AssetRegistryEntry SourceEntry;
-                    if (!Registry.TryResolveKey(Result.Definition.Source, SourceEntry) || SourceEntry.Metadata.Type != ShaderSourceAssetType)
+                    throw std::runtime_error("External material shader sources are not supported; store HLSL in the shader field");
+                }
+                Result.Definition.ShaderSource = Document.value("shader", Result.Definition.PreparedSource);
+                const auto DraftSource = Sources.find(Current.Asset.ToString());
+                if (DraftSource != Sources.end())
+                {
+                    Result.Definition.ShaderSource = DraftSource->second;
+                }
+                if (Result.Definition.ShaderSource.empty())
+                {
+                    throw std::runtime_error("Material requires embedded shader code");
+                }
+                const std::regex IncludePattern(R"(#\s*include\s*["<]([^">]+)[">])");
+                for (std::sregex_iterator Include(Result.Definition.ShaderSource.begin(), Result.Definition.ShaderSource.end(), IncludePattern), End; Include != End; ++Include)
+                {
+                    if ((*Include)[1].str().rfind("Sakura/", 0) != 0)
                     {
-                        throw std::runtime_error("Material shader source is missing or has the wrong type");
+                        throw std::runtime_error("Material shaders may include only built-in Sakura headers");
                     }
-                    Result.Definition.PreparedSource = ReadSource(SourceEntry);
                 }
-                else if (Sources.find(Current.Asset.ToString()) != Sources.end())
-                {
-                    Result.Definition.PreparedSource = Sources.at(Current.Asset.ToString());
-                }
-                else if (Result.Definition.PreparedSource.empty())
-                {
-                    throw std::runtime_error("Material requires a shader source");
-                }
+                Result.Definition.PreparedSource = "\n#line 1 \"" + Entry.VirtualPath + "\"\n" + Result.Definition.ShaderSource;
                 const std::string Identity = Document.dump() + Result.Definition.PreparedSource;
                 uint64_t Hash = 14695981039346656037ull;
                 for (unsigned char Character : Identity)
@@ -493,10 +432,7 @@ nlohmann::json MaterialDocumentIO::MakeMaterialDocument(const ResolvedMaterial& 
         {"modifyVertex", Definition.bModifyVertex}, {"boundsExpansion", Definition.BoundsExpansion},
         {"alphaCutoff", Definition.AlphaCutoff}, {"parameters", nlohmann::json::array()}
     };
-    if (Definition.Source.IsValid())
-    {
-        Document["source"] = AssetMetadataIO::AssetRefToJson(Definition.Source);
-    }
+    Document["shader"] = Definition.ShaderSource;
     if (Definition.PostProcessStage == MaterialPostProcessStage::AfterToneMapping)
     {
         Document["postProcessStage"] = "AfterToneMapping";

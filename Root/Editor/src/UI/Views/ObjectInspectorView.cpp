@@ -4,7 +4,8 @@
 #include <QDoubleSpinBox>
 #include <QGridLayout>
 #include <QGroupBox>
-#include <QHash>
+#include "Reflection/ReflectionSubsystem.h"
+#include "Reflection/Class.h"
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
@@ -18,13 +19,12 @@ namespace EditorUi
 {
 QString ObjectInspectorView::ComponentCaption(const QString& Type)
 {
-    QString Caption = Type.section('.', -1);
-    if (Caption.endsWith("Component")) { Caption.chop(9); }
-    const QHash<QString, QString> Captions{{"MeshRenderer", tr("Статический меш")},
-        {"Camera", tr("Камера")}, {"Light", tr("Освещение")},
-        {"PhysicsBody", tr("Коллизия")}, {"CharacterController", tr("Контроллер персонажа")},
-        {"NavigationAgent", tr("Навигация")}};
-    return Captions.value(Caption, Caption);
+    const Class* ComponentClass = ReflectionSubsystem::Get().FindClass(Type.toUtf8().constData());
+    if (ComponentClass)
+    {
+        return QString::fromStdString(ComponentClass->GetDisplayName());
+    }
+    return Type;
 }
 
 void ObjectInspectorView::AddComponentSection(const QString& Identity, const QString& Type,

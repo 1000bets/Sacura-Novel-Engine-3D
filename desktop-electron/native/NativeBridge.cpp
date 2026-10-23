@@ -1,3 +1,16 @@
+#include "Assets/AssetOperations.h"
+#include "Actions/EditorAction.h"
+#include "Assets/AssetPreview.h"
+#include "Assets/AssetManager.h"
+#include "Assets/Resources/TextureResource.h"
+#include "Core/Threading/JobSystem.h"
+#include "Commands/StaticMeshCommands.h"
+#include "World/Components/MeshRendererComponent.h"
+#include "World/Components/PhysicsBodyComponent.h"
+#include "World/Components/LightComponent.h"
+#include "World/Components/CameraComponent.h"
+#include <QBuffer>
+#include <QByteArray>
 #include "NativeBridge.h"
 #include "Commands/EditorCommands.h"
 #include "Core/Threading/ThreadContext.h"
@@ -7,12 +20,14 @@
 #include "Reflection/PropertyAccess.h"
 #include "Project/ProjectPaths.h"
 #include <fstream>
+#include <algorithm>
 #include <set>
 #include <cmath>
 #include <charconv>
 #include <limits>
 #include "Assets/AssetImporter.h"
 #include "Assets/StoryAssetCreation.h"
+#include "Assets/AssetCreationFactory.h"
 #include "Story/StoryDocumentIO.h"
 #include "World/Serialization/SceneSerializer.h"
 #include "Core/Object/MemorySubsystem.h"
@@ -119,7 +134,7 @@ Json NativeBridge::ConvertValue(const TypeId& T,const Json& V,bool Decode) {
     return V;
 }
 Json NativeBridge::Components(GameObject* O) {
-    Json A=Json::array();for(auto* C:O->GetAllComponents())A.push_back({{"id",C->GetPersistentId()},{"typeId",C->GetTypeId().Value},{"enabled",C->IsEnabled()}});return A;
+    Json A=Json::array();for(auto* C:O->GetAllComponents())A.push_back({{"id",C->GetPersistentId()},{"typeId",C->GetTypeId().Value},{"displayName",C->GetClass()->GetDisplayName()},{"enabled",C->IsEnabled()}});return A;
 }
 Json NativeBridge::Properties(Component* C) {
     Json A=Json::array();if(!C->GetClass())return A;
@@ -134,6 +149,12 @@ Json NativeBridge::Properties(Component* C) {
             auto Types=P->Attributes.AllowedAssetTypes;
             if(P->Attributes.AssetTypeFilter)Types.push_back(P->Attributes.AssetTypeFilter);
             Item["assetTypes"]=Types;Item["subAssetId"]=nullptr;
+            if (D.bOk && V.ValueKind == ReflectedValue::Kind::AssetReference)
+            {
+                Item["assetId"] = nullptr;
+                if (V.AssetValue.IsValid()) { Item["assetId"] = V.AssetValue.Asset.ToString(); }
+                if (V.AssetValue.HasSubAsset()) { Item["subAssetId"] = V.AssetValue.SubAsset->ToString(); }
+            }
             if(P->Attributes.CompanionProperty) {
                 const auto* Other=C->GetClass()->FindProperty(PropertyId{P->Attributes.CompanionProperty});ReflectedValue Sub;
                 if(Other&&PropertyAccess::GetProperty(C,*Other,Sub).bOk)Item["subAssetId"]=Sub.StringValue;
@@ -162,7 +183,7 @@ Json NativeBridge::Describe() {
         {"speaker",Playback.GetDisplayedSpeaker()},{"text",Playback.GetDisplayedLine()},
         {"choices",Choices},{"canAdvance",Playback.CanAdvanceDialogue()},
         {"canChoose",Playback.CanSelectChoice()},{"error",Playback.GetLastError()}};
-    return {{"dirty",Workspace.GetDocument().IsDirty()},{"storyDirty",Story.IsDirty()},
+    return {{"dirty",Workspace.GetDocument().IsDirty()},{"storyDirty",Story.IsDirty()},{"assetDocumentsDirty",HasDirtyAssetDocuments()},
         {"externalChanges",Workspace.GetDocument().HasExternalChanges()},{"projectExternalChanges",ProjectChanged()},
         {"path",Workspace.GetDocument().GetDocumentPath().generic_string()},
         {"project",Project.GetProject()?Project.GetProject()->Name:""},
@@ -172,11 +193,66 @@ Json NativeBridge::Describe() {
         {"canUndo",Workspace.GetCommands().CanUndo()},{"canRedo",Workspace.GetCommands().CanRedo()},{"assetError",AssetError}};
 }
 Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
+    if (M == "assetDocument.execute") { return AssetDocumentTools(P); }
+    if(M.rfind("mesh.",0)==0 || M=="assets.place") { return MeshTools(M, P); }
     if(M.rfind("story.",0)==0||M.rfind("assets.",0)==0)return DispatchDocuments(M,P);
     auto& Commands=Workspace.GetCommands();auto& Document=Workspace.GetDocument();auto& Play=Runtime.GetPlaySession();
-    const bool Read=M=="bridge.describe"||M=="scene.getHierarchy"||M=="object.getComponents"||M=="component.getProperties"||M=="transform.get"||M=="reflection.getComponentTypes"||M=="assets.getScenes"||M=="audio.resolveStartup";
+    const bool Read=M=="editor.actions"||M=="bridge.describe"||M=="scene.getHierarchy"||M=="object.getComponents"||M=="component.getProperties"||M=="transform.get"||M=="reflection.getComponentTypes"||M=="assets.getScenes"||M=="audio.resolveStartup";
     if(!Read&&M!="selection.set"&&M.rfind("play.",0)!=0)Require(!Play.IsSimulating(),"PLAY_READ_ONLY","Stop play before editing or opening/saving a scene");
     if(!Read)ResetInput();
+    if (M == "editor.actions")
+    {
+        Json Result = Json::array();
+        for (const auto* Action : EditorAction::CollectPublishedActions())
+        {
+            Result.push_back({{"id", Action->GetTypeId().Value}, {"label", Action->GetDisplayName()},
+                {"category", Action->GetMenuCategory()}, {"requiresSelection", Action->RequiresSelection()}});
+        }
+        for (const auto& Entry : Runtime.GetAssetRegistry().FindByType(ModelAssetType))
+        {
+            if (Entry.VirtualPath.rfind("/Engine/BasicShapes/", 0) != 0) { continue; }
+            for (const auto& Subasset : Entry.Metadata.SubAssets)
+            {
+                if (Subasset.Type != StaticMeshAssetType) { continue; }
+                Result.push_back({{"id", Entry.Metadata.Guid.ToString() + ":" + Subasset.Id.ToString()},
+                    {"label", Subasset.Name}, {"category", "Objects"}, {"requiresSelection", false},
+                    {"assetId", Entry.Metadata.Guid.ToString()}, {"subAssetId", Subasset.Id.ToString()}});
+            }
+        }
+        return Result;
+    }
+    if (M == "editor.executeAction")
+    {
+        for (const auto* Action : EditorAction::CollectPublishedActions())
+        {
+            if (Action->GetTypeId().Value != P.at("actionId")) { continue; }
+            EditorActionContext Context;
+            Context.EditScene = World();
+            Context.CommandStack = &Commands;
+            if (P.contains("parentId") && !P.at("parentId").is_null())
+            {
+                Context.SelectedObject = Find(P.at("parentId"))->GetObjectHandle();
+            }
+            if (Action->RequiresSelection())
+            {
+                Context.SelectedObject = Workspace.GetSelectedIdentity();
+            }
+            Context.ExecuteCommand = [&Commands](std::unique_ptr<EditorCommand> Command)
+            {
+                return Commands.Execute(std::move(Command));
+            };
+            Context.SelectObject = [this](ObjectHandle Identity)
+            {
+                Workspace.Select(World(), Identity);
+            };
+            Require(Action->CanExecute(Context) && Action->Execute(Context), "COMMAND_FAILED", "Editor action could not execute");
+            const auto* Selected = Workspace.GetSelectedObject(World());
+            Json Identifier = nullptr;
+            if (Selected) { Identifier = Selected->GetPersistentId(); }
+            return {{"id", Identifier}};
+        }
+        throw Failure("NOT_FOUND", "Editor action is not registered");
+    }
     if(M=="bridge.describe")return Describe();
     if(M=="scene.getHierarchy")return Hierarchy();
     if(M=="project.save") {
@@ -185,6 +261,18 @@ Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
         std::string Error;
         Require(Document.Save(Error),"IO_ERROR",Error);
         if(Story.IsOpen()&&Story.IsDirty()) Require(Story.Save(Error),"STORY_ERROR",Error);
+        for (auto& Entry : AssetDocuments)
+        {
+            if (Entry.second.Mesh && Entry.second.Mesh->IsDirty())
+            {
+                Require(Entry.second.Mesh->Save(Runtime.GetAssetManager(), Error), "IO_ERROR", Error);
+            }
+            if (Entry.second.Material && Entry.second.Material->GetDocument().IsDirty())
+            {
+                const auto Saved = Entry.second.Material->Execute(MaterialEditOperation::Save);
+                Require(!Saved.HasError(), "IO_ERROR", Saved.Message);
+            }
+        }
         if(P.value("useCurrentAsStartup",false)) {
             Require(Project.SetStartupDocuments(Document.GetDocumentPath(),Story.IsOpen()?Story.GetPath():Project.GetProject()->StartupStory,Error),"IO_ERROR",Error);
             AssetDiagnostic D; ContentHash::TryHashFile(Project.GetProject()->ProjectFile.u8string(),ProjectFingerprint,D);
@@ -287,6 +375,21 @@ Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
         auto* O=World()->FindByHandle(Created);
         Require(O!=nullptr,"COMMAND_FAILED","Created object unavailable");return {{"id",O->GetPersistentId()}};
     }
+    if (M == "object.copy")
+    {
+        std::string Subtree;
+        const auto Result = SceneSerializer::SerializeSubtreeToJson(*Find(P.at("objectId")), Subtree);
+        Require(Result.bOk, "COMMAND_FAILED", Result.Error);
+        return {{"subtree", Subtree}};
+    }
+    if (M == "object.paste")
+    {
+        ObjectHandle Created;
+        Commit(MakePasteSubtreeCommand(World(), P.at("subtree").get<std::string>(), ObjectHandle{}, &Created));
+        auto* CreatedObject = World()->FindByHandle(Created);
+        Require(CreatedObject != nullptr, "COMMAND_FAILED", "Pasted object unavailable");
+        return {{"id", CreatedObject->GetPersistentId()}};
+    }
     if(M=="object.duplicate") {
         auto* Source=Find(P["objectId"]);std::string Subtree;
         auto Result=SceneSerializer::SerializeSubtreeToJson(*Source,Subtree);
@@ -332,7 +435,15 @@ Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
             Require(std::find(Allowed.begin(),Allowed.end(),Type.GetIdentifier())!=Allowed.end(),"INVALID_ARGUMENT","Asset type does not match property");
         } else Require(SubText.is_null(),"INVALID_ARGUMENT","Subasset requires an asset");
         const auto* Companion=Field->Attributes.CompanionProperty?C->GetClass()->FindProperty(PropertyId{Field->Attributes.CompanionProperty}):nullptr;
-        Require(!Key.HasSubAsset()||Companion,"INVALID_ARGUMENT","Property does not support subassets");
+        Require(!Key.HasSubAsset()||Companion||Field->ValueTypeId.Value=="engine.AssetRef","INVALID_ARGUMENT","Property does not support subassets");
+        if (Field->ValueTypeId.Value == "engine.AssetRef")
+        {
+            ReflectedValue Value;
+            Value.ValueKind = ReflectedValue::Kind::AssetReference;
+            Value.AssetValue = Key;
+            Commit(MakeSetPropertyCommand(World(), C->GetObjectHandle(), Field->Id, Value));
+            return Properties(C);
+        }
         Commands.BeginGroup("Assign Asset");
         bool Ok=Commands.Execute(MakeSetPropertyCommand(World(),C->GetObjectHandle(),Field->Id,ReflectedValue::MakeString(Key.IsValid()?Id.ToString():"")));
         if(Ok&&Companion)Ok=Commands.Execute(MakeSetPropertyCommand(World(),C->GetObjectHandle(),Companion->Id,ReflectedValue::MakeString(Key.HasSubAsset()?Sub.ToString():"")));
@@ -381,7 +492,7 @@ Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
     if(M=="play.step"){Require(Play.GetState()==PlaySessionState::Paused,"INVALID_STATE","Pause before Step");Play.StepFrame(1.f/60.f);return Describe();}
     if(M=="play.stop"){Runtime.GetStoryRuntime().BindScene(nullptr);Play.StopPlay();Workspace.ClearSelection();return Describe();}
     if(M=="reflection.getComponentTypes") {
-        Json A=Json::array();for(auto* C:ReflectionSubsystem::Get().GetPublishedCatalog().Classes)if(C->IsConcrete()&&C->IsA(TypeId{"engine.Component"}))A.push_back({{"typeId",C->Id.Value},{"version",C->SchemaVersion}});return A;
+        Json A=Json::array();for(auto* C:ReflectionSubsystem::Get().GetPublishedCatalog().Classes)if(C->IsConcrete()&&C->IsA(TypeId{"engine.Component"}))A.push_back({{"typeId",C->Id.Value},{"displayName",C->GetDisplayName()},{"version",C->SchemaVersion}});return A;
     }
     if(M=="assets.getScenes") {
         Json A=Json::array();for(const auto& E:Runtime.GetAssetRegistry().FindByType(SceneAssetType))A.push_back({{"id",E.Metadata.Guid.ToString()},{"path",E.VirtualPath}});return A;
@@ -419,20 +530,45 @@ Json NativeBridge::Poll(bool Force) {
 AssetRegistryEntry NativeBridge::Asset(const std::string& Id) {
     Guid Guid;AssetRegistryEntry Entry;Require(Guid::TryParse(Id,Guid)&&Runtime.GetAssetRegistry().TryGetById(Guid,Entry),"NOT_FOUND","Asset no longer exists");return Entry;
 }
-void NativeBridge::ScanAssets(){AssertGameThread();const auto D=Runtime.GetAssetRegistry().ScanContent();AssetError=D.HasError()?D.Message:"";}
+void NativeBridge::ScanAssets()
+{
+    AssertGameThread();
+    auto& Registry = Runtime.GetAssetRegistry();
+    std::map<std::string, Json> Previous;
+    for (const auto& Type : Registry.GetAssetTypeRegistrations())
+    {
+        for (const auto& Entry : Registry.FindByType(Type.Type)) { Previous[Entry.Metadata.Guid.ToString()] = AssetMetadataIO::ToJson(Entry.Metadata); }
+    }
+    const auto Result = Registry.ScanContent();
+    AssetError.clear();
+    if (Result.HasError()) { AssetError = Result.Message; }
+    for (const auto& Type : Registry.GetAssetTypeRegistrations())
+    {
+        for (const auto& Entry : Registry.FindByType(Type.Type))
+        {
+            const auto Found = Previous.find(Entry.Metadata.Guid.ToString());
+            if (Found != Previous.end() && Found->second != AssetMetadataIO::ToJson(Entry.Metadata))
+            {
+                Runtime.GetAssetManager().InvalidateAsset(Entry.Metadata.Guid);
+                Previews.clear();
+            }
+        }
+    }
+}
 Json NativeBridge::Assets() {
     Json Result=Json::array();auto& Registry=Runtime.GetAssetRegistry();
-    // Model containers are hidden by Qt's asset tree, which instead exposes their
-    // subassets. The Bridge must include the container identity for mesh bindings.
-    for(const auto& Type:Registry.GetAssetTypeRegistrations())if(Type.bVisibleInContentBrowser||Type.Type==ModelAssetType)
+    for(const auto& Type:Registry.GetAssetTypeRegistrations())
         for(const auto& E:Registry.FindByType(Type.Type)) {
             std::error_code Error;auto Bytes=std::filesystem::file_size(E.AbsolutePath,Error);const auto Size=Error?0:Bytes;
             const auto Modified=std::filesystem::last_write_time(E.AbsolutePath,Error);
-            const auto Version=Error?std::string{}:std::to_string(Modified.time_since_epoch().count());Json Sub=Json::array();
+            auto Version=Error?std::string{}:std::to_string(Modified.time_since_epoch().count());
+            const auto MetadataModified = std::filesystem::last_write_time(E.AbsoluteMetaPath, Error);
+            if (!Error) { Version += ":" + std::to_string(MetadataModified.time_since_epoch().count()); }
+            Json Sub=Json::array();
             for(const auto& S:E.Metadata.SubAssets)Sub.push_back({{"id",S.Id.ToString()},{"typeId",S.Type.GetIdentifier()},{"name",S.Name}});
             Result.push_back({{"id",E.Metadata.Guid.ToString()},{"name",std::filesystem::path(E.RelativePath).filename().u8string()},
                 {"path",E.VirtualPath},{"relativePath",E.RelativePath},{"typeId",E.Metadata.Type.GetIdentifier()},
-                {"builtin",E.Mount==AssetMount::Engine},{"bytes",Size},{"version",Version},{"subassets",Sub}});
+                {"builtin",E.Mount==AssetMount::Engine},{"browserVisible",Type.bVisibleInContentBrowser||Type.Type==ModelAssetType},{"bytes",Size},{"version",Version},{"subassets",Sub}});
         }
     std::sort(Result.begin(),Result.end(),[](const Json& A,const Json& B){return A.at("path")<B.at("path");});return Result;
 }
@@ -446,6 +582,89 @@ Json NativeBridge::StorySnapshot() {
 }
 Json NativeBridge::DispatchDocuments(const std::string& M,const Json& P) {
     auto& Registry=Runtime.GetAssetRegistry();std::string Error;
+    if(M=="assets.thumbnail")
+    {
+        const auto Entry = Asset(P.at("assetId"));
+        AssetKey Key{Entry.Metadata.Guid, std::nullopt};
+        if (P.contains("subAssetId") && !P.at("subAssetId").is_null())
+        {
+            Guid Identifier;
+            Require(Guid::TryParse(P.at("subAssetId"), Identifier), "INVALID_ARGUMENT", "Invalid subasset");
+            Key.SubAsset = Identifier;
+        }
+        AssetRegistryEntry Resolved;
+        Require(Registry.TryResolveKey(Key, Resolved), "NOT_FOUND", "Asset or subasset unavailable");
+        const std::string CacheKey = Key.Asset.ToString() + P.value("subAssetId", Json(nullptr)).dump()
+            + std::to_string(std::filesystem::last_write_time(Entry.AbsolutePath).time_since_epoch().count())
+            + AssetMetadataIO::ToJson(Entry.Metadata).dump();
+        auto Found = Previews.find(CacheKey);
+        if (Found == Previews.end())
+        {
+            if (Previews.size() >= 256) { Previews.clear(); }
+            auto Result = std::make_shared<PreviewResult>();
+            Previews.emplace(CacheKey, Result);
+            auto Snapshot = std::make_shared<AssetRegistry>(Registry);
+            JobSystem::Get()->Schedule([Result, Snapshot, Key]()
+            {
+                std::string Encoded;
+                try
+                {
+                    QImage Image = GenerateAssetPreview(*Snapshot, Key);
+                    if (!Image.isNull())
+                    {
+                        Image = Image.scaled(128, 128, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+                        QByteArray Bytes;
+                        QBuffer Buffer(&Bytes);
+                        Buffer.open(QIODevice::WriteOnly);
+                        Image.save(&Buffer, "PNG");
+                        Encoded = Bytes.toBase64().toStdString();
+                    }
+                }
+                catch (const std::exception& Error)
+                {
+                    PrintString(std::string("Asset preview failed: ") + Error.what());
+                }
+                std::lock_guard<std::mutex> Lock(Result->Mutex);
+                Result->Encoded = std::move(Encoded);
+                Result->bReady = true;
+            });
+            return {{"ready", false}};
+        }
+        std::lock_guard<std::mutex> Lock(Found->second->Mutex);
+        return {{"ready", Found->second->bReady}, {"png", Found->second->Encoded}};
+    }
+    if (M == "assets.creationTypes")
+    {
+        auto Factories = AssetCreationFactory::DescribeFactories();
+        for (auto& Factory : Factories)
+        {
+            for (auto& Field : Factory["settings"])
+            {
+                Field["value"] = ConvertValue(TypeId{Field.at("typeId").get<std::string>()}, Field.at("value"), false);
+            }
+        }
+        return Factories;
+    }
+    if (M == "assets.folders")
+    {
+        Json Folders = {"Game", "Engine"};
+        for (const auto& Mount : {std::make_pair(Registry.GetGameContentRoot(), "Game/"), std::make_pair(Registry.GetEngineContentRoot(), "Engine/")})
+        {
+            std::error_code DirectoryError;
+            for (std::filesystem::recursive_directory_iterator Directory(Mount.first, std::filesystem::directory_options::skip_permission_denied, DirectoryError), End; Directory != End && !DirectoryError; Directory.increment(DirectoryError))
+            {
+                if (Directory->is_directory() && !Directory->is_symlink())
+                {
+                    Folders.push_back(std::string(Mount.second) + Directory->path().lexically_relative(Mount.first).generic_u8string());
+                }
+                if (Directory->is_symlink())
+                {
+                    Directory.disable_recursion_pending();
+                }
+            }
+        }
+        return Folders;
+    }
     if(M=="assets.list")return Assets();
     if(M=="assets.getScenes") {Json A=Json::array();for(const auto& E:Registry.FindByType(SceneAssetType))A.push_back({{"id",E.Metadata.Guid.ToString()},{"path",E.VirtualPath}});return A;}
     if(M=="assets.resolve") {
@@ -455,6 +674,143 @@ Json NativeBridge::DispatchDocuments(const std::string& M,const Json& P) {
     if(M=="assets.refresh"){ScanAssets();Require(AssetError.empty(),"ASSET_ERROR",AssetError);return Assets();}
     if(M=="story.get")return StorySnapshot();
     Require(!Runtime.GetPlaySession().IsSimulating(),"PLAY_READ_ONLY","Stop Play before editing assets or story");
+    if (M == "assets.rename" || M == "assets.move" || M == "assets.delete" || M == "assets.duplicate"
+        || M == "assets.createFolder" || M == "assets.renameFolder" || M == "assets.deleteFolder")
+    {
+        AssetOperations Operations(Runtime);
+        Operations.SetProjectContext(&Project, &Workspace.GetDocument());
+        AssetDiagnostic Result;
+        Json Response = Json::object();
+        const auto ValidateName = [&](const std::string& Name)
+        {
+            Require(!Name.empty() && Name.find_first_of("./\\:*?\"<>|") == std::string::npos && Name.back() != ' ', "INVALID_ARGUMENT", "Enter a single valid name without an extension");
+        };
+        const auto IsFolderOperation = M == "assets.createFolder" || M == "assets.renameFolder" || M == "assets.deleteFolder";
+        std::filesystem::path AffectedPath;
+        if (IsFolderOperation)
+        {
+            const std::string Folder = P.at("folder");
+            Require(Operations.ResolveGameFolder(Folder, AffectedPath), "INVALID_PATH", "Choose a Game Content folder");
+            if (M == "assets.createFolder")
+            {
+                const std::string Name = P.at("name");
+                ValidateName(Name);
+                const auto Destination = Folder + "/" + Name;
+                Result = Operations.CreateFolder(Destination);
+                Response["folder"] = Destination;
+            }
+            else
+            {
+                Require(!Story.IsOpen() || !AssetPath::IsInsideContent(Story.GetPath(), AffectedPath), "DOCUMENT_OPEN", "Close the story document before modifying its folder");
+                for (const auto& Document : AssetDocuments)
+                {
+                    AssetKey DocumentAsset;
+                    if (Document.second.Material)
+                    {
+                        DocumentAsset = Document.second.Material->GetDocument().GetAsset();
+                    }
+                    else if (Document.second.Mesh)
+                    {
+                        DocumentAsset = Document.second.Mesh->GetAsset();
+                    }
+                    AssetRegistryEntry DocumentEntry;
+                    if (Registry.TryResolveKey(DocumentAsset, DocumentEntry))
+                    {
+                        Require(!AssetPath::IsInsideContent(DocumentEntry.AbsolutePath, AffectedPath), "DOCUMENT_OPEN", "Close affected asset documents before modifying their folder");
+                    }
+                }
+                if (M == "assets.renameFolder")
+                {
+                    const std::string Name = P.at("name");
+                    ValidateName(Name);
+                    const auto Destination = std::filesystem::u8path(Folder).parent_path().generic_u8string() + "/" + Name;
+                    Result = Operations.RenameFolder(Folder, Destination);
+                    Response["folder"] = Destination;
+                }
+                else
+                {
+                    Result = Operations.DeleteFolder(Folder);
+                    Response["folder"] = std::filesystem::u8path(Folder).parent_path().generic_u8string();
+                }
+            }
+        }
+        else
+        {
+            const auto Entry = Asset(P.at("assetId"));
+            const AssetKey Key{Entry.Metadata.Guid, {}};
+            if (M != "assets.duplicate")
+            {
+                Require(!Story.IsOpen() || Story.GetAsset().Asset != Key.Asset, "DOCUMENT_OPEN", "Close the story document before modifying its asset");
+                for (const auto& Document : AssetDocuments)
+                {
+                    Require(!Document.second.Material || Document.second.Material->GetDocument().GetAsset().Asset != Key.Asset, "DOCUMENT_OPEN", "Close the asset document before modifying its file");
+                    Require(!Document.second.Mesh || Document.second.Mesh->GetAsset().Asset != Key.Asset, "DOCUMENT_OPEN", "Close the mesh document before modifying its file");
+                }
+            }
+            if (M == "assets.delete")
+            {
+                Result = Operations.DeleteAsset(Key);
+            }
+            else if (M == "assets.duplicate")
+            {
+                std::set<std::string> Previous;
+                for (const auto& Existing : Registry.FindByType(Entry.Metadata.Type))
+                {
+                    Previous.insert(Existing.Metadata.Guid.ToString());
+                }
+                Result = Operations.DuplicateAsset(Key, P.at("folder").get<std::string>());
+                for (const auto& Existing : Registry.FindByType(Entry.Metadata.Type))
+                {
+                    if (Previous.find(Existing.Metadata.Guid.ToString()) == Previous.end())
+                    {
+                        Response = {{"id", Existing.Metadata.Guid.ToString()}, {"path", Existing.VirtualPath}};
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                std::string Destination;
+                if (M == "assets.rename")
+                {
+                    const std::string Name = P.at("name");
+                    ValidateName(Name);
+                    const auto Source = std::filesystem::u8path(Entry.VirtualPath);
+                    Destination = (Source.parent_path() / std::filesystem::u8path(Name + Source.extension().u8string())).generic_u8string();
+                }
+                else
+                {
+                    Destination = P.at("folder").get<std::string>() + "/" + std::filesystem::u8path(Entry.VirtualPath).filename().u8string();
+                }
+                Result = Operations.RenameAsset(Entry.VirtualPath, Destination);
+                Response = {{"id", Key.Asset.ToString()}, {"path", Destination}};
+            }
+        }
+        Require(!Result.HasError(), "ASSET_ERROR", Result.Message);
+        Previews.clear();
+        ScanAssets();
+        return Response;
+    }
+    if (M == "assets.create")
+    {
+        const std::string Relative = P.at("path");
+        ContentPath(Relative);
+        AssetRegistryEntry Created;
+        const TypeId FactoryType{P.at("factoryId").get<std::string>()};
+        auto Settings = P.value("settings", Json::object());
+        const auto* Descriptor = ReflectionSubsystem::Get().FindClass(FactoryType);
+        if (Descriptor && Settings.is_object())
+        {
+            for (auto Setting = Settings.begin(); Setting != Settings.end(); ++Setting)
+            {
+                const auto* Property = Descriptor->FindProperty(PropertyId{Setting.key()});
+                if (Property) { Setting.value() = ConvertValue(Property->ValueTypeId, Setting.value(), true); }
+            }
+        }
+        Require(AssetCreationFactory::CreateAsset(Registry, FactoryType,
+            "/Game/" + Relative, Settings, Created, Error), "ASSET_ERROR", Error);
+        return {{"id", Created.Metadata.Guid.ToString()}, {"path", Created.VirtualPath}, {"typeId", Created.Metadata.Type.GetIdentifier()}};
+    }
     if(M=="assets.import") {
         // Main process obtains this path from the OS file picker, never from renderer input.
         auto Source=std::filesystem::u8path(P.at("sourcePath").get<std::string>());Require(std::filesystem::is_regular_file(Source),"INVALID_PATH","Import source does not exist");
@@ -555,4 +911,425 @@ Json NativeBridge::DispatchDocuments(const std::string& M,const Json& P) {
         Require(Story.SetEventPlacement(P.at("nodeId"),P.at("bindingId"),Phase(),Join,Error,P.value("batchId",std::string{}),P.value("beforeId",std::string{})),"STORY_ERROR",Error);return StorySnapshot();
     }
     throw Failure("UNKNOWN_METHOD",M);
+}
+
+Json NativeBridge::MeshTools(const std::string& Method, const Json& Params)
+{
+    auto& Registry = Runtime.GetAssetRegistry();
+    std::string Error;
+    if (Method == "assets.place")
+    {
+        Require(!Runtime.GetPlaySession().IsSimulating(), "PLAY_READ_ONLY", "Stop Play before placing assets");
+        const auto Entry = Asset(Params.at("assetId"));
+        Guid Subasset;
+        Require(Guid::TryParse(Params.at("subAssetId"), Subasset), "INVALID_ARGUMENT", "Invalid mesh subasset");
+        Transform Placement;
+        if (Params.contains("transform")) { Placement = ParseTransform(Params.at("transform")); }
+        ObjectHandle Created;
+        Commit(MakeCreateStaticMeshObjectCommand(World(), Registry, {Entry.Metadata.Guid, Subasset},
+            std::filesystem::path(Entry.RelativePath).stem().u8string(), {}, Placement, &Created));
+        auto* Object = World()->FindByHandle(Created);
+        Workspace.Select(World(), Object->GetObjectHandle());
+        return {{"id", Object->GetPersistentId()}};
+    }
+    auto* Mesh = dynamic_cast<MeshRendererComponent*>(FindComponent(Params));
+    Require(Mesh != nullptr, "INVALID_ARGUMENT", "Select a mesh component");
+    if (Method == "mesh.material")
+    {
+        Require(!Runtime.GetPlaySession().IsSimulating(), "PLAY_READ_ONLY", "Stop Play before editing materials");
+        AssetKey Material;
+        if (!Params.at("assetId").is_null()) { Material.Asset = Asset(Params.at("assetId")).Metadata.Guid; }
+        auto Command = MakeAssignMeshMaterialCommand(World(), Registry, Mesh->GetObjectHandle(), Params.at("slot"), Material, Error);
+        Require(Command != nullptr, "INVALID_ARGUMENT", Error);
+        Commit(std::move(Command));
+    }
+    if (Method == "mesh.physics")
+    {
+        Require(!Runtime.GetPlaySession().IsSimulating(), "PLAY_READ_ONLY", "Stop Play before editing physics");
+        auto Command = MakeSetMeshPhysicsCommand(World(), Registry, Mesh->GetObjectHandle(), Params.at("enabled"), Params.at("simulate"), Error);
+        Require(Command != nullptr, "INVALID_ARGUMENT", Error);
+        Commit(std::move(Command));
+    }
+    Json Slots = Json::array();
+    std::set<int32_t> Indices;
+    AssetHandle<StaticMeshResource> LoadedMesh;
+    if (Runtime.GetAssetManager().TryGetLoaded(Mesh->GetMeshAssetKey(), LoadedMesh))
+    {
+        for (const auto& Part : LoadedMesh->Submeshes) { Indices.insert(Part.MaterialSlot); }
+    }
+    for (const auto& Part : Mesh->Submeshes) { Indices.insert(Part.MaterialSlot); }
+    for (const auto& Slot : Mesh->MaterialSlots.Entries) { Indices.insert(Slot.Slot); }
+    for (int32_t Slot : Indices)
+    {
+        AssetKey Material = Mesh->GetMaterialAssetKey();
+        bool bInherited = true;
+        const auto Default = Mesh->DefaultMaterialSlots.find(Slot);
+        if (Default != Mesh->DefaultMaterialSlots.end()) { Material = Default->second; }
+        for (const auto& Override : Mesh->MaterialSlots.Entries)
+        {
+            if (Override.Slot == Slot) { Material = Override.Material; bInherited = false; }
+        }
+        Slots.push_back({{"slot", Slot}, {"assetId", Material.Asset.ToString()}, {"inherited", bInherited}});
+    }
+    const auto* Body = Mesh->GetGameObject()->GetComponent<PhysicsBodyComponent>();
+    return {{"slots", Slots}, {"collision", Body && Body->IsEnabled()}, {"simulate", Body && Body->MotionType == 1},
+        {"motion", Body ? Body->MotionType : 0}};
+}
+
+bool NativeBridge::HasDirtyAssetDocuments() const
+{
+    for (const auto& Entry : AssetDocuments)
+    {
+        if (Entry.second.Mesh && Entry.second.Mesh->IsDirty()) { return true; }
+        if (Entry.second.Material && Entry.second.Material->GetDocument().IsDirty()) { return true; }
+    }
+    return false;
+}
+
+Json NativeBridge::AssetDocumentTools(const Json& Params)
+{
+    auto& Registry = Runtime.GetAssetRegistry();
+    const auto Entry = Asset(Params.at("assetId"));
+    AssetKey Key{Entry.Metadata.Guid, std::nullopt};
+    if (Params.contains("subAssetId") && !Params.at("subAssetId").is_null())
+    {
+        Guid Identifier;
+        Require(Guid::TryParse(Params.at("subAssetId"), Identifier), "INVALID_ARGUMENT", "Invalid subasset");
+        Key.SubAsset = Identifier;
+    }
+    AssetRegistryEntry Resolved;
+    const SubAssetRecord* Subasset = nullptr;
+    Require(Registry.TryResolveKey(Key, Resolved, &Subasset), "NOT_FOUND", "Document asset unavailable");
+    AssetType Type = Entry.Metadata.Type;
+    if (Subasset) { Type = Subasset->Type; }
+    Require(Type == StaticMeshAssetType || Type == MaterialAssetType || Type == MaterialInstanceAssetType || Type == TextureAssetType,
+        "INVALID_ARGUMENT", "This asset type has no document editor");
+    const std::string Identifier = Key.Asset.ToString() + Params.value("subAssetId", Json(nullptr)).dump();
+    const std::string Operation = Params.at("operation");
+    auto Found = AssetDocuments.find(Identifier);
+    if (Found == AssetDocuments.end())
+    {
+        Require(Operation == "open", "NOT_FOUND", "Open the asset document first");
+        AssetDocumentState State;
+        std::string Error;
+        if (Type == StaticMeshAssetType)
+        {
+            State.Mesh = std::make_unique<StaticMeshDocument>(Registry);
+            Require(State.Mesh->Open(Key, Error), "DOCUMENT_ERROR", Error);
+        }
+        else if (Type != TextureAssetType)
+        {
+            State.Material = std::make_unique<MaterialEditingSession>(Registry);
+            const auto Result = State.Material->Open(Key);
+            Require(!Result.HasError(), "DOCUMENT_ERROR", Result.Message);
+        }
+        Found = AssetDocuments.emplace(Identifier, std::move(State)).first;
+    }
+    auto& State = Found->second;
+    if (Type == TextureAssetType)
+    {
+        Require(Operation == "open" || Operation == "get" || Operation == "preview",
+            "READ_ONLY", "Texture editor currently supports inspection only");
+        if (!State.TextureSnapshot.is_null())
+        {
+            return State.TextureSnapshot;
+        }
+        Json Snapshot = {{"assetId", Key.Asset.ToString()}, {"type", "Texture"}, {"revision", State.Revision},
+            {"dirty", false}, {"readOnly", true}, {"preparing", true}, {"previewPng", ""},
+            {"document", Json::object()}, {"diagnostic", ""}};
+        if (Runtime.GetAssetManager().GetLoadState(Key) == AssetLoadState::Unloaded)
+        {
+            Runtime.GetAssetManager().LoadAsync<TextureResource>(Key);
+        }
+        AssetHandle<TextureResource> Texture;
+        if (Runtime.GetAssetManager().TryGetLoaded(Key, Texture))
+        {
+            QImage Image(Texture->Pixels.data(), Texture->Width, Texture->Height, Texture->RowStride, QImage::Format_RGBA8888);
+            if (Image.width() > 1024 || Image.height() > 1024)
+            {
+                Image = Image.scaled(1024, 1024, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            }
+            QByteArray Bytes;
+            QBuffer Buffer(&Bytes);
+            Buffer.open(QIODevice::WriteOnly);
+            Require(Image.save(&Buffer, "PNG"), "DOCUMENT_ERROR", "Texture preview encoding failed");
+            std::string ColorSpace = "Linear";
+            if (Texture->ColorSpace == TextureColorSpace::Srgb)
+            {
+                ColorSpace = "sRGB";
+            }
+            Snapshot["document"] = {{"width", Texture->Width}, {"height", Texture->Height},
+                {"channelCount", Texture->ChannelCount}, {"decodedBytes", Texture->Pixels.size()},
+                {"colorSpace", ColorSpace}, {"format", "RGBA8"}, {"previewWidth", Image.width()}, {"previewHeight", Image.height()}};
+            Snapshot["previewPng"] = Bytes.toBase64().toStdString();
+            Snapshot["preparing"] = false;
+            State.TextureSnapshot = Snapshot;
+        }
+        else if (Runtime.GetAssetManager().GetLoadState(Key) == AssetLoadState::Failed)
+        {
+            Snapshot["preparing"] = false;
+            Snapshot["diagnostic"] = Runtime.GetAssetManager().GetLastDiagnostic(Key).Message;
+            State.TextureSnapshot = Snapshot;
+        }
+        return Snapshot;
+    }
+    if (Operation == "preview")
+    {
+        PreviewDocument = Identifier;
+        PreviewShape = Params.value("value", Json::object()).value("previewShape", PreviewShape);
+        SelectedCollision = Params.value("value", Json::object()).value("selectedCollision", -1);
+        bShowCollision = Params.value("value", Json::object()).value("showCollision", false);
+    }
+    if (Operation != "open" && Operation != "get" && Operation != "preview")
+    {
+        Require(!Runtime.GetPlaySession().IsSimulating(), "PLAY_READ_ONLY", "Stop Play before editing asset documents");
+        Require(Params.contains("revision") && Params.at("revision") == State.Revision, "STALE_DOCUMENT", "Refresh the asset document before editing");
+        Require(Entry.Mount == AssetMount::Game, "READ_ONLY", "Engine Content is read-only");
+        std::string Error;
+        if (State.Mesh)
+        {
+            if (Operation == "edit") { Require(State.Mesh->Edit(Params.at("value"), Error), "DOCUMENT_ERROR", Error); }
+            else if (Operation == "undo") { State.Mesh->Undo(); }
+            else if (Operation == "redo") { State.Mesh->Redo(); }
+            else if (Operation == "save") { Require(State.Mesh->Save(Runtime.GetAssetManager(), Error), "DOCUMENT_ERROR", Error); }
+            else if (Operation == "reload")
+            {
+                Require(!State.Mesh->IsDirty(), "UNSAVED_CHANGES", "Save or undo mesh changes before reloading");
+                Require(State.Mesh->Open(Key, Error), "DOCUMENT_ERROR", Error);
+            }
+            else { throw Failure("INVALID_ARGUMENT", "Unknown mesh document operation"); }
+        }
+        else
+        {
+            MaterialEditOperation Action;
+            if (Operation == "edit") { Action = MaterialEditOperation::Document; }
+            else if (Operation == "source") { Action = MaterialEditOperation::Source; }
+            else if (Operation == "undo") { Action = MaterialEditOperation::Undo; }
+            else if (Operation == "redo") { Action = MaterialEditOperation::Redo; }
+            else if (Operation == "save") { Action = MaterialEditOperation::Save; }
+            else if (Operation == "compile") { Action = MaterialEditOperation::Compile; }
+            else if (Operation == "reload")
+            {
+                Require(!State.Material->GetDocument().IsDirty(), "UNSAVED_CHANGES", "Save or undo material changes before reloading");
+                Action = MaterialEditOperation::Reload;
+            }
+            else { throw Failure("INVALID_ARGUMENT", "Unknown material document operation"); }
+            const auto Result = State.Material->Execute(Action, Params.value("value", Json{}));
+            Require(!Result.HasError(), "DOCUMENT_ERROR", Result.Message);
+        }
+        ++State.Revision;
+        Previews.clear();
+    }
+    Json Document;
+    bool bDirty = false;
+    std::string Source;
+    std::string Diagnostic;
+    if (State.Mesh) { Document = State.Mesh->GetDefaults().ToJson(); bDirty = State.Mesh->IsDirty(); }
+    else
+    {
+        State.Material->Poll(Runtime.GetAssetGpuUploader());
+        Document = State.Material->GetDocument().GetDocument();
+        Source = State.Material->GetDocument().GetSource();
+        bDirty = State.Material->GetDocument().IsDirty();
+        Diagnostic = State.Material->GetDiagnostic();
+        if (!State.ImageDiagnostic.empty()) { Diagnostic = State.ImageDiagnostic; }
+    }
+    Json Parameters = Json::array();
+    std::string PreviewDomain = "Surface";
+    if (State.Material)
+    {
+        ResolvedMaterial ResolvedMaterialValue;
+        const auto Result = State.Material->GetDocument().BuildResolved(ResolvedMaterialValue);
+        if (!Result.HasError())
+        {
+            if (ResolvedMaterialValue.Definition.Domain == MaterialDomain::PostProcess) { PreviewDomain = "PostProcess"; }
+            if (ResolvedMaterialValue.Definition.Domain == MaterialDomain::UserInterface) { PreviewDomain = "UserInterface"; }
+            for (const auto& Parameter : ResolvedMaterialValue.Definition.Parameters)
+            {
+                auto Value = Parameter.DefaultValue;
+                const auto FoundValue = ResolvedMaterialValue.Values.find(Parameter.Identifier);
+                if (FoundValue != ResolvedMaterialValue.Values.end()) { Value = FoundValue->second; }
+                Parameters.push_back({{"id", Parameter.Identifier}, {"displayName", Parameter.DisplayName},
+                    {"group", Parameter.Group}, {"type", MaterialDefinitionIO::ParameterTypeName(Value.Type)},
+                    {"value", MaterialDocumentIO::WriteValue(Value)}});
+            }
+        }
+        else if (Diagnostic.empty()) { Diagnostic = Result.Message; }
+    }
+    Json Slots = Json::array();
+    if (State.Mesh)
+    {
+        Runtime.GetAssetManager().LoadAsync<StaticMeshResource>(Key);
+        AssetHandle<StaticMeshResource> Resource;
+        if (Runtime.GetAssetManager().TryGetLoaded(Key, Resource))
+        {
+            std::set<int32_t> Indices;
+            for (const auto& Part : Resource->Submeshes) { Indices.insert(Part.MaterialSlot); }
+            for (int32_t Index : Indices) { Slots.push_back(Index); }
+        }
+    }
+    return {{"assetId", Key.Asset.ToString()}, {"subAssetId", Params.value("subAssetId", Json(nullptr))},
+        {"type", Type.GetIdentifier()}, {"revision", State.Revision}, {"document", Document}, {"slots", Slots},
+        {"previewDomain", PreviewDomain}, {"previewPng", State.ImagePng}, {"sourceReadOnly", State.Material && State.Material->GetDocument().IsSourceReadOnly()}, {"preparing", State.Material && State.Material->IsPreparing()}, {"parameters", Parameters}, {"selectedCollision", SelectedCollision}, {"dirty", bDirty}, {"readOnly", Entry.Mount == AssetMount::Engine}, {"source", Source}, {"diagnostic", Diagnostic}};
+}
+
+NativeBridge::~NativeBridge()
+{
+    if (PreviewScene)
+    {
+        Runtime.SetRenderSurfaceScene(RenderSurfaceId{1}, nullptr);
+        MemorySubsystem::Get()->DestroyObject(PreviewScene);
+    }
+}
+
+const StaticMeshDefaults* NativeBridge::GetPreviewCollision() const
+{
+    const auto Found = AssetDocuments.find(PreviewDocument);
+    if (!bShowCollision || Found == AssetDocuments.end() || !Found->second.Mesh) { return nullptr; }
+    return &Found->second.Mesh->GetDefaults();
+}
+
+bool NativeBridge::CanEditPreviewCollision() const
+{
+    const auto Found = AssetDocuments.find(PreviewDocument);
+    return Found != AssetDocuments.end() && Found->second.Mesh
+        && Found->second.Mesh->GetEntry().Mount == AssetMount::Game && !Runtime.GetPlaySession().IsSimulating();
+}
+
+uint64_t NativeBridge::GetPreviewRevision() const
+{
+    const auto Found = AssetDocuments.find(PreviewDocument);
+    if (Found == AssetDocuments.end()) { return 0; }
+    return Found->second.Revision;
+}
+
+bool NativeBridge::CommitPreviewCollision(const Json& Value, uint64_t ExpectedRevision)
+{
+    const auto Found = AssetDocuments.find(PreviewDocument);
+    if (Found == AssetDocuments.end() || !Found->second.Mesh) { return false; }
+    const auto Key = Found->second.Mesh->GetAsset();
+    try
+    {
+        AssetDocumentTools({{"assetId", Key.Asset.ToString()}, {"subAssetId", Key.SubAsset->ToString()},
+            {"operation", "edit"}, {"revision", ExpectedRevision}, {"value", Value}});
+        return true;
+    }
+    catch (const std::exception&)
+    {
+        return false;
+    }
+}
+
+void NativeBridge::TickPreview()
+{
+    auto Found = AssetDocuments.find(PreviewDocument);
+    if (Found == AssetDocuments.end()) { return; }
+    auto& State = Found->second;
+    if (!PreviewScene)
+    {
+        PreviewScene = MemorySubsystem::Get()->NewObject<Scene>();
+        PreviewScene->SetAssetManager(&Runtime.GetAssetManager());
+        auto* Light = PreviewScene->CreateGameObject("Preview Light");
+        Transform LightTransform;
+        LightTransform.Rotation = Quaternion::CreateFromYawPitchRoll(-0.5f, -0.7f, 0.f);
+        Light->SetTransform(LightTransform);
+        Light->SetVisual(false);
+        Light->AddComponent<LightComponent>()->Intensity = 2.f;
+        PreviewMesh = PreviewScene->CreateGameObject("Asset Preview")->AddComponent<MeshRendererComponent>();
+        PreviewCamera = PreviewScene->CreateGameObject("Preview Camera")->AddComponent<CameraComponent>();
+    }
+    AssetKey MeshAsset;
+    if (State.Mesh)
+    {
+        MeshAsset = State.Mesh->GetAsset();
+        PreviewMesh->MaterialSlots.Entries.clear();
+        for (const auto& Assignment : State.Mesh->GetDefaults().Materials)
+        {
+            MaterialSlotOverride Override;
+            Override.Slot = Assignment.first;
+            Override.Material = Assignment.second;
+            PreviewMesh->MaterialSlots.Entries.push_back(Override);
+        }
+    }
+    else
+    {
+        for (const auto& Entry : Runtime.GetAssetRegistry().FindByType(ModelAssetType))
+        {
+            if (Entry.VirtualPath.find("BasicShapes/" + PreviewShape + ".glb") == std::string::npos) { continue; }
+            for (const auto& Subasset : Entry.Metadata.SubAssets)
+            {
+                if (Subasset.Type == StaticMeshAssetType) { MeshAsset = {Entry.Metadata.Guid, Subasset.Id}; break; }
+            }
+        }
+        if (State.RequestedPreviewRevision != State.Revision)
+        {
+            State.Material->Execute(MaterialEditOperation::Compile);
+            State.RequestedPreviewRevision = State.Revision;
+        }
+        State.Material->Poll(Runtime.GetAssetGpuUploader());
+        if (State.Material->GetPreview())
+        {
+            const auto Material = State.Material->GetPreview();
+            const auto Domain = Material->GetResolvedMaterial().Definition.Domain;
+            PreviewCamera->PostProcessEffects.Entries.clear();
+            if (Domain == MaterialDomain::Surface) { PreviewMesh->SetDynamicMaterial(Material); }
+            else
+            {
+                PreviewMesh->SetDynamicMaterial(nullptr);
+                if (Domain == MaterialDomain::PostProcess)
+                {
+                    MaterialPostProcessEffect Effect;
+                    Effect.DynamicMaterial = Material;
+                    PreviewCamera->PostProcessEffects.Entries.push_back(Effect);
+                }
+                if (Domain == MaterialDomain::UserInterface)
+                {
+                    Runtime.UpdateMaterialImage();
+                    if (State.Image && State.Image->State.load() == MaterialImageState::Ready)
+                    {
+                        const auto CompletedImage = State.Image;
+                        std::lock_guard<std::mutex> Lock(CompletedImage->Mutex);
+                        if (State.Image->Generation == State.Material->GetPreviewRevision())
+                        {
+                            QImage Image(State.Image->Pixels.data(), State.Image->Width, State.Image->Height,
+                                State.Image->Width * 4, QImage::Format_RGBA8888_Premultiplied);
+                            QByteArray Bytes;
+                            QBuffer Buffer(&Bytes);
+                            Buffer.open(QIODevice::WriteOnly);
+                            Image.save(&Buffer, "PNG");
+                            State.ImagePng = Bytes.toBase64().toStdString();
+                        }
+                        State.Image.reset();
+                    }
+                    if (State.Image && (State.Image->State.load() == MaterialImageState::Failed || State.Image->State.load() == MaterialImageState::Cancelled))
+                    {
+                        const auto CompletedImage = State.Image;
+                        std::lock_guard<std::mutex> Lock(CompletedImage->Mutex);
+                        State.ImageDiagnostic = CompletedImage->Diagnostic;
+                        State.Image.reset();
+                    }
+                    const bool bAnimatedFrame = Material->GetResolvedMaterial().Definition.bAnimated && Runtime.GetMaterialTime() - State.ImageTime >= .25f;
+                    if (!State.Image && (State.ImageRevision != State.Material->GetPreviewRevision() || bAnimatedFrame))
+                    {
+                        auto Image = std::make_shared<MaterialImageRequest>();
+                        Image->Snapshot = Runtime.GetSceneAssetResolver().ResolveMaterial({}, Material);
+                        Image->Width = 512;
+                        Image->Height = 512;
+                        Image->Generation = State.Material->GetPreviewRevision();
+                        Image->Time = Runtime.GetMaterialTime();
+                        if (Image->Snapshot && Runtime.UpdateMaterialImage(Image))
+                        {
+                            State.ImageDiagnostic.clear();
+                            State.ImageTime = Image->Time;
+                            State.ImageRevision = Image->Generation;
+                            State.Image = Image;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if (PreviewMesh->GetMeshAssetKey() != MeshAsset) { PreviewMesh->SetMeshAssetKey(MeshAsset); }
+    Runtime.GetSceneAssetResolver().ResolveScene(*PreviewScene);
+    Runtime.SetRenderSurfaceScene(RenderSurfaceId{1}, PreviewScene);
 }

@@ -19,6 +19,7 @@
 #include "FramePipe.h"
 #include "ViewportController.h"
 #include "NativeBridge.h"
+#include "Actions/SharedEditorRegistrars.h"
 #include "ControlPipe.h"
 #include "ProjectCli.h"
 
@@ -96,6 +97,7 @@ int main(int Argc, char** Argv)
     }
     SetCurrentThreadRole(ThreadRole::Game);
     EnginePaths::InitializeFromExecutable(std::filesystem::absolute(Argv[0]));
+    ForceTouchSharedEditorRegistrars();
     Engine Runtime;
     Runtime.SetGraphicsBackend(GraphicsBackend::D3D12);
     Runtime.InitializeHeadless({});
@@ -197,6 +199,7 @@ int main(int Argc, char** Argv)
         const float Dt = std::min(0.1f, Clock.restart() / 1000.f);
         if (Animate) Time += Dt;
         if (Animate) if (auto* Object = Runtime.GetEditScene()->FindByHandle(Animated)) { auto T = Object->GetTransform(); T.Rotation = Quaternion::CreateFromYawPitchRoll(Time * 0.6f, 0.2f, 0.f); Object->SetTransform(T); }
+        Controller->SetAssetPreview(Bridge.get());
         Controller->Tick(Dt);
         Runtime.Tick(Dt);
         if(Bridge && Ticks % 15 == 0) {
@@ -224,6 +227,7 @@ int main(int Argc, char** Argv)
     const int Result = App.exec();
     Timer.stop();
     Runtime.GetPlaySession().StopPlay();
+    Runtime.StopPresenting();
     Bridge.reset();
     Controller.reset();
     // Release/join GPU work before destroying its native surface.

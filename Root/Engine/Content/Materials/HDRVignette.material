@@ -1,10 +1,6 @@
 {
   "schemaVersion": 2,
   "domain": "PostProcess",
-  "source": {
-    "assetId": "7f0cabfa-fa28-5f15-b501-fc020e494199",
-    "subAssetId": null
-  },
   "parameters": [
     {
       "id": "Strength",
@@ -18,5 +14,6 @@
       ]
     }
   ],
-  "postProcessStage": "BeforeToneMapping"
+  "postProcessStage": "BeforeToneMapping",
+  "shader": "float4 EvaluatePostProcess(SakuraPostProcessInput Input)\n{\n    float Radius = length(Input.TextureCoordinates - 0.5);\n    float Factor = 1.0 - smoothstep(0.2, 0.71, Radius) * GetMaterialParameters().Strength;\n    return float4(Input.SceneColor.rgb * Factor, Input.SceneColor.a);\n}\n"
 }

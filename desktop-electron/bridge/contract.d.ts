@@ -4,15 +4,34 @@ export type Id = string;
 export type Vec3 = [number,number,number];
 export interface Transform {position:Vec3;rotation:[number,number,number,number];scale:Vec3}
 export interface Context {session:string;epoch:number;revision:number}
-export interface ComponentInfo {id:Id;typeId:string;enabled:boolean}
+export interface ComponentInfo {id:Id;typeId:string;displayName:string;enabled:boolean}
 export interface ObjectInfo {id:Id;name:string;parentId:Id|null;active:boolean;transform:Transform;components:ComponentInfo[]}
-export interface PropertyInfo {id:string;typeId:string;editable:boolean;assetTypes?:string[];subAssetId?:Id|null;label:string;category:string;value:JsonValue;error?:string;range?:[number,number]}
+export interface PropertyInfo {id:string;typeId:string;editable:boolean;assetTypes?:string[];assetId?:Id|null;subAssetId?:Id|null;label:string;category:string;value:JsonValue;error?:string;range?:[number,number]}
 /** engine.int64 is represented by a decimal string, including inside reflected arrays/structs. */
 export interface DialogueState {phase:'idle'|'line'|'choice'|'action'|'end'|'failed';speaker:string;text:string;choices:string[];canAdvance:boolean;canChoose:boolean;error:string}
-export interface State {dirty:boolean;storyDirty:boolean;externalChanges:boolean;projectExternalChanges:boolean;path:string;project:string;play:'stopped'|'playing'|'paused';dialogue:DialogueState;startupAudio:boolean;selection:Id|null;canUndo:boolean;canRedo:boolean;assetError?:string}
-export interface AssetInfo {id:Id;name:string;path:string;relativePath:string;typeId:string;builtin:boolean;bytes:number;version:string;subassets:JsonValue[]}
+export interface State {dirty:boolean;storyDirty:boolean;assetDocumentsDirty?:boolean;externalChanges:boolean;projectExternalChanges:boolean;path:string;project:string;play:'stopped'|'playing'|'paused';dialogue:DialogueState;startupAudio:boolean;selection:Id|null;canUndo:boolean;canRedo:boolean;assetError?:string}
+export interface AssetInfo {id:Id;name:string;path:string;relativePath:string;typeId:string;builtin:boolean;browserVisible?:boolean;bytes:number;version:string;subassets:JsonValue[]}
 export interface StorySnapshot {open:boolean;revision:number;error?:string;dirty?:boolean;readOnly?:boolean;externalChanges?:boolean;canUndo?:boolean;canRedo?:boolean;path?:string;document?:JsonValue;positions?:Record<string,{x:number;y:number}>}
+export interface AssetCreationType {id:string;label:string;typeId:string;category:string;extension:string;settings:(PropertyInfo & {required:boolean;enumValues?:string[]})[]}
 export interface Commands {
+  'assets.folders': {params:Record<string,never>;result:string[]};
+  'assets.rename': {params:{assetId:string;name:string};result:JsonValue};
+  'assets.move': {params:{assetId:string;folder:string};result:JsonValue};
+  'assets.delete': {params:{assetId:string};result:JsonValue};
+  'assets.duplicate': {params:{assetId:string;folder:string};result:JsonValue};
+  'assets.createFolder': {params:{folder:string;name:string};result:JsonValue};
+  'assets.renameFolder': {params:{folder:string;name:string};result:JsonValue};
+  'assets.deleteFolder': {params:{folder:string};result:JsonValue};
+  'assets.creationTypes': {params:Record<string,never>;result:AssetCreationType[]};
+  'assets.create': {params:{factoryId:string;path:string;settings?:JsonValue};result:{id:Id;path:string;typeId:string}};
+  'editor.actions': {params:Record<string,never>;result:JsonValue};
+  'editor.executeAction': {params:{actionId:Id;parentId?:Id|null};result:{id:Id|null}};
+  'assets.thumbnail': {params:{assetId:Id;subAssetId?:Id|null};result:{ready:boolean;png?:string}};
+  'assets.place': {params:{assetId:Id;subAssetId:Id;transform?:Transform};result:{id:Id}};
+  'mesh.inspect': {params:{objectId:Id;componentId:Id};result:JsonValue};
+  'mesh.material': {params:{objectId:Id;componentId:Id;slot:number;assetId:Id|null};result:JsonValue};
+  'mesh.physics': {params:{objectId:Id;componentId:Id;enabled:boolean;simulate:boolean};result:JsonValue};
+  'assetDocument.execute': {params:{assetId:Id;subAssetId?:Id|null;operation:string;value?:JsonValue;revision?:number};result:JsonValue};
   'component.setAsset': {params:{objectId:Id;componentId:Id;property:string;assetId:Id|null;subAssetId?:Id|null};result:PropertyInfo[]};
   'project.save': {params:{useCurrentAsStartup?:boolean};result:State};
   'scene.create': {params:{path:string};result:State};
@@ -50,6 +69,8 @@ export interface Commands {
   'object.create': {params:{name:string;parentId?:Id|null;transform?:Transform;componentType?:string;primitive?:string;cameraAspect?:number};result:{id:Id}};
   'character.create': {params:{name:string;transform?:Transform};result:{id:Id}};
   'object.duplicate': {params:{objectId:Id};result:{id:Id}};
+  'object.copy': {params:{objectId:Id};result:{subtree:string}};
+  'object.paste': {params:{subtree:string};result:{id:Id}};
   'object.destroy': {params:{objectId:Id};result:null};
   'object.rename': {params:{objectId:Id;name:string};result:null};
   'object.setParent': {params:{objectId:Id;parentId:Id|null};result:null};
@@ -68,7 +89,7 @@ export interface Commands {
   'play.start': {params:Record<string,never>;result:State};
   'play.pause': {params:Record<string,never>;result:State};
   'play.stop': {params:Record<string,never>;result:State};
-  'reflection.getComponentTypes': {params:Record<string,never>;result:{typeId:string;version:number}[]};
+  'reflection.getComponentTypes': {params:Record<string,never>;result:{typeId:string;displayName:string;version:number}[]};
   'assets.getScenes': {params:Record<string,never>;result:{id:Id;path:string}[]};
 }
 export type Request<K extends keyof Commands>={method:K;params:Commands[K]['params'];context:Context};

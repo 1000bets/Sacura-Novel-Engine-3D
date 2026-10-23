@@ -1,3 +1,5 @@
+#include "Assets/AssetOperations.h"
+#include "Assets/AssetCreationFactory.h"
 #include "UI/Views/AssetReferenceField.h"
 #include "Panels/ContentBrowserWidget.h"
 #include "UI/Adapters/WorkspaceDockController.h"
@@ -56,6 +58,119 @@ void EditorMainWindow::InitializeTools()
     const QJsonObject Text{{"type", "string"}};
     const QJsonObject Number{{"type", "number"}};
     const QJsonObject Boolean{{"type", "boolean"}};
+    Toolset->Register("asset_creation_types", "List reflected asset factories and their creation settings", {}, {}, true,
+        [](const QJsonObject&)
+        {
+            return EditorToolset::Success(QJsonDocument::fromJson(QByteArray::fromStdString(AssetCreationFactory::DescribeFactories().dump())).array());
+        });
+    Toolset->Register("asset_create", "Create an asset using a reflected factory and its validated settings",
+        {{"factoryId", Text}, {"path", Text}, {"settings", QJsonObject{{"type", "object"}}}}, {"factoryId", "path"}, false,
+        [this](const QJsonObject& Arguments)
+        {
+            if (!BoundSession.GetProject() || BoundEngine.GetPlaySession().IsSimulating())
+            { return EditorToolset::Failure("Open a project and stop Play before creating assets"); }
+            const auto Settings = nlohmann::json::parse(QJsonDocument(Arguments.value("settings").toObject()).toJson().toStdString());
+            AssetRegistryEntry Created;
+            std::string Error;
+            if (!AssetCreationFactory::CreateAsset(BoundEngine.GetAssetRegistry(),
+                TypeId{Arguments.value("factoryId").toString().toStdString()}, Arguments.value("path").toString().toStdString(), Settings, Created, Error))
+            { return EditorToolset::Failure(QString::fromStdString(Error)); }
+            ContentBrowser->Refresh();
+            return EditorToolset::Success(QJsonObject{{"id", QString::fromStdString(Created.Metadata.Guid.ToString())},
+                {"path", QString::fromStdString(Created.VirtualPath)}, {"typeId", QString::fromStdString(Created.Metadata.Type.GetIdentifier())}});
+        });
+    for (const QString& Operation : {QString("asset_rename"), QString("asset_move"), QString("asset_delete"), QString("asset_duplicate"), QString("folder_create"), QString("folder_rename"), QString("folder_delete")})
+    {
+        QJsonObject Properties;
+        QJsonArray Required;
+        const bool bFolder = Operation.startsWith("folder_");
+        QString Identity = "assetId";
+        if (bFolder)
+        {
+            Identity = "folder";
+        }
+        Properties[Identity] = Text;
+        Required.append(Identity);
+        if (Operation.endsWith("rename") || Operation == "folder_create")
+        {
+            Properties["name"] = Text;
+            Required.append("name");
+        }
+        if (Operation == "asset_move" || Operation == "asset_duplicate")
+        {
+            Properties["folder"] = Text;
+            Required.append("folder");
+        }
+        Toolset->Register(Operation, "Modify Content assets through shared EditorCore asset operations", Properties, Required, false,
+            [this, Operation, bFolder](const QJsonObject& Arguments)
+            {
+                if (!BoundSession.GetProject() || BoundEngine.GetPlaySession().IsSimulating())
+                {
+                    return EditorToolset::Failure("Open a project and stop Play before modifying assets");
+                }
+                AssetOperations Operations(BoundEngine);
+                Operations.SetProjectContext(&BoundSession, &Workspace.GetDocument());
+                const auto Folder = Arguments.value("folder").toString().toStdString();
+                const auto Name = Arguments.value("name").toString().toStdString();
+                if (Arguments.contains("name") && (Name.empty() || Name.find_first_of("./\\:*?\"<>|") != std::string::npos || Name.back() == ' '))
+                {
+                    return EditorToolset::Failure("Enter a single valid name without an extension");
+                }
+                AssetDiagnostic Result;
+                if (bFolder)
+                {
+                    if (Operation == "folder_create")
+                    {
+                        Result = Operations.CreateFolder(Folder + "/" + Name);
+                    }
+                    else if (Operation == "folder_rename")
+                    {
+                        Result = Operations.RenameFolder(Folder, std::filesystem::u8path(Folder).parent_path().generic_u8string() + "/" + Name);
+                    }
+                    else
+                    {
+                        Result = Operations.DeleteFolder(Folder);
+                    }
+                }
+                else
+                {
+                    AssetKey Key;
+                    if (!Guid::TryParse(Arguments.value("assetId").toString().toStdString(), Key.Asset) || !Key.IsValid())
+                    {
+                        return EditorToolset::Failure("Invalid asset identifier");
+                    }
+                    AssetRegistryEntry Entry;
+                    if (!BoundEngine.GetAssetRegistry().TryResolveKey(Key, Entry))
+                    {
+                        return EditorToolset::Failure("Asset is unavailable");
+                    }
+                    if (Operation == "asset_delete")
+                    {
+                        Result = Operations.DeleteAsset(Key);
+                    }
+                    else if (Operation == "asset_duplicate")
+                    {
+                        Result = Operations.DuplicateAsset(Key, Folder);
+                    }
+                    else
+                    {
+                        const auto Source = std::filesystem::u8path(Entry.VirtualPath);
+                        std::string Destination = Folder + "/" + Source.filename().u8string();
+                        if (Operation == "asset_rename")
+                        {
+                            Destination = (Source.parent_path() / std::filesystem::u8path(Name + Source.extension().u8string())).generic_u8string();
+                        }
+                        Result = Operations.RenameAsset(Entry.VirtualPath, Destination);
+                    }
+                }
+                if (Result.HasError())
+                {
+                    return EditorToolset::Failure(QString::fromStdString(Result.Message));
+                }
+                ContentBrowser->Refresh();
+                return EditorToolset::Success(QJsonObject{{"success", true}});
+            });
+    }
     AssetReferenceField::SetNavigation(*this, [this](const AssetKey& Key, bool bOpen)
     {
         QJsonObject Arguments{{"assetId", QString::fromStdString(Key.Asset.ToString())}};
@@ -493,7 +608,7 @@ void EditorMainWindow::InitializeTools()
                 Properties.append(QJsonObject{{"name", QString::fromStdString(Property->Id.Value)},
                     {"type", QString::fromStdString(Property->ValueTypeId.Value)}, {"readOnly", Property->bReadOnly}});
             }
-            Types.append(QJsonObject{{"typeId", QString::fromStdString(Type->GetTypeId().Value)}, {"properties", Properties}});
+            Types.append(QJsonObject{{"typeId", QString::fromStdString(Type->GetTypeId().Value)}, {"displayName", QString::fromStdString(Type->GetDisplayName())}, {"properties", Properties}});
         }
         return EditorToolset::Success(Types);
     });

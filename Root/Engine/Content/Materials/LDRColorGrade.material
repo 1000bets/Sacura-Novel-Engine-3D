@@ -1,10 +1,6 @@
 {
   "schemaVersion": 2,
   "domain": "PostProcess",
-  "source": {
-    "assetId": "581f3aa1-d73e-57e4-b36e-96e948ed489b",
-    "subAssetId": null
-  },
   "parameters": [
     {
       "id": "Tint",
@@ -19,5 +15,6 @@
       "group": "Surface"
     }
   ],
-  "postProcessStage": "AfterToneMapping"
+  "postProcessStage": "AfterToneMapping",
+  "shader": "float4 EvaluatePostProcess(SakuraPostProcessInput Input)\n{\n    MaterialParameters Parameters = GetMaterialParameters();\n    return float4(saturate(Input.SceneColor.rgb * Parameters.Tint.rgb), Input.SceneColor.a);\n}\n"
 }

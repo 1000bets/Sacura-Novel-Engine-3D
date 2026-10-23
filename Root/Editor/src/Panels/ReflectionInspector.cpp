@@ -261,7 +261,8 @@ void ReflectionInspector::Rebuild()
             DisplayedValues.emplace_back(Property->Id, std::move(Value));
         }
     }
-    TypeLabel->setText(QString::fromStdString(GetInspectedObject()->GetClass()->GetTypeId().Value));
+    TypeLabel->setText(QString::fromStdString(GetInspectedObject()->GetClass()->GetDisplayName()));
+    TypeLabel->setToolTip(QString::fromStdString(GetInspectedObject()->GetClass()->GetTypeId().Value));
     ResetAllButton->setEnabled(true);
     ResetAllButton->setVisible(true);
 

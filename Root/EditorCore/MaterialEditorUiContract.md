@@ -42,7 +42,7 @@ GetSnapshot возвращает неизменяемый MaterialEditingSnapsho
 
 Снимок не содержит ссылок на внутренний JSON, изменяемый экземпляр, Component или GPU-объект. Старый снимок можно удерживать; изменить систему через него нельзя. Незагруженные значения показываются как Pending, а не заменяются нулями.
 
-Engine Content открывается только для чтения. SourceReadOnly проверяется отдельно: Game Material может использовать Engine HLSL. Для редактирования такого источника требуется явное создание Game-копии с новым GUID и смена source через команду.
+Engine Content и унаследованный код экземпляров открываются только для чтения. Game Material хранит редактируемый HLSL в своём поле shader. Внешние исходники и назначение source-ассета не поддерживаются.
 
 ## 3. Команды и undo
 
@@ -50,7 +50,7 @@ Execute принимает команду и ожидаемый DraftRevision. �
 
 Предлагаемые команды:
 
-- SetShaderSource и SetSourceAsset;
+- SetShaderSource;
 - SetDomain, SetShadingModel, SetBlendMode, SetRenderSettings и SetDeformationBounds;
 - AddParameter, UpdateParameterDefinition и RemoveParameter;
 - SetParent, SetParameterOverride, RemoveParameterOverride и RemoveUnusedOverrides;

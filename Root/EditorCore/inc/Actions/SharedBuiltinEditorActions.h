@@ -1,0 +1,286 @@
+#pragma once
+#include "World/Components/SkySphereComponent.h"
+#include "World/Components/SkyLightComponent.h"
+
+#include "Actions/EditorAction.h"
+#include "World/Components/CameraComponent.h"
+#include "World/Components/LightComponent.h"
+#include "World/Components/ArrowComponent.h"
+#include "World/Components/MeshRendererComponent.h"
+#include "Rendering/RenderLight.h"
+
+#include "Commands/EditorCommands.h"
+
+class CreateEmptyObjectAction : public EditorAction
+{
+    ENGINE_CLASS(CreateEmptyObjectAction, EditorAction, "editor.CreateEmptyObjectAction")
+
+public:
+    const char* GetMenuCategory() const override { return ObjectsCategory; }
+    const char* GetDisplayName() const override { return "Empty Object"; }
+    int GetSortOrder() const override { return 0; }
+
+    bool Execute(EditorActionContext& Context) const override
+    {
+        if (!CanExecute(Context))
+        {
+            return false;
+        }
+        ObjectHandle Created;
+        if (!Context.ExecuteCommand(MakeCreateObjectCommand(
+                Context.EditScene,
+                "GameObject",
+                Context.SelectedObject,
+                &Created)))
+        {
+            return false;
+        }
+        if (Context.SelectObject)
+        {
+            Context.SelectObject(Created);
+        }
+        return true;
+    }
+
+protected:
+    CreateEmptyObjectAction() = default;
+};
+
+ENGINE_CLASS_END(CreateEmptyObjectAction)
+
+class CreateCameraObjectAction : public EditorAction
+{
+    ENGINE_CLASS(CreateCameraObjectAction, EditorAction, "editor.CreateCameraObjectAction")
+
+public:
+    const char* GetMenuCategory() const override { return ObjectsCategory; }
+    const char* GetDisplayName() const override { return "Camera Object"; }
+    int GetSortOrder() const override { return 10; }
+
+    bool Execute(EditorActionContext& Context) const override
+    {
+        return CreateObjectWithComponent(
+            Context,
+            "Camera",
+            TypeId{CameraComponent::StaticReflectionTypeId()});
+    }
+
+protected:
+    CreateCameraObjectAction() = default;
+};
+
+ENGINE_CLASS_END(CreateCameraObjectAction)
+
+class CreateStaticMeshObjectAction : public EditorAction
+{
+    ENGINE_CLASS(CreateStaticMeshObjectAction, EditorAction, "editor.CreateStaticMeshObjectAction")
+
+public:
+    const char* GetMenuCategory() const override { return ObjectsCategory; }
+    const char* GetDisplayName() const override { return "Static Mesh Object"; }
+    int GetSortOrder() const override { return 20; }
+
+    bool Execute(EditorActionContext& Context) const override
+    {
+        return CreateObjectWithComponent(
+            Context,
+            "StaticMesh",
+            TypeId{MeshRendererComponent::StaticReflectionTypeId()});
+    }
+
+protected:
+    CreateStaticMeshObjectAction() = default;
+};
+
+ENGINE_CLASS_END(CreateStaticMeshObjectAction)
+
+class CreateDirectionalLightObjectAction : public EditorAction
+{
+    ENGINE_CLASS(CreateDirectionalLightObjectAction, EditorAction, "editor.CreateDirectionalLightObjectAction")
+
+public:
+    const char* GetMenuCategory() const override { return ObjectsCategory; }
+    const char* GetDisplayName() const override { return "Directional Light Object"; }
+    int GetSortOrder() const override { return 100; }
+
+    bool Execute(EditorActionContext& Context) const override
+    {
+        return CreateObjectWithComponent(
+            Context,
+            "DirectionalLight",
+            TypeId{LightComponent::StaticReflectionTypeId()},
+            true,
+            static_cast<int64_t>(RenderLightType::Directional));
+    }
+
+protected:
+    CreateDirectionalLightObjectAction() = default;
+};
+
+ENGINE_CLASS_END(CreateDirectionalLightObjectAction)
+
+class CreatePointLightObjectAction : public EditorAction
+{
+    ENGINE_CLASS(CreatePointLightObjectAction, EditorAction, "editor.CreatePointLightObjectAction")
+
+public:
+    const char* GetMenuCategory() const override { return ObjectsCategory; }
+    const char* GetDisplayName() const override { return "Point Light Object"; }
+    int GetSortOrder() const override { return 110; }
+
+    bool Execute(EditorActionContext& Context) const override
+    {
+        return CreateObjectWithComponent(
+            Context,
+            "PointLight",
+            TypeId{LightComponent::StaticReflectionTypeId()},
+            true,
+            static_cast<int64_t>(RenderLightType::Point));
+    }
+
+protected:
+    CreatePointLightObjectAction() = default;
+};
+
+ENGINE_CLASS_END(CreatePointLightObjectAction)
+
+class CreateSpotLightObjectAction : public EditorAction
+{
+    ENGINE_CLASS(CreateSpotLightObjectAction, EditorAction, "editor.CreateSpotLightObjectAction")
+
+public:
+    const char* GetMenuCategory() const override { return ObjectsCategory; }
+    const char* GetDisplayName() const override { return "Spot Light Object"; }
+    int GetSortOrder() const override { return 120; }
+
+    bool Execute(EditorActionContext& Context) const override
+    {
+        return CreateObjectWithComponent(
+            Context,
+            "SpotLight",
+            TypeId{LightComponent::StaticReflectionTypeId()},
+            true,
+            static_cast<int64_t>(RenderLightType::Spot));
+    }
+
+protected:
+    CreateSpotLightObjectAction() = default;
+};
+
+ENGINE_CLASS_END(CreateSpotLightObjectAction)
+
+class AddCameraComponentAction : public EditorAction
+{
+    ENGINE_CLASS(AddCameraComponentAction, EditorAction, "editor.AddCameraComponentAction")
+
+public:
+    const char* GetMenuCategory() const override { return ComponentsCategory; }
+    const char* GetDisplayName() const override { return "Camera Component"; }
+    int GetSortOrder() const override { return 0; }
+    bool RequiresSelection() const override { return true; }
+
+    bool Execute(EditorActionContext& Context) const override
+    {
+        return AddComponentToSelection(Context, TypeId{CameraComponent::StaticReflectionTypeId()});
+    }
+
+protected:
+    AddCameraComponentAction() = default;
+};
+
+ENGINE_CLASS_END(AddCameraComponentAction)
+
+class AddLightComponentAction : public EditorAction
+{
+    ENGINE_CLASS(AddLightComponentAction, EditorAction, "editor.AddLightComponentAction")
+
+public:
+    const char* GetMenuCategory() const override { return ComponentsCategory; }
+    const char* GetDisplayName() const override { return "Light Component"; }
+    int GetSortOrder() const override { return 10; }
+    bool RequiresSelection() const override { return true; }
+
+    bool Execute(EditorActionContext& Context) const override
+    {
+        return AddComponentToSelection(Context, TypeId{LightComponent::StaticReflectionTypeId()});
+    }
+
+protected:
+    AddLightComponentAction() = default;
+};
+
+ENGINE_CLASS_END(AddLightComponentAction)
+
+class AddMeshRendererComponentAction : public EditorAction
+{
+    ENGINE_CLASS(AddMeshRendererComponentAction, EditorAction, "editor.AddMeshRendererComponentAction")
+
+public:
+    const char* GetMenuCategory() const override { return ComponentsCategory; }
+    const char* GetDisplayName() const override { return "Static Mesh"; }
+    int GetSortOrder() const override { return 20; }
+    bool RequiresSelection() const override { return true; }
+
+    bool Execute(EditorActionContext& Context) const override
+    {
+        return AddComponentToSelection(Context, TypeId{MeshRendererComponent::StaticReflectionTypeId()});
+    }
+
+protected:
+    AddMeshRendererComponentAction() = default;
+};
+
+ENGINE_CLASS_END(AddMeshRendererComponentAction)
+
+class AddArrowComponentAction : public EditorAction
+{
+    ENGINE_CLASS(AddArrowComponentAction, EditorAction, "editor.AddArrowComponentAction")
+
+public:
+    const char* GetMenuCategory() const override { return ComponentsCategory; }
+    const char* GetDisplayName() const override { return "Arrow Component"; }
+    int GetSortOrder() const override { return 15; }
+    bool RequiresSelection() const override { return true; }
+
+    bool Execute(EditorActionContext& Context) const override
+    {
+        return AddComponentToSelection(Context, TypeId{ArrowComponent::StaticReflectionTypeId()});
+    }
+
+protected:
+    AddArrowComponentAction() = default;
+};
+
+ENGINE_CLASS_END(AddArrowComponentAction)
+
+class CreateSkySphereObjectAction : public EditorAction
+{
+    ENGINE_CLASS(CreateSkySphereObjectAction, EditorAction, "editor.CreateSkySphereObjectAction")
+public:
+    const char* GetMenuCategory() const override { return ObjectsCategory; }
+    const char* GetDisplayName() const override { return "Sky Sphere"; }
+    int GetSortOrder() const override { return 130; }
+    bool Execute(EditorActionContext& Context) const override
+    {
+        return CreateObjectWithComponent(Context, "SkySphere", TypeId{SkySphereComponent::StaticReflectionTypeId()});
+    }
+protected:
+    CreateSkySphereObjectAction() = default;
+};
+ENGINE_CLASS_END(CreateSkySphereObjectAction)
+
+class CreateSkyLightObjectAction : public EditorAction
+{
+    ENGINE_CLASS(CreateSkyLightObjectAction, EditorAction, "editor.CreateSkyLightObjectAction")
+public:
+    const char* GetMenuCategory() const override { return ObjectsCategory; }
+    const char* GetDisplayName() const override { return "Sky Light"; }
+    int GetSortOrder() const override { return 130; }
+    bool Execute(EditorActionContext& Context) const override
+    {
+        return CreateObjectWithComponent(Context, "SkyLight", TypeId{SkyLightComponent::StaticReflectionTypeId()});
+    }
+protected:
+    CreateSkyLightObjectAction() = default;
+};
+ENGINE_CLASS_END(CreateSkyLightObjectAction)

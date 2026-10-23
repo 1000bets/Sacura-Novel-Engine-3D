@@ -22,6 +22,12 @@
       "name": "string",
       "transform?": "transform"
     },
+    "object.copy": {
+      "objectId": "id"
+    },
+    "object.paste": {
+      "subtree": "string"
+    },
     "object.duplicate": {
       "objectId": "id"
     },
@@ -80,7 +86,9 @@
     "editor.redo": {},
     "play.start": {},
     "play.advanceDialogue": {},
-    "play.selectChoice": {"index": "number"},
+    "play.selectChoice": {
+      "index": "number"
+    },
     "play.pause": {},
     "play.stop": {},
     "reflection.getComponentTypes": {},
@@ -175,6 +183,76 @@
       "property": "id",
       "assetId": "nullableId",
       "subAssetId?": "nullableId"
+    },
+    "assets.thumbnail": {
+      "assetId": "id",
+      "subAssetId?": "nullableId"
+    },
+    "assets.place": {
+      "assetId": "id",
+      "subAssetId": "id",
+      "transform?": "transform"
+    },
+    "mesh.inspect": {
+      "objectId": "id",
+      "componentId": "id"
+    },
+    "mesh.material": {
+      "objectId": "id",
+      "componentId": "id",
+      "slot": "number",
+      "assetId": "nullableId"
+    },
+    "mesh.physics": {
+      "objectId": "id",
+      "componentId": "id",
+      "enabled": "boolean",
+      "simulate": "boolean"
+    },
+    "assetDocument.execute": {
+      "assetId": "id",
+      "subAssetId?": "nullableId",
+      "operation": "string",
+      "value?": "json",
+      "revision?": "number"
+    },
+    "editor.actions": {},
+    "editor.executeAction": {
+      "actionId": "id",
+      "parentId?": "nullableId"
+    },
+    "assets.creationTypes": {},
+    "assets.create": {
+      "factoryId": "id",
+      "path": "string",
+      "settings?": "json"
+    },
+    "assets.folders": {},
+    "assets.rename": {
+      "assetId": "id",
+      "name": "string"
+    },
+    "assets.move": {
+      "assetId": "id",
+      "folder": "string"
+    },
+    "assets.delete": {
+      "assetId": "id"
+    },
+    "assets.duplicate": {
+      "assetId": "id",
+      "folder": "string"
+    },
+    "assets.createFolder": {
+      "folder": "string",
+      "name": "string"
+    },
+    "assets.renameFolder": {
+      "folder": "string",
+      "name": "string"
+    },
+    "assets.deleteFolder": {
+      "folder": "string"
     }
   }
 }

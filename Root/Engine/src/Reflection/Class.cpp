@@ -1,5 +1,32 @@
 #include "Reflection/Class.h"
 #include "Core/Object/MemorySubsystem.h"
+#include <cctype>
+
+std::string Class::GetDisplayName() const
+{
+    if (!DisplayName.empty())
+    {
+        return DisplayName;
+    }
+    std::string Name = Id.Value.substr(Id.Value.find_last_of('.') + 1);
+    if (Name.size() > 9 && Name.compare(Name.size() - 9, 9, "Component") == 0)
+    {
+        Name.resize(Name.size() - 9);
+    }
+    std::string Caption;
+    for (size_t Index = 0; Index < Name.size(); ++Index)
+    {
+        if (Index > 0 && std::isupper(static_cast<unsigned char>(Name[Index]))
+            && (std::islower(static_cast<unsigned char>(Name[Index - 1]))
+                || std::isdigit(static_cast<unsigned char>(Name[Index - 1]))
+                || (Index + 1 < Name.size() && std::islower(static_cast<unsigned char>(Name[Index + 1])))))
+        {
+            Caption += ' ';
+        }
+        Caption += Name[Index];
+    }
+    return Caption;
+}
 
 Class::Class()
     : Object("Class")

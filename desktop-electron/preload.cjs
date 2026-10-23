@@ -34,7 +34,7 @@ function drawNativeFrame(canvas, frame) {
   const {gl} = blit;
   gl.viewport(0, 0, canvas.width, canvas.height);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, frame);
-  gl.drawArrays(gl.TRIANGLES, 0, 3); gl.flush();
+  gl.drawArrays(gl.TRIANGLES, 0, 3); gl.finish();
   const error = gl.getError(); if (error) throw new Error('Native frame blit GL error ' + error);
 }
 if (process.argv.includes('--native-viewport')) sharedTexture.setSharedTextureReceiver(async ({importedSharedTexture}, bytes) => {
@@ -65,7 +65,12 @@ if (process.argv.includes('--native-viewport')) sharedTexture.setSharedTextureRe
       Object.assign(presentation,{frameMs:percentile(intervals,.5),frameP95Ms:percentile(intervals,.95),readyToDrawP50Ms:percentile(latencies,.5),readyToDrawP95Ms:percentile(latencies,.95),inputToDrawP50Ms:percentile(inputLatencies,.5),inputToDrawP95Ms:percentile(inputLatencies,.95)});
     }
   } catch (error) {presentation.error = error.message;}
-  finally {frame?.close(); importedSharedTexture.release();}
+  finally {
+    frame?.close();
+    importedSharedTexture.release();
+    const Packet = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    await ipcRenderer.invoke('desktop:native-frame-consumed', Packet.getBigUint64(16, true).toString());
+  }
 });
 
 // Only narrow, user-initiated project operations cross the isolated context.
@@ -79,6 +84,25 @@ contextBridge.exposeInMainWorld('sacuraDesktop', Object.freeze({
       return () => ipcRenderer.removeListener('native-bridge-event',listener);
     }
   }),
+  assetEditorIdentity: (() => {const Argument = process.argv.find(Value => Value.startsWith('--asset-editor=')); if (Argument) {return JSON.parse(decodeURIComponent(Argument.slice(15)));} return null;})(),
+  nativeCopyText: Text => ipcRenderer.invoke('desktop:native-copy-text', Text),
+  nativeOpenAssetEditor: Identity => ipcRenderer.invoke('desktop:native-open-asset-editor', Identity),
+  nativeRevealAsset: Identity => ipcRenderer.invoke('desktop:native-reveal-asset', Identity),
+  onAssetEditorAction: Callback => {
+    const Listener = async (Event, Action, RequestId) => {
+      let Completed = false;
+      try {
+        Completed = Boolean(await Callback(Action));
+      } finally {
+        if (RequestId) {
+          ipcRenderer.send('asset-editor-action-result', RequestId, Completed);
+        }
+      }
+    };
+    ipcRenderer.on('asset-editor-action', Listener);
+    return () => ipcRenderer.removeListener('asset-editor-action', Listener);
+  },
+  onRevealAsset: Callback => {const Listener = (_, Identity) => Callback(Identity); ipcRenderer.on('native-reveal-asset', Listener); return () => ipcRenderer.removeListener('native-reveal-asset', Listener);},
   nativeViewport: process.argv.includes('--native-viewport'),
   nativeSession: () => ipcRenderer.invoke('desktop:native-session'),
   nativeListProjects: () => ipcRenderer.invoke('desktop:native-list-projects'),

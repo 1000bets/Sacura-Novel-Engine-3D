@@ -46,7 +46,7 @@ void SharedFrameExporter::Export(RenderDevice& Device, Diligent::ITexture* Sourc
         if (!Data->Consumer) Data->Consumer = OpenProcess(PROCESS_DUP_HANDLE, FALSE, Data->Stream->ConsumerProcess);
         if (!Data->Consumer) throw std::runtime_error("Cannot open GPU frame consumer process.");
         const auto Desc = Source->GetDesc();
-        // Retire old generations only after Chromium's GPU release callback.
+        // Retire old generations only after the consumer's completed-frame ACK.
         for (auto It = Data->Slots.begin(); It != Data->Slots.end();) {
             if (((*It)->Width != Desc.Width || (*It)->Height != Desc.Height) && (*It)->Released->load()) {
                 Data->CloseRemote((*It)->Remote); It = Data->Slots.erase(It);
@@ -95,7 +95,7 @@ void SharedFrameExporter::Export(RenderDevice& Device, Diligent::ITexture* Sourc
         StateTransitionDesc Transition(Available->Texture, RESOURCE_STATE_UNKNOWN, RESOURCE_STATE_COMMON, STATE_TRANSITION_FLAG_UPDATE_STATE);
         Context->TransitionResourceStates(1, &Transition);
         // Conservative producer fence: no pixel readback, but a CPU wait on Render
-        // thread. Consumer ownership ends only on allReferencesReleased, never on send.
+        // thread. Consumer ownership ends on its completed GPU blit ACK, never on send.
         Device.WaitForIdle();
         Available->Released = std::make_shared<std::atomic<bool>>(false);
         SharedGpuFrame Frame;

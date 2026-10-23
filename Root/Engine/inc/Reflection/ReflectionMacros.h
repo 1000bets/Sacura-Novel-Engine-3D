@@ -325,11 +325,17 @@ struct ReflectionReadOnlyAccess
     }
 };
 
-#define ENGINE_CLASS_ROOT(ClassName, TypeIdLiteral) \
+inline constexpr const char* ReflectionClassDisplayName(const char* DisplayName = "")
+{
+    return DisplayName;
+}
+
+#define ENGINE_CLASS_ROOT(ClassName, TypeIdLiteral, ...) \
     SAKURA_OBJECT(ClassName) \
 public: \
     static constexpr const char* StaticReflectionTypeId() { return TypeIdLiteral; } \
     static constexpr uint32_t StaticReflectionSchemaVersion() { return 1; } \
+    static constexpr const char* StaticReflectionDisplayName() { return ReflectionClassDisplayName(__VA_ARGS__); } \
     static constexpr const char* StaticReflectionBaseTypeId() { return nullptr; } \
     static constexpr CreationPolicy StaticReflectionCreationPolicy() { return CreationPolicy::Concrete; } \
     friend struct ClassName##_ReflectionClassRegistrar; \
@@ -352,11 +358,12 @@ public: \
     static ClassName##_ReflectionClassRegistrar s_ReflectionClassRegistrar; \
 private:
 
-#define ENGINE_CLASS(ClassName, BaseClassName, TypeIdLiteral) \
+#define ENGINE_CLASS(ClassName, BaseClassName, TypeIdLiteral, ...) \
     SAKURA_OBJECT(ClassName) \
 public: \
     static constexpr const char* StaticReflectionTypeId() { return TypeIdLiteral; } \
     static constexpr uint32_t StaticReflectionSchemaVersion() { return 1; } \
+    static constexpr const char* StaticReflectionDisplayName() { return ReflectionClassDisplayName(__VA_ARGS__); } \
     static constexpr const char* StaticReflectionBaseTypeId() { return BaseClassName::StaticReflectionTypeId(); } \
     static constexpr CreationPolicy StaticReflectionCreationPolicy() { return CreationPolicy::Concrete; } \
     friend struct ClassName##_ReflectionClassRegistrar; \
@@ -379,11 +386,12 @@ public: \
     static ClassName##_ReflectionClassRegistrar s_ReflectionClassRegistrar; \
 private:
 
-#define ENGINE_ABSTRACT_CLASS(ClassName, BaseClassName, TypeIdLiteral) \
+#define ENGINE_ABSTRACT_CLASS(ClassName, BaseClassName, TypeIdLiteral, ...) \
     SAKURA_OBJECT(ClassName) \
 public: \
     static constexpr const char* StaticReflectionTypeId() { return TypeIdLiteral; } \
     static constexpr uint32_t StaticReflectionSchemaVersion() { return 1; } \
+    static constexpr const char* StaticReflectionDisplayName() { return ReflectionClassDisplayName(__VA_ARGS__); } \
     static constexpr const char* StaticReflectionBaseTypeId() { return BaseClassName::StaticReflectionTypeId(); } \
     static constexpr CreationPolicy StaticReflectionCreationPolicy() { return CreationPolicy::Abstract; } \
     friend struct ClassName##_ReflectionClassRegistrar; \
@@ -406,11 +414,12 @@ public: \
     static ClassName##_ReflectionClassRegistrar s_ReflectionClassRegistrar; \
 private:
 
-#define ENGINE_ABSTRACT_CLASS_ROOT(ClassName, TypeIdLiteral) \
+#define ENGINE_ABSTRACT_CLASS_ROOT(ClassName, TypeIdLiteral, ...) \
     SAKURA_OBJECT(ClassName) \
 public: \
     static constexpr const char* StaticReflectionTypeId() { return TypeIdLiteral; } \
     static constexpr uint32_t StaticReflectionSchemaVersion() { return 1; } \
+    static constexpr const char* StaticReflectionDisplayName() { return ReflectionClassDisplayName(__VA_ARGS__); } \
     static constexpr const char* StaticReflectionBaseTypeId() { return nullptr; } \
     static constexpr CreationPolicy StaticReflectionCreationPolicy() { return CreationPolicy::Abstract; } \
     friend struct ClassName##_ReflectionClassRegistrar; \
@@ -438,6 +447,7 @@ private:
     inline void ClassName::ClassName##_ReflectionClassRegistrar::Bind() \
     { \
         Class* Target = ReflectionSubsystem::Get().GetOrCreateClassDuringBind(ClassName::StaticReflectionTypeId()); \
+        Target->DisplayName = ClassName::StaticReflectionDisplayName(); \
         ReflectionSubsystem::Get().SetClassBindData( \
             Target, \
             ClassName::StaticReflectionBaseTypeId(), \
@@ -620,4 +630,4 @@ private:
             ReflectionSubsystem::Get().RegisterEnumDescriptor(std::move(Descriptor)); \
         } \
     }; \
-    static inline EnumType##_ReflectionEnumRegistrar s_ReflectionEnumRegistrar_##EnumType{}
+    inline EnumType##_ReflectionEnumRegistrar s_ReflectionEnumRegistrar_##EnumType{}

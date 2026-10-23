@@ -20,7 +20,6 @@ AssetRegistry::AssetRegistry()
     RegisterAssetType({TextureAssetType, "Texture", {".png", ".jpg", ".jpeg"}, true});
     RegisterAssetType({MaterialAssetType, "Material", {".material"}, true});
     RegisterAssetType({MaterialInstanceAssetType, "Material Instance", {".materialinstance"}, true});
-    RegisterAssetType({ShaderSourceAssetType, "Shader Source", {".hlsl", ".hlsli"}, false});
     RegisterAssetType({StaticMeshAssetType, "Static Mesh", {}, true});
     RegisterAssetType({SkeletalMeshAssetType, "Skeletal Mesh", {}, true});
     RegisterAssetType({SkeletonAssetType, "Skeleton", {}, true});

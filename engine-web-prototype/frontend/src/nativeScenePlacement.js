@@ -1,3 +1,13 @@
+export const NativeAssetDragMimeType = 'application/x-sacura-native-asset';
+
+export function GetNativeMeshPlacement(Asset) {
+  const Mesh = Asset?.subassets?.find(Subasset => Subasset.typeId === 'StaticMesh');
+  if (!Mesh) {
+    return null;
+  }
+  return {assetId:Asset.id,subAssetId:Mesh.id};
+}
+
 const cross = (a,b) => [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
 const dot = (a,b) => a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
 const normalize = a => {const length=Math.hypot(...a);return length>1e-8?a.map(value=>value/length):null;};

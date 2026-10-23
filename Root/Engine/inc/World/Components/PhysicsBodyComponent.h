@@ -11,7 +11,7 @@ class AssetManager;
 
 class PhysicsBodyComponent : public Component
 {
-    ENGINE_CLASS(PhysicsBodyComponent, Component, "engine.PhysicsBodyComponent")
+    ENGINE_CLASS(PhysicsBodyComponent, Component, "engine.PhysicsBodyComponent", "Коллизия")
 
 public:
     bool bUseMeshDefaults = false;
@@ -151,7 +151,7 @@ ENGINE_IMPLEMENT_READONLY(PhysicsBodyComponent, DiagnosticProperty, std::string,
 
 class CharacterControllerComponent : public PhysicsBodyComponent
 {
-    ENGINE_CLASS(CharacterControllerComponent, PhysicsBodyComponent, "engine.CharacterControllerComponent")
+    ENGINE_CLASS(CharacterControllerComponent, PhysicsBodyComponent, "engine.CharacterControllerComponent", "Контроллер персонажа")
 protected:
     CharacterControllerComponent()
     {

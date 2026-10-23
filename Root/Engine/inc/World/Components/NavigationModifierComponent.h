@@ -6,7 +6,7 @@
 
 class NavigationModifierComponent : public Component
 {
-    ENGINE_CLASS(NavigationModifierComponent, Component, "engine.NavigationModifierComponent")
+    ENGINE_CLASS(NavigationModifierComponent, Component, "engine.NavigationModifierComponent", "Модификатор навигации")
 public:
     Vector3 HalfExtents = Vector3::One;
     ENGINE_REFLECT_FIELD(NavigationModifierComponent, HalfExtents, "half_extents", RF_EDITOR_EDITABLE, RF_SERIALIZABLE,

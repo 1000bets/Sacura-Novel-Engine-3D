@@ -1,4 +1,4 @@
-export function nativeSceneMenuItems({context,selection,objects,editing,editSpace,showGrid,command,select,focus,setEditSpace,setShowGrid}) {
+export function nativeSceneMenuItems({context,selection,objects,editing,editSpace,showGrid,command,select,focus,setEditSpace,setShowGrid,copy,paste,canPaste}) {
   const selected=selection&&objects.some(object=>object.id===selection);
   const unavailable=reason=>({disabled:true,reason});
   const placement=context?.worldPosition&&{position:context.worldPosition,rotation:[0,0,0,1],scale:[1,1,1]};
@@ -29,6 +29,8 @@ export function nativeSceneMenuItems({context,selection,objects,editing,editSpac
     {id:'scene.camera',label:'Камера из текущего вида',icon:'Video',group:'Добавить объект',disabled:!context?.cameraTransform,reason:'Положение камеры ещё не получено от viewport.',action:()=>create('Камера','engine.CameraComponent',context.cameraTransform,context.cameraAspect)},
     {id:'scene.frame',label:'Приблизить выделение',icon:'Focus',group:'Выделение',shortcut:'F',disabled:!selected,action:focus},
     {id:'scene.group',label:'Сгруппировать выделение',icon:'FolderPlus',group:'Выделение',...unavailable('В C++ редакторе пока доступно одиночное выделение.')},
+    {id:'scene.copy',label:'Копировать',icon:'Copy',group:'Выделение',shortcut:'Ctrl+C',disabled:!selected||!copy,action:copy},
+    {id:'scene.paste',label:'Вставить',icon:'ClipboardPaste',group:'Выделение',shortcut:'Ctrl+V',disabled:!canPaste,action:paste},
     {id:'scene.duplicate',label:'Дублировать выделение',icon:'Copy',group:'Выделение',disabled:!selected,action:async()=>{const result=await command('object.duplicate',{objectId:selection});if(result?.id)await select(result.id);}},
     {id:'scene.delete',label:'Удалить выделение',icon:'Trash2',group:'Выделение',shortcut:'Del',disabled:!selected,action:()=>command('object.destroy',{objectId:selection})},
     {id:'scene.axes',label:'Оси трансформации',icon:'Axis3d',group:'Выделение',disabled:!selected,children:[

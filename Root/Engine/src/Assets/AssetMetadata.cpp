@@ -198,6 +198,14 @@ bool AssetMetadataIO::TryAssetRefFromJson(const nlohmann::json& Document, AssetK
     }
 
     AssetKey Key{};
+    if ((Document["assetId"].get<std::string>().empty()
+            || Document["assetId"] == "00000000-0000-0000-0000-000000000000")
+        && (!Document.contains("subAssetId") || Document["subAssetId"].is_null()))
+    {
+        OutKey = Key;
+        OutError = AssetDiagnostic::Ok();
+        return true;
+    }
     if (!Guid::TryParse(Document["assetId"].get<std::string>(), Key.Asset))
     {
         OutError = AssetDiagnostic::Fail(AssetErrorCode::InvalidMetadata, "AssetRef", "Invalid assetId");

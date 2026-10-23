@@ -6,7 +6,7 @@
 
 class CameraComponent : public Component
 {
-    ENGINE_CLASS(CameraComponent, Component, "engine.CameraComponent")
+    ENGINE_CLASS(CameraComponent, Component, "engine.CameraComponent", "Камера")
 
 public:
     std::string MaterialDiagnostic;

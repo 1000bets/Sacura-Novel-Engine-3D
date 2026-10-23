@@ -1,3 +1,6 @@
+import {GetNativeMeshPlacement} from './nativeScenePlacement.js';
+import {nativePlacementMenuItems} from './nativePlacementMenu.js';
+import {NativeAssetsContext, AssetThumbnail} from './NativeAssets.jsx';
 import {copyObjectComponents} from './componentObjectCopies.js';
 import ComponentFeedback from './ComponentFeedback.jsx';
 import ComponentRuntimeIssue from './ComponentRuntimeIssue.jsx';
@@ -264,16 +267,27 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
  const native=useEditorPlatform(),isNative=!!native.adapter;
  const nativeRendered=useRef(native);nativeRendered.current=native;
  const [nativeFocus,setNativeFocus]=useState('scene');
+ const [NativeReveal, SetNativeReveal] = useState(null);
+ const [NativeActions, SetNativeActions] = useState([]);
+ const [NativeFolders, SetNativeFolders] = useState(['Game','Engine']);
+ useEffect(()=>{let Cancelled=false;if(native.connected){native.adapter.command('assets.folders',{},native.context).then(Folders=>{if(!Cancelled){SetNativeFolders(Folders);}}).catch(()=>{});}return()=>{Cancelled=true;};},[native.connected,native.context?.session]);
+ const RefreshNativeAssets = async () => {
+   await native.adapter.loadDomain('assets.list','assets');
+   SetNativeFolders(await native.adapter.command('assets.folders',{},native.context));
+ };
+
+ useEffect(()=>{let Cancelled=false;if(native.connected){native.adapter.loadDomain('editor.actions','actions').then(Actions=>{if(!Cancelled){SetNativeActions(Actions);}}).catch(()=>{});}else{SetNativeActions([]);}return()=>{Cancelled=true;};},[native.connected,native.context?.session]);
+ useEffect(()=>{SetNativeReveal(null);},[native.context?.session]);
  const nativeLastFocus=useRef('scene');
  useEffect(()=>{if(nativeFocus!=='sceneSettings')nativeLastFocus.current=nativeFocus;},[nativeFocus]);
  const [nativeAssetId,setNativeAssetId]=useState(null),[nativeStorySelection,setNativeStorySelection]=useState(null),[nativeStoryPath,setNativeStoryPath]=useState('New.story');
  const nativeFlow=useMemo(()=>nativeStoryPresentation(native.story,native.objects),[native.story,native.objects]);
- const nativeFiles=useMemo(()=>native.assets.map(a=>({...a,path:a.path.replace(/^\//,''),kind:a.typeId==='Texture'&&/\.(png|jpe?g|bmp|webp)$/i.test(a.path)?'image':a.typeId==='Model'?'model':'file',src:`sacura://native-asset/${native.context?.session}/${a.id}?v=${encodeURIComponent(a.version||'')}`,users:[]})),[native.assets,native.context?.session]);
+ const nativeFiles=useMemo(()=>native.assets.filter(Asset => Asset.browserVisible !== false || Asset.id === NativeReveal?.assetId).map(a=>({...a,path:a.path.replace(/^\//,''),kind:a.typeId==='Texture'&&/\.(png|jpe?g|bmp|webp)$/i.test(a.path)?'image':a.typeId==='Model'?'model':'file',src:`sacura://native-asset/${native.context?.session}/${a.id}?v=${encodeURIComponent(a.version||'')}`,users:[]})),[native.assets,native.context?.session,NativeReveal?.assetId]);
  const nativeObject=native.objects.find(o=>o.id===native.state?.selection);
  const nativeScene={id:'native',kind:'3d',name:native.state?.project||'',location:native.state?.path||'',cameras:[]};
  const nativeEditing=!native.connected||native.state?.play!=='stopped';
  const nativePlaying=native.connected&&(native.state?.play==='playing'||native.state?.play==='paused');
- const nativeCommand=(method,params={})=>native.adapter.command(method,params,native.context).catch(()=>null);
+ const nativeCommand=(method,params={})=>native.adapter.command(method,params,native.context).catch(ErrorValue=>{setNotice(ErrorValue.message);return null;});
  const [nativeStoryCreating,setNativeStoryCreating]=useState(false);
  const createNativeStory=async()=>{
    if(nativeStoryCreating)return;
@@ -295,6 +309,19 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
    }finally{setNativeStoryCreating(false);}
  };
  const selectNative=id=>{setNativeFocus('scene');return nativeCommand('selection.set',{objectId:id});};
+ const PlaceNativeMesh = async (Identity, Placement) => {
+   if (!Identity) {
+     throw Error('В выбранном ассете нет статического меша.');
+   }
+   const Params = {assetId:Identity.assetId,subAssetId:Identity.subAssetId};
+   if (Placement?.worldPosition) {
+     Params.transform = {position:Placement.worldPosition,rotation:[0,0,0,1],scale:[1,1,1]};
+   }
+   const Created = await native.adapter.command('assets.place',Params,native.context);
+   await selectNative(Created.id);
+   return Created;
+ };
+
  const createNativeObject=async(name='GameObject',typeId)=>{
    const result=await nativeCommand('object.create',{name});
    if(!result)return;
@@ -1106,7 +1133,24 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   useEffect(()=>{setCameraPilotId(null);setCameraPreviewId(null);setFocusRequest(0);},[displayScene.id]);
   const transformObject=(id,value)=>{if(rt?.running)return;mutate(p=>setObjectTransform(p,id,scene.id,value));};
   const transformObjects=changes=>{if(rt?.running)return;mutate(p=>{for(const {id,value}of changes)setObjectTransform(p,id,scene.id,value);});};
-  const objectClipboard=command=>{
+  const objectClipboard=async command=>{
+    if (isNative) {
+      if (nativeEditing) { return; }
+      if (command === 'copy' || command === 'cut') {
+        if (!native.state?.selection) { return; }
+        const Copied = await nativeCommand('object.copy',{objectId:native.state.selection});
+        if (!Copied) { return; }
+        clipboard.current = {kind:'native-objects',subtree:Copied.subtree,project:native.state.path};
+        if (command === 'cut') {
+          await nativeCommand('object.destroy',{objectId:native.state.selection});
+        }
+        setNotice('Объект скопирован. Ctrl+V — вставить.');
+      } else if (clipboard.current?.kind === 'native-objects' && clipboard.current.project === native.state?.path) {
+        const Created = await nativeCommand('object.paste',{subtree:clipboard.current.subtree});
+        if (Created?.id) { await selectNative(Created.id); }
+      }
+      return;
+    }
     if(rt?.running)return;
     if(command==='copy'){if(!selectedObjects.length)return;clipboard.current={kind:'objects',items:copySceneObjects(selectedObjects,scene),componentSource:structuredClone({id:project.id,gameplay:project.gameplay}),step:0};setNotice('Объекты скопированы. Ctrl+V — вставить.');}
     else if(clipboard.current?.kind==='objects'){const copies=pasteSceneObjects(clipboard.current.items,scene,++clipboard.current.step);mutate(p=>{copyObjectComponents(p,clipboard.current.items,copies,clipboard.current.componentSource);p.objects.push(...copies);});setSelection({kind:'object',id:copies.at(-1).id,ids:copies.map(o=>o.id)});setFocusRequest({nonce:uid('focus')});setNotice('Объекты вставлены. Ctrl+Z — отменить.');}
@@ -1132,11 +1176,24 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       const copied=[...groups,...actions],positions={...layout.positions[graphKey]},step=++data.step;copied.forEach((n,i)=>{const source=[...data.groups,...data.actions][i],origin=data.positions?.[source.id]||{x:100,y:100+80*i};positions[n.id]={x:origin.x+60*step,y:origin.y+60*step};});setPositions(graphKey,positions);setSelection({kind:actions.length?'action':'group',id:copied.at(-1).id});setNotice('Ноды вставлены. Ctrl+Z — отменить.');
     }
   };
-  const duplicateObjects=()=>{
+  const duplicateObjects=async()=>{
+    if (isNative) {
+      if (nativeEditing || !native.state?.selection) { return; }
+      const Created = await nativeCommand('object.duplicate',{objectId:native.state.selection});
+      if (Created?.id) { await selectNative(Created.id); }
+      return;
+    }
     if(rt?.running)return;const copies=selectedObjects.map(object=>{const copy=structuredClone(object);copy.id=uid('object');copy.name=object.name+' · копия';copy.subsceneId=scene.id;copy.builtin=object.builtin||(['letter','door','fireplace','garden-note','ticket'].includes(object.id)?object.id:undefined);const value=objectTransform(object,scene.id,scene.kind);value.position[0]+=.65;copy.transforms={[scene.id]:value};return copy;});
     mutate(p=>{copyObjectComponents(p,selectedObjects,copies);p.objects.push(...copies);});setSelection({kind:'object',id:copies.at(-1)?.id,ids:copies.map(object=>object.id)});setFocusRequest({nonce:uid('focus')});
   };
-  const deleteObjects=()=>{if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSelectionIds.includes(object.id));p.objects=p.objects.filter(object=>!objectSelectionIds.includes(object.id));removed.forEach(object=>retainObjectModel(p,object));});setSelection({kind:'scene',id:scene.id});setNotice('Выделенные объекты удалены. Ctrl+Z — вернуть всю группу.');};
+  const deleteObjects=()=>{
+    if (isNative) {
+      if (!nativeEditing && native.state?.selection) {
+        nativeCommand('object.destroy',{objectId:native.state.selection});
+      }
+      return;
+    }
+if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSelectionIds.includes(object.id));p.objects=p.objects.filter(object=>!objectSelectionIds.includes(object.id));removed.forEach(object=>retainObjectModel(p,object));});setSelection({kind:'scene',id:scene.id});setNotice('Выделенные объекты удалены. Ctrl+Z — вернуть всю группу.');};
   const duplicateObject=(object)=>{
     const copy=structuredClone(object);copy.id=uid('object');copy.name=object.name+' · копия';copy.subsceneId=scene.id;copy.builtin=object.builtin||(['letter','door','fireplace','garden-note','ticket'].includes(object.id)?object.id:undefined);const t=objectTransform(object,scene.id,scene.kind);t.position[0]+=.65;copy.transforms={[scene.id]:t};
     mutate(p=>{copyObjectComponents(p,[object],[copy]);p.objects.push(copy);});setSelection({kind:'object',id:copy.id});setFocusRequest({nonce:uid('focus')});
@@ -1273,8 +1330,9 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         if(ctrl&&e.code==='KeyS'){e.preventDefault();nativeCommand(nativeFocus==='story'?'story.save':'scene.save');return;}
         if(!editing&&ctrl&&['KeyZ','KeyY'].includes(e.code)){e.preventDefault();(e.code==='KeyY'||e.shiftKey?redo:undo)();return;}
         if(!editing&&e.key==='Delete'&&nativeFocus==='scene'&&nativeObject){e.preventDefault();nativeCommand('object.destroy',{objectId:nativeObject.id});return;}
+        if(!editing&&ctrl&&e.code==='KeyD'&&nativeFocus==='scene'){e.preventDefault();duplicateObjects();return;}
         if(!editing&&e.code==='F5'){e.preventDefault();if(native.connected)nativeCommand(native.state?.play==='stopped'?'play.start':'play.stop');return;}
-        if(!editing&&ctrl&&['KeyC','KeyX','KeyV'].includes(e.code)&&!e.target.closest?.('.react-flow')){e.preventDefault();setNotice('Clipboard native-объектов пока не подключён.');return;}
+        if(!editing&&ctrl&&['KeyC','KeyX','KeyV'].includes(e.code)&&!e.target.closest?.('.react-flow')){e.preventDefault();objectClipboard(({KeyC:'copy',KeyX:'cut',KeyV:'paste'})[e.code]);return;}
       }
       const command=clipboardCommand(e);
       if(command&&!e.target.closest?.('.react-flow, .widget-workspace')&&!contextMenu&&!picker&&!projectDialog&&!detailEditor&&!menu&&!running&&mode==='scene'&&(selection.kind==='object'||e.target.closest?.('.scene-viewport,.hierarchy'))){e.preventDefault();objectClipboard(command);return;}
@@ -1356,7 +1414,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     if(isNative){
       if(nativeFocus==='sceneSettings')return <div className="story-inspector native-scene-inspector"><div className="story-inspector-heading"><Icon name="Clapperboard" size={16}/><strong>Сцена</strong><small>{native.state?.project}</small></div><div className="inspector-primary-fields"><Field label="Файл"><output>{native.state?.path||'Не открыт'}</output></Field><Field label="Объектов"><output>{native.objects.length}</output></Field><Button icon="Save" disabled={nativeEditing||!native.state?.dirty} onClick={()=>nativeCommand('scene.save')}>Сохранить сцену</Button></div></div>;
       if(nativeFocus==='asset'){
-        const asset=nativeFiles.find(a=>a.id===nativeAssetId);return asset?<><h3>{asset.name}</h3><p>{asset.typeId} · {asset.path}</p><p>{asset.id}</p>{asset.kind==='image'&&<img style={{maxWidth:'100%'}} src={asset.src} alt={asset.name}/>}<pre style={{whiteSpace:'pre-wrap'}}>{JSON.stringify(asset.subassets,null,2)}</pre>{asset.kind==='model'&&<p>3D preview и размещение модели пока не подключены. Импорт и subassets читаются из AssetRegistry.</p>}</>:<p>Ресурс удалён или больше не зарегистрирован.</p>;
+        const asset=nativeFiles.find(a=>a.id===nativeAssetId);return asset?<><h3>{asset.name}</h3><p>{asset.typeId} · {asset.path}</p><p>{asset.id}</p>{asset.kind==='image'&&<img style={{maxWidth:'100%'}} src={asset.src} alt={asset.name}/>}<pre style={{whiteSpace:'pre-wrap'}}>{JSON.stringify(asset.subassets,null,2)}</pre>{asset.kind==='model'&&<button onClick={()=>OpenNativeAsset({assetId:asset.id})}>Открыть редактор меша</button>}</>:<p>Ресурс удалён или больше не зарегистрирован.</p>;
       }
       if(nativeFocus==='story'){
         return <NativeStoryInspector story={native.story} selection={nativeStorySelection} objects={native.objects} disabled={nativeEditing||native.story?.readOnly} command={nativeCommand} onSelect={setNativeStorySelection} onEvents={openNativeEvents} onFocus={()=>graphApi.current?.focus(nativeStorySelection?.nodeId)}/>;
@@ -1371,7 +1429,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           onReset={()=>nativeCommand('transform.set',{objectId:id,transform:{position:[0,0,0],rotation:[0,0,0,1],scale:[1,1,1]}})} onFocus={()=>setFocusRequest({nonce:uid('focus')})}
           onDelete={()=>nativeCommand('object.destroy',{objectId:id})}/>
         <ComponentInstancesInspector project={project} running={nativeEditing} reflection={{components:native.components,types:native.types,
-          assets:native.assets,onAsset:(componentId,property,{assetId,subAssetId})=>nativeCommand('component.setAsset',{objectId:id,componentId,property,assetId,subAssetId}),
+          assets:native.assets,objectId:id,command:nativeCommand,revision:native.context?.revision,onAsset:(componentId,property,{assetId,subAssetId})=>nativeCommand('component.setAsset',{objectId:id,componentId,property,assetId,subAssetId}),
           onAdd:typeId=>nativeCommand('object.addComponent',{objectId:id,typeId}),onRemove:componentId=>nativeCommand('object.removeComponent',{objectId:id,componentId}),onEnabled:(componentId,enabled)=>nativeCommand('component.setEnabled',{objectId:id,componentId,enabled}),
           onProperty:(componentId,property,value)=>nativeCommand('component.setProperty',{objectId:id,componentId,property,value})}}/>
       </div>;
@@ -1976,7 +2034,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     );
   };
 
-  const editClipboard=command=>{if(selection.kind==='object')objectClipboard(command);else {const api=graphApi.current?.clipboard?.();if(api)graphClipboard(command,api.nodes,api.graphKey);}setMenu(null);};
+  const editClipboard=command=>{if(isNative){objectClipboard(command);setMenu(null);return;}if(selection.kind==='object')objectClipboard(command);else {const api=graphApi.current?.clipboard?.();if(api)graphClipboard(command,api.nodes,api.graphKey);}setMenu(null);};
   const closeContextMenu=useCallback(()=>setContextMenu(null),[]);
   useEffect(()=>{setContextMenu(null);},[dock,mode,displayScene.id,running]);
   const placeContextNode=(id,placement)=>setLayout(l=>({...l,positions:{...l.positions,[placement.graphKey]:{...l.positions[placement.graphKey],[id]:placement.position}}}));
@@ -2050,6 +2108,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
   const contextItems=()=>{
     if(isNative&&contextMenu?.kind==='scene')return nativeSceneMenuItems({context:contextMenu,selection:native.state?.selection,objects:native.objects,
       editing:!nativeEditing,editSpace,showGrid,command:nativeCommand,select:selectNative,
+      copy:()=>objectClipboard('copy'),paste:()=>objectClipboard('paste'),canPaste:clipboard.current?.kind==='native-objects'&&clipboard.current.project===native.state?.path,
       focus:()=>setFocusRequest({nonce:uid('focus')}),setEditSpace,setShowGrid});
     if(isNative&&contextMenu?.kind==='native-create-component')return native.types.map(type=>({
       label:({'engine.CameraComponent':'Камера','engine.LightComponent':'Источник освещения','engine.MeshRendererComponent':'Меш','engine.PhysicsBodyComponent':'Физическое тело'}[type.typeId]||type.typeId.replace(/^.*\./,'')),
@@ -2059,11 +2118,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         if(objectId)await nativeCommand('object.addComponent',{objectId,typeId:type.typeId});
       }
     }));
-    if(isNative&&contextMenu?.kind==='native-create-object')return [
-      {label:'Пустой объект',icon:'Box',action:()=>createNativeObject('GameObject')},
-      {label:'Камера',icon:'Video',action:()=>createNativeObject('Camera','engine.CameraComponent')},
-      {label:'Источник освещения',icon:'Lightbulb',action:()=>createNativeObject('Light','engine.LightComponent')},
-    ];
+    if(isNative&&['native-create-object','native-place'].includes(contextMenu?.kind))return nativePlacementMenuItems({actions:NativeActions,disabled:nativeEditing,command:nativeCommand,select:selectNative});
     if(isNative&&contextMenu?.kind==='native-create-beat')return [
       ['Line','Реплика','MessageSquare'],['Choice','Выбор игрока','GitFork'],
       ['Action','Действие','Zap'],['End','Концовка','Flag']
@@ -2212,13 +2267,44 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                     ))}
                 </details>
               ))}</div>);
+  function RevealNativeAsset(Identity) {
+    SetNativeReveal({...Identity, nonce:Date.now()});
+    setNativeAssetId(Identity.assetId);
+    setNativeFocus('asset');
+    setDock('files');
+  }
+  useEffect(() => window.sacuraDesktop?.onRevealAsset?.(Identity => {
+    if (Identity.open) { OpenNativeAsset(Identity); }
+    else { RevealNativeAsset(Identity); }
+  }), [native.assets]);
+  async function OpenNativeAsset(Identity) {
+    const Asset = native.assets.find(Entry=>Entry.id===Identity.assetId);
+    if (!Asset) { return; }
+    if (Asset.typeId==='Scene') {
+      if(await nativeCommand('scene.open',{path:Asset.relativePath})) { setNativeFocus('scene'); showBaseDock('scene'); }
+      return;
+    }
+    if (Asset.typeId==='Story') {
+      if(await nativeCommand('story.open',{assetId:Asset.id})) { setNativeFocus('story'); setDock('story'); }
+      return;
+    }
+    let SubassetId = Identity.subAssetId;
+    if (Asset.typeId==='Model' && !SubassetId) { SubassetId = Asset.subassets.find(Entry=>Entry.typeId==='StaticMesh')?.id; }
+    if (['Material','MaterialInstance','Texture'].includes(Asset.typeId) || SubassetId && Asset.subassets.some(Entry=>Entry.id===SubassetId&&Entry.typeId==='StaticMesh')) {
+      try { await window.sacuraDesktop.nativeOpenAssetEditor({assetId:Asset.id, subAssetId:SubassetId || null}); }
+      catch (ErrorValue) { setNotice(ErrorValue.message); }
+      return;
+    }
+    RevealNativeAsset(Identity);
+  }
   const renderNativeWorkspace=(dock,visible)=>{
-    const openAsset=async asset=>{
-      if(asset.typeId==='Scene'){if(await nativeCommand('scene.open',{path:asset.relativePath})){setNativeFocus('scene');showBaseDock('scene');}}
-      else if(asset.typeId==='Story'){if(await nativeCommand('story.open',{assetId:asset.id})){setNativeFocus('story');setDock('story');}}
-      else {setNativeAssetId(asset.id);setNativeFocus('asset');}
-    };
-    if(dock==='files')return <AssetExplorer project={project} audioAssets={[]} disabled={nativeEditing} onSelectFile={id=>{setNativeAssetId(id);setNativeFocus('asset');}} adapter={{files:nativeFiles,open:openAsset,import:async folder=>{if(folder.startsWith('Engine'))throw Error('Engine Content доступен только для чтения');const results=await window.sacuraDesktop.nativeImportAssets(folder.replace(/^Game\/?/,''));await native.adapter.loadDomain('assets.list','assets');const failure=results.find(r=>!r.ok);if(failure)throw Error(failure.error.message);}}}/>;
+    const openAsset=Asset=>OpenNativeAsset({assetId:Asset.id});
+    if(dock==='files')return <AssetExplorer project={project} audioAssets={[]} revealRequest={NativeReveal} onPlaceModel={Asset=>PlaceNativeMesh(GetNativeMeshPlacement(Asset)).catch(Failure=>setNotice(Failure.message))} disabled={nativeEditing} onSelectFile={id=>{setNativeAssetId(id);setNativeFocus('asset');}} adapter={{files:nativeFiles,folders:NativeFolders,open:openAsset,
+      manage:async (Method,Params)=>{const Result=await native.adapter.command(Method,Params,native.context);await RefreshNativeAssets();return Result;},
+      refresh:RefreshNativeAssets,
+      creationTypes:()=>native.adapter.command('assets.creationTypes',{},native.context),
+      create:async Params=>{const Created=await native.adapter.command('assets.create',Params,native.context);await native.adapter.loadDomain('assets.list','assets');RevealNativeAsset({assetId:Created.id});return Created;},
+      import:async folder=>{if(folder.startsWith('Engine'))throw Error('Engine Content доступен только для чтения');const results=await window.sacuraDesktop.nativeImportAssets(folder.replace(/^Game\/?/,''));await native.adapter.loadDomain('assets.list','assets');const failure=results.find(r=>!r.ok);if(failure)throw Error(failure.error.message);}}}/>;
     if(dock==='characters')return <NativeCharacterWorkspace objects={native.objects} components={native.components} assets={native.assets}
       selected={native.state?.selection} disabled={nativeEditing} playing={nativePlaying} dirty={native.state?.dirty}
       command={nativeCommand} select={selectNative} onActivate={()=>setNativeFocus('scene')}
@@ -2262,7 +2348,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             {["story", "timeline", "staging", "event"].includes(dock) && !detailEditor && (
               <div className="graph-toolbar">
                 {dock==='event'?<><Button icon="ArrowLeft" title={tr("Вернуться в поток истории")} onClick={()=>setDock('story')}/><span className="graph-breadcrumb">{event?.name}</span></>:<><Icon name="Route" size={15}/><span className="flow-toolbar-context">{project.subscenes.length} {tr("сабсцены · ")}{nodes.length} {tr("реплик · единый поток")}</span><Button icon="Focus" onClick={()=>graphApis.current[dock]?.focus(beat.id)}>{tr("К реплике")}</Button><Button icon="Scan" onClick={()=>graphApis.current[dock]?.fit()}>{tr("Вся история")}</Button></>}
-                <div className="flex-space" />
+        <div className="flex-space" />
                 <details className="viewport-help graph-help"><summary title={tr("Навигация по графу")} aria-label={tr("Навигация по графу")}><Icon name="CircleHelp" size={15}/></summary><div>{tr("ПКМ — панорама")}<br/>{tr("Колесо — масштаб")}<br/>{tr("Пин → пин — соединить")}<br/>{tr("Alt + щелчок по пину — разорвать связи")}<br/>{tr("Ctrl + перетаскивание пина — перенести связи")}<br/>{tr("Выбрать провод + Delete — разорвать")}<br/>{tr("ЛКМ — выбор и перемещение узла")}<br/>{tr("Двойной щелчок — открыть узел")}</div></details>
                 {dock !== "event" && beat.kind === "choice" && (
                   <Button
@@ -2434,6 +2520,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             </div>
   </>;
   return (
+    <NativeAssetsContext.Provider value={{assets:native.assets,session:native.context?.session,
+      open:OpenNativeAsset,reveal:RevealNativeAsset}}>
     <AuthoringNavigation.Provider value={{onFunction:openImplementation,onEvent:openLogicEvent,onOperation:d=>openOperationSource(d).catch(e=>setNotice(e.message))}}>
     <EditorDockProvider windows={windows} onChange={changeWindows} onSelect={selectWorkspace} onClose={closeWorkspace} onPlace={revealDockArea}>
     <div
@@ -2453,7 +2541,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             Sacura<span>Novel Studio</span>
           </strong>
         </div>
-        {["Файл", "Правка", "Создать", "Окна"].map((m) => (
+        {["Файл", "Правка", "Создать", "Разместить", "Окна"].filter(Name=>isNative||Name!=="Разместить").map((m) => (
           <button
             className={menu === m ? "active" : ""}
             key={m}
@@ -2462,6 +2550,11 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
             data-windows-menu={m==='Окна'?true:undefined}
             onClick={(e) => {
               const rect = e.currentTarget.getBoundingClientRect();
+              if (m === 'Разместить') {
+                setMenu(null);
+                setContextMenu({kind:'native-place',x:rect.left,y:rect.bottom+4});
+                return;
+              }
               setMenuAnchor({left: Math.max(8, Math.min(rect.left, window.innerWidth - (m==='Окна'?348:250))), top: rect.bottom + 4});
               setMenu(menu === m ? null : m);
             }}
@@ -2649,7 +2742,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
                 }
               }}
             >
-              <SceneViewport onCreateProject={()=>openProjectDialog('new')} onActivate={()=>setNativeFocus('scene')} blocked={!!(contextMenu || picker || projectDialog || detailEditor || menu || running || positionPick)}
+              <SceneViewport onAssetDrop={PlaceNativeMesh} onCreateProject={()=>openProjectDialog('new')} onActivate={()=>setNativeFocus('scene')} blocked={!!(contextMenu || picker || projectDialog || detailEditor || menu || running || positionPick)}
                 sceneId={displayScene.id}
                 editTool={editTool} editSpace={editSpace} snap={snap} focusRequest={cameraPilotId?0:focusRequest} editing={!running&&!cameraPilotId&&!positionPick&&(!isNative||!nativeEditing)} onTransform={transformObject} onTransforms={transformObjects}
                 cameraScene={displayScene} selectedCameraId={selection.kind==='camera'?selection.id:null} cameraPreviewId={cameraPreviewId} cameraPilotId={cameraPilotId} onCameraChange={changeCamera} onCameraSelect={selectCamera} cameraApi={cameraApi} physicsApi={physicsApi}
@@ -2877,7 +2970,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
           )}
         </div>
       )}
-      {contextMenu&&<EditorContextMenu x={contextMenu.x} y={contextMenu.y} className={contextMenu.kind==='scene'?'scene-context-menu':''} title={contextMenu.kind==='native-create-component'?tr('Компонент'):contextMenu.kind==='native-create-object'?tr('Объект'):contextMenu.kind==='native-event'?tr("Добавить событие"):contextMenu.kind==='scene'?tr("Сцена"):tr("Добавить ноду")} items={contextItems()} onClose={closeContextMenu}/>}
+      {contextMenu&&<EditorContextMenu x={contextMenu.x} y={contextMenu.y} className={contextMenu.kind==='scene'?'scene-context-menu':''} title={contextMenu.kind==='native-place'?'Разместить объект':contextMenu.kind==='native-create-component'?tr('Компонент'):contextMenu.kind==='native-create-object'?tr('Объект'):contextMenu.kind==='native-event'?tr("Добавить событие"):contextMenu.kind==='scene'?tr("Сцена"):tr("Добавить ноду")} items={contextItems()} onClose={closeContextMenu}/>}
       {picker?.kind==='object'&&<SceneObjectMenu anchor={picker.anchor} onClose={()=>setPicker(null)} onGroup={addEmptyGroup} onCamera={()=>createCamera()} onPoint={addStagingPoint} onSound={addSoundEvent} onObject={addObject}/>}
       {picker && picker.kind!=='object' && (
         <div
@@ -3097,5 +3190,6 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     </div>
     </EditorDockProvider>
     </AuthoringNavigation.Provider>
+    </NativeAssetsContext.Provider>
   );
 }

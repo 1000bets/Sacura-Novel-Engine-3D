@@ -1,4 +1,4 @@
-const {app, BrowserWindow, dialog, ipcMain, net, protocol} = require('electron');
+const {app, BrowserWindow, dialog, ipcMain, net, protocol, clipboard} = require('electron');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const {pathToFileURL} = require('node:url');
@@ -15,10 +15,13 @@ const uiRoot = path.join(__dirname, 'dist-ui');
 const smoke = process.argv.includes('--desktop-smoke');
 const nativePrototype = true;
 const compatibilityTest=process.argv.includes('--compat-roundtrip');
-const nativeSmoke = process.argv.includes('--native-smoke')||compatibilityTest;
+const assetTransferTest=process.argv.includes('--asset-transfer-check');
+const ComponentNamesCheck = process.argv.includes('--component-names-check');
+const MaterialCapture = process.argv.find(Argument => Argument.startsWith('--screenshot-material='));
+const nativeSmoke = process.argv.includes('--native-smoke')||compatibilityTest||assetTransferTest;
 // CLI rendering checks must keep Chromium producing frames when another app
 // covers the test window. Production keeps normal background/visibility policy.
-if(nativeSmoke){
+if(nativeSmoke || MaterialCapture || ComponentNamesCheck){
   app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
   app.commandLine.appendSwitch('disable-features','CalculateNativeWinOcclusion');
 }
@@ -27,6 +30,7 @@ if (process.env.SACURA_GPU_DIAGNOSTIC) {
   app.commandLine.appendSwitch('vmodule', '*shared_image*=2,*d3d*=2');
 }
 let nativeViewport;
+let AssetWindows;
 let releaseNativeProject = async () => {};
 if (nativePrototype && process.env.SACURA_NATIVE_USERDATA) app.setPath('userData', process.env.SACURA_NATIVE_USERDATA);
 if (smoke && process.env.SACURA_DESKTOP_SMOKE_USERDATA) app.setPath('userData', process.env.SACURA_DESKTOP_SMOKE_USERDATA);
@@ -43,12 +47,19 @@ async function remember(root, info) {
   await fs.writeFile(recentFile(), JSON.stringify(list.slice(0, 30), null, 2));
 }
 function trusted(event) {
-  if (!window || window.isDestroyed() || event.sender.isDestroyed() || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame) throw new Error('Untrusted IPC sender');
+  if (event.sender.isDestroyed() || event.senderFrame !== event.sender.mainFrame || (event.sender !== window?.webContents && !AssetWindows?.has(event.sender.id))) throw new Error('Untrusted IPC sender');
   const url = event.senderFrame.url;
   if (devUrl ? url !== devUrl : !url.startsWith('sacura://app/')) throw new Error('Untrusted IPC origin');
 }
 function handle(channel, action) {
-  ipcMain.handle('desktop:' + channel, async (event, ...args) => {trusted(event); return action(...args);});
+  ipcMain.handle('desktop:' + channel, async (event, ...args) => {trusted(event);
+    const Editor = AssetWindows?.get(event.sender.id);
+    if (Editor) {
+      const Action = Editor.actions[channel];
+      if (!Action) { throw Error('Operation is not available in an asset editor'); }
+      return Action(...args);
+    }
+    return action(...args);});
 }
 async function openRoot(root) {
   const real = await fs.realpath(root);
@@ -76,6 +87,20 @@ app.whenReady().then(async () => {
         const file=result.value.absolutePath;
         if(result.value.typeId!=='Texture'||!['.png','.jpg','.jpeg','.bmp','.webp'].includes(path.extname(file).toLowerCase()))return new Response('No browser preview for this native asset type',{status:415});
         return net.fetch(pathToFileURL(file).toString());
+      }
+      if (url.host === 'native-thumbnail') {
+        const [Session, Identifier, Subasset] = url.pathname.split('/').filter(Boolean);
+        const Bridge = [nativeViewport, ...Array.from(AssetWindows?.values() || [], Editor => Editor.viewport)].find(Owner => Owner?.bridge.context?.session === Session)?.bridge;
+        if (!Bridge?.connected || Session !== Bridge.context?.session) {
+          return new Response('Expired asset session', {status: 410});
+        }
+        const Params = {assetId: Identifier};
+        if (Subasset) { Params.subAssetId = Subasset; }
+        const Result = await Bridge.request('assets.thumbnail', Params);
+        if (!Result.ok) { return new Response(Result.error.message, {status: 404}); }
+        if (!Result.value.ready) { return new Response('Pending preview', {status: 202}); }
+        if (!Result.value.png) { return new Response('Type preview', {status: 415}); }
+        return new Response(Buffer.from(Result.value.png, 'base64'), {headers: {'Content-Type': 'image/png', 'Cache-Control': 'no-store'}});
       }
       if(url.host==='startup-audio') {
         const [session,resource]=url.pathname.split('/').filter(Boolean);
@@ -110,6 +135,10 @@ app.whenReady().then(async () => {
         await delay(50);
       }
     };
+    AssetWindows = require('./asset-windows.cjs').createAssetWindows({app, BrowserWindow, dialog, NativeViewport, waitForNative,
+      getMainWindow: () => window, getViewport: () => nativeViewport, devUrl, uiRoot, nativeSmoke: nativeSmoke || Boolean(MaterialCapture)});
+    handle('native-open-asset-editor', Identity => AssetWindows.open(Identity));
+    handle('native-reveal-asset', Identity => {window.webContents.send('native-reveal-asset', Identity); window.show(); window.focus(); return true;});
     const rememberNative=async()=>{try{await nativeRecents.remember(nativeViewport.project,nativeViewport.bridge.state?.project||path.basename(nativeViewport.project,'.project'));}catch(error){console.error('Recent project preference:',error.message);}};
     if(nativeViewport.project)waitForNative(nativeViewport).then(rememberNative).catch(error=>console.error(error.message));
     let replacement = Promise.resolve();
@@ -126,7 +155,7 @@ app.whenReady().then(async () => {
       loading={label:project?'Проверяем проект…':'Закрываем проект…',project:project?path.basename(project,'.project'):null};
       nativeViewport.input({kind:'reset'});
       if(project)await projectCli(hostPath(app),['--project-check',project]);
-      if(!await guard())return false;
+      if(!await AssetWindows.closeAll() || !await guard())return false;
       const previous = nativeViewport;
       loading={...loading,label:'Закрываем проект…'};
       await nativeViewport.stop();
@@ -142,6 +171,7 @@ app.whenReady().then(async () => {
     releaseNativeProject = () => replaceProject(null);
     handle('native-bounds', value => {const result=nativeViewport.bounds(value);requestedBounds={...value};return result;});
     handle('native-status', () => nativeViewport.state);
+    handle('native-frame-consumed', Token => nativeViewport.frameConsumed(Token));
     handle('native-session',()=>({phase:nativeViewport.state.phase,connected:nativeViewport.bridge.connected,project:nativeViewport.project||null,error:nativeViewport.state.error||null,loading}));
     handle('native-list-projects',()=>nativeRecents.list());
     handle('native-open-recent',async id=>replaceProject(await nativeRecents.resolve(id)));
@@ -149,9 +179,13 @@ app.whenReady().then(async () => {
     handle('native-close-project',()=>replaceProject(null));
     handle('bridge-connect', () => ({connected:nativeViewport.bridge.connected,context:nativeViewport.bridge.context,state:nativeViewport.bridge.state}));
     if(nativeSmoke)handle('bridge-test-result',result=>{nativeViewport.bridgeTest=result;return true;});
-    handle('bridge-command', request => {
+    handle('native-copy-text', Text => {if(typeof Text !== 'string' || Text.length > 4096){throw Error('Invalid clipboard text');}clipboard.writeText(Text);return true;});
+    handle('bridge-command', async request => {
       if(!request||typeof request.method!=='string'||!request.context||typeof request.context.session!=='string'||!Number.isSafeInteger(request.context.epoch))return {version:1,type:'bridge.result',id:null,context:nativeViewport.bridge.context,ok:false,error:{code:'INVALID_ARGUMENT',message:'Invalid Bridge request or missing context'}};
       if(['assets.import','assets.resolve'].includes(request.method))return {version:1,id:null,context:nativeViewport.bridge.context,ok:false,error:{code:'FORBIDDEN',message:'This operation requires the main-process asset capability'}};
+      if (await AssetWindows.blocksMutation(request.method, request.params)) {
+        return {version:1,id:null,context:nativeViewport.bridge.context,ok:false,error:{code:'DOCUMENT_OPEN',message:'Закройте редакторы затронутых ассетов перед переименованием, перемещением или удалением.'}};
+      }
       return nativeViewport.bridge.request(request.method,request.params,request.context);
     });
     handle('native-import-assets',async destination=>{
@@ -197,12 +231,14 @@ app.whenReady().then(async () => {
       if (closing) return;
       closing = true;
       replacement.catch(()=>{}).then(async()=>{
-        if(!await guard()){closing=false;return;}
+        if(!await AssetWindows.closeAll() || !await guard()){closing=false;return;}
         await nativeViewport.stop();closed=true;window.close();
       }).catch(error=>{closing=false;dialog.showErrorBox('Проект остаётся открытым',error.message);});
     });
+    if (ComponentNamesCheck) require('./scripts/component-names-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
+    if (assetTransferTest) require('./scripts/asset-transfer-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
     if (compatibilityTest) require('./scripts/compat-roundtrip.cjs').run({app,window,getViewport:()=>nativeViewport,replaceProject,createNativeProject});
-    else if (nativeSmoke) require('./scripts/native-smoke-main.cjs').run({app, window, getViewport:()=>nativeViewport, replaceProject});
+    else if (nativeSmoke && !assetTransferTest && !process.argv.some(Argument => Argument.startsWith('--screenshot-texture='))) require('./scripts/native-smoke-main.cjs').run({app, window, getViewport:()=>nativeViewport, replaceProject});
   }
   if (smoke) {
     const deadline = setTimeout(() => {console.error('Desktop smoke: React did not become ready'); app.exit(1);}, 15000);
@@ -267,6 +303,13 @@ app.whenReady().then(async () => {
   if (nativePrototype && process.env.SACURA_NATIVE_DEMO_PROJECT) await openRoot(process.env.SACURA_NATIVE_DEMO_PROJECT);
   if(nativeSmoke)console.log('Native smoke: loading React');
   if (devUrl) await window.loadURL(devUrl); else await window.loadURL('sacura://app/index.html');
+  if (MaterialCapture) {
+    require('./scripts/capture-material-editor.cjs').run({app, window, editors: AssetWindows, getViewport: () => nativeViewport, output: MaterialCapture.slice('--screenshot-material='.length)});
+  }
+  const TextureCapture = process.argv.find(Argument => Argument.startsWith('--screenshot-texture='));
+  if (TextureCapture) {
+    require('./scripts/capture-texture-editor.cjs').run({app, window, editors: AssetWindows, getViewport: () => nativeViewport, output: TextureCapture.slice('--screenshot-texture='.length)});
+  }
   if(nativeSmoke)console.log('Native smoke: React document loaded');
   if (nativePrototype && !window.isDestroyed()) await window.webContents.setVisualZoomLevelLimits(1, 1);
 }).catch(async error => {console.error(error); await nativeViewport?.stop(); app.exit(1);});

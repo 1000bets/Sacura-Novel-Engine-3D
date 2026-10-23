@@ -1,10 +1,6 @@
 {
   "schemaVersion": 2,
   "domain": "Surface",
-  "source": {
-    "assetId": "cab7136e-3cd5-59b2-ab43-d5c34715aae1",
-    "subAssetId": null
-  },
   "parameters": [
     {
       "id": "BaseColor",
@@ -40,5 +36,6 @@
     }
   ],
   "shadingModel": "Unlit",
-  "blendMode": "Opaque"
+  "blendMode": "Opaque",
+  "shader": "SakuraSurface EvaluateSurface(SakuraSurfaceInput Input)\n{\n    MaterialParameters Parameters = GetMaterialParameters();\n    SakuraSurface Surface = MakeDefaultSurface(Input);\n    float4 Color = Parameters.BaseColor * Input.VertexColor * SampleBaseColorTexture(Input.TextureCoordinates);\n    Surface.Albedo = Color.rgb;\n    Surface.Opacity = Color.a;\n    Surface.Emission = Parameters.Emissive.rgb;\n    return Surface;\n}\n"
 }

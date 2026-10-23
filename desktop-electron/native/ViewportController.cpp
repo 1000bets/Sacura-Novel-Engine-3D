@@ -1,4 +1,5 @@
 #include "ViewportController.h"
+#include "NativeBridge.h"
 #include "Commands/EditorCommands.h"
 #include "World/Scene.h"
 #include "World/GameObject.h"
@@ -83,6 +84,11 @@ RenderCamera ViewportController::Camera() const
     RenderCamera C; C.bValid = true; C.Position = Position;
     C.View = Matrix::CreateLookAt(Position, Target, Vector3::Up);
     C.AspectRatio = Width / Height;
+    if (AssetPreview && AssetPreview->GetPreviewScene())
+    {
+        C.NearPlane = std::max(.001f, (Position - Target).Length() / 1000.f);
+        C.FarPlane = std::max(1000.f, (Position - Target).Length() * 10.f);
+    }
     C.Projection = Matrix::CreatePerspectiveFieldOfView(C.FieldOfView * 0.0174532925f, C.AspectRatio, C.NearPlane, C.FarPlane);
     C.ViewProjection = C.View * C.Projection;
     return C;
@@ -90,6 +96,7 @@ RenderCamera ViewportController::Camera() const
 void ViewportController::ResetInput()
 {
     AssertGameThread();
+    bCollisionDragging = false; CollisionDraft = nullptr;
     Buttons = 0; Navigation = 0; Keys.clear(); Alt = Shift = Ctrl = false;
     // A lost pointer/focus cancels an uncommitted drag, never leaves a stuck gizmo.
     if (DraggingGizmo) if (auto* Object = Workspace.GetSelectedObject(Runtime.GetActiveScene())) Object->SetTransform(DragStart);
@@ -102,9 +109,30 @@ void ViewportController::SetTool(const Json& Options)
     Operation = Tool == "rotate" ? 1 : Tool == "scale" ? 2 : Tool == "select" ? 3 : 0;
     Snap = Options.value("snap", false); WorldAxes = Options.value("space", "local") == "world";
     Grid = Options.value("grid", true);
+    if (Options.contains("visualization"))
+    {
+        const auto* Mode = FindRenderVisualization(Options.at("visualization").get<std::string>());
+        if (Mode) { ViewSettings.Visualization = Mode->Mode; }
+    }
+    if (Options.contains("depthRange"))
+    {
+        ViewSettings.VisualizationDepthRange = std::clamp(Options.at("depthRange").get<float>(), 0.01f, 100000.0f);
+    }
 }
 void ViewportController::FocusSelection()
 {
+    if (AssetPreview && AssetPreview->GetPreviewMesh())
+    {
+        AssetHandle<StaticMeshResource> Resource;
+        if (Runtime.GetAssetManager().TryGetLoaded(AssetPreview->GetPreviewMesh()->GetMeshAssetKey(), Resource))
+        {
+            Target = (Resource->Bounds.Minimum + Resource->Bounds.Maximum) * 0.5f;
+            const float Radius = std::max(0.1f, (Resource->Bounds.Maximum - Resource->Bounds.Minimum).Length() * 0.5f);
+            Position = Target + Vector3(1.5f, 1.f, -2.5f) * Radius;
+            bPreviewFramed = true;
+        }
+        return;
+    }
     if (auto* Object = Workspace.GetSelectedObject(Runtime.GetActiveScene())) {
         const auto Previous = Target; Target = Object->GetWorldPosition(); Position += Target - Previous;
     }
@@ -172,6 +200,23 @@ void ViewportController::Input(const Json& E)
 void ViewportController::Pick(float X, float Y)
 {
     const auto C = Camera();
+    if (AssetPreview && AssetPreview->GetPreviewScene())
+    {
+        const auto* Defaults = AssetPreview->GetPreviewCollision();
+        int Selected = -1;
+        float Closest = 24.f * Scale;
+        if (Defaults)
+        {
+            for (size_t Index = 0; Index < Defaults->CollisionElements.size(); ++Index)
+            {
+                const auto Clip = Vector3::Transform(Defaults->CollisionElements[Index].Center, C.ViewProjection);
+                const float Distance = std::hypot(X - (Clip.x + 1.f) * Width * 0.5f, Y - (1.f - Clip.y) * Height * 0.5f);
+                if (Clip.z > 0.f && Clip.z < 1.f && Distance < Closest) { Closest = Distance; Selected = static_cast<int>(Index); }
+            }
+        }
+        AssetPreview->SelectCollision(Selected);
+        return;
+    }
     GameObject* SelectedLight = nullptr;
     float LightDistance = (13.f * Scale) * (13.f * Scale);
     if (!Runtime.GetPlaySession().IsSimulating()) for (auto* Object : Runtime.GetActiveScene()->GetAllObjects()) {
@@ -219,8 +264,13 @@ void ViewportController::Tick(float Dt)
         if (Keys.count("KeyE")) Move += Vector3::Up; if (Keys.count("KeyQ")) Move -= Vector3::Up;
         if (Move.LengthSquared() > 0) { Move.Normalize(); Move *= Dt * (Shift ? 12.f : 4.f); Position += Move; Target += Move; }
     }
+    if (AssetPreview)
+    {
+        AssetPreview->TickPreview();
+        if (AssetPreview->GetPreviewScene() && !bPreviewFramed) { FocusSelection(); }
+    }
     BuildOverlay(Dt);
-    RenderSettings Settings; Settings.bGroundGrid = Grid;
+    RenderSettings Settings = ViewSettings; Settings.bGroundGrid = Grid;
     Runtime.ConfigureRenderSurface(RenderSurfaceId{1}, !Runtime.GetPlaySession().IsSimulating(), Runtime.GetPlaySession().IsSimulating() ? RenderCamera{} : Camera(), Settings);
 }
 void ViewportController::BuildOverlay(float Dt)
@@ -231,6 +281,13 @@ void ViewportController::BuildOverlay(float Dt)
     ImGui::NewFrame(); ImGuizmo::SetImGuiContext(Gui); ImGuizmo::BeginFrame();
     ImGuizmo::SetRect(0, 0, Width, Height); ImGuizmo::SetOrthographic(false);
     ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());
+    if (AssetPreview && AssetPreview->GetPreviewScene())
+    {
+        BuildAssetOverlay();
+        ImGui::Render();
+        Runtime.SetRenderSurfaceImGuiOverlay(RenderSurfaceId{1}, Capture(ImGui::GetDrawData()));
+        return;
+    }
     auto* Object = Workspace.GetSelectedObject(Runtime.GetActiveScene());
     if (!Runtime.GetPlaySession().IsSimulating()) {
         const auto View = Camera();
@@ -277,8 +334,17 @@ Json ViewportController::Status() const
 {
     AssertGameThread();
     Json Result{{"cameraPosition", V(Position)}, {"cameraTarget", V(Target)}, {"inputCount", InputCount}, {"edits", Edits},
-        {"tool", Operation}, {"navigation", Navigation}, {"heldKeys", Keys.size()}, {"canUndo", const_cast<SceneWorkspace&>(Workspace).GetCommands().CanUndo()}, {"selection", nullptr}, {"pickTargets",Json::array()}, {"lightIcons",Json::array()}};
+        {"preview", AssetPreview && AssetPreview->GetPreviewScene()}, {"selectedCollision", AssetPreview ? AssetPreview->GetSelectedCollision() : -1}, {"tool", Operation}, {"navigation", Navigation}, {"heldKeys", Keys.size()}, {"canUndo", const_cast<SceneWorkspace&>(Workspace).GetCommands().CanUndo()}, {"selection", nullptr}, {"pickTargets",Json::array()}, {"lightIcons",Json::array()}};
     const auto C = Camera();
+    Result["collisionTargets"] = Json::array();
+    if (AssetPreview && AssetPreview->GetPreviewCollision())
+    {
+        for (const auto& Element : AssetPreview->GetPreviewCollision()->CollisionElements)
+        {
+            const auto Clip = Vector3::Transform(Element.Center, C.ViewProjection);
+            Result["collisionTargets"].push_back({{"x", (Clip.x + 1.f) * Width * .5f}, {"y", (1.f - Clip.y) * Height * .5f}});
+        }
+    }
     for (auto* Object : Runtime.GetActiveScene()->GetAllObjects()) if (Object->GetComponent<MeshRendererComponent>()) {
         const auto P = Vector3::Transform(Object->GetWorldPosition(),C.ViewProjection);
         Result["pickTargets"].push_back({{"id",Object->GetPersistentId()},{"x",(P.x+1)*Width/2},{"y",(1-P.y)*Height/2}});
@@ -295,4 +361,129 @@ Json ViewportController::Status() const
         {"id", Object->GetPersistentId()}, {"name", Object->GetName()}, {"position", V(Object->GetTransform().Position)},
         {"scale", V(Object->GetTransform().Scale)}};
     return Result;
+}
+
+void ViewportController::BuildAssetOverlay()
+{
+    const auto* Defaults = AssetPreview->GetPreviewCollision();
+    if (!Defaults) { return; }
+    Json Document = Defaults->ToJson();
+    if (bCollisionDragging) { Document = CollisionDraft; }
+    const auto CameraValue = Camera();
+    auto* Draw = ImGui::GetForegroundDrawList();
+    const auto DrawLine = [&](Vector3 Start, Vector3 End, ImU32 Color)
+    {
+        Start = Vector3::Transform(Start, CameraValue.ViewProjection);
+        End = Vector3::Transform(End, CameraValue.ViewProjection);
+        if (Start.z <= 0.f || End.z <= 0.f || Start.z >= 1.f || End.z >= 1.f) { return; }
+        Draw->AddLine(ImVec2((Start.x + 1.f) * Width * .5f, (1.f - Start.y) * Height * .5f),
+            ImVec2((End.x + 1.f) * Width * .5f, (1.f - End.y) * Height * .5f), Color, 2.f * Scale);
+    };
+    for (size_t Index = 0; Index < Document["collision"]["elements"].size(); ++Index)
+    {
+        const auto& Element = Document["collision"]["elements"][Index];
+        const Vector3 Center(Element["center"][0], Element["center"][1], Element["center"][2]);
+        const Vector3 Rotation(Element["rotation"][0], Element["rotation"][1], Element["rotation"][2]);
+        const auto Orientation = Quaternion::CreateFromYawPitchRoll(Rotation.y * .0174532925f, Rotation.x * .0174532925f, Rotation.z * .0174532925f);
+        const auto MatrixValue = Matrix::CreateFromQuaternion(Orientation) * Matrix::CreateTranslation(Center);
+        ImU32 Color = IM_COL32(84, 220, 130, 240);
+        if (static_cast<int>(Index) == AssetPreview->GetSelectedCollision()) { Color = IM_COL32(255, 208, 80, 255); }
+        const auto Segment = [&](const Vector3& Start, const Vector3& End) { DrawLine(Vector3::Transform(Start, MatrixValue), Vector3::Transform(End, MatrixValue), Color); };
+        const int Shape = Element["shape"];
+        if (Shape == 3)
+        {
+            AssetHandle<StaticMeshResource> Resource;
+            if (Runtime.GetAssetManager().TryGetLoaded(AssetPreview->GetPreviewMesh()->GetMeshAssetKey(), Resource))
+            {
+                for (size_t Triangle = 0; Triangle + 2 < Resource->Indices.size(); Triangle += 3)
+                {
+                    for (size_t Edge = 0; Edge < 3; ++Edge)
+                    {
+                        Segment(Resource->Vertices[Resource->Indices[Triangle + Edge]].Position,
+                            Resource->Vertices[Resource->Indices[Triangle + (Edge + 1) % 3]].Position);
+                    }
+                }
+            }
+        }
+        else if (Shape == 0)
+        {
+            const Vector3 Extent(Element["halfExtents"][0], Element["halfExtents"][1], Element["halfExtents"][2]);
+            for (int Corner = 0; Corner < 8; ++Corner)
+            {
+                Vector3 Start(-Extent.x, -Extent.y, -Extent.z);
+                if (Corner & 1) { Start.x = Extent.x; }
+                if (Corner & 2) { Start.y = Extent.y; }
+                if (Corner & 4) { Start.z = Extent.z; }
+                for (int Axis = 0; Axis < 3; ++Axis)
+                {
+                    if (Corner & (1 << Axis)) { continue; }
+                    auto End = Start;
+                    (&End.x)[Axis] = (&Extent.x)[Axis];
+                    Segment(Start, End);
+                }
+            }
+        }
+        else
+        {
+            const float Radius = Element["radius"];
+            float HalfHeight = 0.f;
+            if (Shape == 2) { HalfHeight = Element["capsuleHalfHeight"]; }
+            for (int Plane = 0; Plane < 3; ++Plane)
+            {
+                for (int Step = 0; Step < 48; ++Step)
+                {
+                    const auto Point = [&](int Sample)
+                    {
+                        const float Angle = Sample * 6.2831853f / 48.f;
+                        Vector3 Result = Vector3::Zero;
+                        (&Result.x)[Plane] = std::cos(Angle) * Radius;
+                        (&Result.x)[(Plane + 1) % 3] = std::sin(Angle) * Radius;
+                        if (Result.y >= 0.f) { Result.y += HalfHeight; }
+                        else { Result.y -= HalfHeight; }
+                        return Result;
+                    };
+                    Segment(Point(Step), Point(Step + 1));
+                }
+            }
+        }
+        const auto Clip = Vector3::Transform(Center, CameraValue.ViewProjection);
+        if (Clip.z > 0.f && Clip.z < 1.f) { Draw->AddCircle(ImVec2((Clip.x + 1.f) * Width * .5f, (1.f - Clip.y) * Height * .5f), 7.f * Scale, Color); }
+    }
+    const int Selected = AssetPreview->GetSelectedCollision();
+    if (Selected >= 0 && Selected < static_cast<int>(Document["collision"]["elements"].size()) && Operation != 3 && !Navigation && AssetPreview->CanEditPreviewCollision())
+    {
+        auto& Element = Document["collision"]["elements"][Selected];
+        float Translation[]{Element["center"][0], Element["center"][1], Element["center"][2]};
+        float Rotation[]{Element["rotation"][0], Element["rotation"][1], Element["rotation"][2]};
+        float Scaling[]{1.f, 1.f, 1.f};
+        Matrix Manipulated;
+        ImGuizmo::RecomposeMatrixFromComponents(Translation, Rotation, Scaling, &Manipulated._11);
+        auto Manipulation = ImGuizmo::TRANSLATE;
+        if (Operation == 1) { Manipulation = ImGuizmo::ROTATE; }
+        if (Operation == 2) { Manipulation = ImGuizmo::SCALE; }
+        const bool bSupportsScale = Element["shape"] != 3 || Operation != 2;
+        if (bSupportsScale && ImGuizmo::Manipulate(&CameraValue.View._11, &CameraValue.Projection._11, Manipulation, ImGuizmo::LOCAL, &Manipulated._11))
+        {
+            ImGuizmo::DecomposeMatrixToComponents(&Manipulated._11, Translation, Rotation, Scaling);
+            Element["center"] = {Translation[0], Translation[1], Translation[2]};
+            Element["rotation"] = {Rotation[0], Rotation[1], Rotation[2]};
+            if (Operation == 2)
+            {
+                for (int Axis = 0; Axis < 3; ++Axis) { Element["halfExtents"][Axis] = std::max(.0001f, Element["halfExtents"][Axis].get<float>() * std::abs(Scaling[Axis])); }
+                float RadiusScale = std::max(std::abs(Scaling[0]), std::abs(Scaling[2]));
+                if (Element["shape"] == 1) { RadiusScale = std::max(RadiusScale, std::abs(Scaling[1])); }
+                Element["radius"] = std::max(.0001f, Element["radius"].get<float>() * RadiusScale);
+                Element["capsuleHalfHeight"] = std::max(.0001f, Element["capsuleHalfHeight"].get<float>() * std::abs(Scaling[1]));
+            }
+            if (!bCollisionDragging) { CollisionStartRevision = AssetPreview->GetPreviewRevision(); }
+            CollisionDraft = Document;
+            bCollisionDragging = true;
+        }
+    }
+    if (bCollisionDragging && !(Buttons & 1))
+    {
+        if (AssetPreview->CommitPreviewCollision(CollisionDraft, CollisionStartRevision)) { ++Edits; }
+        bCollisionDragging = false;
+        CollisionDraft = nullptr;
+    }
 }

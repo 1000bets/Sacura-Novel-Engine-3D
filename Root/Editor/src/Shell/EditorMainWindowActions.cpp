@@ -235,7 +235,7 @@ void EditorMainWindow::PopulateCreateMenus(QMenu* ObjectsMenu, QMenu* Components
             continue;
         }
         const TypeId ComponentType = ComponentClass->GetTypeId();
-        QAction* ComponentAction = ComponentsMenu->addAction(QString::fromStdString(ComponentType.Value));
+        QAction* ComponentAction = ComponentsMenu->addAction(QString::fromStdString(ComponentClass->GetDisplayName()));
         ComponentAction->setEnabled(GetSelectedGameObject() != nullptr && !BoundEngine.GetPlaySession().IsSimulating());
         connect(ComponentAction, &QAction::triggered, this, [this, ComponentType]()
         {

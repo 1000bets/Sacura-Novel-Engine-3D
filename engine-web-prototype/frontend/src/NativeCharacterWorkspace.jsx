@@ -1,3 +1,4 @@
+import {AssetReferenceField} from './NativeAssets.jsx';
 import React,{useEffect,useRef,useState} from 'react';
 import {Button,Icon} from './StudioParts.jsx';
 import {t as tr,useLocale} from './i18n.jsx';
@@ -91,7 +92,7 @@ export default function NativeCharacterWorkspace({objects=[],components=[],asset
         <div className="subscene-form-grid two"><label>{tr('Имя')}<input key={character.id+character.name} aria-label={tr('Имя персонажа')} defaultValue={character.name} onBlur={event=>{const value=event.target.value.trim();if(value&&value!==character.name)command('object.rename',{objectId:character.id,name:value});}} onKeyDown={event=>{if(event.key==='Enter')event.currentTarget.blur();}}/></label><label className="check"><input type="checkbox" checked={character.active} onChange={event=>command('object.setActive',{objectId:character.id,active:event.target.checked})}/>{tr('Персонаж включён')}</label></div>
         <label>{tr('Описание')}<textarea key={character.id+description} aria-label={tr('Описание персонажа')} rows={3} defaultValue={description} placeholder={tr('Кто этот персонаж?')} onBlur={event=>{if(marker&&event.target.value!==description)command('component.setProperty',{objectId:character.id,componentId:marker.id,property:'description',value:event.target.value});}}/></label>
         <section className="native-character-model"><h3>{tr('3D модель')}</h3><p>{tr('Выберите статический меш проекта или импортируйте GLB/FBX. Стартовая модель позволяет видеть персонажа сразу после создания.')}</p>
-          {renderer?<label>{tr('Меш персонажа')}<select aria-label={tr('Меш персонажа')} value={modelKey} onChange={event=>assignModel(event.target.value)}><option value="">{tr('Без модели')}</option>{models.map(model=><option key={model.key} value={model.key}>{model.builtin?'Engine · ':'Game · '}{model.label}</option>)}</select></label>
+          {renderer?<div><span>{tr('Меш персонажа')}</span><AssetReferenceField label="Меш персонажа" assetId={mesh?.value} subAssetId={mesh?.subAssetId} allowedTypes={['StaticMesh']} disabled={disabled||busy} onChange={Identity=>command('component.setAsset',{objectId:character.id,componentId:renderer.id,property:'mesh_asset_id',assetId:Identity.assetId,subAssetId:Identity.subAssetId})}/></div>
             :<Button icon="Box" onClick={()=>command('object.addComponent',{objectId:character.id,typeId:meshType})}>{tr('Добавить меш')}</Button>}
           <Button icon="Upload" onClick={importModel} disabled={disabled||busy}>{tr('Импортировать модель')}</Button>
           <small>{tr('FBX с ригом загружается как статическая поза. Риг и анимации пока не воспроизводятся в C++ viewport.')}</small>

@@ -15,6 +15,7 @@ public:
     ~Class() override;
 
     const TypeId& GetTypeId() const { return Id; }
+    std::string GetDisplayName() const;
     uint32_t GetSchemaVersion() const { return SchemaVersion; }
     ReflectionOrigin GetOrigin() const { return Origin; }
     CreationPolicy GetCreationPolicy() const { return Policy; }
@@ -35,6 +36,7 @@ public:
     using FactoryFunction = Object* (*)(Class* OwningClass);
 
     TypeId Id{};
+    std::string DisplayName;
     uint32_t SchemaVersion = 1;
     ReflectionOrigin Origin = ReflectionOrigin::Native;
     CreationPolicy Policy = CreationPolicy::Concrete;

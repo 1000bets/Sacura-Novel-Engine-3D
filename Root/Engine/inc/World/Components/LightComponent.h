@@ -10,7 +10,7 @@ using namespace DirectX::SimpleMath;
 
 class LightComponent : public Component
 {
-    ENGINE_CLASS(LightComponent, Component, "engine.LightComponent")
+    ENGINE_CLASS(LightComponent, Component, "engine.LightComponent", "Освещение")
 
 public:
     std::string GetEditorIconPath() const override

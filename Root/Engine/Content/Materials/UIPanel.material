@@ -1,10 +1,6 @@
 {
   "schemaVersion": 2,
   "domain": "UserInterface",
-  "source": {
-    "assetId": "26c3bd67-0e08-59fb-9423-a21010310ad8",
-    "subAssetId": null
-  },
   "parameters": [
     {
       "id": "Tint",
@@ -30,5 +26,6 @@
       ]
     }
   ],
-  "blendMode": "Translucent"
+  "blendMode": "Translucent",
+  "shader": "float4 EvaluateUserInterface(SakuraUserInterfaceInput Input)\n{\n    MaterialParameters Parameters = GetMaterialParameters();\n    float2 HalfSize = Input.Resolution * 0.5;\n    float2 Position = abs((Input.TextureCoordinates - 0.5) * Input.Resolution) - HalfSize + Parameters.Radius;\n    float Distance = length(max(Position, 0.0)) + min(max(Position.x, Position.y), 0.0) - Parameters.Radius;\n    float Alpha = saturate(0.5 - Distance);\n    return float4(Parameters.Tint.rgb * Input.Color.rgb, Alpha * Parameters.Tint.a * Input.Color.a);\n}\n"
 }

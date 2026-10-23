@@ -115,3 +115,13 @@ ctest --test-dir build -C Debug -R '^Editor.Mcp.Integration$' --output-on-failur
 идёт через действующий обработчик поля и его историю. Для отражённых свойств
 это обычная команда присваивания asset/companion, для материалов документа —
 соответствующая документная команда. Отдельного обхода Play/read-only нет.
+
+## Операции Content Browser
+
+`asset_rename` принимает `assetId` и новое `name` без расширения; `asset_move` и `asset_duplicate` — `assetId` и виртуальную папку `folder`. `asset_delete` принимает `assetId`. Папки обслуживают `folder_create` и `folder_rename` (`folder`, `name`) и `folder_delete` (`folder`). Это операции AssetOperations с теми же ограничениями на Game Content, открытые сцены и Play, что у Qt Content Browser. Дублирование создаёт новые GUID, переименование и перемещение сохраняют существующие. Удаление не является командой истории сцены.
+
+React использует соответствующие typed Bridge-команды `assets.rename`, `assets.move`, `assets.duplicate`, `assets.delete`, `assets.createFolder`, `assets.renameFolder`, `assets.deleteFolder`. `assets.folders` перечисляет реальные каталоги, включая пустые. Копирование/вырезание хранит выбранную идентичность в UI; вставка вызывает duplicate/move, не прямое копирование файлов. Диалоги подтверждения и системный буфер пути — UI-only.
+
+### React texture inspection
+
+Detached React texture windows use read-only `assetDocument.execute` open/get/preview snapshots through the existing typed Electron bridge. Texture pixels are decoded by Engine TextureLoader; compression and mip mutations are unavailable. Channel, background, zoom and pan controls are UI-only and excluded from MCP mutations. See [Texture editor](TEXTURE-EDITOR.md).

@@ -14,7 +14,7 @@ async function preserveDraft(bridge,choose){
   if(!bridge.connected)return true;
   const state=await bridge.request('bridge.describe',{});
   if(!state.ok)throw Error(state.error.message);
-  if(!state.value.dirty&&!state.value.storyDirty)return true;
+  if(!state.value.dirty&&!state.value.storyDirty&&!state.value.assetDocumentsDirty)return true;
   const choice=await choose();
   if(choice==='cancel')return false;
   if(choice==='discard')return true;

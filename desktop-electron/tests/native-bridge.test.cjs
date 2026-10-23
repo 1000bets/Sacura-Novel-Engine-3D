@@ -428,3 +428,149 @@ test('native project creation, external conflicts, version errors and saved draf
   app=await launch(created.path);assert.ok((await call('scene.getHierarchy')).some(o=>o.name==='Unsaved retained'));
  }finally{await app?.close();await fs.rm(dir,{recursive:true,force:true});}
 });
+
+
+test('React asset migration uses native previews, placement, documents and undo', {skip:process.platform!=='win32',timeout:120000}, async()=>{
+  const Parent=await fs.mkdtemp(path.join(os.tmpdir(),'sacura-asset-transfer-'));
+  let Application;
+  try {
+    const Created=spawn(host,['--project-create',Parent,'AssetTransfer','Empty'],{windowsHide:true});
+    let Output='';Created.stdout.on('data',Chunk=>Output+=Chunk);Created.stderr.on('data',Chunk=>Output+=Chunk);
+    assert.equal(await new Promise(Resolve=>Created.once('exit',Resolve)),0,Output);
+    const ProjectRoot=path.join(Parent,'AssetTransfer');
+    Application=await launch(path.join(ProjectRoot,'AssetTransfer.project'));
+    const Call=async(Method,Params={})=>{
+      const Result=await Application.bridge.request(Method,Params);
+      assert.equal(Result.ok,true,Method+': '+JSON.stringify(Result));return Result.value;
+    };
+    const CreationTypes=await Call('assets.creationTypes');
+    for (const Identifier of ['Scene','Story','Material','PostProcessMaterial','UserInterfaceMaterial','MaterialInstance']) {
+      assert.ok(CreationTypes.some(Type=>Type.id==='editor.Create'+Identifier+'AssetFactory'));
+    }
+    await fs.mkdir(path.join(ProjectRoot,'Content','CreatedAssets'),{recursive:true});
+    await Call('object.create',{name:'KeepUnsavedScene'});
+    const SceneBeforeCreation=await Call('bridge.describe');
+    const NewScene=await Call('assets.create',{factoryId:'editor.CreateSceneAssetFactory',path:'CreatedAssets/MenuScene.scene'});
+    assert.equal(NewScene.typeId,'Scene');
+    const AfterSceneCreation=await Call('bridge.describe');
+    assert.equal(AfterSceneCreation.path,SceneBeforeCreation.path);
+    assert.equal(AfterSceneCreation.dirty,true);
+    const NewStory=await Call('assets.create',{factoryId:'editor.CreateStoryAssetFactory',path:'CreatedAssets/MenuStory.story'});
+    assert.equal(NewStory.typeId,'Story');
+    assert.equal((await Call('story.get')).open,false);
+    const NewMaterial=await Call('assets.create',{factoryId:'editor.CreateMaterialAssetFactory',path:'CreatedAssets/MenuMaterial.material'});
+    await Call('assets.create',{factoryId:'editor.CreatePostProcessMaterialAssetFactory',path:'CreatedAssets/MenuPostProcess.material'});
+    await Call('assets.create',{factoryId:'editor.CreateUserInterfaceMaterialAssetFactory',path:'CreatedAssets/MenuUserInterface.material'});
+    const NewInstance=await Call('assets.create',{factoryId:'editor.CreateMaterialInstanceAssetFactory',path:'CreatedAssets/MenuInstance.materialinstance',settings:{parent:{assetId:NewMaterial.id,subAssetId:null}}});
+    const InstanceData=JSON.parse(await fs.readFile(path.join(ProjectRoot,'Content','CreatedAssets','MenuInstance.materialinstance'),'utf8'));
+    assert.equal(InstanceData.parent.assetId,NewMaterial.id);
+    assert.equal(NewInstance.typeId,'MaterialInstance');
+    for (const Params of [{factoryId:'editor.CreateSceneAssetFactory',path:'CreatedAssets/MenuScene.scene'},{factoryId:'editor.CreateSceneAssetFactory',path:'../Escape.scene'},
+      {factoryId:'editor.CreateMaterialAssetFactory',path:'/Engine/Escape.material'},{factoryId:'editor.CreateMaterialInstanceAssetFactory',path:'CreatedAssets/NoParent.materialinstance'},
+      {factoryId:'editor.CreateUnknownAssetFactory',path:'CreatedAssets/Unknown.asset'},{factoryId:'editor.CreateMaterialAssetFactory',path:'CreatedAssets/Wrong.scene'}]) {
+      assert.equal((await Application.bridge.request('assets.create',Params)).ok,false,JSON.stringify(Params));
+    }
+    await Call('play.start');
+    assert.equal((await Application.bridge.request('assets.create',{factoryId:'editor.CreateSceneAssetFactory',path:'CreatedAssets/PlayBlocked.scene'})).error.code,'PLAY_READ_ONLY');
+    await Call('play.stop');
+    const ParentSetting=CreationTypes.find(Type=>Type.id==='editor.CreateMaterialInstanceAssetFactory').settings.find(Field=>Field.id==='parent');
+    assert.equal(ParentSetting.required,true);
+    assert.deepEqual(ParentSetting.assetTypes,['Material','MaterialInstance']);
+    assert.equal(ParentSetting.value,null);
+    const CharacterCreated=await Call('assets.create',{factoryId:'editor.CreateCharacterAssetFactory',path:'CreatedAssets/MenuCharacter.character',settings:{description:'Created through reflected settings'}});
+    assert.equal(CharacterCreated.typeId,'Character');
+    const CharacterData=JSON.parse(await fs.readFile(path.join(ProjectRoot,'Content','CreatedAssets','MenuCharacter.character'),'utf8'));
+    assert.equal(CharacterData.description,'Created through reflected settings');
+    const ValueTypeSetting=CreationTypes.find(Type=>Type.id==='editor.CreateInputActionAssetFactory').settings.find(Field=>Field.id==='value_type');
+    assert.equal(ValueTypeSetting.typeId,'engine.InputValueType');
+    assert.equal(ValueTypeSetting.value,'Boolean');
+    assert.deepEqual(ValueTypeSetting.enumValues,['Boolean','Axis1D','Axis2D','Axis3D']);
+    await Call('assets.create',{factoryId:'editor.CreateInputActionAssetFactory',path:'CreatedAssets/MenuInput.inputaction',settings:{value_type:'Axis2D',execute_when_paused:true}});
+    const InputData=JSON.parse(await fs.readFile(path.join(ProjectRoot,'Content','CreatedAssets','MenuInput.inputaction'),'utf8'));
+    assert.equal(InputData.Action.ValueType,2);
+    assert.equal(InputData.Action.bExecuteWhenPaused,true);
+    await Call('assets.create',{factoryId:'editor.CreateInputContextAssetFactory',path:'CreatedAssets/MenuContext.inputcontext'});
+    await Call('assets.create',{factoryId:'editor.CreateWidgetLibraryAssetFactory',path:'CreatedAssets/MenuWidgets.widgets'});
+    await Call('assets.create',{factoryId:'editor.CreatePrefabAssetFactory',path:'CreatedAssets/MenuPrefab.prefab'});
+    assert.ok(!CreationTypes.some(Type=>Type.id==='editor.CreateShaderSourceAssetFactory'));
+    assert.equal((await Application.bridge.request('assets.create',{factoryId:'editor.CreateShaderSourceAssetFactory',path:'CreatedAssets/MenuShader.hlsl'})).ok,false);
+    for (const Settings of [{unregistered:true},{value_type:'Axis4D'},{value_type:'2'},{execute_when_paused:'invalid'}]) {
+      assert.equal((await Application.bridge.request('assets.create',{factoryId:'editor.CreateInputActionAssetFactory',path:'CreatedAssets/Rejected.inputaction',settings:Settings})).ok,false);
+    }
+    const MissingParent=await Application.bridge.request('assets.create',{factoryId:'editor.CreateMaterialInstanceAssetFactory',path:'CreatedAssets/NoLeakedDefaults.materialinstance'});
+    assert.equal(MissingParent.ok,false);
+    assert.equal((await Call('assets.creationTypes')).find(Type=>Type.id==='editor.CreateMaterialInstanceAssetFactory').settings[0].value,null);
+    const Actions=await Call('editor.actions');
+    for (const [Identifier,Expected] of [['editor.CreatePointLightObjectAction','1'],['editor.CreateSpotLightObjectAction','2'],['editor.CreateDirectionalLightObjectAction','0']]) {
+      assert.ok(Actions.some(Action=>Action.id===Identifier));
+      const Created=await Call('editor.executeAction',{actionId:Identifier});
+      const Objects=await Call('scene.getHierarchy');
+      const Light=Objects.find(Object=>Object.id===Created.id).components.find(Component=>Component.typeId==='engine.LightComponent');
+      const Properties=await Call('component.getProperties',{objectId:Created.id,componentId:Light.id});
+      assert.equal(Properties.find(Property=>Property.id==='light_type').value,Expected);
+      await Call('editor.undo');
+      assert.ok(!(await Call('scene.getHierarchy')).some(Object=>Object.id===Created.id));
+    }
+    const Assets=await Call('assets.list');
+    const Model=Assets.find(Entry=>Entry.typeId==='Model'&&Entry.subassets.some(Subasset=>Subasset.typeId==='StaticMesh'));
+    assert.ok(Model);
+    const Mesh=Model.subassets.find(Entry=>Entry.typeId==='StaticMesh');
+    let Preview=await Call('assets.thumbnail',{assetId:Model.id,subAssetId:Mesh.id});
+    for(let Attempt=0;!Preview.ready&&Attempt<100;Attempt++){
+      await delay(100);Preview=await Call('assets.thumbnail',{assetId:Model.id,subAssetId:Mesh.id});
+    }
+    assert.equal(Preview.ready,true);assert.equal(Buffer.from(Preview.png,'base64').subarray(1,4).toString(),'PNG');
+    const Placed=await Call('assets.place',{assetId:Model.id,subAssetId:Mesh.id});
+    const Object=(await Call('scene.getHierarchy')).find(Entry=>Entry.id===Placed.id);
+    assert.ok(Object);const Component=Object.components.find(Entry=>Entry.typeId==='engine.MeshRendererComponent');
+    const Identity={objectId:Object.id,componentId:Component.id};
+    await Call('mesh.physics',{...Identity,enabled:true,simulate:false});
+    assert.equal((await Call('mesh.inspect',Identity)).collision,true);
+    await Call('editor.undo');
+    await Call('editor.redo');
+    assert.equal((await Call('mesh.inspect',Identity)).collision,true);
+    const Material=Assets.find(Entry=>Entry.typeId==='Material');assert.ok(Material);
+    const MaterialPath=(await Call('assets.resolve',{assetId:Material.id})).absolutePath;
+    await fs.mkdir(path.join(ProjectRoot,'Content','Materials'),{recursive:true});
+    await fs.copyFile(MaterialPath,path.join(ProjectRoot,'Content','Materials','TransferSurface.material'));
+    const Refreshed=await Call('assets.refresh');
+    const Editable=Refreshed.find(Entry=>Entry.name==='TransferSurface.material');assert.ok(Editable);
+    const Opened=await Call('assetDocument.execute',{assetId:Editable.id,operation:'open'});
+    const Next={...Opened.document,blendMode:'Masked'};
+    const Edited=await Call('assetDocument.execute',{assetId:Editable.id,operation:'edit',revision:Opened.revision,value:Next});
+    assert.equal(Edited.dirty,true);assert.equal((await Call('bridge.describe')).assetDocumentsDirty,true);
+    const Stale=await Application.bridge.request('assetDocument.execute',{assetId:Editable.id,operation:'save',revision:Opened.revision});
+    assert.equal(Stale.ok,false);assert.equal(Stale.error.code,'STALE_DOCUMENT');
+    const Undone=await Call('assetDocument.execute',{assetId:Editable.id,operation:'undo',revision:Edited.revision});
+    assert.equal(Undone.document.blendMode,Opened.document.blendMode);
+    const Redone=await Call('assetDocument.execute',{assetId:Editable.id,operation:'redo',revision:Undone.revision});
+    const Saved=await Call('assetDocument.execute',{assetId:Editable.id,operation:'save',revision:Redone.revision});
+    assert.equal(Saved.dirty,false);
+    const Builtin=await Call('assetDocument.execute',{assetId:Material.id,operation:'open'});
+    assert.equal(Builtin.readOnly,true);
+    const InstancePath=path.join(ProjectRoot,'Content','Materials','TransferInstance.materialinstance');
+    await fs.writeFile(InstancePath,JSON.stringify({schemaVersion:1,parent:{assetId:Editable.id,subAssetId:null},overrides:{}}));
+    const InstanceAssets=await Call('assets.refresh');
+    const Instance=InstanceAssets.find(Entry=>Entry.relativePath==='Materials/TransferInstance.materialinstance');
+    assert.ok(Instance);
+    const InstanceDocument=await Call('assetDocument.execute',{assetId:Instance.id,operation:'open'});
+    assert.ok(InstanceDocument.parameters.length>0);
+    const Parameter=InstanceDocument.parameters[0];
+    const InstanceEdit=await Call('assetDocument.execute',{assetId:Instance.id,operation:'edit',revision:InstanceDocument.revision,
+      value:{...InstanceDocument.document,overrides:{[Parameter.id]:{type:Parameter.type,value:Parameter.value}}}});
+    assert.equal(InstanceEdit.dirty,true);
+    assert.equal(InstanceEdit.parameters[0].id,Parameter.id);
+    const InstanceUndo=await Call('assetDocument.execute',{assetId:Instance.id,operation:'undo',revision:InstanceEdit.revision});
+    assert.equal(Reflect.ownKeys(InstanceUndo.document.overrides).length,0);
+    const MeshDocument=await Call('assetDocument.execute',{assetId:Model.id,subAssetId:Mesh.id,operation:'open'});
+    const MeshPreview=await Call('assetDocument.execute',{assetId:Model.id,subAssetId:Mesh.id,operation:'preview',value:{showCollision:true,selectedCollision:0}});
+    assert.equal(MeshPreview.selectedCollision,0);
+    assert.deepEqual(MeshPreview.document,MeshDocument.document);
+
+    const Rejected=await Application.bridge.request('assetDocument.execute',{assetId:Material.id,operation:'edit',revision:Builtin.revision,value:Next});
+    assert.equal(Rejected.ok,false);
+  } finally {
+    if(Application){await Application.close();}
+    await fs.rm(Parent,{recursive:true,force:true});
+  }
+});

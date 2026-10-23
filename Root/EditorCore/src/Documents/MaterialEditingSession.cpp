@@ -47,21 +47,8 @@ AssetDiagnostic MaterialEditingSession::Open(const AssetKey& Asset)
 
 AssetDiagnostic MaterialEditingSession::ResolveCandidate(const nlohmann::json& Candidate, ResolvedMaterial& Material) const
 {
-    std::map<std::string, std::string> Sources;
-    if (!bInstance)
-    {
-        AssetKey Source;
-        AssetDiagnostic Result;
-        AssetMetadataIO::TryAssetRefFromJson(Candidate.value("source", nlohmann::json()), Source, Result);
-        std::string Identifier = Document->GetAsset().Asset.ToString();
-        if (Source.IsValid())
-        {
-            Identifier = Source.Asset.ToString();
-        }
-        Sources[Identifier] = Document->GetSource();
-    }
     return MaterialDocumentIO::Resolve(Registry, Document->GetAsset(), Material,
-        {{Document->GetAsset().Asset.ToString(), Candidate}}, Sources);
+        {{Document->GetAsset().Asset.ToString(), Candidate}});
 }
 
 AssetDiagnostic MaterialEditingSession::Execute(MaterialEditOperation Operation, const nlohmann::json& Value,
@@ -89,23 +76,10 @@ AssetDiagnostic MaterialEditingSession::Execute(MaterialEditOperation Operation,
             auto RegistrySnapshot = Registry;
             const auto Key = Document->GetAsset();
             const auto Draft = Document->GetDocument();
-            std::map<std::string, std::string> Sources;
-            if (!bInstance)
-            {
-                AssetKey Source;
-                AssetDiagnostic Result;
-                AssetMetadataIO::TryAssetRefFromJson(Draft.value("source", nlohmann::json()), Source, Result);
-                std::string Identifier = Key.Asset.ToString();
-                if (Source.IsValid())
-                {
-                    Identifier = Source.Asset.ToString();
-                }
-                Sources[Identifier] = Document->GetSource();
-            }
-            Jobs->Schedule([Pending, RegistrySnapshot, Key, Draft, Sources]()
+            Jobs->Schedule([Pending, RegistrySnapshot, Key, Draft]()
             {
                 Pending->Diagnostic = MaterialDocumentIO::Resolve(RegistrySnapshot, Key, Pending->Material,
-                    {{Key.Asset.ToString(), Draft}}, Sources);
+                    {{Key.Asset.ToString(), Draft}});
                 Pending->bReady.store(true, std::memory_order_release);
             });
             Preparation = Pending;
@@ -139,7 +113,7 @@ AssetDiagnostic MaterialEditingSession::Execute(MaterialEditOperation Operation,
                 }
             }
             else if (Value.value("domain", "Surface") != Previous.value("domain", "Surface")
-                || Value.value("source", nlohmann::json()) != Previous.value("source", nlohmann::json())
+                || Value.contains("source")
                 || Value.value("schemaVersion", 0) != Previous.value("schemaVersion", 0))
             {
                 return AssetDiagnostic::Fail(AssetErrorCode::UnsupportedFeature, "MaterialEditor", "Create a material in the required domain; source reassignment and schema changes are not supported by this editor");

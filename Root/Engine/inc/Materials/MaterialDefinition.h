@@ -48,7 +48,7 @@ struct MaterialDefinition
     bool bAnimated = false;
     float BoundsExpansion = 0.0f;
     float AlphaCutoff = 0.5f;
-    AssetKey Source;
+    std::string ShaderSource;
     std::vector<MaterialParameterDefinition> Parameters;
     std::string PreparedSource;
     std::vector<std::string> SourceFiles;

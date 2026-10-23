@@ -1,4 +1,8 @@
 set(EDITOR_CORE_SRC
+    src/Actions/SharedEditorRegistrars.cpp
+    src/Assets/AssetPreview.cpp
+    src/Assets/AssetCreationFactory.cpp
+    src/Assets/BuiltinAssetCreationFactories.cpp
     src/Commands/StaticMeshCommands.cpp
     src/Documents/StaticMeshDocument.cpp
     src/Project/GameExporter.cpp
@@ -63,5 +67,3 @@ target_link_libraries(EditorCore PRIVATE
 
 
 target_sources(EditorCore PRIVATE src/Assets/MaterialAssetCreation.cpp)
-
-target_sources(EditorCore PRIVATE src/Assets/MaterialSourceRelocation.cpp)

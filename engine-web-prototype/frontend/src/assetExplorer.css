@@ -33,3 +33,14 @@
 .asset-drop-overlay{position:absolute;inset:4px;z-index:2;pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;border:2px dashed var(--accent);background:var(--surface-1);color:var(--text-primary)}
 .asset-drop-overlay svg{color:var(--accent)}
 .asset-drop-overlay span{color:var(--text-secondary);font-size:12px}
+
+.asset-create-backdrop {position:fixed;inset:0;z-index:3000;background:#0005;display:grid;place-items:center}
+.asset-create-dialog {width:min(400px,calc(100vw - 32px));box-sizing:border-box;display:flex;flex-direction:column;gap:12px;padding:18px;background:var(--bg-panel);color:var(--text-primary);border:1px solid var(--divider);border-radius:6px;box-shadow:0 12px 40px #0008}
+.asset-create-dialog>label {display:flex;flex-direction:column;gap:6px}
+.asset-create-dialog>small {color:var(--text-secondary)}
+.asset-create-dialog>footer {display:flex;justify-content:flex-end;gap:8px}
+.asset-create-dialog p[role=alert] {color:var(--danger,#ee8d9b);margin:0}
+
+.asset-create-dialog {max-height:calc(100vh - 32px);overflow:auto}
+.asset-create-dialog fieldset {border:0;margin:0;padding:0;min-width:0}
+.asset-create-dialog .native-asset-options {position:relative;max-height:200px}

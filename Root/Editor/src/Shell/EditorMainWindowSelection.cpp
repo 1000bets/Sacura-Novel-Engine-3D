@@ -493,7 +493,7 @@ void EditorMainWindow::RefreshSelectionUi()
         if (ComponentClass->GetOrigin() == ReflectionOrigin::Python && ComponentClass->IsConcrete()
             && ComponentClass->IsA(TypeId{"engine.ScriptComponent"}))
         {
-            ObjectView->AddComponentType->addItem(QString::fromStdString(ComponentClass->GetTypeId().Value),
+            ObjectView->AddComponentType->addItem(QString::fromStdString(ComponentClass->GetDisplayName()),
                 QString::fromStdString(ComponentClass->GetTypeId().Value));
         }
     }

@@ -37,6 +37,7 @@
       "preload.cjs",
       "project-store.cjs",
       "native-viewport.cjs",
+      "asset-windows.cjs",
       "bridge/**/*",
       "scripts/native-smoke-main.cjs",
       "dist-ui/**/*",

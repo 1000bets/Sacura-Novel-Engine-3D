@@ -310,3 +310,14 @@ void RenderThread::SetSharedFrameStream(std::shared_ptr<SharedGpuFrameStream> St
     AssertGameThread();
     if (IsReady()) Enqueue([this, Stream = std::move(Stream)] { OwnedRenderer->SetSharedFrameStream(Stream); });
 }
+
+bool RenderThread::UpdateMaterialImage(std::shared_ptr<MaterialImageRequest> Image)
+{
+    AssertGameThread();
+    if (!IsReady()) { return false; }
+    return Enqueue([this, Image]()
+    {
+        if (Image) { GetRenderer()->QueueMaterialImage(Image); }
+        else { GetRenderer()->PollMaterialImages(); }
+    }) == RenderCommandEnqueueResult::Accepted;
+}

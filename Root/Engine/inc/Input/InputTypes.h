@@ -1,10 +1,17 @@
 #pragma once
 
+#include "Reflection/ReflectionMacros.h"
+
 #include <array>
 #include <string>
 #include <vector>
 
 enum class InputValueType { Boolean, Axis1D, Axis2D, Axis3D };
+ENGINE_REFLECT_ENUM(InputValueType, "engine.InputValueType",
+    ENGINE_ENUM_VALUE(InputValueType, Boolean),
+    ENGINE_ENUM_VALUE(InputValueType, Axis1D),
+    ENGINE_ENUM_VALUE(InputValueType, Axis2D),
+    ENGINE_ENUM_VALUE(InputValueType, Axis3D));
 enum class InputTrigger { Pressed, Released, Hold, Continuous };
 enum class InputPhase { Started, Ongoing, Triggered, Completed, Canceled };
 enum class InputAccumulation { Sum, Strongest };

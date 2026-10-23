@@ -1,10 +1,6 @@
 {
   "schemaVersion": 2,
   "domain": "Surface",
-  "source": {
-    "assetId": "6c85f1fa-54c0-5069-9c00-cdc936cbb91f",
-    "subAssetId": null
-  },
   "parameters": [
     {
       "id": "BaseColor",
@@ -149,5 +145,6 @@
     }
   ],
   "shadingModel": "Toon",
-  "blendMode": "Opaque"
+  "blendMode": "Opaque",
+  "shader": "SakuraSurface EvaluateSurface(SakuraSurfaceInput Input)\n{\n    MaterialParameters Parameters = GetMaterialParameters();\n    SakuraSurface Surface = MakeDefaultSurface(Input);\n    float4 Base = Parameters.BaseColor * Input.VertexColor;\n    if (HasBaseColorTexture())\n    {\n        Base *= SampleBaseColorTexture(Input.TextureCoordinates);\n    }\n    Surface.Albedo = Base.rgb;\n    Surface.Opacity = Base.a;\n    Surface.Metalness = Parameters.Metallic;\n    Surface.RoughnessValue = Parameters.Roughness;\n    if (HasMetallicRoughnessTexture())\n    {\n        float4 Packed = SampleMetallicRoughnessTexture(Input.TextureCoordinates);\n        Surface.Metalness *= Packed.b;\n        Surface.RoughnessValue *= Packed.g;\n    }\n    if (HasNormalTexture())\n    {\n        float3 TangentNormal = SampleNormalTexture(Input.TextureCoordinates).rgb * 2.0 - 1.0;\n        TangentNormal.xy *= Parameters.NormalStrength;\n        Surface.Normal = TangentNormalToWorld(Input, normalize(TangentNormal));\n    }\n    if (HasOcclusionTexture())\n    {\n        Surface.Occlusion = lerp(1.0, SampleOcclusionTexture(Input.TextureCoordinates).r, Parameters.OcclusionStrength);\n    }\n    Surface.Emission = Parameters.Emissive.rgb;\n    if (HasEmissiveTexture())\n    {\n        Surface.Emission *= SampleEmissiveTexture(Input.TextureCoordinates).rgb;\n    }\n    Surface.ToonSteps = Parameters.Steps;\n    Surface.ToonSmoothness = Parameters.Smoothness;\n    Surface.ToonSpecular = Parameters.Specular;\n    return Surface;\n}\n"
 }

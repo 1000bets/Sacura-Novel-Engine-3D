@@ -75,8 +75,12 @@ input, bounds, commands and low-rate status, never render frame contents.
   A conservative `WaitForIdle` on Render Thread completes producer GPU work before
   publishing the handle. This adds a CPU fence wait, not a CPU copy of pixels.
 - Three slots per extent, at most nine across resize generations. Busy slots are
-  never reused. Release requires `VideoFrame.close`, imported texture release in
-  both processes, and Electron `allReferencesReleased`, followed by the binary ACK.
+  never reused before the renderer completes its GL blit, closes the VideoFrame
+  and sends a consumed-frame ACK. Main keeps a bounded resource/extent pool and renews the Electron import for
+  each publication after the previous consumer ACK. Reusing a Chromium import
+  across external writes leaves its initial image cached. The native D3D12
+  texture and duplicated handle remain pooled; pixels never pass through CPU memory. Old imports
+  retire after pending frames finish; shutdown releases the retained imports.
 - Old sizes retire only after consumer release. Shutdown suspends production,
   drains imports, joins Render Thread and destroys the native surface. A timeout
   reports/kills a stuck host; normal tested shutdown returned exit code 0.

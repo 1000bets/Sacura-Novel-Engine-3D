@@ -1,0 +1,34 @@
+.native-texture-editor {height:100vh;display:flex;flex-direction:column;overflow:hidden;background:var(--bg-app);color:var(--text-primary);font-size:12px}
+.native-texture-toolbar {display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg-panel);border-bottom:1px solid var(--divider)}
+.native-texture-toolbar strong {flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.native-texture-body {display:grid;grid-template-columns:minmax(0,1fr) 310px;flex:1;min-height:0}
+.native-texture-preview {display:flex;flex-direction:column;min-width:0;min-height:0}
+.native-texture-preview nav {display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px;background:var(--bg-panel);border-bottom:1px solid var(--divider)}
+.native-texture-preview label {display:flex;align-items:center;gap:6px}
+.native-texture-preview input {width:56px}
+.native-texture-editor button,.native-texture-editor select,.native-texture-editor input {font:inherit;color:var(--text-primary);background:var(--bg-input,var(--bg-panel));border:1px solid var(--divider);border-radius:4px;padding:5px 7px}
+.native-texture-editor button {cursor:pointer}
+.native-texture-editor button:hover {background:var(--bg-hover)}
+.native-texture-editor button[aria-pressed=true] {border-color:var(--accent);color:var(--accent)}
+.native-texture-editor :focus-visible {outline:1px solid var(--accent);outline-offset:2px}
+.native-texture-surface {flex:1;min-height:0;overflow:auto;position:relative;cursor:grab;touch-action:none}
+.native-texture-surface:active {cursor:grabbing}
+.native-texture-surface.checker {background-color:#292932;background-image:conic-gradient(#363640 25%,transparent 0 50%,#363640 0 75%,transparent 0);background-size:24px 24px}
+.native-texture-surface.dark {background:#111116}
+.native-texture-surface.light {background:#dedee2}
+.native-texture-image-area {min-width:100%;min-height:100%;width:max-content;box-sizing:border-box;display:flex;align-items:center;justify-content:center;padding:24px}
+.native-texture-image-area canvas {display:block;flex:none;image-rendering:pixelated;box-shadow:0 1px 8px #0006}
+.native-texture-surface>p {margin:20px;padding:12px;background:var(--bg-panel);color:var(--text-primary);width:fit-content}
+.native-texture-details {overflow:auto;border-left:1px solid var(--divider);background:var(--bg-panel)}
+.native-texture-details h3 {font-size:12px;margin:0;padding:12px;border-bottom:1px solid var(--divider)}
+.native-texture-details details {border-bottom:1px solid var(--divider);padding:12px}
+.native-texture-details summary {font-weight:600;cursor:pointer}
+.native-texture-details p {color:var(--text-secondary);line-height:1.6;margin:10px 0 0}
+.native-texture-details dl {display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;margin:14px 0}
+.native-texture-details dt {color:var(--text-secondary)}
+.native-texture-details dd {margin:0}
+.native-texture-path {overflow-wrap:anywhere}
+.native-texture-editor footer {display:flex;gap:16px;padding:6px 12px;border-top:1px solid var(--divider);background:var(--bg-panel);color:var(--text-muted);font-size:11px}
+.native-texture-editor footer span:first-child {flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:850px) {.native-texture-body {grid-template-columns:minmax(0,1fr) 260px}.native-texture-preview nav {gap:5px}}
+@media(max-width:600px) {.native-texture-body {grid-template-columns:1fr;grid-template-rows:minmax(240px,1fr) 180px}.native-texture-details {border-left:0;border-top:1px solid var(--divider)}.native-texture-toolbar {flex-wrap:wrap}}

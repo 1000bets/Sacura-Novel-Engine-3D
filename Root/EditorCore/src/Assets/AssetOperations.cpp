@@ -1,5 +1,4 @@
 #include "Assets/AssetOperations.h"
-#include "Assets/MaterialSourceRelocation.h"
 
 #include "Assets/AssetMetadata.h"
 #include "Engine.h"
@@ -77,31 +76,14 @@ AssetDiagnostic AssetOperations::RenameAsset(const std::string& Source, const st
     {
         return AssetDiagnostic::Fail(AssetErrorCode::InvalidData, "AssetMove", "Destination is outside Game Content");
     }
-    std::vector<MaterialSourceEdit> ShaderEdits;
-    AssetDiagnostic Result;
-    if (Entry.Metadata.Type == ShaderSourceAssetType)
-    {
-        Result = MaterialSourceRelocation::Prepare(Registry, Entry.AbsolutePath, DestinationAbsolute, ShaderEdits);
-        if (Result.HasError())
-        {
-            return Result;
-        }
-    }
-    Result = Registry.RenamePair(Source, Destination);
+    AssetDiagnostic Result = Registry.RenamePair(Source, Destination);
     if (Result.HasError())
     {
-        return Result;
-    }
-    Result = MaterialSourceRelocation::Apply(ShaderEdits);
-    if (Result.HasError())
-    {
-        Registry.RenamePair(Destination, Source);
         return Result;
     }
     Result = RelocateProjectPaths(Entry.AbsolutePath, DestinationAbsolute);
     if (Result.HasError())
     {
-        MaterialSourceRelocation::Restore(ShaderEdits);
         const AssetDiagnostic RolledBack = Registry.RenamePair(Destination, Source);
         if (RolledBack.HasError())
         {
@@ -178,28 +160,14 @@ AssetDiagnostic AssetOperations::RenameFolder(const std::string& Source, const s
     {
         return AssetDiagnostic::Fail(AssetErrorCode::ImportConflict, "FolderMove", "Destination folder already exists");
     }
-    std::vector<MaterialSourceEdit> ShaderEdits;
-    AssetDiagnostic Result = MaterialSourceRelocation::Prepare(Registry, SourceAbsolute, DestinationAbsolute, ShaderEdits);
-    if (Result.HasError())
-    {
-        return Result;
-    }
     std::filesystem::rename(SourceAbsolute, DestinationAbsolute, Error);
     if (Error)
     {
         return AssetDiagnostic::Fail(AssetErrorCode::InternalError, "FolderMove", Error.message());
     }
-    Result = MaterialSourceRelocation::Apply(ShaderEdits);
+    AssetDiagnostic Result = RelocateProjectPaths(SourceAbsolute, DestinationAbsolute);
     if (Result.HasError())
     {
-        MaterialSourceRelocation::Restore(ShaderEdits);
-        std::filesystem::rename(DestinationAbsolute, SourceAbsolute, Error);
-        return Result;
-    }
-    Result = RelocateProjectPaths(SourceAbsolute, DestinationAbsolute);
-    if (Result.HasError())
-    {
-        MaterialSourceRelocation::Restore(ShaderEdits);
         std::filesystem::rename(DestinationAbsolute, SourceAbsolute, Error);
         if (Error)
         {

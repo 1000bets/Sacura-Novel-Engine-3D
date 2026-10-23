@@ -704,7 +704,7 @@ void PrefabEditorWindow::RebuildComponentInspectors()
         for (Component* ComponentInstance : SelectedObject->GetAllComponents())
         {
             const QString Type = ComponentInstance->GetClass() != nullptr
-                ? QString::fromStdString(ComponentInstance->GetClass()->GetTypeId().Value)
+                ? QString::fromStdString(ComponentInstance->GetClass()->GetDisplayName())
                 : QString::fromStdString(ComponentInstance->GetName());
             const bool bAdded = OverrideMarkers.count(ComponentInstance->GetPersistentId() + "/*") != 0;
             auto* Card = new QGroupBox(bAdded ? QStringLiteral("+ ") + Type : Type);
@@ -712,6 +712,7 @@ void PrefabEditorWindow::RebuildComponentInspectors()
             {
                 Card->setStyleSheet("QGroupBox { color:#7fd18b; }");
             }
+            Card->setToolTip(QString::fromStdString(ComponentInstance->GetTypeId().Value));
             auto* CardLayout = new QVBoxLayout(Card);
             CardLayout->setContentsMargins(6, 8, 6, 6);
 

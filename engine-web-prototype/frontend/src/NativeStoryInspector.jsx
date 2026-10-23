@@ -1,9 +1,14 @@
+import {AssetReferenceField} from './NativeAssets.jsx';
 import React from 'react';
 import Fold from './InspectorSection.jsx';
 import {Button,Field,Icon,Select} from './StudioParts.jsx';
 import {t as tr,useLocale} from './i18n.jsx';
 import './nativeStoryInspector.css';
 
+function SpeakerAssetIdentifier(Value) {
+  if (Value?.startsWith('character:')) { return Value.slice(10); }
+  return null;
+}
 const kinds=[['Line','Реплика'],['Choice','Выбор игрока'],['Action','Действие'],['End','Концовка']];
 const phases=[['BEFORE','До текста'],['ON_START','Вместе с текстом'],['AFTER','После ответа игрока']];
 const actionKinds=[['Wait','Ожидание'],['MoveTo','Перемещение объекта'],['CameraCut','Переход камеры'],['NavigateTo','Движение по навигации']];
@@ -60,7 +65,7 @@ export default function NativeStoryInspector({story,selection,objects=[],disable
   </>:<>
    <fieldset className="inspector-primary-fields" disabled={disabled}>
     <Field label="Тип блока"><Select aria-label="Тип блока" value={node.kind} options={kinds} onChange={kind=>edit({kind})}/></Field>
-    {node.kind==='Line'&&<><Field label="Говорит"><Select aria-label="Говорит" value={node.speaker||'Narrator'} options={[['Narrator','Рассказчик'],...objects.map(o=>[o.name,o.name]),...(node.speaker&&!objects.some(o=>o.name===node.speaker)&&node.speaker!=='Narrator'?[[node.speaker,node.speaker]]:[])]} onChange={speaker=>edit({speaker})}/></Field><CommitText label="Текст выбранной реплики" value={node.text} onCommit={text=>edit({text})} disabled={disabled} multiline/></>}
+    {node.kind==='Line'&&<><Field label="Говорит"><AssetReferenceField label="Персонаж-говорящий" assetId={SpeakerAssetIdentifier(node.speaker)} allowedTypes={['Character']} disabled={disabled} onChange={Identity=>{let Speaker='Narrator';if(Identity.assetId){Speaker='character:'+Identity.assetId;}edit({speaker:Speaker});}}/><Select aria-label="Говорит" value={node.speaker||'Narrator'} options={[['Narrator','Рассказчик'],...objects.map(o=>[o.name,o.name]),...(node.speaker&&!objects.some(o=>o.name===node.speaker)&&node.speaker!=='Narrator'?[[node.speaker,node.speaker]]:[])]} onChange={speaker=>edit({speaker})}/></Field><CommitText label="Текст выбранной реплики" value={node.text} onCommit={text=>edit({text})} disabled={disabled} multiline/></>}
     {node.kind==='Choice'&&<CommitText label="Текст выбора" value={node.prompt} onCommit={prompt=>edit({prompt})} disabled={disabled} multiline/>}
    </fieldset>
    {['Line','Choice'].includes(node.kind)&&<><Fold title="Постановка реплики" open={false} extra={<span className="inspector-count">{node.bindings?.length||0}</span>}>

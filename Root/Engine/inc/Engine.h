@@ -19,6 +19,7 @@
 #include "Story/StoryRuntime.h"
 #include <memory>
 #include "Materials/MaterialWidgetBinding.h"
+#include "Materials/MaterialImageRequest.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -82,6 +83,7 @@ public:
     bool IsGamePaused() const { return bGamePaused; }
     bool PrepareSceneMaterials(Scene& World);
     bool PrepareSceneSimulation(Scene& World);
+    bool UpdateMaterialImage(std::shared_ptr<MaterialImageRequest> Image = {});
     void RegisterMaterialWidgetBinding(const std::shared_ptr<MaterialWidgetBinding>& Binding);
     float GetMaterialTime() const { return MaterialTime; }
     void StopGame();
