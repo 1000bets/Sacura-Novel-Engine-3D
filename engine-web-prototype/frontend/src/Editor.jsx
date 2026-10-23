@@ -111,6 +111,7 @@ import {exportLocation,importLocation} from "./locationFiles.js";
 import FailureLab from "./FailureLab.jsx";
 import SubsceneWorkspace from './SubsceneWorkspace.jsx';
 import CharacterWorkspace from './CharacterWorkspace.jsx';
+import NativeCharacterWorkspace from './NativeCharacterWorkspace.jsx';
 import {createCharacter,setCharacterInScene} from './characterModel.js';
 import {createSubscene,cloneSubscene,setSceneEntry,connectSubscene,changeSceneLocation,newSceneDraft,LOCATION_PRIMITIVES} from './subsceneModel.js';
 import EventPlayground from './EventPlayground.jsx';
@@ -2218,6 +2219,17 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       else {setNativeAssetId(asset.id);setNativeFocus('asset');}
     };
     if(dock==='files')return <AssetExplorer project={project} audioAssets={[]} disabled={nativeEditing} onSelectFile={id=>{setNativeAssetId(id);setNativeFocus('asset');}} adapter={{files:nativeFiles,open:openAsset,import:async folder=>{if(folder.startsWith('Engine'))throw Error('Engine Content доступен только для чтения');const results=await window.sacuraDesktop.nativeImportAssets(folder.replace(/^Game\/?/,''));await native.adapter.loadDomain('assets.list','assets');const failure=results.find(r=>!r.ok);if(failure)throw Error(failure.error.message);}}}/>;
+    if(dock==='characters')return <NativeCharacterWorkspace objects={native.objects} components={native.components} assets={native.assets}
+      selected={native.state?.selection} disabled={nativeEditing} playing={nativePlaying} dirty={native.state?.dirty}
+      command={nativeCommand} select={selectNative} onActivate={()=>setNativeFocus('scene')}
+      onFocus={async id=>{await selectNative(id);setFocusRequest({nonce:uid('focus')});}}
+      onImport={async()=>{const results=await window.sacuraDesktop.nativeImportAssets('Models');
+        const assets=await native.adapter.loadDomain('assets.list','assets');const failure=results.find(result=>!result.ok);
+        if(failure)throw Error(failure.error.message);
+        const imported=assets.find(asset=>asset.id===results.find(result=>result.ok)?.value?.id);
+        const mesh=imported?.subassets?.find(item=>item.typeId==='StaticMesh');
+        if(results.length&&!mesh)throw Error('В импортированном файле нет статического меша.');
+        return mesh?{assetId:imported.id,subAssetId:mesh.id,name:imported.name?.replace(/\.glb$/i,'')}:null;}}/>;
     if(dock!=='story'&&dock!=='event')return <p role="status">Эта панель ещё не подключена к C++ Engine. Доступны Hierarchy, Inspector, Сцена, Файлы и История.</p>;
     const doc=native.story?.document;
     const select=value=>{setNativeFocus('story');setNativeStorySelection(!value?null:typeof value==='string'?{nodeId:value}:{nodeId:value.flowBeatId,eventId:value.event?.id,bindingId:value.binding?.id});};

@@ -3,6 +3,7 @@
 #include "World/Scene.h"
 #include "World/GameObject.h"
 #include "World/Components/MeshRendererComponent.h"
+#include "World/Components/LightComponent.h"
 #include "Project/ProjectSession.h"
 #include "Core/Threading/ThreadContext.h"
 #include <imgui.h>
@@ -15,6 +16,35 @@
 using Json = nlohmann::json;
 namespace {
 Json V(const Vector3& P) { return {P.x, P.y, P.z}; }
+bool ProjectLightIcon(const GameObject& Object, const RenderCamera& Camera, float Width, float Height,
+    float Scale, ImVec2& Position)
+{
+    const Vector3 Clip = Vector3::Transform(Object.GetWorldPosition(), Camera.ViewProjection);
+    if (!std::isfinite(Clip.x) || !std::isfinite(Clip.y) || !std::isfinite(Clip.z)
+        || Clip.z <= 0.f || Clip.z >= 1.f) return false;
+    Position = ImVec2((Clip.x + 1.f) * Width * .5f,
+        (1.f - Clip.y) * Height * .5f - 18.f * Scale);
+    const float Margin = 13.f * Scale;
+    return Position.x >= -Margin && Position.x <= Width + Margin
+        && Position.y >= -Margin && Position.y <= Height + Margin;
+}
+void DrawLightIcon(ImDrawList& Draw, const ImVec2& Center, float Scale, bool Selected)
+{
+    const auto P = [=](float X, float Y) { return ImVec2(Center.x + X * Scale, Center.y + Y * Scale); };
+    const ImU32 Gold = IM_COL32(255, 211, 99, 255);
+    Draw.AddLine(P(0, 11), P(0, 17), IM_COL32(255, 211, 99, 180), 1.5f * Scale);
+    Draw.AddCircleFilled(Center, 12.f * Scale, IM_COL32(28, 30, 39, 225), 24);
+    Draw.AddCircle(Center, 12.f * Scale,
+        Selected ? IM_COL32(255, 226, 143, 255) : IM_COL32(188, 157, 90, 220), 24, 1.5f * Scale);
+    Draw.AddCircleFilled(P(0, -3), 5.f * Scale, Gold, 16);
+    Draw.AddLine(P(-3, 1), P(-2, 5), Gold, 2.f * Scale);
+    Draw.AddLine(P(3, 1), P(2, 5), Gold, 2.f * Scale);
+    Draw.AddLine(P(-2, 5), P(2, 5), Gold, 2.f * Scale);
+    Draw.AddLine(P(-2, 8), P(2, 8), Gold, 2.f * Scale);
+    Draw.AddLine(P(-9, -3), P(-7, -3), Gold, 1.5f * Scale);
+    Draw.AddLine(P(9, -3), P(7, -3), Gold, 1.5f * Scale);
+    Draw.AddLine(P(0, -10), P(0, -8), Gold, 1.5f * Scale);
+}
 ImGuiOverlaySnapshot Capture(const ImDrawData* Source)
 {
     ImGuiOverlaySnapshot Result;
@@ -126,7 +156,7 @@ void ViewportController::Input(const Json& E)
             const Vector3 Delta = (-Right * Dx + Up * Dy) * std::max(0.001f, Distance * 0.0015f);
             Position += Delta; Target += Delta;
         } else {
-            float Yaw = std::atan2(Forward.x, Forward.z) + Dx * 0.005f;
+            float Yaw = std::atan2(Forward.x, Forward.z) - Dx * 0.005f;
             float Pitch = std::clamp(std::asin(Forward.y) - Dy * 0.005f, -1.54f, 1.54f);
             const Vector3 Direction(std::sin(Yaw) * std::cos(Pitch), std::sin(Pitch), std::cos(Yaw) * std::cos(Pitch));
             if (Navigation == 3) Position = Target - Direction * Distance;
@@ -142,6 +172,18 @@ void ViewportController::Input(const Json& E)
 void ViewportController::Pick(float X, float Y)
 {
     const auto C = Camera();
+    GameObject* SelectedLight = nullptr;
+    float LightDistance = (13.f * Scale) * (13.f * Scale);
+    if (!Runtime.GetPlaySession().IsSimulating()) for (auto* Object : Runtime.GetActiveScene()->GetAllObjects()) {
+        if (!Object->IsActiveInHierarchy()) continue;
+        const auto* Light = Object->GetComponent<LightComponent>();
+        if (!Light || !Light->IsEnabled()) continue;
+        ImVec2 Icon;
+        if (!ProjectLightIcon(*Object, C, Width, Height, Scale, Icon)) continue;
+        const float Distance = (X - Icon.x) * (X - Icon.x) + (Y - Icon.y) * (Y - Icon.y);
+        if (Distance < LightDistance) { LightDistance = Distance; SelectedLight = Object; }
+    }
+    if (SelectedLight) { Workspace.Select(Runtime.GetActiveScene(), SelectedLight->GetObjectHandle()); return; }
     const Matrix Inv = C.ViewProjection.Invert();
     const Vector3 Near = Vector3::Transform(Vector3(X / Width * 2 - 1, 1 - Y / Height * 2, 0), Inv);
     const Vector3 Far = Vector3::Transform(Vector3(X / Width * 2 - 1, 1 - Y / Height * 2, 1), Inv);
@@ -190,6 +232,18 @@ void ViewportController::BuildOverlay(float Dt)
     ImGuizmo::SetRect(0, 0, Width, Height); ImGuizmo::SetOrthographic(false);
     ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());
     auto* Object = Workspace.GetSelectedObject(Runtime.GetActiveScene());
+    if (!Runtime.GetPlaySession().IsSimulating()) {
+        const auto View = Camera();
+        auto* Draw = ImGui::GetForegroundDrawList();
+        for (auto* LightObject : Runtime.GetActiveScene()->GetAllObjects()) {
+            if (!LightObject->IsActiveInHierarchy()) continue;
+            const auto* Light = LightObject->GetComponent<LightComponent>();
+            if (!Light || !Light->IsEnabled()) continue;
+            ImVec2 Icon;
+            if (ProjectLightIcon(*LightObject, View, Width, Height, Scale, Icon))
+                DrawLightIcon(*Draw, Icon, Scale, LightObject == Object);
+        }
+    }
     if (Object && Operation != 3 && !Navigation && !Runtime.GetPlaySession().IsSimulating()) {
         const auto C = Camera(); Matrix World = Object->GetWorldMatrix();
         const auto Op = Operation == 1 ? ImGuizmo::ROTATE : Operation == 2 ? ImGuizmo::SCALE : ImGuizmo::TRANSLATE;
@@ -223,11 +277,19 @@ Json ViewportController::Status() const
 {
     AssertGameThread();
     Json Result{{"cameraPosition", V(Position)}, {"cameraTarget", V(Target)}, {"inputCount", InputCount}, {"edits", Edits},
-        {"tool", Operation}, {"navigation", Navigation}, {"heldKeys", Keys.size()}, {"canUndo", const_cast<SceneWorkspace&>(Workspace).GetCommands().CanUndo()}, {"selection", nullptr}, {"pickTargets",Json::array()}};
+        {"tool", Operation}, {"navigation", Navigation}, {"heldKeys", Keys.size()}, {"canUndo", const_cast<SceneWorkspace&>(Workspace).GetCommands().CanUndo()}, {"selection", nullptr}, {"pickTargets",Json::array()}, {"lightIcons",Json::array()}};
     const auto C = Camera();
     for (auto* Object : Runtime.GetActiveScene()->GetAllObjects()) if (Object->GetComponent<MeshRendererComponent>()) {
         const auto P = Vector3::Transform(Object->GetWorldPosition(),C.ViewProjection);
         Result["pickTargets"].push_back({{"id",Object->GetPersistentId()},{"x",(P.x+1)*Width/2},{"y",(1-P.y)*Height/2}});
+    }
+    if (!Runtime.GetPlaySession().IsSimulating()) for (auto* Object : Runtime.GetActiveScene()->GetAllObjects()) {
+        if (!Object->IsActiveInHierarchy()) continue;
+        const auto* Light = Object->GetComponent<LightComponent>();
+        if (!Light || !Light->IsEnabled()) continue;
+        ImVec2 Icon;
+        if (ProjectLightIcon(*Object, C, Width, Height, Scale, Icon))
+            Result["lightIcons"].push_back({{"id",Object->GetPersistentId()},{"x",Icon.x},{"y",Icon.y}});
     }
     if (auto* Object = Workspace.GetSelectedObject(Runtime.GetActiveScene())) Result["selection"] = {
         {"id", Object->GetPersistentId()}, {"name", Object->GetName()}, {"position", V(Object->GetTransform().Position)},

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "guid": "38ab7fb7-d867-5017-9e75-dcb9cb20f0e8",
+  "assetType": "Model",
+  "sourceFingerprint": "eace5bf633834546",
+  "loadSettings": {},
+  "importInfo": {},
+  "subAssets": [
+    {
+      "id": "a7380ae6-1d02-5203-8261-518f678d7b0c",
+      "type": "StaticMesh",
+      "name": "StarterCharacter",
+      "selector": {
+        "kind": "mesh",
+        "index": 0
+      }
+    }
+  ]
+}

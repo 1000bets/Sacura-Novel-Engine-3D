@@ -18,6 +18,10 @@
       "primitive?": "id",
       "cameraAspect?": "number"
     },
+    "character.create": {
+      "name": "string",
+      "transform?": "transform"
+    },
     "object.duplicate": {
       "objectId": "id"
     },

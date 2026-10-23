@@ -1,4 +1,4 @@
-"""Regenerate the built-in sphere and cylinder GLB assets and their stable metadata."""
+"""Regenerate built-in primitive and starter character GLBs with stable metadata."""
 
 import json
 import math
@@ -56,6 +56,35 @@ def cylinder():
     return vertices, indices
 
 
+def starter_character():
+    vertices, indices = [], []
+
+    def cross(a, b):
+        return (a[1] * b[2] - a[2] * b[1],
+                a[2] * b[0] - a[0] * b[2],
+                a[0] * b[1] - a[1] * b[0])
+
+    def box(center, half):
+        for normal, tangent in (((1, 0, 0), (0, 0, 1)), ((-1, 0, 0), (0, 0, 1)),
+                                ((0, 1, 0), (1, 0, 0)), ((0, -1, 0), (1, 0, 0)),
+                                ((0, 0, 1), (1, 0, 0)), ((0, 0, -1), (1, 0, 0))):
+            bitangent = cross(normal, tangent)
+            start = len(vertices)
+            for u, v in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+                position = tuple(center[i] + normal[i] * half[i]
+                                 + tangent[i] * half[i] * u + bitangent[i] * half[i] * v
+                                 for i in range(3))
+                vertices.append((position, normal, ((u + 1) / 2, (v + 1) / 2)))
+            indices.extend((start, start + 1, start + 2, start, start + 2, start + 3))
+
+    box((0, 1.56, 0), (.22, .22, .19))
+    box((0, 1.05, 0), (.28, .40, .15))
+    for side in (-1, 1):
+        box((side * .39, 1.06, 0), (.10, .35, .12))
+        box((side * .14, .37, 0), (.11, .37, .13))
+    return vertices, indices
+
+
 def write_model(name, geometry):
     vertices, indices = geometry
     payload = bytearray()
@@ -71,8 +100,8 @@ def write_model(name, geometry):
             payload.extend(struct.pack(fmt, *value))
         views.append({"buffer": 0, "byteOffset": offset, "byteLength": len(payload) - offset})
         accessors.append({"bufferView": len(views) - 1, "componentType": component, "count": len(values), "type": kind})
-    accessors[0]["min"] = [-0.5, -0.5, -0.5]
-    accessors[0]["max"] = [0.5, 0.5, 0.5]
+    accessors[0]["min"] = [min(vertex[0][axis] for vertex in vertices) for axis in range(3)]
+    accessors[0]["max"] = [max(vertex[0][axis] for vertex in vertices) for axis in range(3)]
     document = {"asset": {"version": "2.0"}, "buffers": [{"byteLength": len(payload)}],
                 "bufferViews": views, "accessors": accessors,
                 "meshes": [{"name": name, "primitives": [{"attributes": {"POSITION": 0, "NORMAL": 1, "TEXCOORD_0": 2}, "indices": 3}]}],
@@ -98,3 +127,4 @@ def write_model(name, geometry):
 if __name__ == "__main__":
     write_model("PrimitiveSphere", sphere())
     write_model("PrimitiveCylinder", cylinder())
+    write_model("StarterCharacter", starter_character())

@@ -209,6 +209,30 @@ Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
         std::string Error;bool Ok=P.contains("path")?Document.SaveAs(ScenePath(P.at("path")),Error):Document.Save(Error);
         Require(Ok,"IO_ERROR",Error);return Describe();
     }
+    if(M=="character.create") {
+        const std::string Name=P.at("name").get<std::string>();
+        Require(!Name.empty(),"INVALID_ARGUMENT","Character name is required");
+        AssetRegistryEntry Model;
+        Require(Runtime.GetAssetRegistry().TryGetByPath("/Engine/Models/StarterCharacter.glb",Model)
+            &&Model.Metadata.SubAssets.size()==1&&Model.Metadata.SubAssets.front().Type==StaticMeshAssetType,
+            "NOT_FOUND","Starter character mesh is unavailable");
+        ObjectHandle Created,Mesh;
+        Commands.BeginGroup("Create Character");
+        try {
+            Commit(MakeCreateObjectCommand(World(),Name,{},&Created));
+            if(P.contains("transform"))Commit(MakeSetTransformCommand(World(),Created,ParseTransform(P["transform"])));
+            Commit(MakeAddComponentCommand(World(),Created,TypeId{"engine.CharacterComponent"}));
+            Commit(MakeAddComponentCommand(World(),Created,TypeId{"engine.MeshRendererComponent"},&Mesh));
+            Commit(MakeSetPropertyCommand(World(),Mesh,PropertyId{"mesh_asset_id"},
+                ReflectedValue::MakeString(Model.Metadata.Guid.ToString())));
+            Commit(MakeSetPropertyCommand(World(),Mesh,PropertyId{"mesh_sub_asset_id"},
+                ReflectedValue::MakeString(Model.Metadata.SubAssets.front().Id.ToString())));
+            Commands.EndGroup();
+        } catch(...) {Commands.CancelGroup();throw;}
+        auto* Object=World()->FindByHandle(Created);
+        Require(Object!=nullptr,"COMMAND_FAILED","Created character unavailable");
+        return {{"id",Object->GetPersistentId()}};
+    }
     if(M=="object.create") {
         ObjectHandle Created,Parent;if(P.contains("parentId")&&!P["parentId"].is_null())Parent=Find(P["parentId"])->GetObjectHandle();
         const bool Compound=P.contains("transform")||P.contains("componentType")||P.contains("primitive");

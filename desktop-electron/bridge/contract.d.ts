@@ -48,6 +48,7 @@ export interface Commands {
   'scene.save': {params:{path?:string};result:State};
   'scene.getHierarchy': {params:Record<string,never>;result:ObjectInfo[]};
   'object.create': {params:{name:string;parentId?:Id|null;transform?:Transform;componentType?:string;primitive?:string;cameraAspect?:number};result:{id:Id}};
+  'character.create': {params:{name:string;transform?:Transform};result:{id:Id}};
   'object.duplicate': {params:{objectId:Id};result:{id:Id}};
   'object.destroy': {params:{objectId:Id};result:null};
   'object.rename': {params:{objectId:Id;name:string};result:null};

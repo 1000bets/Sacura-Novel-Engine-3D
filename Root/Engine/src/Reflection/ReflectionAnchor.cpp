@@ -1,6 +1,7 @@
 #include "World/Components/CameraComponent.h"
 #include "World/Components/ArrowComponent.h"
 #include "World/Components/LightComponent.h"
+#include "World/Components/CharacterComponent.h"
 #include "World/Components/LightSettings.h"
 #include "World/Components/MeshRendererComponent.h"
 #include "World/Components/ScriptComponent.h"
@@ -23,11 +24,13 @@ void ForceTouchRegistrars()
     (void)ArrowComponent::StaticReflectionTypeId();
     (void)&ArrowComponent::s_ReflectionClassRegistrar;
     (void)LightComponent::StaticReflectionTypeId();
+    (void)CharacterComponent::StaticReflectionTypeId();
     (void)MeshRendererComponent::StaticReflectionTypeId();
     (void)ScriptComponent::StaticReflectionTypeId();
     (void)LightSettings::StaticReflectionTypeId();
     (void)&CameraComponent::s_ReflectionClassRegistrar;
     (void)&LightComponent::s_ReflectionClassRegistrar;
+    (void)&CharacterComponent::s_ReflectionClassRegistrar;
     (void)&MeshRendererComponent::s_ReflectionClassRegistrar;
     (void)&ScriptComponent::s_ReflectionClassRegistrar;
     (void)&LightSettings::s_ReflectionStructRegistrar;

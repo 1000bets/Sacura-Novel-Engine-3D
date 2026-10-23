@@ -21,6 +21,14 @@ async function launch(project){
     const watchdog=setTimeout(()=>child.kill(),10000);const code=await exit;clearTimeout(watchdog);bridge.close();assert.equal(code,0,output);
   }};
 }
+function latestViewport(app){
+  const packets=app.output().split(/\r?\n/).filter(line=>line.startsWith('@sacura '));
+  for(let index=packets.length-1;index>=0;index--){
+    const packet=JSON.parse(packets[index].slice(8));
+    if(packet.type==='viewport')return packet.data;
+  }
+  return null;
+}
 test('contract rejects extra fields, unsafe values, methods and malformed transforms',()=>{
   for(const [m,p] of [['eval',{}],['object.destroy',{objectId:'x',pointer:42}],['object.rename',{objectId:'x',name:'\0'}],['component.setProperty',{objectId:'x',componentId:'c',property:'p',value:Infinity}],['transform.set',{objectId:'x',transform:{position:[1],rotation:[],scale:[]}}]])assert.throws(()=>validate(m,p));
   validate('object.create',{name:'日本語 объект'});
@@ -37,6 +45,9 @@ test('visual novel template plays dialogue, branches and resolves its WAV cue', 
     app=await launch(project);
     const call=async(method,params={})=>{const result=await app.bridge.request(method,params);assert.equal(result.ok,true,method+': '+JSON.stringify(result));return result.value;};
     const initial=await call('bridge.describe');assert.equal(initial.startupAudio,true);
+    const mira=(await call('scene.getHierarchy')).find(item=>item.name==='Мира');
+    assert.ok(mira?.components.some(component=>component.typeId==='engine.CharacterComponent'));
+    assert.ok(mira.components.some(component=>component.typeId==='engine.MeshRendererComponent'));
     assert.ok((await call('assets.list')).some(asset=>asset.typeId==='Audio'&&asset.name==='RainTheme.wav'));
     assert.equal((await call('story.get')).document.nodes.length,6);
     const audio=(await call('audio.resolveStartup')).absolutePath;
@@ -48,6 +59,138 @@ test('visual novel template plays dialogue, branches and resolves its WAV cue', 
     state=await call('play.advanceDialogue');assert.equal(state.dialogue.phase,'end');
     state=await call('play.stop');assert.equal(state.dialogue.phase,'idle');
   }finally{if(app)await app.close();await fs.rm(parent,{recursive:true,force:true,maxRetries:5});}
+});
+test('right mouse drag turns the native viewport toward the drag direction', {skip:process.platform!=='win32',timeout:30000},async()=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'sacura-camera-input-'));
+  await fs.cp(path.join(root,'Samples/SampleProject'),dir,{recursive:true});
+  let app;
+  try{
+    app=await launch(path.join(dir,'SampleProject.project'));
+    await until(()=>latestViewport(app),5000);
+    const before=latestViewport(app);
+    const forward=before.cameraTarget.map((value,index)=>value-before.cameraPosition[index]);
+    const right=[-forward[2],0,forward[0]];
+    const send=event=>app.child.stdin.write(JSON.stringify({type:'input',event:{kind:'pointer',...event}})+'\n');
+    send({phase:'down',x:200,y:100,button:2,buttons:2});
+    send({phase:'move',x:240,y:100,button:2,buttons:2});
+    send({phase:'up',x:240,y:100,button:2,buttons:0});
+    await until(()=>latestViewport(app)?.inputCount>=before.inputCount+3,5000);
+    const after=latestViewport(app);
+    const targetChange=after.cameraTarget.map((value,index)=>value-before.cameraTarget[index]);
+    assert.ok(targetChange.reduce((sum,value,index)=>sum+value*right[index],0)>0,
+      `Dragging right turned the camera left: ${JSON.stringify({before:before.cameraTarget,after:after.cameraTarget})}`);
+    send({phase:'down',x:240,y:100,button:2,buttons:2});
+    send({phase:'move',x:200,y:100,button:2,buttons:2});
+    send({phase:'up',x:200,y:100,button:2,buttons:0});
+    await until(()=>latestViewport(app)?.inputCount>=after.inputCount+3,5000);
+    const restored=latestViewport(app);
+    const leftChange=restored.cameraTarget.map((value,index)=>value-after.cameraTarget[index]);
+    assert.ok(leftChange.reduce((sum,value,index)=>sum+value*right[index],0)<0,
+      'Dragging left did not turn the camera left');
+    assert.ok(restored.cameraTarget.every((value,index)=>Math.abs(value-before.cameraTarget[index])<0.001),
+      'Equal right and left drags did not restore the view');
+  }finally{if(app)await app.close();await fs.rm(dir,{recursive:true,force:true,maxRetries:5});}
+});
+test('native viewport projects and picks enabled light icons', {skip:process.platform!=='win32',timeout:30000},async()=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'sacura-light-icon-'));
+  await fs.cp(path.join(root,'Samples/SampleProject'),dir,{recursive:true});
+  let app;
+  try{
+    app=await launch(path.join(dir,'SampleProject.project'));
+    const call=async(method,params={})=>{
+      const result=await app.bridge.request(method,params);
+      assert.equal(result.ok,true,method+': '+JSON.stringify(result));
+      return result.value;
+    };
+    const created=await call('object.create',{name:'Viewport light',componentType:'engine.LightComponent',
+      transform:{position:[0,0,0],rotation:[0,0,0,1],scale:[1,1,1]}});
+    const icon=()=>latestViewport(app)?.lightIcons?.find(item=>item.id===created.id);
+    await until(()=>icon(),5000);
+    const initial=icon();
+    assert.ok(Number.isFinite(initial.x)&&Number.isFinite(initial.y));
+    await call('transform.set',{objectId:created.id,
+      transform:{position:[1,0,0],rotation:[0,0,0,1],scale:[1,1,1]}});
+    await until(()=>Math.abs((icon()?.x??initial.x)-initial.x)>1,5000);
+    const first=icon();
+    const before=latestViewport(app).inputCount;
+    const send=event=>app.child.stdin.write(JSON.stringify({type:'input',event:{kind:'pointer',...event}})+'\n');
+    send({phase:'down',x:first.x,y:first.y,button:0,buttons:1});
+    send({phase:'up',x:first.x,y:first.y,button:0,buttons:0});
+    await until(()=>latestViewport(app)?.inputCount>=before+2,5000);
+    assert.equal(latestViewport(app).selection?.id,created.id,'Clicking the light icon must select its object');
+    const component=(await call('scene.getHierarchy')).find(item=>item.id===created.id).components
+      .find(item=>item.typeId==='engine.LightComponent');
+    await call('component.setEnabled',{objectId:created.id,componentId:component.id,enabled:false});
+    await until(()=>!icon(),5000);
+  }finally{if(app)await app.close();await fs.rm(dir,{recursive:true,force:true,maxRetries:5});}
+});
+test('native character is visible, editable, undoable and saved in the scene', {skip:process.platform!=='win32',timeout:30000},async()=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'sacura-character-'));
+  await fs.cp(path.join(root,'Samples/SampleProject'),dir,{recursive:true});
+  let app;
+  try{
+    app=await launch(path.join(dir,'SampleProject.project'));
+    const call=async(method,params={})=>{
+      const result=await app.bridge.request(method,params);
+      assert.equal(result.ok,true,method+': '+JSON.stringify(result));return result.value;
+    };
+    const starter=(await call('assets.list')).find(asset=>asset.path==='/Engine/Models/StarterCharacter.glb');
+    assert.ok(starter?.subassets?.some(item=>item.typeId==='StaticMesh'));
+    const created=await call('character.create',{name:'Алиса',transform:{position:[2,0,3],rotation:[0,0,0,1],scale:[1,1,1]}});
+    let character=(await call('scene.getHierarchy')).find(item=>item.id===created.id);
+    assert.deepEqual(character.transform.position,[2,0,3]);
+    const marker=character.components.find(item=>item.typeId==='engine.CharacterComponent');
+    const renderer=character.components.find(item=>item.typeId==='engine.MeshRendererComponent');
+    assert.ok(marker&&renderer);
+    const mesh=(await call('component.getProperties',{objectId:created.id,componentId:renderer.id}))
+      .find(item=>item.id==='mesh_asset_id');
+    assert.equal(mesh.value,starter.id);
+    assert.equal(mesh.subAssetId,starter.subassets[0].id);
+    await call('component.setProperty',{objectId:created.id,componentId:marker.id,property:'description',value:'Героиня истории'});
+    await call('object.rename',{objectId:created.id,name:'Алиса Волкова'});
+    await call('scene.save');
+    const saved=JSON.parse(await fs.readFile(path.join(dir,'Content/Scenes/Main.scene'),'utf8'));
+    assert.match(JSON.stringify(saved),/Героиня истории/);
+    assert.match(JSON.stringify(saved),/engine.CharacterComponent/);
+    await call('scene.open',{path:'Scenes/Main.scene'});
+    character=(await call('scene.getHierarchy')).find(item=>item.id===created.id);
+    assert.equal(character.name,'Алиса Волкова');
+    assert.ok(character.components.some(item=>item.typeId==='engine.CharacterComponent'));
+    const duplicate=await call('object.duplicate',{objectId:created.id});
+    assert.ok((await call('scene.getHierarchy')).some(item=>item.id===duplicate.id&&item.components.some(component=>component.typeId==='engine.CharacterComponent')));
+    await call('editor.undo');
+    assert.ok(!(await call('scene.getHierarchy')).some(item=>item.id===duplicate.id));
+    await call('object.destroy',{objectId:created.id});
+    await call('editor.undo');
+    assert.ok((await call('scene.getHierarchy')).some(item=>item.id===created.id));
+  }finally{if(app)await app.close();await fs.rm(dir,{recursive:true,force:true,maxRetries:5});}
+});
+test('native bridge imports a rigged FBX as a static character mesh', {skip:process.platform!=='win32',timeout:30000},async()=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'sacura-rigged-fbx-'));
+  await fs.cp(path.join(root,'Samples/SampleProject'),dir,{recursive:true});
+  let app;
+  try{
+    app=await launch(path.join(dir,'SampleProject.project'));
+    const call=async(method,params={})=>{
+      const result=await app.bridge.request(method,params);
+      assert.equal(result.ok,true,method+': '+JSON.stringify(result));return result.value;
+    };
+    const sourcePath=path.join(root,'Root/Editor/ThirdParty/ufbx/_src/data/blender_293_half_skinned_7400_binary.fbx');
+    const imported=await call('assets.import',{sourcePath,destination:'Models/RiggedFixture.glb'});
+    const model=(await call('assets.list')).find(asset=>asset.id===imported.id);
+    assert.equal(model.typeId,'Model');
+    const subasset=model.subassets.find(item=>item.typeId==='StaticMesh');
+    assert.ok(subasset);
+    const character=await call('character.create',{name:'Rigged fixture'});
+    const renderer=(await call('scene.getHierarchy')).find(item=>item.id===character.id).components
+      .find(item=>item.typeId==='engine.MeshRendererComponent');
+    await call('component.setAsset',{objectId:character.id,componentId:renderer.id,
+      property:'mesh_asset_id',assetId:model.id,subAssetId:subasset.id});
+    const assigned=(await call('component.getProperties',{objectId:character.id,componentId:renderer.id}))
+      .find(item=>item.id==='mesh_asset_id');
+    assert.equal(assigned.value,model.id);
+    assert.equal(assigned.subAssetId,subasset.id);
+  }finally{if(app)await app.close();await fs.rm(dir,{recursive:true,force:true,maxRetries:5});}
 });
 test('real Engine / EditorCore bridge, errors, events and restart', {skip:process.platform!=='win32',timeout:120000}, async t=>{
   const dir=await fs.mkdtemp(path.join(os.tmpdir(),'sacura-bridge-test-'));

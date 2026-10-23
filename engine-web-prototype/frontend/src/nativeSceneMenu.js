@@ -11,8 +11,12 @@ export function nativeSceneMenuItems({context,selection,objects,editing,editSpac
     const result=await command('object.create',params);
     if(result?.id)await select(result.id);
   };
+  const createCharacter=async()=>{
+    const result=await command('character.create',{name:'Новый персонаж',...(placement?{transform:placement}:{})});
+    if(result?.id)await select(result.id);
+  };
   return [
-    {id:'scene.character',label:'Персонаж',icon:'PersonStanding',group:'Добавить объект',...unavailable('Шаблон персонажа пока не поддерживается C++ проектом.')},
+    {id:'scene.character',label:'Персонаж',icon:'PersonStanding',group:'Добавить объект',action:createCharacter},
     {id:'scene.interactive',label:'Интерактивный предмет',icon:'MousePointer2',group:'Добавить объект',...unavailable('Шаблон интерактивного предмета пока не поддерживается C++ проектом.')},
     {id:'scene.objects',label:'Объект',icon:'Box',group:'Добавить объект',children:[
       ...[['cube','Куб','Box'],['sphere','Сфера','Circle'],['cylinder','Цилиндр','Cylinder']].map(([id,label,icon])=>({

@@ -42,7 +42,10 @@ test('native scene actions create placed components, duplicate and guard unsuppo
   find('scene.axes.local').action();find('scene.grid').action();find('scene.frame').action();
   assert.deepEqual(calls.slice(6),[['space','local'],['grid',false],['focus']]);
   assert.deepEqual(selected,['created','created','created','created','created','created']);
-  for(const id of ['scene.character','scene.interactive','scene.sound','scene.group'])assert.ok(find(id).disabled&&find(id).reason);
+  await find('scene.character').action();
+  assert.deepEqual(calls.at(-1),['character.create',{name:'Новый персонаж',transform:{position:[2,0,3],rotation:[0,0,0,1],scale:[1,1,1]}}]);
+  assert.equal(selected.length,7);
+  for(const id of ['scene.interactive','scene.sound','scene.group'])assert.ok(find(id).disabled&&find(id).reason);
   const noSelection=nativeSceneMenuItems({context,selection:null,objects:[],editing:true,command(){},select(){},focus(){},setEditSpace(){},setShowGrid(){}});
   assert.ok(noSelection.find(item=>item.id==='scene.delete').disabled);
   assert.ok(noSelection.find(item=>item.id==='scene.axes').children.every(item=>item.disabled));

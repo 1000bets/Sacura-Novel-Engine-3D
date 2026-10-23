@@ -33,7 +33,7 @@ bool ReflectionInspector::BuildMeshPresentation()
     auto* Caption = new QLabel(tr("Custom mesh"), this);
     Caption->setProperty("uiRole", "objectSectionTitle");
     PropertiesLayout->addRow(Caption);
-    AddNote(tr("GLB / FBX · статическая геометрия. GLB со встроенными текстурами. Размеры и начало координат сохраняются."));
+    AddNote(tr("GLB / FBX · статическая геометрия. FBX с ригом импортируется в статической позе. GLB со встроенными текстурами."));
     auto* Upload = new QPushButton(EditorUi::MakeFrontendIcon("Upload"), tr("Загрузить меш"), this);
     Upload->setObjectName("MeshUpload");
     Upload->setEnabled(Registry != nullptr);

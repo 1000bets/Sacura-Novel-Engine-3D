@@ -12,6 +12,8 @@ namespace
 using Json = nlohmann::json;
 constexpr const char* StarterMeshId = "5bcbb1a6-db24-4248-b7d9-40555c563724";
 constexpr const char* StarterSubMeshId = "997a9fc2-2f8e-4e5d-82a1-af384af37962";
+constexpr const char* StarterCharacterId = "38ab7fb7-d867-5017-9e75-dcb9cb20f0e8";
+constexpr const char* StarterCharacterSubMeshId = "a7380ae6-1d02-5203-8261-518f678d7b0c";
 constexpr const char* StarterMaterialId = "42b33bd1-5bf7-5462-920b-297de12b0f18";
 
 StoryNode Line(const std::string& Id, const std::string& Speaker, const std::string& Text, const std::string& Next)
@@ -99,6 +101,13 @@ Json BlockMesh()
         {{"mesh_asset_id", StarterMeshId}, {"mesh_sub_asset_id", StarterSubMeshId},
             {"material_asset_id", StarterMaterialId}, {"visible", true}});
 }
+
+Json CharacterMesh()
+{
+    return SceneComponentJson("engine.MeshRendererComponent",
+        {{"mesh_asset_id", StarterCharacterId}, {"mesh_sub_asset_id", StarterCharacterSubMeshId},
+            {"material_asset_id", StarterMaterialId}, {"visible", true}});
+}
 }
 
 bool IsBuiltInProjectTemplate(const std::string& TemplateId)
@@ -123,6 +132,7 @@ bool BuildProjectTemplateContent(const std::string& TemplateId,
     const bool bKinetic = TemplateId == "KineticNovel";
     const bool bNovel = TemplateId == "builtin-novel" || TemplateId == "VisualNovel";
     const bool bStandard = TemplateId == "builtin-standard";
+    const bool bCharacter = bKinetic || bNovel || bStandard;
     const std::string FocusId = Guid::Generate().ToString();
 
     Json Objects = Json::array();
@@ -136,10 +146,13 @@ bool BuildProjectTemplateContent(const std::string& TemplateId,
         Json::array({0.0, -0.75, -1.0}), Json::array({BlockMesh()}),
         Json::array({8.0, 0.15, 8.0})));
     Objects.push_back(SceneObject(bQuest ? "Locked Door" : bShooter ? "Training Target"
-        : bHorror ? "Exit Door" : bNovel ? "Mira" : "Story Focus", FocusId,
-        bNovel ? Json::array({-1.05, 0.0, -1.0}) : Json::array({0.0, 0.0, 0.0}), Json::array({BlockMesh()}),
-        Json::array({bQuest || bHorror ? 0.5 : bNovel ? 0.7 : 1.0,
-            bQuest || bHorror ? 2.0 : bNovel ? 1.6 : 1.0, bNovel ? 0.35 : 0.5})));
+        : bHorror ? "Exit Door" : bNovel ? "Мира" : bCharacter ? "Mira" : "Story Focus", FocusId,
+        bCharacter ? Json::array({-1.05, 0.0, -1.0}) : Json::array({0.0, 0.0, 0.0}),
+        bCharacter ? Json::array({CharacterMesh(), SceneComponentJson("engine.CharacterComponent",
+            {{"description", "Starter story character"}})}) : Json::array({BlockMesh()}),
+        bCharacter ? Json::array({1.0, 1.0, 1.0})
+            : Json::array({bQuest || bHorror ? 0.5 : 1.0,
+                bQuest || bHorror ? 2.0 : 1.0, 0.5})));
     if (bQuest || bShooter || bHorror)
     {
         Objects.push_back(SceneObject(bQuest ? "Key" : bShooter ? "Player Start" : "Recorder",

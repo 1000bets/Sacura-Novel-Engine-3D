@@ -1,0 +1,12 @@
+.native-character-workspace .native-character-note{font-size:12px;line-height:1.6;color:var(--muted)}
+.native-character-workspace .native-character-adopt{border-top:1px solid var(--line);padding-top:12px}
+.native-character-workspace .native-character-adopt select{width:100%}
+.native-character-workspace .character-details .subscene-form-grid label{display:flex;flex-direction:column;gap:6px}
+.native-character-workspace .character-details .subscene-form-grid label.check{flex-direction:row;align-items:center;align-self:end;padding:9px 0}
+.native-character-workspace .character-details textarea{min-height:78px;resize:vertical}
+.native-character-workspace .native-character-model{display:flex;flex-direction:column;align-items:flex-start;gap:11px;margin-top:8px;padding:16px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.native-character-workspace .native-character-model h3,.native-character-workspace .native-character-model p{margin:0}
+.native-character-workspace .native-character-model p,.native-character-workspace .native-character-model small,.native-character-workspace .native-character-actions span{font-size:12px;line-height:1.5;color:var(--muted)}
+.native-character-workspace .native-character-model label{display:flex;flex-direction:column;gap:7px;width:100%;font-size:12px}
+.native-character-workspace .native-character-model select{width:100%;max-width:560px}
+.native-character-workspace .native-character-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
