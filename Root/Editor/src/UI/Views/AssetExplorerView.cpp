@@ -83,16 +83,6 @@ AssetExplorerView::AssetExplorerView(QWidget* Parent) : QWidget(Parent)
     EmptyState->setWordWrap(true);
     EmptyState->setAttribute(Qt::WA_TransparentForMouseEvents);
     EmptyState->hide();
-    DropHint = new QLabel(this);
-    DropHint->setObjectName("ExplorerDropHint");
-    DropHint->setWordWrap(true);
-    Layout->addWidget(DropHint);
-    Details = new QLabel(this);
-    Details->setObjectName("ExplorerDetails");
-    Details->setTextFormat(Qt::PlainText);
-    Details->setWordWrap(true);
-    Details->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    Layout->addWidget(Details);
     SetFolder("/Game", false);
 }
 
@@ -136,10 +126,7 @@ void AssetExplorerView::SetFolder(const QString& VirtualFolder, bool Writable)
         Button->setEnabled(Writable);
         Button->setToolTip(Writable ? Button->text() : tr("Ресурсы движка доступны только для чтения"));
     }
-    DropHint->setText(Writable
-        ? tr("Перетащите файлы или папки из проводника компьютера сюда · до 100 МБ на файл")
-        : tr("Ресурсы движка доступны только для чтения · для импорта выберите Assets"));
-    DropHint->setToolTip(tr("Поддерживаются GLB, статический FBX, PNG и JPEG"));
+
 }
 
 void AssetExplorerView::SetEmptyState(bool Empty, bool Searching)

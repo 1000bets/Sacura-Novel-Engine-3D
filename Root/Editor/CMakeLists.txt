@@ -10,6 +10,8 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
 set(EDITOR_SRC
+    src/UI/Views/AssetReferenceField.cpp
+    src/UI/Adapters/AssetThumbnails.cpp
     src/Shell/EditorMainWindowStaticMeshes.cpp
     src/UI/Views/StaticMeshEditorWindow.cpp
     src/Shell/EditorMainWindowCharacters.cpp
@@ -93,6 +95,8 @@ set(EDITOR_SRC
 )
 
 set(EDITOR_HDR
+    inc/UI/Views/AssetReferenceField.h
+    inc/UI/Adapters/AssetThumbnails.h
     inc/UI/Presentation/AudioEnvironmentModel.h
     inc/UI/Adapters/AudioEnvironmentAdapter.h
     inc/UI/Views/AudioEnvironmentView.h

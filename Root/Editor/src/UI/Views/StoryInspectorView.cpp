@@ -1,3 +1,5 @@
+#include "UI/Views/AssetReferenceField.h"
+#include "UI/Adapters/AssetThumbnails.h"
 #include "UI/Views/StudioControls.h"
 #include "Panels/ReflectionValueEditor.h"
 #include "UI/Views/StoryInspectorView.h"
@@ -62,6 +64,12 @@ QWidget* StoryInspectorView::MakeSection(const QString& Key, const QString& Capt
     return Fields;
 }
 
+void StoryInspectorView::SetAssetRegistry(const AssetRegistry* Value)
+{
+    Registry = Value;
+    SpeakerAsset->SetRegistry(Value);
+}
+
 void StoryInspectorView::resizeEvent(QResizeEvent* Event)
 {
     QWidget::resizeEvent(Event);
@@ -123,8 +131,9 @@ StoryInspectorView::StoryInspectorView(QWidget* Parent) : QWidget(Parent)
     Speaker->setInsertPolicy(QComboBox::NoInsert);
     Form->addRow(tr("Тип блока"), Kind);
     KindCaption = Form->labelForField(Kind);
-    Form->addRow(tr("Говорит"), Speaker);
-    SpeakerCaption = Form->labelForField(Speaker);
+    SpeakerAsset = new AssetReferenceField(*Speaker, Registry);
+    Form->addRow(tr("Говорит"), SpeakerAsset);
+    SpeakerCaption = Form->labelForField(SpeakerAsset);
     PrimaryLayout->addLayout(Form);
     Text = new QTextEdit(Primary);
     Text->setObjectName("StoryText");
@@ -285,6 +294,14 @@ void StoryInspectorView::SetNode(const StoryGraphNode& Node, const StoryGraphMod
     for (const auto& Character : Model.Characters)
     {
         Speaker->addItem(Character.second, Character.first);
+        if (Registry && Character.first.startsWith("character:"))
+        {
+            AssetKey Key;
+            if (Guid::TryParse(Character.first.mid(10).toStdString(), Key.Asset))
+            {
+                AssetThumbnails::Bind(*Speaker, Speaker->count() - 1, *Registry, Key);
+            }
+        }
     }
     for (const auto& Candidate : Model.Nodes)
     {
@@ -294,7 +311,7 @@ void StoryInspectorView::SetNode(const StoryGraphNode& Node, const StoryGraphMod
         }
     }
     Speaker->setCurrentIndex(std::max(0, Speaker->findData(Node.Speaker)));
-    Speaker->setVisible(Node.KindId == 0);
+    SpeakerAsset->setVisible(Node.KindId == 0);
     SpeakerCaption->setVisible(Node.KindId == 0);
     if (!bSameText)
     {
@@ -379,7 +396,7 @@ void StoryInspectorView::Clear()
     ContextTitle->clear();
     Options->hide();
     Text->clear();
-    for (auto* Field : {static_cast<QWidget*>(Kind), KindCaption, static_cast<QWidget*>(Speaker), SpeakerCaption,
+    for (auto* Field : {static_cast<QWidget*>(Kind), KindCaption, static_cast<QWidget*>(SpeakerAsset), SpeakerCaption,
                         static_cast<QWidget*>(Text), static_cast<QWidget*>(Start), Details})
     {
         Field->hide();

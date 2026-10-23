@@ -142,9 +142,9 @@ EditorMainWindow::~EditorMainWindow()
         }
     }
     delete CharacterWorkspace.data();
-    for (QDialog* Dialog : findChildren<QDialog*>())
+    for (QMainWindow* AssetWindow : findChildren<QMainWindow*>())
     {
-        if (auto* MaterialWindow = dynamic_cast<MaterialEditorWindow*>(Dialog))
+        if (auto* MaterialWindow = dynamic_cast<MaterialEditorWindow*>(AssetWindow))
         {
             delete MaterialWindow;
         }

@@ -29,6 +29,7 @@ void EditorMainWindow::InitializeStoryAuthoring()
         StoryGraph->SetNavigationSettings(QString::fromStdWString(Project->ProjectFile.wstring()),
                                           qEnvironmentVariable("SAKURA_EDITOR_LAYOUT_FILE"));
     }
+    StoryInspector->SetAssetRegistry(&BoundEngine.GetAssetRegistry());
     StoryAuthoring = std::make_unique<EditorUi::StoryGraphController>(*StoryGraph, *StoryInspector);
     RegisterNarrativeTools(*Toolset, BoundEngine, *StoryAuthoring);
     StoryAuthoring->SelectionActivated = [this]()

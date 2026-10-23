@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Documents/MaterialEditingSession.h"
-#include <QDialog>
+#include <QMainWindow>
 
 class Engine;
 class QFormLayout;
@@ -11,14 +11,13 @@ class QTimer;
 class MaterialWidget;
 class QFileSystemWatcher;
 
-class MaterialEditorWindow : public QDialog
+class MaterialEditorWindow : public QMainWindow
 {
 public:
     MaterialEditorWindow(Engine& Runtime, std::shared_ptr<MaterialEditingSession> Session, QWidget* Parent);
     MaterialEditingSession& GetSession() { return *Session; }
     bool FlushSource();
     void Refresh();
-    void reject() override;
 
 protected:
     void closeEvent(QCloseEvent* Event) override;

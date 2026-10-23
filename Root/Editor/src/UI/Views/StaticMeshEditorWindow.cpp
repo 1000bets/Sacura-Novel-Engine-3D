@@ -1,3 +1,6 @@
+#include "UI/Styles/StudioIcons.h"
+#include "UI/Views/AssetReferenceField.h"
+#include "UI/Adapters/AssetThumbnails.h"
 #include "UI/Views/StaticMeshEditorWindow.h"
 #include "UI/Styles/EditorStyle.h"
 #include "Viewport/EditorViewportWidget.h"
@@ -56,6 +59,8 @@ StaticMeshEditorWindow::StaticMeshEditorWindow(Engine& InRuntime, const AssetKey
     auto* Toolbar = new QToolBar(tr("Документ"), this);
     Toolbar->setObjectName("StaticMeshDocumentToolbar");
     Toolbar->setMovable(false);
+    Toolbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    Toolbar->setIconSize(QSize(20, 20));
     addToolBar(Toolbar);
     for (const auto& Action : std::vector<std::pair<QString, QString>>{
         {tr("Сохранить"), "save"}, {tr("Отменить"), "undo"}, {tr("Повторить"), "redo"}, {tr("Перечитать"), "reload"}})
@@ -64,6 +69,9 @@ StaticMeshEditorWindow::StaticMeshEditorWindow(Engine& InRuntime, const AssetKey
         if (Action.second == "save")
         {
             Command->setShortcut(QKeySequence::Save);
+            Command->setIcon(EditorUi::MakeFrontendIcon("Save"));
+            Command->setToolTip(tr("Сохранить (Ctrl+S)"));
+            Toolbar->addAction(Command);
             FileMenu->addAction(Command);
         }
         else if (Action.second == "reload")
@@ -82,7 +90,6 @@ StaticMeshEditorWindow::StaticMeshEditorWindow(Engine& InRuntime, const AssetKey
                 Command->setShortcut(QKeySequence::Redo);
             }
         }
-        Toolbar->addAction(Command);
         connect(Command, &QAction::triggered, this, [this, Operation = Action.second]()
         {
             if (Operation == "reload" && Document.IsDirty()
@@ -102,8 +109,6 @@ StaticMeshEditorWindow::StaticMeshEditorWindow(Engine& InRuntime, const AssetKey
     auto* ShowCollision = ViewMenu->addAction(tr("Показать коллизию"));
     ShowCollision->setCheckable(true);
     ShowCollision->setChecked(true);
-    Toolbar->addSeparator();
-    Toolbar->addAction(ShowCollision);
     auto* Splitter = new QSplitter(this);
     Viewport = new EditorViewportWidget(Splitter);
     Viewport->SetViewId(ViewId);
@@ -121,7 +126,15 @@ StaticMeshEditorWindow::StaticMeshEditorWindow(Engine& InRuntime, const AssetKey
     int OperationIndex = 0;
     for (const QString& Title : {tr("Перемещение (W)"), tr("Поворот (E)"), tr("Размер (R)"), tr("Выбор (Q)")})
     {
-        auto* Button = new QPushButton(Title, this);
+        const std::vector<EditorUi::StudioIcon> Icons{
+            EditorUi::StudioIcon::Move, EditorUi::StudioIcon::Rotate,
+            EditorUi::StudioIcon::Scale, EditorUi::StudioIcon::Select};
+        auto* Button = new QPushButton(EditorUi::MakeStudioIcon(Icons[OperationIndex]), {}, this);
+        Button->setProperty("uiRole", "viewportTool");
+        Button->setFixedSize(28, 26);
+        Button->setIconSize(QSize(14, 14));
+        Button->setToolTip(Title);
+        Button->setAccessibleName(Title);
         Button->setAutoDefault(false);
         Button->setCheckable(true);
         Modes->addButton(Button, OperationIndex++);
@@ -522,11 +535,13 @@ void StaticMeshEditorWindow::RebuildFields()
         auto* Material = new QComboBox(this);
         Material->setObjectName(QString("StaticMeshDefaultMaterial_%1").arg(Slot));
         Material->addItem(tr("Не назначен"), QString{});
+        AssetThumbnails::Bind(*Material, 0, Runtime.GetAssetRegistry(), {});
         for (const auto& Type : {MaterialAssetType, MaterialInstanceAssetType})
         {
             for (const auto& Entry : Runtime.GetAssetRegistry().FindByType(Type))
             {
                 Material->addItem(QString::fromStdString(Entry.VirtualPath), QString::fromStdString(Entry.Metadata.Guid.ToString()));
+            AssetThumbnails::Bind(*Material, Material->count() - 1, Runtime.GetAssetRegistry(), {Entry.Metadata.Guid, std::nullopt});
             }
         }
         const auto Found = Defaults.Materials.find(Slot);
@@ -541,7 +556,8 @@ void StaticMeshEditorWindow::RebuildFields()
             }
             Material->setCurrentIndex(Index);
         }
-        MaterialFields->addRow(tr("Слот %1").arg(Slot), Material);
+        Material->setEnabled(Document.GetEntry().Mount == AssetMount::Game);
+        MaterialFields->addRow(tr("Слот %1").arg(Slot), new AssetReferenceField(*Material, Runtime.GetAssetRegistry()));
         connect(Material, &QComboBox::currentIndexChanged, this, [this, Material, Slot](int)
         {
             auto Defaults = Document.GetDefaults();
@@ -557,7 +573,7 @@ void StaticMeshEditorWindow::RebuildFields()
         });
     }
     Fields->parentWidget()->setEnabled(Document.GetEntry().Mount == AssetMount::Game);
-    MaterialFields->parentWidget()->setEnabled(Document.GetEntry().Mount == AssetMount::Game);
+    MaterialFields->parentWidget()->setEnabled(true);
     SyncSelection();
 }
 

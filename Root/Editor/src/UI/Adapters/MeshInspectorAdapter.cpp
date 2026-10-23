@@ -1,3 +1,5 @@
+#include "UI/Views/AssetReferenceField.h"
+#include "UI/Adapters/AssetThumbnails.h"
 #include "Panels/ReflectionInspector.h"
 #include "Panels/AssetImportDialog.h"
 #include "UI/Views/StudioControls.h"
@@ -239,7 +241,14 @@ bool ReflectionInspector::BuildMeshPresentation()
     Menu->addSeparator();
     for (const auto& Entry : Materials)
     {
-        connect(Menu->addAction(Entry.first), &QAction::triggered, this, [Assign, Key = Entry.second]() { Assign(-1, Key); });
+        auto* Action = Menu->addAction(Entry.first);
+        AssetThumbnails::Bind(*Action, *Registry, Entry.second);
+        AssetRegistryEntry MaterialEntry;
+        if (Registry->TryResolveKey(Entry.second, MaterialEntry))
+        {
+            Action->setToolTip(QString::fromStdString(MaterialEntry.VirtualPath));
+        }
+        connect(Action, &QAction::triggered, this, [Assign, Key = Entry.second]() { Assign(-1, Key); });
     }
     PropertiesLayout->addRow(All);
     if (Slots.empty())
@@ -288,6 +297,18 @@ bool ReflectionInspector::BuildMeshPresentation()
             }
         }
         Material->addItem(Inherited);
+        if (Registry)
+        {
+            AssetThumbnails::Bind(*Material, 0, *Registry, {});
+        }
+        if (Registry && CpuMesh.IsValid())
+        {
+            const auto Found = CpuMesh->Defaults.Materials.find(Slot);
+            if (Found != CpuMesh->Defaults.Materials.end())
+            {
+                AssetThumbnails::Bind(*Material, 0, *Registry, Found->second);
+            }
+        }
         std::vector<AssetKey> Keys{AssetKey{}};
         AssetKey Current = Mesh->GetMaterialAssetKey();
         bool bOverride = Current.IsValid();
@@ -303,6 +324,7 @@ bool ReflectionInspector::BuildMeshPresentation()
         for (const auto& Entry : Materials)
         {
             Material->addItem(Entry.first);
+            AssetThumbnails::Bind(*Material, Material->count() - 1, *Registry, Entry.second);
             Material->setItemData(Material->count() - 1, Entry.first, Qt::ToolTipRole);
             Keys.push_back(Entry.second);
             if (Current == Entry.second)
@@ -325,7 +347,7 @@ bool ReflectionInspector::BuildMeshPresentation()
                 Assign(Slot, Keys[Index]);
             }
         });
-        Layout->addWidget(Material);
+        Layout->addWidget(new AssetReferenceField(*Material, *Registry));
         PropertiesLayout->addRow(Card);
     }
     AddTitle(tr("Физика объекта"));

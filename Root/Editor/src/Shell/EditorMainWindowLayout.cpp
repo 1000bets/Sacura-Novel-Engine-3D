@@ -1,3 +1,4 @@
+#include "UI/Adapters/AssetThumbnails.h"
 #include "UI/Views/StudioControls.h"
 #include "UI/Views/AudioEnvironmentView.h"
 #include "UI/Views/WidgetWorkspaceView.h"
@@ -222,6 +223,7 @@ void EditorMainWindow::BuildToolbar()
 {
     auto* Header = new EditorUi::StudioHeaderView(*menuBar(), *ProjectTitleLabel, this);
     setMenuWidget(Header);
+    connect(Header->Save, &QPushButton::clicked, this, &EditorMainWindow::SaveActiveDocument);
     PlayButton = Header->Play;
     PauseButton = Header->Pause;
     StepButton = Header->Step;
@@ -432,13 +434,13 @@ void EditorMainWindow::BuildUi()
         ViewportHeaderLayout->addWidget(Button);
         return Button;
     };
-    MakeGizmoModeButton(EditorUi::StudioIcon::Select, "ViewportSelect", tr("Выбор · Q"),
+    MakeGizmoModeButton(EditorUi::StudioIcon::Select, "ViewportSelect", tr("Выбор (Q)"),
         EditorViewportWidget::GizmoOperation::Select);
-    TranslateGizmoButton = MakeGizmoModeButton(EditorUi::StudioIcon::Move, "ViewportTranslate", tr("Сдвиг · W"),
+    TranslateGizmoButton = MakeGizmoModeButton(EditorUi::StudioIcon::Move, "ViewportTranslate", tr("Перемещение (W)"),
         EditorViewportWidget::GizmoOperation::Translate);
-    RotateGizmoButton = MakeGizmoModeButton(EditorUi::StudioIcon::Rotate, "ViewportRotate", tr("Поворот · E"),
+    RotateGizmoButton = MakeGizmoModeButton(EditorUi::StudioIcon::Rotate, "ViewportRotate", tr("Поворот (E)"),
         EditorViewportWidget::GizmoOperation::Rotate);
-    ScaleGizmoButton = MakeGizmoModeButton(EditorUi::StudioIcon::Scale, "ViewportScale", tr("Масштаб · R"),
+    ScaleGizmoButton = MakeGizmoModeButton(EditorUi::StudioIcon::Scale, "ViewportScale", tr("Размер (R)"),
         EditorViewportWidget::GizmoOperation::Scale);
     SyncGizmoModeButtons();
     connect(GizmoModeButtons, &QButtonGroup::idClicked, this, [this](int ModeId)
@@ -876,6 +878,7 @@ void EditorMainWindow::PopulateDockPages()
     ContentBrowser->SetProjectContext(&BoundSession, &Document);
     connect(ContentBrowser, &ContentBrowserWidget::AssetsChanged, this, [this]()
     {
+        AssetThumbnails::Invalidate();
         RefreshStoryTargets();
         UpdateWindowTitleDirty();
         UpdateStatus();

@@ -1,3 +1,6 @@
+#include "UI/Styles/StudioIcons.h"
+#include "UI/Views/AssetReferenceField.h"
+#include "UI/Adapters/AssetThumbnails.h"
 #include "UI/Views/MaterialEditorWindow.h"
 #include "Engine.h"
 #include "UI/MaterialWidget.h"
@@ -8,6 +11,11 @@
 #include <QColorDialog>
 #include <QDoubleSpinBox>
 #include <QDialogButtonBox>
+#include <QDialog>
+#include <QMenuBar>
+#include <QMenu>
+#include <QToolBar>
+#include <QAction>
 #include <QFontDatabase>
 #include <QFileSystemWatcher>
 #include <QFileInfo>
@@ -59,29 +67,35 @@ protected:
 };
 
 MaterialEditorWindow::MaterialEditorWindow(Engine& InRuntime, std::shared_ptr<MaterialEditingSession> InSession, QWidget* Parent)
-    : QDialog(Parent), Runtime(InRuntime), Session(std::move(InSession))
+    : QMainWindow(Parent, Qt::Window), Runtime(InRuntime), Session(std::move(InSession))
 {
     setObjectName("MaterialEditorWindow");
     EditorUi::EditorStyle::Apply(*this);
-    setWindowFlag(Qt::Window, true);
+    setWindowFlags(Qt::Window | Qt::WindowTitleHint | Qt::WindowSystemMenuHint
+        | Qt::WindowMinMaxButtonsHint | Qt::WindowCloseButtonHint);
     setAttribute(Qt::WA_DeleteOnClose);
     resize(1100, 720);
     setMinimumSize(900, 600);
-    auto* Layout = new QVBoxLayout(this);
-    auto* Toolbar = new QHBoxLayout();
-    auto AddButton = [this, Toolbar](const QString& Label, const std::function<void()>& Callback)
-    {
-        auto* Button = new QPushButton(Label, this);
-        Button->setAutoDefault(false);
-        Toolbar->addWidget(Button);
-        connect(Button, &QPushButton::clicked, this, Callback);
-        return Button;
-    };
-    AddButton(tr("Сохранить"), [this]() { Save(); });
-    AddButton(tr("Проверить и показать"), [this]() { Run(MaterialEditOperation::Compile); });
-    AddButton(tr("Отменить"), [this]() { Run(MaterialEditOperation::Undo); });
-    AddButton(tr("Повторить"), [this]() { Run(MaterialEditOperation::Redo); });
-    AddButton(tr("Перечитать"), [this]()
+    auto* Content = new QWidget(this);
+    Content->setObjectName("MaterialEditorContent");
+    setCentralWidget(Content);
+    auto* Layout = new QVBoxLayout(Content);
+    auto* FileMenu = menuBar()->addMenu(tr("Файл"));
+    auto* EditMenu = menuBar()->addMenu(tr("Правка"));
+    auto* ViewMenu = menuBar()->addMenu(tr("Вид"));
+    auto* Toolbar = new QToolBar(tr("Документ"), this);
+    Toolbar->setObjectName("MaterialDocumentToolbar");
+    Toolbar->setMovable(false);
+    Toolbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    Toolbar->setIconSize(QSize(20, 20));
+    addToolBar(Toolbar);
+    auto* SaveAction = FileMenu->addAction(EditorUi::MakeFrontendIcon("Save"), tr("Сохранить"));
+    SaveAction->setShortcut(QKeySequence::Save);
+    SaveAction->setToolTip(tr("Сохранить (Ctrl+S)"));
+    Toolbar->addAction(SaveAction);
+    connect(SaveAction, &QAction::triggered, this, [this]() { Save(); });
+    auto* ReloadAction = FileMenu->addAction(tr("Перечитать"));
+    connect(ReloadAction, &QAction::triggered, this, [this]()
     {
         if ((Session->GetDocument().IsDirty() || bSourcePending)
             && QMessageBox::question(this, tr("Перечитать материал"), tr("Отбросить локальные изменения?")) != QMessageBox::Yes)
@@ -91,8 +105,18 @@ MaterialEditorWindow::MaterialEditorWindow(Engine& InRuntime, std::shared_ptr<Ma
         bSourcePending = false;
         Run(MaterialEditOperation::Reload);
     });
-    Toolbar->addStretch();
-    Layout->addLayout(Toolbar);
+    auto* CloseAction = FileMenu->addAction(tr("Закрыть"));
+    CloseAction->setShortcut(QKeySequence::Close);
+    connect(CloseAction, &QAction::triggered, this, [this]() { close(); });
+    auto* UndoAction = EditMenu->addAction(tr("Отменить"));
+    UndoAction->setShortcut(QKeySequence::Undo);
+    connect(UndoAction, &QAction::triggered, this, [this]() { Run(MaterialEditOperation::Undo); });
+    auto* RedoAction = EditMenu->addAction(tr("Повторить"));
+    RedoAction->setShortcut(QKeySequence::Redo);
+    connect(RedoAction, &QAction::triggered, this, [this]() { Run(MaterialEditOperation::Redo); });
+    auto* CompileAction = ViewMenu->addAction(tr("Обновить предпросмотр"));
+    connect(CompileAction, &QAction::triggered, this, [this]() { Run(MaterialEditOperation::Compile); });
+    ViewMenu->addAction(Toolbar->toggleViewAction());
     StateLabel = new QLabel(this);
     Layout->addWidget(StateLabel);
     auto* Splitter = new QSplitter(this);
@@ -155,8 +179,6 @@ MaterialEditorWindow::MaterialEditorWindow(Engine& InRuntime, std::shared_ptr<Ma
         bSourcePending = true;
         SourceTimer->start();
     });
-    auto* SaveShortcut = new QShortcut(QKeySequence::Save, this);
-    connect(SaveShortcut, &QShortcut::activated, this, [this]() { Save(); });
     auto* Timer = new QTimer(this);
     Timer->setInterval(100);
     connect(Timer, &QTimer::timeout, this, [this]()
@@ -223,6 +245,7 @@ bool MaterialEditorWindow::Save()
     {
         return false;
     }
+    AssetThumbnails::Invalidate();
     Diagnostics->setPlainText(tr("Материал сохранён. Изменения общего ресурса используются всеми его экземплярами."));
     return true;
 }
@@ -426,9 +449,11 @@ QWidget* MaterialEditorWindow::MakeParameterField(const MaterialParameterDefinit
         Picker->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
         Picker->setMinimumContentsLength(8);
         Picker->addItem(tr("Без текстуры"), QString());
+        AssetThumbnails::Bind(*Picker, 0, Runtime.GetAssetRegistry(), {});
         for (const auto& Entry : Runtime.GetAssetRegistry().FindByType(TextureAssetType))
         {
             Picker->addItem(QString::fromStdString(Entry.VirtualPath), QString::fromStdString(Entry.Metadata.Guid.ToString()));
+            AssetThumbnails::Bind(*Picker, Picker->count() - 1, Runtime.GetAssetRegistry(), {Entry.Metadata.Guid, std::nullopt});
         }
         const auto Selected = Picker->findData(QString::fromStdString(Value.Texture.Asset.ToString()));
         if (Value.Texture.IsValid() && Selected < 0)
@@ -440,7 +465,7 @@ QWidget* MaterialEditorWindow::MakeParameterField(const MaterialParameterDefinit
         {
             Picker->setCurrentIndex(Selected);
         }
-        Layout->addWidget(Picker);
+        Layout->addWidget(new AssetReferenceField(*Picker, Runtime.GetAssetRegistry()));
         connect(Picker, &QComboBox::activated, this, [this, Picker, Definition](int)
         {
             AssetKey Texture;
@@ -539,7 +564,17 @@ QWidget* MaterialEditorWindow::MakeParameterField(const MaterialParameterDefinit
             });
         }
     }
-    Container->setEnabled(!Session->GetDocument().IsReadOnly());
+    if (Type == MaterialParameterType::Texture2D)
+    {
+        for (auto* Picker : Container->findChildren<QComboBox*>())
+        {
+            Picker->setEnabled(!Session->GetDocument().IsReadOnly());
+        }
+    }
+    else
+    {
+        Container->setEnabled(!Session->GetDocument().IsReadOnly());
+    }
     Container->setObjectName(QString::fromStdString("MaterialParameter_" + Definition.Identifier));
     return Container;
 }
@@ -677,6 +712,8 @@ void MaterialEditorWindow::RebuildFields()
         auto* Parent = new QComboBox(this);
         Parent->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
         Parent->setMinimumContentsLength(8);
+        Parent->addItem(tr("Не назначен"), QString{});
+        AssetThumbnails::Bind(*Parent, 0, Runtime.GetAssetRegistry(), {});
         for (const auto& Type : {MaterialAssetType, MaterialInstanceAssetType})
         {
             for (const auto& Entry : Runtime.GetAssetRegistry().FindByType(Type))
@@ -684,12 +721,13 @@ void MaterialEditorWindow::RebuildFields()
                 if (Entry.Metadata.Guid != Document.GetAsset().Asset)
                 {
                     Parent->addItem(QString::fromStdString(Entry.VirtualPath), QString::fromStdString(Entry.Metadata.Guid.ToString()));
+                    AssetThumbnails::Bind(*Parent, Parent->count() - 1, Runtime.GetAssetRegistry(), {Entry.Metadata.Guid, std::nullopt});
                 }
             }
         }
         Parent->setCurrentIndex(Parent->findData(QString::fromStdString(Resolved.Parent.Asset.ToString())));
         Parent->setEnabled(!Document.IsReadOnly());
-        Fields->addRow(tr("Родитель"), Parent);
+        Fields->addRow(tr("Родитель"), new AssetReferenceField(*Parent, Runtime.GetAssetRegistry()));
         connect(Parent, &QComboBox::activated, this, [this, Parent](int)
         {
             AssetKey Key;
@@ -791,7 +829,3 @@ void MaterialEditorWindow::closeEvent(QCloseEvent* Event)
     Event->accept();
 }
 
-void MaterialEditorWindow::reject()
-{
-    close();
-}

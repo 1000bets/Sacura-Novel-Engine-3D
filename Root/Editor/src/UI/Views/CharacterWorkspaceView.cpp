@@ -1,3 +1,5 @@
+#include "UI/Views/AssetReferenceField.h"
+#include "UI/Adapters/AssetThumbnails.h"
 #include "UI/Views/CharacterWorkspaceView.h"
 #include "UI/Styles/EditorStyle.h"
 #include "Viewport/EditorViewportWidget.h"
@@ -190,6 +192,8 @@ void CharacterWorkspaceView::RefreshLibrary()
     {
         auto* Item = new QListWidgetItem(QString::fromStdWString(std::filesystem::path(Entry.AbsolutePath).stem().wstring()), Library);
         Item->setData(Qt::UserRole, QString::fromStdString(Entry.VirtualPath));
+        Library->setIconSize(QSize(48, 48));
+        AssetThumbnails::Bind(*Library->model(), Library->indexFromItem(Item), Runtime.GetAssetRegistry(), {Entry.Metadata.Guid, std::nullopt});
         if (Document && Document->GetEntry().Metadata.Guid == Entry.Metadata.Guid)
         {
             Library->setCurrentItem(Item);
@@ -359,12 +363,13 @@ void CharacterWorkspaceView::RefreshFields()
             if (Animation.bEnabled)
             {
                 Choice->addItem(QString::fromStdString(Animation.Name), QString::fromStdString(Animation.Identifier));
+                AssetThumbnails::Bind(*Choice, Choice->count() - 1, Runtime.GetAssetRegistry(), Animation.Clip);
             }
         }
         Choice->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
         Choice->setMinimumContentsLength(8);
         Choice->setCurrentIndex(std::max(0, Choice->findData(QString::fromStdString(Selected))));
-        Form->addRow(Label, Choice);
+        Form->addRow(Label, new AssetReferenceField(*Choice, Runtime.GetAssetRegistry()));
         connect(Choice, &QComboBox::currentIndexChanged, this, [this, Choice, Role]()
         {
             const auto Selected = Choice->currentData().toString().toStdString();

@@ -12,6 +12,7 @@ class StudioHeaderView final : public QWidget
 {
 public:
     StudioHeaderView(QMenuBar& Menus, QLabel& ProjectTitle, QWidget* Parent = nullptr);
+    QPushButton* Save = nullptr;
     QPushButton* Play = nullptr;
     QPushButton* Pause = nullptr;
     QPushButton* Step = nullptr;

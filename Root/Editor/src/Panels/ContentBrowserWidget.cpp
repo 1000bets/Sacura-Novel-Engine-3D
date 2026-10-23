@@ -1,3 +1,4 @@
+#include "UI/Adapters/AssetThumbnails.h"
 #include "Panels/ContentBrowserWidget.h"
 #include "UI/Styles/StudioIcons.h"
 #include "UI/Adapters/AssetImportSources.h"
@@ -363,7 +364,6 @@ ContentBrowserWidget::ContentBrowserWidget(QWidget* Parent)
     {
         RefreshAssetView();
     });
-    connect(AssetView, &QListWidget::itemSelectionChanged, this, &ContentBrowserWidget::UpdateDetails);
     connect(SourcesTree, &QTreeWidget::currentItemChanged, this, [this](QTreeWidgetItem* Item)
     {
         if (Item != nullptr)
@@ -446,7 +446,6 @@ void ContentBrowserWidget::Refresh()
         static_cast<AssetListWidget*>(AssetView)->bWritable = false;
         Explorer->SetFolder("/Game", false);
         Explorer->SetEmptyState(true, false);
-        UpdateDetails();
         return;
     }
     CachedEntries = Registry->FindByDirectory("/Game");
@@ -646,7 +645,6 @@ void ContentBrowserWidget::RefreshAssetView()
         }
     }
     Explorer->SetEmptyState(AssetView->count() == 0, !SearchText.isEmpty() || bTypeFilterActive);
-    UpdateDetails();
 }
 
 bool ContentBrowserWidget::FocusAsset(const AssetKey& Key)
@@ -717,30 +715,6 @@ void ContentBrowserWidget::SetCurrentFolder(const QString& Folder)
     Explorer->SetFolder(CurrentFolder, Registry != nullptr && IsWritableGameFolder(CurrentFolder));
     static_cast<AssetListWidget*>(AssetView)->bWritable = Registry != nullptr && IsWritableGameFolder(CurrentFolder);
     RefreshAssetView();
-}
-
-void ContentBrowserWidget::UpdateDetails()
-{
-    const auto* Item = AssetView->currentItem();
-    if (Item != nullptr && Item->isSelected())
-    {
-        const QString Path = Item->data(ItemKindRole).toInt() == FolderItemKind
-            ? Item->data(FolderPathRole).toString() : Item->data(VirtualPathRole).toString();
-        Explorer->Details->setText(Item->text() + " · " + Item->data(EditorUi::ExplorerSubtitleRole).toString()
-            + "\n" + Path);
-    }
-    else
-    {
-        int Count = 0;
-        for (const auto& Entry : CachedEntries)
-        {
-            if (Entry.VirtualPath.rfind("/Game/", 0) == 0)
-            {
-                Count += Entry.Metadata.SubAssets.empty() ? 1 : static_cast<int>(Entry.Metadata.SubAssets.size());
-            }
-        }
-        Explorer->Details->setText(tr("Ресурсов в проекте: %1 · выберите файл для подробностей · импорт до 100 МБ на файл").arg(Count));
-    }
 }
 
 void ContentBrowserWidget::SelectImportFolder()
@@ -1454,6 +1428,7 @@ void ContentBrowserWidget::AddAssetItem(const AssetRegistryEntry& Entry)
     Item->setData(VirtualPathRole, VirtualPath);
     Item->setToolTip(VirtualPath + "\n" + QString::fromUtf8(AssetTypeToString(Entry.Metadata.Type)));
     Item->setFlags(Item->flags() | Qt::ItemIsDragEnabled);
+    AssetThumbnails::Bind(*AssetView->model(), AssetView->indexFromItem(Item), *Registry, {Entry.Metadata.Guid, std::nullopt});
 }
 
 void ContentBrowserWidget::AddSubAssetItem(const AssetRegistryEntry& Entry, const SubAssetRecord& SubAsset)
@@ -1470,6 +1445,7 @@ void ContentBrowserWidget::AddSubAssetItem(const AssetRegistryEntry& Entry, cons
     Item->setData(VirtualPathRole, QString::fromStdString(Entry.VirtualPath));
     Item->setToolTip(QString::fromStdString(Entry.VirtualPath) + "\n" + QString::fromUtf8(AssetTypeToString(SubAsset.Type)));
     Item->setFlags(Item->flags() | Qt::ItemIsDragEnabled);
+    AssetThumbnails::Bind(*AssetView->model(), AssetView->indexFromItem(Item), *Registry, {Entry.Metadata.Guid, SubAsset.Id});
 }
 
 void ContentBrowserWidget::CreateMaterial(bool bInstance, bool bSelectedParent)

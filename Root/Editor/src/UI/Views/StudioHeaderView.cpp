@@ -160,6 +160,14 @@ StudioHeaderView::StudioHeaderView(QMenuBar& Menus, QLabel& ProjectTitle, QWidge
         Commands->addWidget(Button);
         return Button;
     };
+    Save = new QPushButton(MakeFrontendIcon("Save"), {}, this);
+    Save->setObjectName("SaveDocument");
+    Save->setProperty("uiRole", "chromeButton");
+    Save->setFixedSize(32, 32);
+    Save->setIconSize(QSize(20, 20));
+    Save->setToolTip(tr("Сохранить (Ctrl+S)"));
+    Save->setAccessibleName(tr("Сохранить"));
+    Commands->addWidget(Save);
     Play = MakeButton(tr("Запуск"), StudioIcon::Play, tr("Запустить / остановить предпросмотр"));
     Play->setObjectName("PlayButton");
     Play->setIcon(MakeStudioIcon(StudioIcon::Play, "--success"));

@@ -1,10 +1,10 @@
 /* EditorSelect.jsx, objectInspector.css, editorTheme.css. Logical CSS pixels. */
 /* EditorWorkspace.jsx windows menu. */
-QDialog#MaterialEditorWindow, QDialog#MaterialParameterDialog { background: @--bg-app@; color: @--text-primary@; }
+QMainWindow#MaterialEditorWindow, QDialog#MaterialParameterDialog { background: @--bg-app@; color: @--text-primary@; }
 QWidget#MaterialFields, QWidget#MaterialPreviewPanel { background: @--bg-panel@; }
-QDialog#MaterialEditorWindow QLabel { color: @--text-secondary@; }
-QDialog#MaterialEditorWindow QDoubleSpinBox, QDialog#MaterialEditorWindow QSpinBox,
-QDialog#MaterialEditorWindow QComboBox { min-height: 24px; }
+QMainWindow#MaterialEditorWindow QLabel { color: @--text-secondary@; }
+QMainWindow#MaterialEditorWindow QDoubleSpinBox, QMainWindow#MaterialEditorWindow QSpinBox,
+QMainWindow#MaterialEditorWindow QComboBox { min-height: 24px; }
 QPlainTextEdit#MaterialSourceEditor { font-family: "Cascadia Mono", "Consolas", monospace; }
 QWidget#StudioHeader QMenuBar { font-size: 10px; }
 QWidget#StudioHeader QMenuBar::item { padding: 5px 6px; }
@@ -229,3 +229,43 @@ QMainWindow#StaticMeshEditorWindow QToolBar QToolButton:hover {
 QMainWindow#StaticMeshEditorWindow QToolBar QToolButton:checked {
     background: @--accent-muted@; border-color: @--accent@;
 }
+
+QComboBox[assetReference="true"] {
+    min-height: 48px;
+    padding: 3px 24px 3px 4px;
+}
+QComboBox[assetReference="true"] QAbstractItemView::item {
+    min-height: 48px;
+}
+
+QWidget[uiRole="assetReferenceField"] { background: transparent; }
+QPushButton[uiRole="assetReferenceAction"] {
+    background: transparent;
+    border: 1px solid transparent;
+    padding: 0;
+    min-width: 24px;
+    min-height: 26px;
+}
+QPushButton[uiRole="assetReferenceAction"]:hover { background: @--bg-hover@; }
+QPushButton[uiRole="assetReferenceAction"]:pressed { background: @--bg-active@; }
+QPushButton[uiRole="assetReferenceAction"]:focus { border-color: @--accent@; }
+
+QMainWindow#MaterialEditorWindow, QWidget#MaterialEditorContent { background: @--bg-app@; color: @--text-primary@; }
+QMainWindow#MaterialEditorWindow QScrollArea, QMainWindow#MaterialEditorWindow QScrollArea > QWidget > QWidget { background: @--bg-app@; }
+
+QMainWindow#MaterialEditorWindow QToolBar {
+    background: @--bg-panel@;
+    border: none;
+    border-bottom: 1px solid @--border-subtle@;
+    spacing: 4px;
+    padding: 4px;
+}
+QMainWindow#MaterialEditorWindow QToolBar QToolButton {
+    background: transparent;
+    border: 1px solid transparent;
+    padding: 4px;
+    min-width: 26px;
+    min-height: 26px;
+}
+QMainWindow#MaterialEditorWindow QToolBar QToolButton:hover { background: @--bg-hover@; }
+QMainWindow#MaterialEditorWindow QToolBar QToolButton:focus { border-color: @--accent@; }

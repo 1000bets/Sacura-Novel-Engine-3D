@@ -2,6 +2,7 @@
 #include "UI/Styles/ControlStyle.h"
 #include "UI/Styles/EditorStyle.h"
 #include <QApplication>
+#include <QIcon>
 #include <QKeyEvent>
 #include <QLineEdit>
 #include <QMouseEvent>
@@ -165,13 +166,29 @@ class OptionDelegate final : public QStyledItemDelegate
 {
 public:
     using QStyledItemDelegate::QStyledItemDelegate;
-    QSize sizeHint(const QStyleOptionViewItem&, const QModelIndex&) const override
-    { return {100, ControlStyle::OptionHeight}; }
+    QSize sizeHint(const QStyleOptionViewItem&, const QModelIndex& Index) const override
+    {
+        if (!qvariant_cast<QIcon>(Index.data(Qt::DecorationRole)).isNull())
+        {
+            return {100, 48};
+        }
+        return {100, ControlStyle::OptionHeight};
+    }
     void paint(QPainter* Painter, const QStyleOptionViewItem& Style, const QModelIndex& Index) const override
     {
-        ControlStyle::Option(*Painter, Style.rect, Index.data().toString(), Index.data(Qt::UserRole + 1).toBool(),
+        const QIcon Icon = qvariant_cast<QIcon>(Index.data(Qt::DecorationRole));
+        QRect TextBounds = Style.rect;
+        if (!Icon.isNull())
+        {
+            TextBounds.adjust(44, 0, 0, 0);
+        }
+        ControlStyle::Option(*Painter, TextBounds, Index.data().toString(), Index.data(Qt::UserRole + 1).toBool(),
                              Style.state.testFlag(QStyle::State_Selected) || Style.state.testFlag(QStyle::State_MouseOver),
                              Style.state.testFlag(QStyle::State_Enabled), Style.font);
+        if (!Icon.isNull())
+        {
+            Icon.paint(Painter, QRect(Style.rect.left() + 6, Style.rect.center().y() - 20, 40, 40));
+        }
     }
 };
 }
@@ -248,7 +265,7 @@ void StudioSelect::showPopup()
     Options->installEventFilter(this);
     for (int I = 0; I < count(); ++I)
     {
-        auto* Item = new QListWidgetItem(itemText(I), Options);
+        auto* Item = new QListWidgetItem(itemIcon(I), itemText(I), Options);
         Item->setData(Qt::UserRole, I);
         Item->setData(Qt::UserRole + 1, I == currentIndex());
         Item->setData(Qt::UserRole + 2, QVariant::fromValue(QPersistentModelIndex(model()->index(I, modelColumn(), rootModelIndex()))));
@@ -256,6 +273,17 @@ void StudioSelect::showPopup()
         Item->setFlags(model()->flags(model()->index(I, modelColumn(), rootModelIndex())) &
                        (Qt::ItemIsEnabled | Qt::ItemIsSelectable));
     }
+    connect(model(), &QAbstractItemModel::dataChanged, Popup, [this](const QModelIndex& First, const QModelIndex& Last)
+    {
+        if (!Options)
+        {
+            return;
+        }
+        for (int Index = First.row(); Index <= Last.row() && Index < Options->count(); ++Index)
+        {
+            Options->item(Index)->setIcon(itemIcon(Index));
+        }
+    });
     Options->setCurrentRow(currentIndex());
     Layout->addWidget(Options, 1);
     connect(Search, &QLineEdit::textChanged, Popup, [this, Empty](const QString& Query) {
@@ -272,7 +300,7 @@ void StudioSelect::showPopup()
     connect(Options, &QListWidget::itemClicked, this, [this]() { Choose(); });
     const QRect Available = screen()->availableGeometry().adjusted(8, 8, -8, -8);
     const int Width = std::min(std::max(width() + 8, 280), Available.width());
-    const int Height = std::min(18 + 34 + std::min(count(), 8) * ControlStyle::OptionHeight, Available.height());
+    const int Height = std::min(18 + 34 + std::min(count(), 8) * std::max(ControlStyle::OptionHeight, iconSize().height() + 8), Available.height());
     QPoint Position = mapToGlobal(QPoint(-4, height()));
     Position.setX(std::clamp(Position.x(), Available.left(), Available.right() - Width + 1));
     if (Position.y() + Height > Available.bottom()) { Position.setY(mapToGlobal(QPoint()).y() - Height - 4); }

@@ -25,8 +25,6 @@ public:
     QToolButton* ImportFiles = nullptr;
     QToolButton* ImportFolder = nullptr;
     QSplitter* Body = nullptr;
-    QLabel* Details = nullptr;
-    QLabel* DropHint = nullptr;
     QLabel* EmptyState = nullptr;
 
 signals:

@@ -428,9 +428,9 @@ void EditorMainWindow::closeEvent(QCloseEvent* Event)
         Event->ignore();
         return;
     }
-    for (QDialog* Dialog : findChildren<QDialog*>())
+    for (QMainWindow* AssetWindow : findChildren<QMainWindow*>())
     {
-        if (auto* MaterialWindow = dynamic_cast<MaterialEditorWindow*>(Dialog))
+        if (auto* MaterialWindow = dynamic_cast<MaterialEditorWindow*>(AssetWindow))
         {
             if (!MaterialWindow->close())
             {

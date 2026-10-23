@@ -34,6 +34,8 @@ std::unique_ptr<EditorCommand> MakeCreateStaticMeshObjectCommand(Scene* World, c
     {
         auto* Body = Object->AddComponent<PhysicsBodyComponent>();
         Body->bUseMeshDefaults = true;
+        Body->CollisionMeshAssetId = Asset.Asset.ToString();
+        Body->CollisionMeshSubAssetId = Asset.SubAsset->ToString();
         const auto& Element = Defaults.CollisionElements.front();
         Body->ShapeType = Element.ShapeType;
         Body->Center = Element.Center;

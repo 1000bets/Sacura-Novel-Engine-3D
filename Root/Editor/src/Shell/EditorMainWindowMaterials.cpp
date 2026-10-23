@@ -8,9 +8,9 @@
 
 MaterialEditorWindow* EditorMainWindow::OpenMaterialEditor(const AssetKey& Asset)
 {
-    for (QDialog* Dialog : findChildren<QDialog*>())
+    for (QMainWindow* AssetWindow : findChildren<QMainWindow*>())
     {
-        auto* Window = dynamic_cast<MaterialEditorWindow*>(Dialog);
+        auto* Window = dynamic_cast<MaterialEditorWindow*>(AssetWindow);
         if (Window && Window->GetSession().GetDocument().GetAsset() == Asset && Window->isVisible())
         {
             Window->raise();

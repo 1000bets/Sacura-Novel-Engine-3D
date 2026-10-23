@@ -10,7 +10,7 @@ namespace EditorUi
 {
 QSize AssetExplorerTileDelegate::sizeHint(const QStyleOptionViewItem&, const QModelIndex&) const
 {
-    return {132, 122};
+    return {144, 176};
 }
 
 void AssetExplorerTileDelegate::paint(QPainter* Painter, const QStyleOptionViewItem& Option,
@@ -27,11 +27,11 @@ void AssetExplorerTileDelegate::paint(QPainter* Painter, const QStyleOptionViewI
         Painter->drawRoundedRect(Bounds.adjusted(1, 1, -1, -1), 3, 3);
     }
     const QIcon Icon = qvariant_cast<QIcon>(Index.data(Qt::DecorationRole));
-    Icon.paint(Painter, QRect(Bounds.center().x() - 18, Bounds.top() + 12, 36, 36));
+    Icon.paint(Painter, QRect(Bounds.center().x() - 54, Bounds.top() + 6, 108, 108));
     const QFont NameFont = ControlStyle::Font(12, true);
     Painter->setFont(NameFont);
     Painter->setPen(EditorStyle::Color("--text-primary"));
-    const QRect TextBounds = Bounds.adjusted(8, 56, -8, -24);
+    const QRect TextBounds = Bounds.adjusted(8, 118, -8, -18);
     QTextOption TextOption(Qt::AlignHCenter);
     TextOption.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
     QTextLayout Text(Index.data(Qt::DisplayRole).toString(), NameFont);
@@ -50,14 +50,14 @@ void AssetExplorerTileDelegate::paint(QPainter* Painter, const QStyleOptionViewI
         Height += Line.height();
     }
     Text.endLayout();
-    Painter->setClipRect(TextBounds);
+    Painter->setClipRect(QRect(TextBounds.topLeft(), QSize(TextBounds.width(), 32)));
     Text.draw(Painter, TextBounds.topLeft());
     Painter->setClipping(false);
     Painter->setFont(ControlStyle::Font(11));
     Painter->setPen(EditorStyle::Color("--text-secondary"));
     const QString Subtitle = Painter->fontMetrics().elidedText(
         Index.data(ExplorerSubtitleRole).toString(), Qt::ElideRight, Bounds.width() - 16);
-    const QRect SubtitleBounds(Bounds.left() + 8, TextBounds.top() + static_cast<int>(Height) + 7,
+    const QRect SubtitleBounds(Bounds.left() + 8, Bounds.bottom() - 17,
                                Bounds.width() - 16, 16);
     Painter->drawText(SubtitleBounds, Qt::AlignHCenter | Qt::AlignTop, Subtitle);
     Painter->restore();

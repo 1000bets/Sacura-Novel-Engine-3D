@@ -58,7 +58,6 @@ private:
     void SelectImportFiles();
     void SelectImportFolder();
     void ImportFiles(const QStringList& SourceFiles);
-    void UpdateDetails();
     void ShowAssetContextMenu(const QPoint& Position);
     void ShowSourcesContextMenu(const QPoint& Position);
     void RenameSelectedAsset();

@@ -4,6 +4,8 @@
 #include <QMap>
 #include <functional>
 
+class AssetRegistry;
+class AssetReferenceField;
 class QLabel;
 class QLineEdit;
 class QTextEdit;
@@ -21,6 +23,7 @@ class StoryInspectorView final : public QWidget
   public:
     explicit StoryInspectorView(QWidget* Parent = nullptr);
     void SetNode(const StoryGraphNode& Node, const StoryGraphModel& Model, bool bForce = false);
+    void SetAssetRegistry(const AssetRegistry* Value);
     void Commit();
     void Clear();
     void SetEvent(const StoryGraphNode& Node, const StoryGraphEventBatch& Batch, const StoryGraphEventBinding& Binding,
@@ -44,6 +47,7 @@ class StoryInspectorView final : public QWidget
     void SetPendingStructure();
     QWidget* MakeSection(const QString& Key, const QString& Caption, bool bOpen = true);
     QComboBox* MakeTargetPicker(QWidget* Parent, const QString& Target);
+    const AssetRegistry* Registry = nullptr;
     StoryGraphNode Current;
     StoryGraphModel Context;
     bool bUpdating = false;
@@ -56,6 +60,7 @@ class StoryInspectorView final : public QWidget
     QComboBox* Kind = nullptr;
     QWidget* KindCaption = nullptr;
     QComboBox* Speaker = nullptr;
+    AssetReferenceField* SpeakerAsset = nullptr;
     QWidget* SpeakerCaption = nullptr;
     QTextEdit* Text = nullptr;
     QWidget* Details = nullptr;

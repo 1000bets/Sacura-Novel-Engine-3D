@@ -1,3 +1,5 @@
+#include "UI/Views/AssetReferenceField.h"
+#include "UI/Adapters/AssetThumbnails.h"
 #include "UI/Views/StudioControls.h"
 #include "UI/Presentation/InspectorLabels.h"
 #include "Panels/ReflectionInspector.h"
@@ -616,10 +618,18 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
         Picker->setEnabled(bEditable && Registry != nullptr);
         Picker->setAccessibleName(Label);
         Picker->addItem(tr("Не назначено"));
+        if (Registry != nullptr)
+        {
+            AssetThumbnails::Bind(*Picker, 0, *Registry, {});
+        }
         std::vector<AssetKey> Keys{AssetKey{}};
         int SelectedIndex = 0;
         auto AddOption = [&](const QString& Caption, const AssetKey& Key) {
             Picker->addItem(Caption);
+            if (Registry != nullptr)
+            {
+                AssetThumbnails::Bind(*Picker, Picker->count() - 1, *Registry, Key);
+            }
             Keys.push_back(Key);
             if (Key == CurrentKey) { SelectedIndex = Picker->count() - 1; }
         };
@@ -670,26 +680,14 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
         connect(Picker, &QComboBox::activated, this, [this, Descriptor, Keys](int Index) {
             if (Index >= 0 && Index < static_cast<int>(Keys.size())) { ApplyAssetValue(Descriptor, Keys[Index]); }
         });
-        FieldLayout->addWidget(Picker, 1);
-        auto* FocusAsset = new QPushButton(FieldWidget);
-        FocusAsset->setObjectName("AssetFocus_" + QString::fromStdString(Descriptor.Id.Value));
-        FocusAsset->setProperty("uiRole", "propertyReset");
-        FocusAsset->setIcon(EditorUi::MakeFrontendIcon("Search"));
-        FocusAsset->setFixedSize(24, 24);
-        FocusAsset->setToolTip(tr("Найти в Проводнике"));
-        FocusAsset->setAccessibleName(tr("Найти в Проводнике: %1").arg(Label));
-        AssetRegistryEntry FocusEntry;
-        FocusAsset->setEnabled(Registry != nullptr && Registry->TryResolveKey(CurrentKey, FocusEntry));
-        connect(FocusAsset, &QPushButton::clicked, this, [this, CurrentKey]()
+        if (Registry)
         {
-            QString SubAssetIdentifier;
-            if (CurrentKey.HasSubAsset())
-            {
-                SubAssetIdentifier = QString::fromStdString(CurrentKey.SubAsset->ToString());
-            }
-            emit AssetFocusRequested(QString::fromStdString(CurrentKey.Asset.ToString()), SubAssetIdentifier);
-        });
-        FieldLayout->addWidget(FocusAsset);
+            FieldLayout->addWidget(new AssetReferenceField(*Picker, *Registry), 1);
+        }
+        else
+        {
+            FieldLayout->addWidget(Picker, 1);
+        }
     }
     else if (Descriptor.ValueTypeId.Value == "engine.bool")
     {

@@ -1,3 +1,4 @@
+#include "UI/Views/AssetReferenceField.h"
 #include "Panels/ContentBrowserWidget.h"
 #include "UI/Adapters/WorkspaceDockController.h"
 #include "Commands/StaticMeshCommands.h"
@@ -55,6 +56,61 @@ void EditorMainWindow::InitializeTools()
     const QJsonObject Text{{"type", "string"}};
     const QJsonObject Number{{"type", "number"}};
     const QJsonObject Boolean{{"type", "boolean"}};
+    AssetReferenceField::SetNavigation(*this, [this](const AssetKey& Key, bool bOpen)
+    {
+        QJsonObject Arguments{{"assetId", QString::fromStdString(Key.Asset.ToString())}};
+        if (Key.HasSubAsset())
+        {
+            Arguments.insert("subAssetId", QString::fromStdString(Key.SubAsset->ToString()));
+        }
+        if (bOpen)
+        {
+            Toolset->Call("asset_open", Arguments);
+        }
+        else
+        {
+            Toolset->Call("asset_focus", Arguments);
+            raise();
+            activateWindow();
+        }
+    });
+    Toolset->Register("asset_open", "Open an asset or subasset through its registered editor",
+        {{"assetId", Text}, {"subAssetId", Text}}, {"assetId"}, false, [this](const QJsonObject& Arguments)
+    {
+        AssetKey Key;
+        if (!Guid::TryParse(Arguments.value("assetId").toString().toStdString(), Key.Asset) || !Key.IsValid())
+        {
+            return EditorToolset::Failure("Invalid asset identifier");
+        }
+        const QString SubAssetIdentifier = Arguments.value("subAssetId").toString();
+        if (!SubAssetIdentifier.isEmpty())
+        {
+            SubAssetId Identifier;
+            if (!Guid::TryParse(SubAssetIdentifier.toStdString(), Identifier) || !Identifier.IsValid())
+            {
+                return EditorToolset::Failure("Invalid subasset identifier");
+            }
+            Key.SubAsset = Identifier;
+        }
+        AssetRegistryEntry Entry;
+        const SubAssetRecord* SubAsset = nullptr;
+        if (!BoundEngine.GetAssetRegistry().TryResolveKey(Key, Entry, &SubAsset))
+        {
+            return EditorToolset::Failure("Asset is unavailable");
+        }
+        AssetType Type = Entry.Metadata.Type;
+        if (SubAsset)
+        {
+            Type = SubAsset->Type;
+        }
+        if (AssetEditors.find(Type) == AssetEditors.end())
+        {
+            return Toolset->Call("asset_focus", Arguments);
+        }
+        OnAssetActivated(Arguments.value("assetId").toString(), SubAssetIdentifier,
+            QString::fromStdString(Type.GetIdentifier()), QString::fromStdString(Entry.VirtualPath));
+        return EditorToolset::Success(true);
+    });
     Toolset->Register("project_export_game", "Export saved project files and the installed Player into a new standalone Windows folder; does not save drafts",
         {{"destination", Text}}, {"destination"}, false, [this](const QJsonObject& Arguments)
     {
