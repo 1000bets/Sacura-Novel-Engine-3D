@@ -12,6 +12,12 @@
 
 ## Editor settings, console and MCP
 
+- Standalone asset editors use ordinary native Windows windows (`QMainWindow`, standard title bar, minimize/maximize/close, resizable frame) with File/Edit/View menus and shared Editor styling. Do not present a full asset workspace as a restricted dialog. Menu and toolbar entries reuse the same actions and shortcuts; document operations retain their existing MCP command path. Window presentation controls are UI-only. Main-window shutdown and asset-window reuse must include these windows and preserve unsaved-document prompts.
+
+- Component overview pins are multi-select Inspector filters keyed by persistent component ID, not navigation/disclosure arrows. With no pins selected, show every component; with pins selected, show only those components. Search narrows overview rows without clearing pins. Property refresh must retain the Inspector scroll position through deferred Qt layout updates; never scroll to a component as a side effect of editing a field.
+
+- The main mesh Inspector presents the mesh asset, actual material slots and object physics as separate sections. Material assignment is direct per slot, with explicit inherited-material reset and a single assign-all action; do not expose raw slot collection editing as the primary workflow. Collision participation and dynamic simulation are separate controls. Disabling a physics body preserves its authored settings. Material and physics changes use shared EditorCore commands and the typed `mesh_material_assign` / `mesh_physics_set` tools. Undo/Redo resolves restored scene components by persistent ID, never by a stale runtime identity.
+
 - Every editor window, asset editor, detached workspace and settings dialog must use the shared Engine/Editor design system: palette tokens, backgrounds, typography, controls, spacing and interaction states. New windows must explicitly participate in the shared QSS selectors or reusable style roles; calling `EditorStyle::Apply` alone is not sufficient. Do not leave native light surfaces or default unstyled controls inside the themed editor. Verify the actual native window, including scroll contents and detached presentation, using the project screenshot helpers or automated native tests before completing UI work.
 
 - Every new editor capability must consider its MCP integration in the same change: register a typed command in `EditorToolset`, or expose it through the existing reflected component / published action catalogs. Document explicit exclusions. Console and MCP share this registry and validation; do not implement separate mutation paths.
@@ -119,6 +125,8 @@ Scripts live only under `<ProjectRoot>/Scripts/`. After project open, that direc
 - Narrative authoring MCP/console commands (`narrative_*`) use the active `StoryGraphController` document, shared command history and Play lock. Typed literal changes use `StoryGraphDocument::SetNarrativeInput`; replacing a data wire with a literal is one undoable edit. Register the tools after constructing the story controller. Document opening/creation and source editing remain UI-only; coverage is in `Editor.Narrative`.
 
 ## Rendering architecture
+
+- Viewport component icons, camera outlines and arrows belong to the viewport's immutable ImGui render snapshot, alongside the transform gizmo. Do not display them in a separately raised Qt tool window. Project their positions from the same editor camera used for that frame so scene presentation and editor markers share GPU submission and window clipping. Icon selection remains keyed to scene identities; image resources are cached on the Game thread.
 
 - Graphics abstraction: **Diligent Engine Core** (not raw D3D12/Vulkan/OpenGL, not SDL_GPU).
 - Application windows / runtime UI: **Qt6**. SDL3 remains for legacy host tests.
@@ -546,3 +554,15 @@ Python @register_class / field()
 - Static Mesh authoring must support direct collision selection and transform gizmos in its isolated preview scene, with the same camera navigation as the main viewport. One pointer drag is one document-history edit; transient previews must not enter saved metadata. Collision authoring outlines are independent of simulation enablement and are clipped against the camera frustum. Selected elements must be visually distinguished; show only shape-relevant fields and keep material slots in their own tab. Preview navigation and selection remain UI-only; serialized transforms use the shared StaticMeshDocument/MCP path.
 
 - Builtin geometric primitives live as ordinary GLB assets with stable metadata in `Root/Engine/Content/BasicShapes` (`/Engine/BasicShapes`). Reproduce them with `Scripts/GenerateBasicShapes.py`; preserve identifiers. Units are metres, Y-up, centered pivots, slot 0 uses StandardPBR. Cube/Sphere/Capsule/Plane use primitive collision; Cylinder/Cone use static/kinematic triangle collision. Use existing asset registry, placement commands and runtime deployment, not special object types. Details: `docs/BASIC-SHAPES.md`.
+
+
+## Sky environment
+
+- Reflected SkySphereComponent and SkyLightComponent are scene data. Extraction copies immutable RenderSky values; no world references enter RHI. Sky Sphere owns visible procedural zenith/horizon/ground and sun radiance; Sky Light owns IBL color/intensity. Sun direction is the sphere object's world +Y, independent of position/scale. Direct lighting/shadows require a separate Directional Light.
+- Each render surface retains its own IBL cache. Background and irradiance/reflection use the same procedural function; intensity-only edits do not rebuild maps. Preserve legacy IBL for scenes without either component. Multiple active skies/lights resolve deterministically by owner persistent ID. Editor creation and component properties use existing action/reflection catalogs, command history and MCP. Usage and DiligentFX investigation: `docs/SKY.md`.
+
+
+## Viewport diagnostic visualization
+
+- `RenderVisualization` and its shared descriptor catalog define viewport modes for Engine, Editor UI and `viewport_visualization` console/MCP. These are per-view presentation settings, never scene/project data. Camera and asset previews keep independent modes; Player defaults to Lit.
+- The renderer is forward: BaseColor/WorldNormal/Roughness/Metallic/material AO/Emissive/Opacity are shader diagnostic outputs, not a G-buffer. Depth, HDR scene color, shadow atlas and weighted OIT accumulation/revealage inspect the actual per-surface textures. Diagnostic views bypass material postprocess, exposure, bloom, tone mapping, FXAA and the editor grid; lit rendering retains its usual path. Document display mappings, depth range and transparency limits in `docs/BUFFER-VISUALIZATION.md`.

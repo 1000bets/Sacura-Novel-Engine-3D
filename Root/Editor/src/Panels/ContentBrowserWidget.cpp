@@ -649,6 +649,44 @@ void ContentBrowserWidget::RefreshAssetView()
     UpdateDetails();
 }
 
+bool ContentBrowserWidget::FocusAsset(const AssetKey& Key)
+{
+    AssetRegistryEntry Entry;
+    if (Registry == nullptr || !Registry->TryResolveKey(Key, Entry))
+    {
+        return false;
+    }
+    {
+        const QSignalBlocker Block(Search);
+        Search->clear();
+    }
+    ActiveTypeFilter.clear();
+    RebuildTypeFilters();
+    FilterAction->setIcon(EditorUi::MakeFrontendIcon("ListFilter", "--text-muted"));
+    FilterAction->setToolTip(tr("Тип ресурса: %1").arg(tr("Все типы")));
+    Refresh();
+    SetCurrentFolder(QString::fromStdString(Entry.VirtualPath).section('/', 0, -2));
+    const QString AssetIdentifier = QString::fromStdString(Key.Asset.ToString());
+    QString SubAssetIdentifier;
+    if (Key.HasSubAsset())
+    {
+        SubAssetIdentifier = QString::fromStdString(Key.SubAsset->ToString());
+    }
+    for (int Index = 0; Index < AssetView->count(); ++Index)
+    {
+        auto* Item = AssetView->item(Index);
+        if (Item->data(AssetIdRole).toString() == AssetIdentifier
+            && (!Key.HasSubAsset() || Item->data(SubAssetIdRole).toString() == SubAssetIdentifier))
+        {
+            AssetView->setCurrentItem(Item, QItemSelectionModel::ClearAndSelect);
+            AssetView->scrollToItem(Item, QAbstractItemView::PositionAtCenter);
+            AssetView->setFocus(Qt::OtherFocusReason);
+            return true;
+        }
+    }
+    return false;
+}
+
 void ContentBrowserWidget::SetCurrentFolder(const QString& Folder)
 {
     const bool ValidMount = Folder == "/Game" || Folder.startsWith("/Game/")

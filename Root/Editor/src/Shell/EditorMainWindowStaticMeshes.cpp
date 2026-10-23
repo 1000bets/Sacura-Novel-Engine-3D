@@ -31,11 +31,15 @@ StaticMeshEditorWindow* EditorMainWindow::OpenStaticMeshEditor(const AssetKey& R
         statusBar()->showMessage(QString::fromStdString(Error), 5000);
         return nullptr;
     }
-    for (QDialog* Dialog : findChildren<QDialog*>())
+    for (QMainWindow* AssetWindow : findChildren<QMainWindow*>())
     {
-        auto* Window = dynamic_cast<StaticMeshEditorWindow*>(Dialog);
+        auto* Window = dynamic_cast<StaticMeshEditorWindow*>(AssetWindow);
         if (Window && Window->GetDocument().GetAsset() == Asset)
         {
+            if (Window->isMinimized())
+            {
+                Window->showNormal();
+            }
             Window->show();
             Window->raise();
             Window->activateWindow();

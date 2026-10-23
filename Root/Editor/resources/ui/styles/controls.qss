@@ -122,6 +122,10 @@ QWidget#ObjectComponents QPushButton[uiRole="componentInstance"] {
     background: transparent; font-size: 12px; font-weight: 500;
 }
 QWidget#ObjectComponents QPushButton[uiRole="componentInstance"]:hover { background: @--bg-hover@; }
+QWidget#ObjectComponents QPushButton[uiRole="componentInstance"]:checked {
+    background: @--accent-muted@; color: @--text-primary@;
+    border: 1px solid @--accent@; border-radius: 4px;
+}
 QPushButton#ObjectAddComponent { min-height: 32px; padding: 0 8px; border: 1px solid @--border-strong@;
     background: @--accent-muted@; font-size: 12px; font-weight: 600; color: @--text-primary@; }
 QPushButton#ObjectAddComponent:hover { border-color: @--accent@; background: @--bg-hover@; }
@@ -185,18 +189,43 @@ QLabel#StudioMenuGroup {
 }
 QLabel#StudioMenuEmpty { padding: 10px 7px; color: @--text-muted@; font-size: 11px; }
 
-QDialog#StaticMeshEditorWindow, QDialog#StaticMeshEditorWindow QScrollArea,
-QDialog#StaticMeshEditorWindow QScrollArea > QWidget > QWidget {
+QMainWindow#StaticMeshEditorWindow, QMainWindow#StaticMeshEditorWindow QScrollArea,
+QMainWindow#StaticMeshEditorWindow QScrollArea > QWidget > QWidget {
     background: @--bg-app@; color: @--text-primary@;
 }
-QDialog#StaticMeshEditorWindow QLabel { color: @--text-secondary@; }
-QDialog#StaticMeshEditorWindow QDoubleSpinBox, QDialog#StaticMeshEditorWindow QComboBox { min-height: 24px; }
+QMainWindow#StaticMeshEditorWindow QLabel { color: @--text-secondary@; }
+QMainWindow#StaticMeshEditorWindow QDoubleSpinBox, QMainWindow#StaticMeshEditorWindow QComboBox { min-height: 24px; }
 
-QDialog#StaticMeshEditorWindow QListWidget {
+QMainWindow#StaticMeshEditorWindow QListWidget {
     background: @--bg-panel@; color: @--text-primary@;
     border: 1px solid @--border-subtle@; border-radius: 4px; padding: 4px;
 }
-QDialog#StaticMeshEditorWindow QListWidget::item { padding: 6px; }
-QDialog#StaticMeshEditorWindow QListWidget::item:selected { background: @--bg-hover@; color: @--accent@; }
-QDialog#StaticMeshEditorWindow QTabWidget::pane { border: 1px solid @--border-subtle@; background: @--bg-app@; }
-QDialog#StaticMeshEditorWindow QPushButton:checked { background: @--bg-hover@; color: @--accent@; border-color: @--accent@; }
+QMainWindow#StaticMeshEditorWindow QListWidget::item { padding: 6px; }
+QMainWindow#StaticMeshEditorWindow QListWidget::item:selected { background: @--bg-hover@; color: @--accent@; }
+QMainWindow#StaticMeshEditorWindow QTabWidget::pane { border: 1px solid @--border-subtle@; background: @--bg-app@; }
+QMainWindow#StaticMeshEditorWindow QPushButton:checked { background: @--bg-hover@; color: @--accent@; border-color: @--accent@; }
+
+QFrame#MeshMaterialSlot {
+    background: @--bg-panel@;
+    border: 1px solid @--border-subtle@;
+    border-radius: 4px;
+}
+QFrame#MeshMaterialSlot QLabel { border: none; background: transparent; }
+QFrame#MeshMaterialSlot QPushButton { min-height: 24px; padding: 0 7px; }
+
+QWidget#StaticMeshEditorContent, QMainWindow#StaticMeshEditorWindow QToolBar {
+    background: @--bg-app@; color: @--text-primary@;
+}
+QMainWindow#StaticMeshEditorWindow QToolBar {
+    border: none; border-bottom: 1px solid @--border-subtle@; spacing: 6px; padding: 6px;
+}
+QMainWindow#StaticMeshEditorWindow QToolBar QToolButton {
+    padding: 5px 9px; border: 1px solid transparent; border-radius: 4px;
+    background: @--bg-panel@; color: @--text-primary@;
+}
+QMainWindow#StaticMeshEditorWindow QToolBar QToolButton:hover {
+    background: @--bg-hover@; border-color: @--border-strong@;
+}
+QMainWindow#StaticMeshEditorWindow QToolBar QToolButton:checked {
+    background: @--accent-muted@; border-color: @--accent@;
+}

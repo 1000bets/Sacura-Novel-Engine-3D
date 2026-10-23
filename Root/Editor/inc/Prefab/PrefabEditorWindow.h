@@ -58,6 +58,7 @@ public:
     Scene* GetPreviewScene() const { return PreviewScene; }
 
 signals:
+    void AssetFocusRequested(QString AssetIdentifier, QString SubAssetIdentifier);
     void OpenPrefabRequested(QString AssetId);
     void PrefabSaved(QString AssetId);
 

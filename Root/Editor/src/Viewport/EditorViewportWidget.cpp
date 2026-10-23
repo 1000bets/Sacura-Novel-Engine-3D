@@ -30,6 +30,7 @@
 #include <QPainter>
 #include <QPixmap>
 #include <QHash>
+#include <QImage>
 #include <QResizeEvent>
 #include <QScopedValueRollback>
 #include <QScopeGuard>
@@ -156,8 +157,7 @@ class EditorGizmoOverlay : public QWidget
 
 public:
     explicit EditorGizmoOverlay(EditorViewportWidget* InOwner)
-        : QWidget(InOwner->window(), Qt::Tool | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint
-            | Qt::WindowTransparentForInput | Qt::WindowDoesNotAcceptFocus)
+        : QWidget(InOwner)
         , Owner(InOwner)
     {
         setObjectName("EditorGizmoOverlay");
@@ -184,25 +184,8 @@ public:
 
     void SyncGeometry()
     {
-        setGeometry(QRect(Owner->mapToGlobal(QPoint(0, 0)), Owner->size()));
-        // This is a top-level translucent window, so it does not inherit the
-        // viewport's clipping when a splitter makes its parent smaller.
-        const QRegion Visible = Owner->visibleRegion();
-        if (!Owner->isVisible() || Visible.isEmpty())
-        {
-            hide();
-            return;
-        }
-        if (Visible == QRegion(Owner->rect()))
-        {
-            if (!mask().isEmpty()) { clearMask(); }
-        }
-        else if (mask() != Visible) { setMask(Visible); }
-        if (Owner->isVisible())
-        {
-            show();
-            raise();
-        }
+        setGeometry(Owner->rect());
+        hide();
     }
 
     void SetSelectedTransform(const Transform& LocalTransform, const Transform& WorldTransform, ObjectHandle ObjectIdentity)
@@ -302,7 +285,7 @@ public:
             ComponentIcons.clear();
             Arrows.clear();
         }
-        update();
+        DrawComponentVisuals();
         ImGui::Render();
         if (Owner->BoundEngine != nullptr)
         {
@@ -444,29 +427,58 @@ public:
         Event->accept();
     }
 
-protected:
-    void paintEvent(QPaintEvent*) override
+private:
+    void DrawComponentVisuals()
     {
-        QPainter Painter(this);
-        Painter.setCompositionMode(QPainter::CompositionMode_Source);
-        Painter.fillRect(rect(), Qt::transparent);
-        Painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
-        Painter.setRenderHint(QPainter::SmoothPixmapTransform);
-        Painter.setRenderHint(QPainter::Antialiasing);
+        auto* Drawing = ImGui::GetBackgroundDrawList();
+        const float PixelRatio = static_cast<float>(Owner->devicePixelRatioF());
+        const auto ScreenPosition = [PixelRatio](const QPointF& Position)
+        {
+            return ImVec2(static_cast<float>(Position.x()) * PixelRatio,
+                static_cast<float>(Position.y()) * PixelRatio);
+        };
         for (const EditorArrow& Arrow : Arrows)
         {
-            Painter.setPen(QPen(Arrow.Color, Arrow.Thickness, Qt::SolidLine, Qt::RoundCap));
+            const auto Color = IM_COL32(Arrow.Color.red(), Arrow.Color.green(), Arrow.Color.blue(), Arrow.Color.alpha());
             for (const QLineF& Segment : Arrow.Segments)
             {
-                Painter.drawLine(Segment);
+                Drawing->AddLine(ScreenPosition(Segment.p1()), ScreenPosition(Segment.p2()), Color,
+                    Arrow.Thickness * PixelRatio);
             }
         }
         for (const ComponentIcon& Icon : ComponentIcons)
         {
-            Painter.setPen(Qt::NoPen);
-            Painter.setBrush(QColor(24, 24, 28, 180));
-            Painter.drawRoundedRect(Icon.Bounds.adjusted(-2, -2, 2, 2), 5, 5);
-            Painter.drawPixmap(Icon.Bounds.toRect(), Icon.Image);
+            const QRectF Background = Icon.Bounds.adjusted(-2, -2, 2, 2);
+            Drawing->AddRectFilled(ScreenPosition(Background.topLeft()), ScreenPosition(Background.bottomRight()),
+                IM_COL32(24, 24, 28, 180), 5.0f * PixelRatio);
+            if (Icon.ObjectIdentity == SelectedObject)
+            {
+                Drawing->AddRect(ScreenPosition(Background.topLeft()), ScreenPosition(Background.bottomRight()),
+                    IM_COL32(246, 194, 112, 255), 5.0f * PixelRatio, 0, PixelRatio);
+            }
+            const float PixelWidth = static_cast<float>(Icon.Bounds.width()) / Icon.Image.width();
+            const float PixelHeight = static_cast<float>(Icon.Bounds.height()) / Icon.Image.height();
+            for (int Row = 0; Row < Icon.Image.height(); ++Row)
+            {
+                int Column = 0;
+                while (Column < Icon.Image.width())
+                {
+                    const QRgb Color = Icon.Image.pixel(Column, Row);
+                    const int StartColumn = Column;
+                    ++Column;
+                    while (Column < Icon.Image.width() && Icon.Image.pixel(Column, Row) == Color)
+                    {
+                        ++Column;
+                    }
+                    if (qAlpha(Color) != 0)
+                    {
+                        Drawing->AddRectFilled(ScreenPosition(Icon.Bounds.topLeft()
+                                + QPointF(StartColumn * PixelWidth, Row * PixelHeight)),
+                            ScreenPosition(Icon.Bounds.topLeft() + QPointF(Column * PixelWidth, (Row + 1) * PixelHeight)),
+                            IM_COL32(qRed(Color), qGreen(Color), qBlue(Color), qAlpha(Color)));
+                    }
+                }
+            }
         }
     }
 
@@ -695,7 +707,7 @@ private:
     struct ComponentIcon
     {
         QRectF Bounds;
-        QPixmap Image;
+        QImage Image;
         ObjectHandle ObjectIdentity;
         float Depth = 0.0f;
     };
@@ -881,7 +893,9 @@ private:
             auto CachedImage = IconImages.find(SelectedPath);
             if (CachedImage == IconImages.end())
             {
-                CachedImage = IconImages.insert(SelectedPath, QPixmap(SelectedPath));
+                CachedImage = IconImages.insert(SelectedPath,
+                    QPixmap(SelectedPath).toImage().scaled(28, 28, Qt::KeepAspectRatio, Qt::SmoothTransformation)
+                        .convertToFormat(QImage::Format_ARGB32));
             }
             if (CachedImage.value().isNull())
             {
@@ -905,7 +919,7 @@ private:
 
     std::vector<ComponentIcon> ComponentIcons;
     std::vector<EditorArrow> Arrows;
-    QHash<QString, QPixmap> IconImages;
+    QHash<QString, QImage> IconImages;
 
     void ApplyManipulatedWorld(const Matrix& WorldMatrix)
     {

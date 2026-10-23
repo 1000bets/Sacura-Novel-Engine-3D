@@ -1,6 +1,6 @@
+#pragma once
 #include "World/Components/SkySphereComponent.h"
 #include "World/Components/SkyLightComponent.h"
-#pragma once
 
 #include "Actions/EditorAction.h"
 #include "World/Components/CameraComponent.h"
@@ -258,7 +258,7 @@ class CreateSkySphereObjectAction : public EditorAction
     ENGINE_CLASS(CreateSkySphereObjectAction, EditorAction, "editor.CreateSkySphereObjectAction")
 public:
     const char* GetMenuCategory() const override { return ObjectsCategory; }
-    const char* GetDisplayName() const override { return "SkySphere"; }
+    const char* GetDisplayName() const override { return "Sky Sphere"; }
     int GetSortOrder() const override { return 130; }
     bool Execute(EditorActionContext& Context) const override
     {
@@ -274,7 +274,7 @@ class CreateSkyLightObjectAction : public EditorAction
     ENGINE_CLASS(CreateSkyLightObjectAction, EditorAction, "editor.CreateSkyLightObjectAction")
 public:
     const char* GetMenuCategory() const override { return ObjectsCategory; }
-    const char* GetDisplayName() const override { return "SkyLight"; }
+    const char* GetDisplayName() const override { return "Sky Light"; }
     int GetSortOrder() const override { return 130; }
     bool Execute(EditorActionContext& Context) const override
     {

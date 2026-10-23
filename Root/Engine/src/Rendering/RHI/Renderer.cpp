@@ -136,6 +136,7 @@ struct Renderer::PipelineState
     ForwardPipeline Transparent[2];
     ForwardPipeline Shadow[2];
     ForwardPipeline ToneMap;
+    ForwardPipeline Visualization;
     ForwardPipeline Composite;
     std::chrono::steady_clock::time_point StartTime = std::chrono::steady_clock::now();
     ForwardPipeline Antialias;
@@ -310,10 +311,11 @@ bool Renderer::CreatePipeline(const std::string& ShaderDirectory)
     const auto ShadowPixel = CreateShader("Forward.hlsl", "ShadowMain", SHADER_TYPE_PIXEL);
     const auto FullscreenVertex = CreateShader("Postprocess.hlsl", "FullscreenMain", SHADER_TYPE_VERTEX);
     const auto CompositePixel = CreateShader("Postprocess.hlsl", "CompositeMain", SHADER_TYPE_PIXEL);
+    const auto VisualizationPixel = CreateShader("Postprocess.hlsl", "VisualizationMain", SHADER_TYPE_PIXEL);
     const auto TonePixel = CreateShader("Postprocess.hlsl", "ToneMapMain", SHADER_TYPE_PIXEL);
     const auto AntialiasPixel = CreateShader("Postprocess.hlsl", "AntialiasMain", SHADER_TYPE_PIXEL);
     const auto PreviewPixel = CreateShader("Postprocess.hlsl", "PreviewAntialiasMain", SHADER_TYPE_PIXEL);
-    if (!Vertex || !OpaquePixel || !TransparentPixel || !ShadowPixel || !FullscreenVertex || !TonePixel || !CompositePixel || !AntialiasPixel)
+    if (!VisualizationPixel || !Vertex || !OpaquePixel || !TransparentPixel || !ShadowPixel || !FullscreenVertex || !TonePixel || !CompositePixel || !AntialiasPixel)
     {
         return false;
     }
@@ -360,7 +362,7 @@ bool Renderer::CreatePipeline(const std::string& ShaderDirectory)
             BindTexture(Target, "BrdfImage", Pipeline->Environment.IntegratedBrdf->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE));
         }
     };
-    Pipeline->CreateState = [this, GraphicsDevice, Vertex, FullscreenVertex, CompositePixel, Layout](ForwardPipeline& Target, IShader* Pixel, uint32_t Kind, bool bDoubleSided, IShader* MaterialVertex, const ResolvedMaterial* Material, bool bAsync)
+    Pipeline->CreateState = [this, GraphicsDevice, Vertex, FullscreenVertex, CompositePixel, VisualizationPixel, Layout](ForwardPipeline& Target, IShader* Pixel, uint32_t Kind, bool bDoubleSided, IShader* MaterialVertex, const ResolvedMaterial* Material, bool bAsync)
     {
         GraphicsPipelineStateCreateInfo Description;
         if (bAsync)
@@ -467,7 +469,14 @@ bool Renderer::CreatePipeline(const std::string& ShaderDirectory)
         }
         else
         {
-            Samplers.emplace_back(SHADER_TYPE_PIXEL, "SceneImage", Linear);
+            if (Pixel == VisualizationPixel.RawPtr())
+            {
+                Samplers.emplace_back(SHADER_TYPE_PIXEL, "SceneImage", Point);
+            }
+            else
+            {
+                Samplers.emplace_back(SHADER_TYPE_PIXEL, "SceneImage", Linear);
+            }
             // Composite and tone mapping share HDR pipeline settings, but only
             // the transparency composite shader samples the OIT attachments.
             if (Pixel == CompositePixel.RawPtr())
@@ -617,7 +626,8 @@ bool Renderer::CreatePipeline(const std::string& ShaderDirectory)
             Variable->Set(Pipeline->GroundGridBuffer.GetBuffer());
         }
     }
-    return Pipeline->CreateState(Pipeline->Composite, CompositePixel, 3, true, nullptr, nullptr, false)
+    return Pipeline->CreateState(Pipeline->Visualization, VisualizationPixel, 3, true, nullptr, nullptr, false)
+        && Pipeline->CreateState(Pipeline->Composite, CompositePixel, 3, true, nullptr, nullptr, false)
         && Pipeline->CreateState(Pipeline->ToneMap, TonePixel, 3, true, nullptr, nullptr, false) && Pipeline->CreateState(Pipeline->Antialias, AntialiasPixel, 4, true, nullptr, nullptr, false)
         && Pipeline->CreateState(Pipeline->PreviewAntialias, PreviewPixel, 7, true, nullptr, nullptr, false);
 }
@@ -1101,6 +1111,7 @@ void Renderer::RenderView(const RenderViewFrame& View, uint64_t FrameIndex, ITex
     Statistics.SurfaceHeight = Target.Height;
     Statistics.SurfaceResizeCount = Target.ResizeCount;
     Statistics.bLiveResizeScaling = Device.SupportsLiveResizeScaling();
+    Statistics.Visualization = View.Settings.Visualization;
     Statistics.SubmittedObjects = static_cast<uint32_t>(View.Scene.Objects.size());
     PipelineState::QueryFrame* ActiveTiming = nullptr;
     for (auto& Timing : Target.Timings)
@@ -1201,11 +1212,13 @@ void Renderer::RenderView(const RenderViewFrame& View, uint64_t FrameIndex, ITex
             Lighting = &Target.SkyEnvironment;
         }
     }
+    Statistics.bSkyLightActive = Sky.bLighting && Frame.FrameParameters.y > 0.f;
     Frame.OutputParameters = Vector4(0.f, -1.f, 0.f, 0.f);
     if (Device.GetActiveBackend() == GraphicsBackend::OpenGL)
     {
         Frame.OutputParameters = Vector4(1.f, 1.f, 0.f, 0.f);
     }
+    Frame.OutputParameters.z = static_cast<float>(View.Settings.Visualization);
     uint32_t ShadowCount = 0;
     for (const auto& Light : View.Scene.Lights)
     {
@@ -1481,14 +1494,21 @@ void Renderer::RenderView(const RenderViewFrame& View, uint64_t FrameIndex, ITex
     Context->SetRenderTargets(1, &Radiance, Depth, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
     Diligent::Viewport FullViewport(0.f, 0.f, static_cast<float>(Target.Width), static_cast<float>(Target.Height));
     Context->SetViewports(1, &FullViewport, Target.Width, Target.Height);
-    const float Background[] = {0.025f, 0.03f, 0.04f, 1.f};
+    float Background[] = {0.025f, 0.03f, 0.04f, 1.f};
+    if (View.Settings.Visualization != RenderVisualization::Lit)
+    {
+        Background[0] = 0.f;
+        Background[1] = 0.f;
+        Background[2] = 0.f;
+    }
     Context->ClearRenderTarget(Radiance, Background, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
     Context->ClearDepthStencil(Depth, CLEAR_DEPTH_FLAG, 1.f, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
-    if (Sky.bVisible && View.Scene.Camera.bValid)
+    if (Sky.bVisible && View.Scene.Camera.bValid
+        && (View.Settings.Visualization == RenderVisualization::Lit || View.Settings.Visualization == RenderVisualization::SceneColorHdr))
     {
         SkyConstants Constants{View.Scene.Camera.ViewProjection.Invert(), Frame.CameraPosition,
-            Vector4(Sky.Zenith.x, Sky.Zenith.y, Sky.Zenith.z, Sky.Brightness), Vector4(Sky.Horizon), Vector4(Sky.Ground),
-            Vector4(Sky.SunColor), Vector4(Sky.SunDirection)};
+            Vector4(Sky.Zenith.x, Sky.Zenith.y, Sky.Zenith.z, Sky.Brightness), Vector4(Sky.Horizon.x, Sky.Horizon.y, Sky.Horizon.z, 0.f), Vector4(Sky.Ground.x, Sky.Ground.y, Sky.Ground.z, 0.f),
+            Vector4(Sky.SunColor.x, Sky.SunColor.y, Sky.SunColor.z, 0.f), Vector4(Sky.SunDirection.x, Sky.SunDirection.y, Sky.SunDirection.z, 0.f)};
         Pipeline->SkyBuffer.Update(Context, &Constants, sizeof(Constants));
         Context->SetPipelineState(Pipeline->Sky.State);
         Context->CommitShaderResources(Pipeline->Sky.Binding, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
@@ -1496,6 +1516,7 @@ void Renderer::RenderView(const RenderViewFrame& View, uint64_t FrameIndex, ITex
         SkyDraw.NumVertices = 3;
         SkyDraw.Flags = DRAW_FLAG_VERIFY_ALL;
         Context->Draw(SkyDraw);
+        Statistics.bSkyRendered = true;
         ++Statistics.DrawCalls;
         ++Statistics.Triangles;
     }
@@ -1506,7 +1527,7 @@ void Renderer::RenderView(const RenderViewFrame& View, uint64_t FrameIndex, ITex
             DrawObject(*Object, Pipeline->Opaque[Object->MaterialSnapshot && Object->MaterialSnapshot->Material->Definition.bDoubleSided]);
         }
     }
-    if (View.Settings.bGroundGrid && View.Scene.Camera.bValid)
+    if (View.Settings.bGroundGrid && View.Scene.Camera.bValid && View.Settings.Visualization == RenderVisualization::Lit)
     {
         // Keep the opaque/masked scene depth bound, but never write grid depth.
         // Transparent surfaces are composited over this editor aid afterwards.
@@ -1540,7 +1561,7 @@ void Renderer::RenderView(const RenderViewFrame& View, uint64_t FrameIndex, ITex
     BeginPass(3);
     PostprocessConstants Post;
     Post.Parameters = Vector4(std::max(0.f, View.Settings.Exposure), std::max(0.f, View.Settings.BloomIntensity), std::max(0.f, View.Settings.BloomThreshold), 0.f);
-    if (View.Settings.bAntialiasing)
+    if (View.Settings.bAntialiasing && View.Settings.Visualization == RenderVisualization::Lit)
     {
         Post.Parameters.w = 1.f;
     }
@@ -1569,7 +1590,7 @@ void Renderer::RenderView(const RenderViewFrame& View, uint64_t FrameIndex, ITex
     ITexture* CurrentColor = Target.PostTargets[0];
     auto ApplyPostEffects = [&](MaterialPostProcessStage Stage)
     {
-        if (!View.Settings.bMaterialPostProcess)
+        if (!View.Settings.bMaterialPostProcess || View.Settings.Visualization != RenderVisualization::Lit)
         {
             return;
         }
@@ -1627,11 +1648,37 @@ void Renderer::RenderView(const RenderViewFrame& View, uint64_t FrameIndex, ITex
     ApplyPostEffects(MaterialPostProcessStage::BeforeToneMapping);
     ITextureView* ToneTarget = Target.ToneMapped->GetDefaultView(TEXTURE_VIEW_RENDER_TARGET);
     Context->SetRenderTargets(1, &ToneTarget, nullptr, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
-    BindTexture(Pipeline->ToneMap, "SceneImage", CurrentColor->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE));
-    Context->SetPipelineState(Pipeline->ToneMap.State);
-    Context->CommitShaderResources(Pipeline->ToneMap.Binding, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+    if (View.Settings.Visualization == RenderVisualization::Lit)
+    {
+        BindTexture(Pipeline->ToneMap, "SceneImage", CurrentColor->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE));
+        Context->SetPipelineState(Pipeline->ToneMap.State);
+        Context->CommitShaderResources(Pipeline->ToneMap.Binding, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+    }
+    else
+    {
+        ITexture* Source = CurrentColor;
+        switch (View.Settings.Visualization)
+        {
+        case RenderVisualization::LinearDepth: Source = Target.Depth; break;
+        case RenderVisualization::ShadowAtlas: Source = Target.ShadowAtlas; break;
+        case RenderVisualization::TransparencyAccumulation: Source = Target.Accumulation; break;
+        case RenderVisualization::TransparencyRevealage: Source = Target.Revealage; break;
+        default: break;
+        }
+        Post.Resolution.w = static_cast<float>(View.Settings.Visualization);
+        Post.Parameters = Vector4(View.Scene.Camera.NearPlane, View.Scene.Camera.FarPlane, View.Settings.VisualizationDepthRange, 0.f);
+        Pipeline->PostBuffer.Update(Context, &Post, sizeof(Post));
+        BindTexture(Pipeline->Visualization, "SceneImage", Source->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE));
+        Context->SetPipelineState(Pipeline->Visualization.State);
+        Context->CommitShaderResources(Pipeline->Visualization.Binding, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+    }
     Context->Draw(FullscreenDraw);
     ++Statistics.DrawCalls;
+    if (View.Settings.Visualization != RenderVisualization::Lit)
+    {
+        Post.Parameters.w = 0.f;
+        Pipeline->PostBuffer.Update(Context, &Post, sizeof(Post));
+    }
     CurrentColor = Target.ToneMapped;
     ApplyPostEffects(MaterialPostProcessStage::AfterToneMapping);
     ITextureView* BackBuffer = Output;

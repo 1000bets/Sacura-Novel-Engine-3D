@@ -1,3 +1,9 @@
+#include "Panels/ContentBrowserWidget.h"
+#include "UI/Adapters/WorkspaceDockController.h"
+#include "Commands/StaticMeshCommands.h"
+#include "World/Components/MeshRendererComponent.h"
+#include "World/Components/PhysicsBodyComponent.h"
+#include <cmath>
 #include "Shell/EditorMainWindow.h"
 #include "Automation/EditorToolset.h"
 #include "Automation/InputTools.h"
@@ -66,6 +72,65 @@ void EditorMainWindow::InitializeTools()
         }
         return EditorToolset::Success(QString::fromStdWString((Destination / "Game.exe").wstring()));
     });
+    Toolset->Register("asset_focus", "Reveal and select an asset or subasset in the Content Browser; clears search and type filters",
+        {{"assetId", Text}, {"subAssetId", Text}}, {"assetId"}, false, [this](const QJsonObject& Arguments)
+    {
+        AssetKey Key;
+        if (!Guid::TryParse(Arguments.value("assetId").toString().toStdString(), Key.Asset) || !Key.IsValid())
+        {
+            return EditorToolset::Failure("Invalid asset identifier");
+        }
+        const auto SubAssetIdentifier = Arguments.value("subAssetId").toString();
+        if (!SubAssetIdentifier.isEmpty())
+        {
+            SubAssetId Identifier;
+            if (!Guid::TryParse(SubAssetIdentifier.toStdString(), Identifier) || !Identifier.IsValid())
+            {
+                return EditorToolset::Failure("Invalid subasset identifier");
+            }
+            Key.SubAsset = Identifier;
+        }
+        if (!ContentBrowser->FocusAsset(Key))
+        {
+            return EditorToolset::Failure("Asset is unavailable in the Content Browser");
+        }
+        Docking->Open(*ContentBrowser);
+        return EditorToolset::Success(true);
+    });
+    QJsonArray VisualizationNames;
+    for (const auto& Descriptor : RenderVisualizations)
+    {
+        VisualizationNames.append(Descriptor.Identifier);
+    }
+    Toolset->Register("viewport_visualization", "Inspect or change the primary viewport diagnostic mode; does not change scene data",
+        {{"mode", QJsonObject{{"type", "string"}, {"enum", VisualizationNames}}},
+         {"depthRange", QJsonObject{{"type", "number"}, {"minimum", 0.01}, {"maximum", 100000.0}}}}, {}, false,
+        [this](const QJsonObject& Arguments)
+    {
+        RenderVisualization Mode = RenderConfiguration.Visualization;
+        if (Arguments.contains("mode"))
+        {
+            const auto* Descriptor = FindRenderVisualization(Arguments.value("mode").toString().toStdString());
+            if (!Descriptor)
+            {
+                return EditorToolset::Failure("Unknown viewport visualization mode");
+            }
+            Mode = Descriptor->Mode;
+        }
+        const double DepthRange = Arguments.value("depthRange").toDouble(RenderConfiguration.VisualizationDepthRange);
+        if (!std::isfinite(DepthRange) || DepthRange < 0.01 || DepthRange > 100000.0)
+        {
+            return EditorToolset::Failure("Depth range must be between 0.01 and 100000 metres");
+        }
+        SetViewportVisualization(Mode, static_cast<float>(DepthRange));
+        QJsonArray Catalog;
+        for (const auto& Descriptor : RenderVisualizations)
+        {
+            Catalog.append(QJsonObject{{"mode", Descriptor.Identifier}, {"description", QString::fromUtf8(Descriptor.Description)}});
+        }
+        return EditorToolset::Success(QJsonObject{{"mode", RenderVisualizations[static_cast<size_t>(Mode)].Identifier},
+            {"depthRange", DepthRange}, {"modes", Catalog}});
+    });
     auto Outcome = [](bool bSucceeded)
     {
         if (!bSucceeded)
@@ -128,6 +193,66 @@ void EditorMainWindow::InitializeTools()
         }
         GameObject* ObjectInstance = GetEditScene()->FindByHandle(Created);
         return EditorToolset::Success(QString::fromStdString(ObjectInstance->GetPersistentId()));
+    });
+    auto ResolveMesh = [Resolve](const QJsonObject& Arguments) -> MeshRendererComponent*
+    {
+        auto* Object = Resolve(Arguments);
+        if (!Object)
+        {
+            return nullptr;
+        }
+        return Object->GetComponent<MeshRendererComponent>();
+    };
+    Toolset->Register("mesh_material_assign", "Assign a Surface material to one slot or all slots; empty materialId restores mesh materials",
+        {{"objectId", Text}, {"slot", QJsonObject{{"type", "integer"}, {"minimum", -1}, {"maximum", 2147483647}}}, {"materialId", Text}},
+        {"objectId", "slot", "materialId"}, false, [this, ResolveMesh](const QJsonObject& Arguments)
+    {
+        auto* Mesh = ResolveMesh(Arguments);
+        if (!Mesh || BoundEngine.GetPlaySession().IsSimulating() || bPlayRequested)
+        {
+            return EditorToolset::Failure("Select a mesh object and stop Play before assigning materials");
+        }
+        AssetKey Material;
+        const auto Identifier = Arguments.value("materialId").toString().toStdString();
+        if (!Identifier.empty() && !Guid::TryParse(Identifier, Material.Asset))
+        {
+            return EditorToolset::Failure("Invalid material asset ID");
+        }
+        std::string Error;
+        auto Command = MakeAssignMeshMaterialCommand(GetEditScene(), BoundEngine.GetAssetRegistry(), Mesh->GetObjectHandle(),
+            Arguments.value("slot").toInt(), Material, Error);
+        if (!Command || !ExecuteCommand(std::move(Command)))
+        {
+            return EditorToolset::Failure(QString::fromStdString(Error));
+        }
+        return EditorToolset::Success(true);
+    });
+    Toolset->Register("mesh_physics_set", "Enable mesh collision and optionally simulate a dynamic body; preserves existing physics settings and supports undo",
+        {{"objectId", Text}, {"enabled", Boolean}, {"simulate", Boolean}}, {"objectId", "enabled", "simulate"}, false,
+        [this, ResolveMesh](const QJsonObject& Arguments)
+    {
+        auto* Mesh = ResolveMesh(Arguments);
+        if (!Mesh || BoundEngine.GetPlaySession().IsSimulating() || bPlayRequested)
+        {
+            return EditorToolset::Failure("Select a mesh object and stop Play before changing physics");
+        }
+        const bool bEnabled = Arguments.value("enabled").toBool();
+        const bool bSimulate = Arguments.value("simulate").toBool();
+        if (!bEnabled && bSimulate)
+        {
+            return EditorToolset::Failure("Enable collision before simulating physics");
+        }
+        if (!bEnabled && !Mesh->GetGameObject()->GetComponent<PhysicsBodyComponent>())
+        {
+            return EditorToolset::Success(true);
+        }
+        std::string Error;
+        auto Command = MakeSetMeshPhysicsCommand(GetEditScene(), BoundEngine.GetAssetRegistry(), Mesh->GetObjectHandle(), bEnabled, bSimulate, Error);
+        if (!Command || !ExecuteCommand(std::move(Command)))
+        {
+            return EditorToolset::Failure(QString::fromStdString(Error));
+        }
+        return EditorToolset::Success(true);
     });
     Toolset->Register("object_rename", "Rename an object by persistent ID; supports undo", {{"objectId", Text}, {"name", Text}}, {"objectId", "name"}, false,
         [this, Resolve, Outcome](const QJsonObject& Arguments)

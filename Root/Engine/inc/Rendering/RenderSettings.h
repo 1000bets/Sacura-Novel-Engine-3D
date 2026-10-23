@@ -1,7 +1,10 @@
 #pragma once
+#include "Rendering/RenderVisualization.h"
 
 struct RenderSettings
 {
+    RenderVisualization Visualization = RenderVisualization::Lit;
+    float VisualizationDepthRange = 10.f;
     float Exposure = 1.f;
     float EnvironmentIntensity = 1.f;
     float BloomIntensity = 0.05f;
@@ -40,4 +43,7 @@ struct RenderStatistics
     double TransparencyMilliseconds = 0.0;
     double PostprocessMilliseconds = 0.0;
     bool bGpuTimingsAvailable = false;
+    RenderVisualization Visualization = RenderVisualization::Lit;
+    bool bSkyRendered = false;
+    bool bSkyLightActive = false;
 };

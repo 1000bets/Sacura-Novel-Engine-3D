@@ -1,3 +1,6 @@
+#include <QComboBox>
+#include <QDoubleSpinBox>
+#include <QSignalBlocker>
 #include "Shell/EditorMainWindow.h"
 
 #include "Actions/BuiltinEditorActions.h"
@@ -295,6 +298,7 @@ void EditorMainWindow::ConfigureRenderView()
             View.BuildRenderCamera(static_cast<float>(qMax(1u, Info.Width)) / static_cast<float>(qMax(1u, Info.Height)), Camera);
             RenderSettings PreviewSettings = RenderConfiguration;
             PreviewSettings.bGroundGrid = false;
+            PreviewSettings.Visualization = RenderVisualization::Lit;
             BoundEngine.ConfigureRenderSurface(RenderSurfaceId{2}, true, Camera, PreviewSettings);
         }
     }
@@ -443,3 +447,21 @@ bool EditorMainWindow::eventFilter(QObject* Watched, QEvent* Event)
     return QMainWindow::eventFilter(Watched, Event);
 }
 
+
+void EditorMainWindow::SetViewportVisualization(RenderVisualization Mode, float DepthRange)
+{
+    RenderConfiguration.Visualization = Mode;
+    RenderConfiguration.VisualizationDepthRange = DepthRange;
+    if (ViewportVisualization)
+    {
+        const QSignalBlocker BlockVisualization(ViewportVisualization);
+        ViewportVisualization->setCurrentIndex(static_cast<int>(Mode));
+        ViewportVisualization->setToolTip(QString::fromUtf8(RenderVisualizations[static_cast<size_t>(Mode)].Description));
+    }
+    if (ViewportDepthRange)
+    {
+        const QSignalBlocker BlockRange(ViewportDepthRange);
+        ViewportDepthRange->setValue(DepthRange);
+        ViewportDepthRange->setVisible(Mode == RenderVisualization::LinearDepth);
+    }
+}

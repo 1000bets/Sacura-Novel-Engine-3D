@@ -26,15 +26,19 @@
 #include <QButtonGroup>
 #include <QSignalBlocker>
 #include <QMenu>
+#include <QMenuBar>
+#include <QAction>
+#include <QToolBar>
 #include <QVBoxLayout>
 #include <algorithm>
 #include <set>
 
 StaticMeshEditorWindow::StaticMeshEditorWindow(Engine& InRuntime, const AssetKey& Asset, QWidget* Parent)
-    : QDialog(Parent), Runtime(InRuntime), Document(Runtime.GetAssetRegistry())
+    : QMainWindow(Parent, Qt::Window), Runtime(InRuntime), Document(Runtime.GetAssetRegistry())
 {
     setObjectName("StaticMeshEditorWindow");
-    setWindowFlag(Qt::Window, true);
+    setWindowFlags(Qt::Window | Qt::WindowTitleHint | Qt::WindowSystemMenuHint
+        | Qt::WindowMinMaxButtonsHint | Qt::WindowCloseButtonHint);
     setAttribute(Qt::WA_DeleteOnClose);
     EditorUi::EditorStyle::Apply(*this);
     resize(1280, 800);
@@ -42,15 +46,44 @@ StaticMeshEditorWindow::StaticMeshEditorWindow(Engine& InRuntime, const AssetKey
     Document.Open(Asset, Error);
     static uint32_t NextView = 30000;
     ViewId = RenderViewId{NextView++};
-    auto* Layout = new QVBoxLayout(this);
-    auto* Toolbar = new QHBoxLayout();
+    auto* Content = new QWidget(this);
+    Content->setObjectName("StaticMeshEditorContent");
+    setCentralWidget(Content);
+    auto* Layout = new QVBoxLayout(Content);
+    auto* FileMenu = menuBar()->addMenu(tr("Файл"));
+    auto* EditMenu = menuBar()->addMenu(tr("Правка"));
+    auto* ViewMenu = menuBar()->addMenu(tr("Вид"));
+    auto* Toolbar = new QToolBar(tr("Документ"), this);
+    Toolbar->setObjectName("StaticMeshDocumentToolbar");
+    Toolbar->setMovable(false);
+    addToolBar(Toolbar);
     for (const auto& Action : std::vector<std::pair<QString, QString>>{
         {tr("Сохранить"), "save"}, {tr("Отменить"), "undo"}, {tr("Повторить"), "redo"}, {tr("Перечитать"), "reload"}})
     {
-        auto* Button = new QPushButton(Action.first, this);
-        Button->setAutoDefault(false);
-        Toolbar->addWidget(Button);
-        connect(Button, &QPushButton::clicked, this, [this, Operation = Action.second]()
+        auto* Command = new QAction(Action.first, this);
+        if (Action.second == "save")
+        {
+            Command->setShortcut(QKeySequence::Save);
+            FileMenu->addAction(Command);
+        }
+        else if (Action.second == "reload")
+        {
+            FileMenu->addAction(Command);
+        }
+        else
+        {
+            EditMenu->addAction(Command);
+            if (Action.second == "undo")
+            {
+                Command->setShortcut(QKeySequence::Undo);
+            }
+            else
+            {
+                Command->setShortcut(QKeySequence::Redo);
+            }
+        }
+        Toolbar->addAction(Command);
+        connect(Command, &QAction::triggered, this, [this, Operation = Action.second]()
         {
             if (Operation == "reload" && Document.IsDirty()
                 && QMessageBox::question(this, tr("Перечитать меш"), tr("Отбросить изменения?")) != QMessageBox::Yes)
@@ -62,11 +95,15 @@ StaticMeshEditorWindow::StaticMeshEditorWindow(Engine& InRuntime, const AssetKey
             Diagnostic->setText(QString::fromStdString(Error));
         });
     }
-    auto* ShowCollision = new QCheckBox(tr("Показать коллизию"), this);
+    FileMenu->addSeparator();
+    auto* CloseAction = FileMenu->addAction(tr("Закрыть"));
+    CloseAction->setShortcut(QKeySequence::Close);
+    connect(CloseAction, &QAction::triggered, this, [this]() { close(); });
+    auto* ShowCollision = ViewMenu->addAction(tr("Показать коллизию"));
+    ShowCollision->setCheckable(true);
     ShowCollision->setChecked(true);
-    Toolbar->addWidget(ShowCollision);
-    Toolbar->addStretch();
-    Layout->addLayout(Toolbar);
+    Toolbar->addSeparator();
+    Toolbar->addAction(ShowCollision);
     auto* Splitter = new QSplitter(this);
     Viewport = new EditorViewportWidget(Splitter);
     Viewport->SetViewId(ViewId);
@@ -112,6 +149,8 @@ StaticMeshEditorWindow::StaticMeshEditorWindow(Engine& InRuntime, const AssetKey
         Button->setAutoDefault(false);
         FrameToolbar->addWidget(Button);
         connect(Button, &QPushButton::clicked, this, [this, bMesh]() { FrameSelection(bMesh); });
+        auto* FrameAction = ViewMenu->addAction(Label);
+        connect(FrameAction, &QAction::triggered, this, [this, bMesh]() { FrameSelection(bMesh); });
         QKeySequence Key(Qt::Key_F);
         if (bMesh)
         {
@@ -125,7 +164,9 @@ StaticMeshEditorWindow::StaticMeshEditorWindow(Engine& InRuntime, const AssetKey
     Help->setWordWrap(true);
     FrameToolbar->addWidget(Help, 1);
     Layout->addLayout(FrameToolbar);
-    connect(ShowCollision, &QCheckBox::toggled, Viewport, &EditorViewportWidget::SetCollisionVisible);
+    ViewMenu->addSeparator();
+    ViewMenu->addAction(Toolbar->toggleViewAction());
+    connect(ShowCollision, &QAction::toggled, Viewport, &EditorViewportWidget::SetCollisionVisible);
     Viewport->setMinimumSize(320, 300);
     Tabs = new QTabWidget(Splitter);
     auto* Scroll = new QScrollArea(Tabs);
@@ -171,24 +212,6 @@ StaticMeshEditorWindow::StaticMeshEditorWindow(Engine& InRuntime, const AssetKey
     {
         const auto Info = Surface->BuildNativeWindowInfo();
         Runtime.ResizeRenderSurface(RenderSurfaceId{ViewId.Value}, Info.Width, Info.Height);
-    });
-    for (const auto& Action : std::vector<std::pair<QKeySequence, QString>>{
-        {QKeySequence::Undo, "undo"}, {QKeySequence::Redo, "redo"}})
-    {
-        auto* Shortcut = new QShortcut(Action.first, this);
-        connect(Shortcut, &QShortcut::activated, this, [this, Operation = Action.second]()
-        {
-            std::string Error;
-            Run(Operation, {}, Error);
-            Diagnostic->setText(QString::fromStdString(Error));
-        });
-    }
-    auto* SaveShortcut = new QShortcut(QKeySequence::Save, this);
-    connect(SaveShortcut, &QShortcut::activated, this, [this]()
-    {
-        std::string Error;
-        Run("save", {}, Error);
-        Diagnostic->setText(QString::fromStdString(Error));
     });
     auto* Timer = new QTimer(this);
     connect(Timer, &QTimer::timeout, this, [this]() { TickPreview(); });
@@ -609,11 +632,6 @@ void StaticMeshEditorWindow::TickPreview()
         Runtime.SetRenderSurfaceScene(Surface, PreviewScene);
         Viewport->SyncGizmoOverlay();
     }
-}
-
-void StaticMeshEditorWindow::reject()
-{
-    close();
 }
 
 void StaticMeshEditorWindow::closeEvent(QCloseEvent* Event)

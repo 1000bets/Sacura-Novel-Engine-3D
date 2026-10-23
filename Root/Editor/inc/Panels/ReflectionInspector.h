@@ -7,10 +7,12 @@
 
 #include <QWidget>
 #include <functional>
+#include <memory>
 #include <vector>
 #include <unordered_map>
 
 class Object;
+class EditorCommand;
 class AssetRegistry;
 class QFormLayout;
 class QLabel;
@@ -42,6 +44,9 @@ public:
     using OverrideMarkerProvider = std::function<bool(Object*, const PropertyId&)>;
     void SetOverrideMarkerProvider(OverrideMarkerProvider Provider) { OverrideMarker = std::move(Provider); }
     void SetTypeLabelVisible(bool bVisible);
+    using CommandExecutor = std::function<bool(std::unique_ptr<EditorCommand>)>;
+    void SetCommandExecutor(CommandExecutor Executor) { ExecuteMeshCommand = std::move(Executor); }
+    void SetMeshOpenCallback(std::function<void(const AssetKey&)> Callback) { OpenMesh = std::move(Callback); }
     void SetMeshPresentation(bool Enabled) { if (bMeshPresentation != Enabled) { bMeshPresentation = Enabled; Rebuild(); } }
 
     void Rebuild();
@@ -52,12 +57,15 @@ public:
     static std::vector<const PropertyDescriptor*> ListEditableProperties(Object* Instance);
 
 signals:
+    void AssetFocusRequested(QString AssetIdentifier, QString SubAssetIdentifier);
     void PropertyChanged();
 
 private:
     void ClearPropertyEditors();
     void AddPropertyEditor(const PropertyDescriptor& Descriptor);
     bool BuildMeshPresentation();
+    std::string GetMeshPresentationState() const;
+    void QueueMeshCommand(std::unique_ptr<EditorCommand> Command, QString Error);
     void ApplyBoolValue(const PropertyId& Property, bool Value);
     void ApplyFloatValue(const PropertyId& Property, double Value);
     void ApplyStringValue(const PropertyId& Property, const QString& Value);
@@ -83,6 +91,8 @@ private:
     QFormLayout* PropertiesLayout = nullptr;
     QVBoxLayout* RootLayout = nullptr;
     bool bMeshPresentation = false;
-    bool bMeshDetailsExpanded = false;
-    int SelectedMaterialSlot = -1;
+    CommandExecutor ExecuteMeshCommand;
+    std::function<void(const AssetKey&)> OpenMesh;
+    std::string MeshPresentationState;
+    QString MeshPresentationError;
 };

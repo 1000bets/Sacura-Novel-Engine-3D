@@ -22,6 +22,7 @@ public:
     void ClearComponentOverview();
     void RemoveComponentSection(const QString& Identity);
     void MoveComponentSection(const QString& Identity, int Index);
+    void ApplyComponentFilter();
     void SetIdentity(const QString& Caption, const QString& Kind, bool Active);
     QLineEdit* Name = nullptr;
     QCheckBox* Active = nullptr;

@@ -6,6 +6,8 @@
 #include <QPointer>
 #include <QScrollArea>
 #include <QScrollBar>
+#include <QTimer>
+#include <QVariant>
 #include <QWidget>
 
 namespace EditorUi
@@ -25,6 +27,11 @@ public:
                 PaintRoot = Area;
                 ScrollPosition = Area->verticalScrollBar()->value();
                 HorizontalPosition = Area->horizontalScrollBar()->value();
+                if (Area->property("inspectorScrollPending").toBool())
+                {
+                    ScrollPosition = Area->property("inspectorScrollVertical").toInt();
+                    HorizontalPosition = Area->property("inspectorScrollHorizontal").toInt();
+                }
                 break;
             }
         }
@@ -45,6 +52,26 @@ public:
             QApplication::sendEvent(Scroll, &LayoutRequest);
             Scroll->verticalScrollBar()->setValue(ScrollPosition);
             Scroll->horizontalScrollBar()->setValue(HorizontalPosition);
+            const auto Revision = Scroll->property("inspectorScrollRevision").toULongLong() + 1;
+            Scroll->setProperty("inspectorScrollRevision", QVariant::fromValue(Revision));
+            Scroll->setProperty("inspectorScrollPending", true);
+            Scroll->setProperty("inspectorScrollVertical", ScrollPosition);
+            Scroll->setProperty("inspectorScrollHorizontal", HorizontalPosition);
+            QTimer::singleShot(0, Scroll.data(), [Area = Scroll, Revision,
+                VerticalPosition = ScrollPosition, HorizontalPosition = HorizontalPosition]()
+            {
+                if (!Area || Area->property("inspectorScrollRevision").toULongLong() != Revision)
+                {
+                    return;
+                }
+                Area->setProperty("inspectorScrollPending", false);
+                if (Area->verticalScrollBar()->isSliderDown() || Area->horizontalScrollBar()->isSliderDown())
+                {
+                    return;
+                }
+                Area->verticalScrollBar()->setValue(VerticalPosition);
+                Area->horizontalScrollBar()->setValue(HorizontalPosition);
+            });
         }
         if (WasUpdating && PaintRoot) { PaintRoot->setUpdatesEnabled(true); }
     }

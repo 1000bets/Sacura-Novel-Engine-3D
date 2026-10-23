@@ -726,6 +726,7 @@ void PrefabEditorWindow::RebuildComponentInspectors()
 
             auto* Inspector = new ReflectionInspector(Card);
             Inspector->SetAssetRegistry(&BoundEngine.GetAssetRegistry());
+            connect(Inspector, &ReflectionInspector::AssetFocusRequested, this, &PrefabEditorWindow::AssetFocusRequested);
             Inspector->SetTypeLabelVisible(false);
             Inspector->SetOverrideMarkerProvider([this](Object* Instance, const PropertyId& Property)
             {

@@ -593,41 +593,67 @@ public:
     const char* GetDisplayName() const override { return "Remove Component"; }
 };
 
-class SetPropertyCommand : public EditorCommand
+Object* ResolvePropertyTarget(Scene* TargetScene, ObjectHandle Target, std::string& TargetPersistentId)
 {
-public:
-    Scene* TargetScene = nullptr;
-    ObjectHandle Target;
-    PropertyId Property;
-    ReflectedValue OldValue;
-    ReflectedValue NewValue;
-    bool bCapturedOld = false;
-
-    Object* ResolveTargetObject() const
+    if (TargetScene == nullptr)
     {
-        if (TargetScene == nullptr)
+        return nullptr;
+    }
+    if (GameObject* ObjectInstance = ResolveObject(TargetScene, Target))
+    {
+        TargetPersistentId = ObjectInstance->GetPersistentId();
+        return ObjectInstance;
+    }
+    for (GameObject* ObjectInstance : TargetScene->GetAllObjects())
+    {
+        if (ObjectInstance == nullptr)
         {
-            return nullptr;
+            continue;
         }
-        if (GameObject* ObjectInstance = ResolveObject(TargetScene, Target))
+        for (Component* ComponentInstance : ObjectInstance->GetAllComponents())
         {
-            return ObjectInstance;
+            if (ComponentInstance != nullptr && ComponentInstance->GetObjectHandle() == Target)
+            {
+                TargetPersistentId = ComponentInstance->GetPersistentId();
+                return ComponentInstance;
+            }
         }
+    }
+    if (!TargetPersistentId.empty())
+    {
         for (GameObject* ObjectInstance : TargetScene->GetAllObjects())
         {
-            if (ObjectInstance == nullptr)
+            if (ObjectInstance->GetPersistentId() == TargetPersistentId)
             {
-                continue;
+                return ObjectInstance;
             }
             for (Component* ComponentInstance : ObjectInstance->GetAllComponents())
             {
-                if (ComponentInstance != nullptr && ComponentInstance->GetObjectHandle() == Target)
+                if (ComponentInstance->GetPersistentId() == TargetPersistentId)
                 {
                     return ComponentInstance;
                 }
             }
         }
-        return nullptr;
+    }
+    return nullptr;
+}
+
+
+class SetPropertyCommand : public EditorCommand
+{
+public:
+    Scene* TargetScene = nullptr;
+    ObjectHandle Target;
+    std::string TargetPersistentId;
+    PropertyId Property;
+    ReflectedValue OldValue;
+    ReflectedValue NewValue;
+    bool bCapturedOld = false;
+
+    Object* ResolveTargetObject()
+    {
+        return ResolvePropertyTarget(TargetScene, Target, TargetPersistentId);
     }
 
     bool Do() override
@@ -682,35 +708,14 @@ class ResetPropertyCommand : public EditorCommand
 public:
     Scene* TargetScene = nullptr;
     ObjectHandle Target;
+    std::string TargetPersistentId;
     PropertyId Property;
     ReflectedValue OldValue;
     bool bCapturedOld = false;
 
-    Object* ResolveTargetObject() const
+    Object* ResolveTargetObject()
     {
-        if (TargetScene == nullptr)
-        {
-            return nullptr;
-        }
-        if (GameObject* ObjectInstance = ResolveObject(TargetScene, Target))
-        {
-            return ObjectInstance;
-        }
-        for (GameObject* ObjectInstance : TargetScene->GetAllObjects())
-        {
-            if (ObjectInstance == nullptr)
-            {
-                continue;
-            }
-            for (Component* ComponentInstance : ObjectInstance->GetAllComponents())
-            {
-                if (ComponentInstance != nullptr && ComponentInstance->GetObjectHandle() == Target)
-                {
-                    return ComponentInstance;
-                }
-            }
-        }
-        return nullptr;
+        return ResolvePropertyTarget(TargetScene, Target, TargetPersistentId);
     }
 
     bool Do() override

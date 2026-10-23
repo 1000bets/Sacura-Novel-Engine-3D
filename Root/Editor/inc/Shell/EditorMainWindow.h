@@ -210,6 +210,7 @@ private:
     bool LaunchEditorProcessForProject(const std::filesystem::path& ProjectFile);
     void EnsurePresenting(RenderViewportWidget* Viewport);
     void ConfigureRenderView();
+    void SetViewportVisualization(RenderVisualization Mode, float DepthRange);
     bool ExecuteCommand(std::unique_ptr<EditorCommand> Command);
     Scene* GetEditScene() const;
     Scene* GetHierarchyScene() const;
@@ -279,6 +280,8 @@ private:
     QDoubleSpinBox* ScaleXSpin = nullptr;
     QDoubleSpinBox* ScaleYSpin = nullptr;
     QDoubleSpinBox* ScaleZSpin = nullptr;
+    QComboBox* ViewportVisualization = nullptr;
+    QDoubleSpinBox* ViewportDepthRange = nullptr;
     QComboBox* ComponentCombo = nullptr;
     QVBoxLayout* ComponentInspectorLayout = nullptr;
     std::vector<ReflectionInspector*> ComponentInspectors;

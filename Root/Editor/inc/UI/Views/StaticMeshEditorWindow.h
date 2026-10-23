@@ -1,7 +1,7 @@
 #pragma once
 #include "Documents/StaticMeshDocument.h"
 #include "Rendering/RenderView.h"
-#include <QDialog>
+#include <QMainWindow>
 #include "Core/Transform.h"
 #include "Physics/PhysicsTypes.h"
 #include <optional>
@@ -16,14 +16,13 @@ class QLabel;
 class QListWidget;
 class QTabWidget;
 
-class StaticMeshEditorWindow : public QDialog
+class StaticMeshEditorWindow : public QMainWindow
 {
 public:
     StaticMeshEditorWindow(Engine& Runtime, const AssetKey& Asset, QWidget* Parent);
     ~StaticMeshEditorWindow() override;
     StaticMeshDocument& GetDocument() { return Document; }
     bool Run(const QString& Operation, const nlohmann::json& Value, std::string& Error);
-    void reject() override;
 protected:
     void closeEvent(QCloseEvent* Event) override;
 private:

@@ -230,11 +230,9 @@ float4 ShadeSurface(VertexOutput Input, bool FrontFace)
     float4 Surface = float4(MaterialSurface.Albedo, MaterialSurface.Opacity);
     float3 Normal = normalize(MaterialSurface.Normal);
     float Metallic = saturate(MaterialSurface.Metalness);
-    float Roughness = clamp(MaterialSurface.RoughnessValue, 0.045, 1.0);
+    float MaterialRoughness = saturate(MaterialSurface.RoughnessValue);
+    float Roughness = clamp(MaterialRoughness, 0.045, 1.0);
     float3 Result = MaterialSurface.Emission;
-#if SAKURA_SHADING_MODEL == 1
-    return float4(max(Surface.rgb + Result, 0.0), saturate(Surface.a));
-#endif
 #else
     float4 Surface = ReadColor(Input);
     float3 Normal = normalize(Input.Normal);
@@ -243,8 +241,45 @@ float4 ShadeSurface(VertexOutput Input, bool FrontFace)
         Normal = -Normal;
     }
     float Metallic = saturate(SurfaceParameters.x);
-    float Roughness = clamp(SurfaceParameters.y, 0.045, 1.0);
+    float MaterialRoughness = saturate(SurfaceParameters.y);
+    float Roughness = clamp(MaterialRoughness, 0.045, 1.0);
     float3 Result = EmissiveAlphaMode.xyz;
+#endif
+    uint Visualization = (uint)OutputParameters.z;
+    if (Visualization == 1)
+    {
+        return float4(Surface.rgb, Surface.a);
+    }
+    if (Visualization == 2)
+    {
+        return float4(Normal * 0.5 + 0.5, Surface.a);
+    }
+    if (Visualization == 3)
+    {
+        return float4(MaterialRoughness.xxx, Surface.a);
+    }
+    if (Visualization == 4)
+    {
+        return float4(Metallic.xxx, Surface.a);
+    }
+    if (Visualization == 5)
+    {
+        float Occlusion = 1.0;
+#ifdef SAKURA_CUSTOM_MATERIAL
+        Occlusion = saturate(MaterialSurface.Occlusion);
+#endif
+        return float4(Occlusion.xxx, Surface.a);
+    }
+    if (Visualization == 6)
+    {
+        return float4(Result, Surface.a);
+    }
+    if (Visualization == 12)
+    {
+        return float4(Surface.aaa, Surface.a);
+    }
+#if defined(SAKURA_CUSTOM_MATERIAL) && SAKURA_SHADING_MODEL == 1
+    return float4(max(Surface.rgb + Result, 0.0), saturate(Surface.a));
 #endif
     float3 ViewDirection = normalize(CameraPosition.xyz - Input.WorldPosition);
     float3 Reflectance = lerp(0.04, Surface.rgb, Metallic);

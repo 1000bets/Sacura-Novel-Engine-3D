@@ -10,6 +10,7 @@
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSignalBlocker>
+#include <QStringList>
 #include <QToolButton>
 #include <QVBoxLayout>
 
@@ -55,21 +56,49 @@ void ObjectInspectorView::AddComponentSection(const QString& Identity, const QSt
         Toggle->setIcon(MakeStudioIcon(Open ? StudioIcon::ChevronDown : StudioIcon::ChevronRight));
     });
     Components->addWidget(Card);
-    auto* Row = new QPushButton(MakeStudioIcon(StudioIcon::ChevronRight), ComponentCaption(Type), this);
+    auto* Row = new QPushButton(MakeFrontendIcon("Pin", "--text-secondary", "--accent"), ComponentCaption(Type), this);
+    Row->setCheckable(true);
+    Row->setIconSize(QSize(16, 16));
+    Row->setAccessibleName(tr("Фильтр компонента: %1").arg(ComponentCaption(Type)));
     Row->setProperty("uiRole", "componentInstance");
     Row->setProperty("componentIdentity", Identity);
     Row->setProperty("searchText", ComponentCaption(Type) + " " + Type);
-    Row->setToolTip(Type);
+    Row->setToolTip(tr("Показать только отмеченные компоненты. Снимите все отметки, чтобы показать все."));
     Row->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     Row->setMinimumWidth(0);
     Row->setVisible(Row->property("searchText").toString().contains(ComponentSearch->text(), Qt::CaseInsensitive));
-    connect(Row, &QPushButton::clicked, Card, [this, Card, Toggle]() {
-        Toggle->setChecked(true);
-        Scroll->ensureWidgetVisible(Card, 0, 16);
+    connect(Row, &QPushButton::toggled, Card, [this, Toggle](bool bSelected) {
+        if (bSelected)
+        {
+            Toggle->setChecked(true);
+        }
+        ApplyComponentFilter();
     });
     ComponentRows->addWidget(Row);
     ComponentCount->setText(QString::number(ComponentRows->count()));
     EmptyComponents->hide();
+}
+
+void ObjectInspectorView::ApplyComponentFilter()
+{
+    QStringList SelectedComponents;
+    for (int Index = 0; Index < ComponentRows->count(); ++Index)
+    {
+        auto* Row = qobject_cast<QPushButton*>(ComponentRows->itemAt(Index)->widget());
+        if (Row && Row->isChecked())
+        {
+            SelectedComponents.push_back(Row->property("componentIdentity").toString());
+        }
+    }
+    for (int Index = 0; Index < Components->count(); ++Index)
+    {
+        auto* Card = Components->itemAt(Index)->widget();
+        if (Card)
+        {
+            Card->setVisible(SelectedComponents.isEmpty()
+                || SelectedComponents.contains(Card->property("componentIdentity").toString()));
+        }
+    }
 }
 
 void ObjectInspectorView::ClearComponentOverview()

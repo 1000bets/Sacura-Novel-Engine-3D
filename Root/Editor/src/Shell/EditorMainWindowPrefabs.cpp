@@ -20,7 +20,14 @@ void EditorMainWindow::OpenPrefabEditor(const AssetId& Prefab)
     {
         if (Window->GetPrefab() == Prefab)
         {
-            Window->show();
+            connect(Window, &PrefabEditorWindow::AssetFocusRequested, this,
+        [this](const QString& AssetIdentifier, const QString& SubAssetIdentifier)
+    {
+        Toolset->Call("asset_focus", {{"assetId", AssetIdentifier}, {"subAssetId", SubAssetIdentifier}});
+        raise();
+        activateWindow();
+    });
+    Window->show();
             Window->raise();
             Window->activateWindow();
             return;

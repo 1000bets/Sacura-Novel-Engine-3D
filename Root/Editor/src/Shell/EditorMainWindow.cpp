@@ -134,9 +134,9 @@ EditorMainWindow::EditorMainWindow(Engine& InEngine, ProjectSession& InSession, 
 
 EditorMainWindow::~EditorMainWindow()
 {
-    for (QDialog* Dialog : findChildren<QDialog*>())
+    for (QMainWindow* AssetWindow : findChildren<QMainWindow*>())
     {
-        if (auto* MeshWindow = dynamic_cast<StaticMeshEditorWindow*>(Dialog))
+        if (auto* MeshWindow = dynamic_cast<StaticMeshEditorWindow*>(AssetWindow))
         {
             delete MeshWindow;
         }

@@ -103,3 +103,26 @@ float4 PreviewAntialiasMain(FullscreenOutput Input) : SV_TARGET
     float3 High = 1.055 * pow(Linear, 1.0 / 2.4) - 0.055;
     return float4(lerp(High, Low, step(Linear, float3(0.0031308, 0.0031308, 0.0031308))), 1.0);
 }
+
+float4 VisualizationMain(FullscreenOutput Input) : SV_TARGET
+{
+    uint Mode = (uint)Resolution.w;
+    float3 Color = SceneImage.SampleLevel(SceneImage_sampler, Input.Coordinates, 0).rgb;
+    if (Mode == 7)
+    {
+        float Depth = Color.r;
+        float Distance = Parameters.x * Parameters.y / max(Parameters.y - Depth * (Parameters.y - Parameters.x), 0.000001);
+        float Linear = saturate(Distance / max(Parameters.z, 0.001));
+        return float4(Linear.xxx, 1.0);
+    }
+    if (Mode == 8 || Mode == 10)
+    {
+        Color = max(Color, 0.0);
+        Color /= 1.0 + Color;
+    }
+    if (Mode == 9 || Mode == 11)
+    {
+        Color = Color.rrr;
+    }
+    return float4(saturate(Color), 1.0);
+}

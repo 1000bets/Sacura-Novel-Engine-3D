@@ -300,6 +300,10 @@ void ReflectionInspector::RefreshValues()
         }
     }
     Changed = Changed || Current.size() != DisplayedValues.size();
+    if (bMeshPresentation && MeshPresentationState != GetMeshPresentationState())
+    {
+        Changed = true;
+    }
     if (!Changed) { return; }
     if (bMeshPresentation) { Rebuild(); return; }
     const EditorUi::InspectorUpdateGuard Guard(this);
@@ -667,6 +671,25 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
             if (Index >= 0 && Index < static_cast<int>(Keys.size())) { ApplyAssetValue(Descriptor, Keys[Index]); }
         });
         FieldLayout->addWidget(Picker, 1);
+        auto* FocusAsset = new QPushButton(FieldWidget);
+        FocusAsset->setObjectName("AssetFocus_" + QString::fromStdString(Descriptor.Id.Value));
+        FocusAsset->setProperty("uiRole", "propertyReset");
+        FocusAsset->setIcon(EditorUi::MakeFrontendIcon("Search"));
+        FocusAsset->setFixedSize(24, 24);
+        FocusAsset->setToolTip(tr("Найти в Проводнике"));
+        FocusAsset->setAccessibleName(tr("Найти в Проводнике: %1").arg(Label));
+        AssetRegistryEntry FocusEntry;
+        FocusAsset->setEnabled(Registry != nullptr && Registry->TryResolveKey(CurrentKey, FocusEntry));
+        connect(FocusAsset, &QPushButton::clicked, this, [this, CurrentKey]()
+        {
+            QString SubAssetIdentifier;
+            if (CurrentKey.HasSubAsset())
+            {
+                SubAssetIdentifier = QString::fromStdString(CurrentKey.SubAsset->ToString());
+            }
+            emit AssetFocusRequested(QString::fromStdString(CurrentKey.Asset.ToString()), SubAssetIdentifier);
+        });
+        FieldLayout->addWidget(FocusAsset);
     }
     else if (Descriptor.ValueTypeId.Value == "engine.bool")
     {

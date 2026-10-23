@@ -73,6 +73,10 @@ void SceneExtractor::Extract(const Scene& SourceScene, RenderScene& Output) cons
     std::string LightIdentifier;
     for (GameObject* Object : SourceScene.GetAllObjects())
     {
+        if (Object->GetComponent<SkySphereComponent>() || Object->GetComponent<SkyLightComponent>())
+        {
+            Output.Sky.bAuthored = true;
+        }
         if (!Object->IsActiveInHierarchy())
         {
             continue;
@@ -87,7 +91,7 @@ void SceneExtractor::Extract(const Scene& SourceScene, RenderScene& Output) cons
             Output.Sky.Zenith = Vector3(Sky->ZenithColor.x, Sky->ZenithColor.y, Sky->ZenithColor.z);
             Output.Sky.Horizon = Vector3(Sky->HorizonColor.x, Sky->HorizonColor.y, Sky->HorizonColor.z);
             Output.Sky.Ground = Vector3(Sky->GroundColor.x, Sky->GroundColor.y, Sky->GroundColor.z);
-            Output.Sky.SunColor = Vector3(Sky->SunColor.x, Sky->SunColor.y, Sky->SunColor.z);
+            Output.Sky.SunColor = Vector3(Sky->SunColor.x, Sky->SunColor.y, Sky->SunColor.z) * std::max(0.f, Sky->SunIntensity);
             Output.Sky.SunDirection = Object->GetWorldUp();
             Output.Sky.Brightness = std::max(0.f, Sky->Brightness);
         }

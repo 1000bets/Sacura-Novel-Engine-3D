@@ -1,3 +1,4 @@
+#include "Automation/EditorToolset.h"
 #include "Prefab/PrefabOverridesPanel.h"
 #include "Shell/EditorMainWindow.h"
 #include "UI/Styles/StudioIcons.h"
@@ -257,6 +258,20 @@ GameObject* EditorMainWindow::GetSelectedGameObject() const
 void EditorMainWindow::ConfigureComponentInspector(ReflectionInspector* ComponentInspector)
 {
     ComponentInspector->SetAssetRegistry(&BoundEngine.GetAssetRegistry());
+    connect(ComponentInspector, &ReflectionInspector::AssetFocusRequested, this,
+        [this](const QString& AssetIdentifier, const QString& SubAssetIdentifier)
+    {
+        Toolset->Call("asset_focus", {{"assetId", AssetIdentifier}, {"subAssetId", SubAssetIdentifier}});
+    });
+    ComponentInspector->SetCommandExecutor([this](std::unique_ptr<EditorCommand> Command)
+    {
+        if (bPlayRequested)
+        {
+            return false;
+        }
+        return ExecuteCommand(std::move(Command));
+    });
+    ComponentInspector->SetMeshOpenCallback([this](const AssetKey& Key) { OpenStaticMeshEditor(Key); });
     ComponentInspector->SetTypeLabelVisible(false);
     ComponentInspector->SetPropertyCommitCallback([this](
         Object* Instance,
@@ -790,17 +805,6 @@ void EditorMainWindow::OnComponentFilterChanged(int Index)
     }
 
     ComponentFilter = ComponentCombo->itemData(Index).toString();
-    for (ReflectionInspector* ComponentInspector : ComponentInspectors)
-    {
-        if (ComponentInspector == nullptr || ComponentInspector->GetInspectedObject() == nullptr)
-        {
-            continue;
-        }
-        Object* ComponentInstance = ComponentInspector->GetInspectedObject();
-        const QString ComponentType = ComponentInstance->GetClass() != nullptr
-            ? QString::fromStdString(ComponentInstance->GetClass()->GetTypeId().Value)
-            : QString::fromStdString(ComponentInstance->GetName());
-        ComponentInspector->parentWidget()->setVisible(ComponentFilter.isEmpty() || ComponentFilter == ComponentType);
-    }
+    static_cast<EditorUi::ObjectInspectorView*>(ObjectInspectorContent)->ApplyComponentFilter();
 }
 

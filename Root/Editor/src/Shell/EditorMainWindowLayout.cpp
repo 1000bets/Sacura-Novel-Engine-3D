@@ -381,6 +381,40 @@ void EditorMainWindow::BuildUi()
     auto* ViewportHeaderLayout = new QHBoxLayout(ViewportHeader);
     ViewportHeaderLayout->setContentsMargins(4, 3, 8, 3);
     ViewportHeaderLayout->setSpacing(2);
+    auto* VisualizationLabel = new QLabel(tr("Вид:"), ViewportHeader);
+    ViewportHeaderLayout->addWidget(VisualizationLabel);
+    ViewportVisualization = new QComboBox(ViewportHeader);
+    ViewportVisualization->setObjectName("ViewportVisualization");
+    ViewportVisualization->setMinimumWidth(155);
+    ViewportVisualization->setMaximumWidth(235);
+    ViewportVisualization->setAccessibleName(tr("Визуализация буферов и материалов"));
+    for (const auto& Descriptor : RenderVisualizations)
+    {
+        ViewportVisualization->addItem(QString::fromUtf8(Descriptor.Label), static_cast<int>(Descriptor.Mode));
+        ViewportVisualization->setItemData(ViewportVisualization->count() - 1, QString::fromUtf8(Descriptor.Description), Qt::ToolTipRole);
+    }
+    ViewportHeaderLayout->addWidget(ViewportVisualization);
+    ViewportDepthRange = new QDoubleSpinBox(ViewportHeader);
+    ViewportDepthRange->setObjectName("ViewportDepthRange");
+    ViewportDepthRange->setRange(0.01, 100000.0);
+    ViewportDepthRange->setValue(RenderConfiguration.VisualizationDepthRange);
+    ViewportDepthRange->setSuffix(tr(" м"));
+    ViewportDepthRange->setToolTip(tr("Дальность, соответствующая белому цвету в режиме глубины"));
+    ViewportDepthRange->setKeyboardTracking(false);
+    ViewportDepthRange->setMaximumWidth(100);
+    ViewportDepthRange->hide();
+    ViewportHeaderLayout->addWidget(ViewportDepthRange);
+    connect(ViewportVisualization, &QComboBox::currentIndexChanged, this, [this](int Index)
+    {
+        SetViewportVisualization(static_cast<RenderVisualization>(ViewportVisualization->itemData(Index).toInt()),
+            static_cast<float>(ViewportDepthRange->value()));
+    });
+    connect(ViewportDepthRange, &QDoubleSpinBox::valueChanged, this, [this](double Value)
+    {
+        SetViewportVisualization(RenderConfiguration.Visualization, static_cast<float>(Value));
+    });
+    SetViewportVisualization(RenderConfiguration.Visualization, RenderConfiguration.VisualizationDepthRange);
+    ViewportHeaderLayout->addSpacing(6);
     GizmoModeButtons = new QButtonGroup(ViewportHeader);
     GizmoModeButtons->setExclusive(true);
     auto MakeGizmoModeButton = [&](EditorUi::StudioIcon Icon, const char* Name, const QString& ToolTip,

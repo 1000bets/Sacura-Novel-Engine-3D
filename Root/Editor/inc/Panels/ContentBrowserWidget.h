@@ -36,6 +36,7 @@ public:
     void SetEngine(Engine* EngineInstance);
     void SetProjectContext(ProjectSession* Session, SceneDocument* Document);
     void Refresh();
+    bool FocusAsset(const AssetKey& Key);
     bool CopySelectionToClipboard();
     bool PasteFromClipboard();
 
