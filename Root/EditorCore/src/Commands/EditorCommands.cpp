@@ -12,16 +12,42 @@
 
 namespace
 {
-GameObject* ResolveObject(Scene* TargetScene, ObjectHandle Target)
+// Undo deserializes objects with the same persistent identity and a new generation.
+// Keep the checked handle for the fast path, and resolve restored instances only
+// inside this command's scene. Never retain an Object pointer across commands.
+struct CommandIdentity
+{
+    ObjectHandle Handle;
+    std::string PersistentId;
+    CommandIdentity& operator=(ObjectHandle Value)
+    {
+        Handle = Value;
+        PersistentId.clear();
+        if (auto* Memory = MemorySubsystem::Get())
+            if (auto* Instance = Memory->ResolveHandle(Value))
+                PersistentId = Instance->GetPersistentId();
+        return *this;
+    }
+    operator ObjectHandle() const { return Handle; }
+    bool IsValid() const { return Handle.IsValid() || !PersistentId.empty(); }
+    bool Matches(const Object* Instance) const
+    {
+        return Instance && (Instance->GetObjectHandle() == Handle ||
+            (!PersistentId.empty() && Instance->GetPersistentId() == PersistentId));
+    }
+};
+
+GameObject* ResolveObject(Scene* TargetScene, const CommandIdentity& Target)
 {
     if (TargetScene == nullptr || !Target.IsValid())
     {
         return nullptr;
     }
-    return TargetScene->FindByHandle(Target);
+    if (auto* Instance = TargetScene->FindByHandle(Target.Handle)) return Instance;
+    return Target.PersistentId.empty() ? nullptr : TargetScene->FindByPersistentId(Target.PersistentId);
 }
 
-Component* ResolveComponent(Scene* TargetScene, ObjectHandle Owner, ObjectHandle ComponentTarget)
+Component* ResolveComponent(Scene* TargetScene, const CommandIdentity& Owner, const CommandIdentity& ComponentTarget)
 {
     GameObject* OwnerObject = ResolveObject(TargetScene, Owner);
     if (OwnerObject == nullptr || !ComponentTarget.IsValid())
@@ -30,7 +56,7 @@ Component* ResolveComponent(Scene* TargetScene, ObjectHandle Owner, ObjectHandle
     }
     for (Component* ComponentInstance : OwnerObject->GetAllComponents())
     {
-        if (ComponentInstance != nullptr && ComponentInstance->GetObjectHandle() == ComponentTarget)
+        if (ComponentTarget.Matches(ComponentInstance))
         {
             return ComponentInstance;
         }
@@ -42,7 +68,7 @@ class RenameObjectCommand : public EditorCommand
 {
 public:
     Scene* TargetScene = nullptr;
-    ObjectHandle Target;
+    CommandIdentity Target;
     std::string OldName;
     std::string NewName;
 
@@ -79,7 +105,7 @@ class SetTransformCommand : public EditorCommand
 {
 public:
     Scene* TargetScene = nullptr;
-    ObjectHandle Target;
+    CommandIdentity Target;
     Transform OldTransform;
     Transform NewTransform;
     bool bCapturedOld = false;
@@ -119,7 +145,7 @@ class SetObjectActiveCommand final : public EditorCommand
 {
 public:
     Scene* TargetScene = nullptr;
-    ObjectHandle Target;
+    CommandIdentity Target;
     bool NewActive = true;
     bool OldActive = true;
     bool bCapturedOld = false;
@@ -147,10 +173,10 @@ class CreateObjectCommand : public EditorCommand
 public:
     Scene* TargetScene = nullptr;
     std::string Name;
-    ObjectHandle Parent;
-    ObjectHandle Created;
+    CommandIdentity Parent;
+    CommandIdentity Created;
     std::string CapturedSubtree;
-    ObjectHandle CapturedParent;
+    CommandIdentity CapturedParent;
     ObjectHandle* OutCreated = nullptr;
 
     bool Do() override
@@ -241,8 +267,8 @@ class PasteSubtreeCommand : public EditorCommand
 {
 public:
     Scene* TargetScene = nullptr;
-    ObjectHandle Parent;
-    ObjectHandle Created;
+    CommandIdentity Parent;
+    CommandIdentity Created;
     std::string CapturedSubtree;
     ObjectHandle* OutCreated = nullptr;
 
@@ -311,10 +337,10 @@ class DeleteObjectCommand : public EditorCommand
 {
 public:
     Scene* TargetScene = nullptr;
-    ObjectHandle Target;
-    ObjectHandle Parent;
+    CommandIdentity Target;
+    CommandIdentity Parent;
     std::string CapturedSubtree;
-    ObjectHandle RestoredRoot;
+    CommandIdentity RestoredRoot;
 
     bool Do() override
     {
@@ -383,9 +409,9 @@ class ReparentObjectCommand : public EditorCommand
 {
 public:
     Scene* TargetScene = nullptr;
-    ObjectHandle Target;
-    ObjectHandle OldParent;
-    ObjectHandle NewParent;
+    CommandIdentity Target;
+    CommandIdentity OldParent;
+    CommandIdentity NewParent;
     bool bCapturedOld = false;
 
     bool Do() override
@@ -435,9 +461,9 @@ class AddComponentCommand : public EditorCommand
 {
 public:
     Scene* TargetScene = nullptr;
-    ObjectHandle Owner;
+    CommandIdentity Owner;
     TypeId ComponentType;
-    ObjectHandle CreatedComponent;
+    CommandIdentity CreatedComponent;
     std::string CapturedComponent;
     ObjectHandle* OutCreatedComponent = nullptr;
 
@@ -537,10 +563,10 @@ class RemoveComponentCommand : public EditorCommand
 {
 public:
     Scene* TargetScene = nullptr;
-    ObjectHandle Owner;
-    ObjectHandle ComponentTarget;
+    CommandIdentity Owner;
+    CommandIdentity ComponentTarget;
     std::string CapturedComponent;
-    ObjectHandle RestoredComponent;
+    CommandIdentity RestoredComponent;
 
     bool Do() override
     {
@@ -597,7 +623,7 @@ class SetPropertyCommand : public EditorCommand
 {
 public:
     Scene* TargetScene = nullptr;
-    ObjectHandle Target;
+    CommandIdentity Target;
     PropertyId Property;
     ReflectedValue OldValue;
     ReflectedValue NewValue;
@@ -621,7 +647,7 @@ public:
             }
             for (Component* ComponentInstance : ObjectInstance->GetAllComponents())
             {
-                if (ComponentInstance != nullptr && ComponentInstance->GetObjectHandle() == Target)
+                if (Target.Matches(ComponentInstance))
                 {
                     return ComponentInstance;
                 }
@@ -681,7 +707,7 @@ class ResetPropertyCommand : public EditorCommand
 {
 public:
     Scene* TargetScene = nullptr;
-    ObjectHandle Target;
+    CommandIdentity Target;
     PropertyId Property;
     ReflectedValue OldValue;
     bool bCapturedOld = false;
@@ -704,7 +730,7 @@ public:
             }
             for (Component* ComponentInstance : ObjectInstance->GetAllComponents())
             {
-                if (ComponentInstance != nullptr && ComponentInstance->GetObjectHandle() == Target)
+                if (Target.Matches(ComponentInstance))
                 {
                     return ComponentInstance;
                 }

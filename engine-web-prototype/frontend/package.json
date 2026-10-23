@@ -28,6 +28,7 @@
     "quickjs-emscripten-core": "^0.32.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "sacura-desktop-experiment": "file:../../desktop-electron",
     "three": "^0.180.0"
   },
   "devDependencies": {

@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "methods": {
+    "bridge.describe": {},
+    "scene.open": {
+      "path": "string",
+      "discard?": "boolean"
+    },
+    "scene.save": {
+      "path?": "string"
+    },
+    "scene.getHierarchy": {},
+    "object.create": {
+      "name": "string",
+      "parentId?": "nullableId"
+    },
+    "object.destroy": {
+      "objectId": "id"
+    },
+    "object.rename": {
+      "objectId": "id",
+      "name": "string"
+    },
+    "object.setParent": {
+      "objectId": "id",
+      "parentId": "nullableId"
+    },
+    "object.getComponents": {
+      "objectId": "id"
+    },
+    "object.addComponent": {
+      "objectId": "id",
+      "typeId": "id"
+    },
+    "object.removeComponent": {
+      "objectId": "id",
+      "componentId": "id"
+    },
+    "component.getProperties": {
+      "objectId": "id",
+      "componentId": "id"
+    },
+    "component.setProperty": {
+      "objectId": "id",
+      "componentId": "id",
+      "property": "id",
+      "value": "json"
+    },
+    "transform.get": {
+      "objectId": "id"
+    },
+    "transform.set": {
+      "objectId": "id",
+      "transform": "transform"
+    },
+    "selection.set": {
+      "objectId": "nullableId"
+    },
+    "editor.undo": {},
+    "editor.redo": {},
+    "play.start": {},
+    "play.pause": {},
+    "play.stop": {},
+    "reflection.getComponentTypes": {},
+    "assets.getScenes": {},
+    "play.step": {},
+    "assets.list": {},
+    "assets.refresh": {},
+    "assets.resolve": {
+      "assetId": "id"
+    },
+    "assets.import": {
+      "sourcePath": "string",
+      "destination": "string"
+    },
+    "story.get": {},
+    "story.open": {
+      "assetId": "id",
+      "discard?": "boolean"
+    },
+    "story.create": {
+      "path": "string"
+    },
+    "story.addNode": {
+      "kind": "string",
+      "x": "number",
+      "y": "number"
+    },
+    "story.updateNode": {
+      "nodeId": "id",
+      "patch": "json"
+    },
+    "story.deleteNode": {
+      "nodeId": "id"
+    },
+    "story.connect": {
+      "sourceId": "id",
+      "port": "number",
+      "targetId": "nullableId"
+    },
+    "story.moveNodes": {
+      "positions": "json"
+    },
+    "story.setStart": {
+      "nodeId": "id"
+    },
+    "story.addEvent": {
+      "nodeId": "id",
+      "phase": "string",
+      "eventId?": "id",
+      "actionKind?": "string",
+      "batchId?": "id"
+    },
+    "story.removeEvent": {
+      "nodeId": "id",
+      "bindingId": "id"
+    },
+    "story.updateEvent": {
+      "eventId": "id",
+      "event": "json"
+    },
+    "story.placeEvent": {
+      "nodeId": "id",
+      "bindingId": "id",
+      "phase": "string",
+      "join": "string",
+      "batchId?": "string",
+      "beforeId?": "string"
+    },
+    "story.batchMode": {
+      "nodeId": "id",
+      "batchId": "id",
+      "parallel": "boolean"
+    },
+    "story.save": {},
+    "story.undo": {},
+    "story.redo": {},
+    "project.save": {
+      "useCurrentAsStartup?": "boolean"
+    },
+    "scene.create": {
+      "path": "string"
+    },
+    "component.setAsset": {
+      "objectId": "id",
+      "componentId": "id",
+      "property": "id",
+      "assetId": "nullableId",
+      "subAssetId?": "nullableId"
+    }
+  }
+}

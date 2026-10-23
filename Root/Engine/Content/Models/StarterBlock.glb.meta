@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "guid": "5bcbb1a6-db24-4248-b7d9-40555c563724",
+  "assetType": "Model",
+  "sourceFingerprint": "15328aafe74070b5",
+  "loadSettings": {},
+  "importInfo": {},
+  "subAssets": [
+    {
+      "id": "997a9fc2-2f8e-4e5d-82a1-af384af37962",
+      "type": "StaticMesh",
+      "name": "StarterBlock",
+      "selector": { "kind": "mesh", "index": 0 }
+    }
+  ]
+}

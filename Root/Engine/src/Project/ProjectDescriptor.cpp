@@ -120,6 +120,11 @@ bool ProjectDescriptor::TryLoadFromFile(
     {
         Parsed.EngineVersion = "0.1";
     }
+    if (Parsed.EngineVersion != "0.1")
+    {
+        OutError = "Unsupported project engineVersion '" + Parsed.EngineVersion + "' (supported: 0.1)";
+        return false;
+    }
 
     if (!TryReadRequiredString(Document, "template", Parsed.TemplateId, OutError))
     {

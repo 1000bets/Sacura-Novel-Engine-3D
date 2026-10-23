@@ -1,14 +1,25 @@
 import {initializeLanguage} from './i18n.js';
-import {initializeTheme} from './themes.js';
+import {initializeTheme,applyTheme,saveTheme} from './themes.js';
 import React from 'react';
 import {createRoot} from 'react-dom/client';
 import AuthGate from './AuthGate.jsx';
 import ProjectHome from './ProjectHome.jsx';
+import NativeProjectHome from './NativeProjectHome.jsx';
 import './editor.css';
 initializeTheme();
+// Match the requested web reference once; later theme choices remain user-owned.
+if(window.sacuraDesktop?.nativeViewport){try{
+  if(!localStorage.getItem('sacura-native-web-home-v1')){
+    applyTheme('sakura');saveTheme('sakura',localStorage);localStorage.setItem('sacura-native-web-home-v1','1');
+  }
+}catch{}}
 initializeLanguage();
-const root=createRoot(document.getElementById('root'));
-root.render(window.sacuraDesktop?.isDesktop===true?<ProjectHome/>:<AuthGate/>);
+const root=createRoot(document.getElementById('root'),{onUncaughtError:error=>console.error('React render failed:',error.stack||error.message)});
+// Native panels read exclusively from the Bridge. The empty legacy shape supplies
+// existing shell/layout defaults; it is never saved or simulated in desktop.
+root.render(window.sacuraDesktop?.nativeViewport
+  ? <NativeProjectHome/>
+  : window.sacuraDesktop?.isDesktop===true?<ProjectHome/>:<AuthGate/>);
 
 import "./editorTheme.css";
 import "./editorWindows.css";

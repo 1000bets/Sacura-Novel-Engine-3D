@@ -19,7 +19,7 @@ QString ObjectInspectorView::ComponentCaption(const QString& Type)
 {
     QString Caption = Type.section('.', -1);
     if (Caption.endsWith("Component")) { Caption.chop(9); }
-    const QHash<QString, QString> Captions{{"MeshRenderer", tr("Меш и материалы")},
+    const QHash<QString, QString> Captions{{"MeshRenderer", tr("Статический меш")},
         {"Camera", tr("Камера")}, {"Light", tr("Освещение")},
         {"PhysicsBody", tr("Коллизия")}, {"CharacterController", tr("Контроллер персонажа")},
         {"NavigationAgent", tr("Навигация")}};
@@ -50,6 +50,15 @@ void ObjectInspectorView::AddComponentSection(const QString& Identity, const QSt
     Toggle->setVisible(!Mesh);
     Layout->addWidget(&Fields);
     Fields.setVisible(Expanded);
+    if (Mesh)
+    {
+        auto* Remove = new QPushButton(tr("Удалить компонент"), Card);
+        Remove->setObjectName("RemoveStaticMeshComponent");
+        connect(Remove, &QPushButton::clicked, this, [this, Identity]() {
+            if (RemoveComponentRequested) { RemoveComponentRequested(Identity); }
+        });
+        Layout->addWidget(Remove);
+    }
     AnimateDisclosure(*Toggle, Fields);
     connect(Toggle, &QToolButton::toggled, Card, [Toggle](bool Open) {
         Toggle->setIcon(MakeStudioIcon(Open ? StudioIcon::ChevronDown : StudioIcon::ChevronRight));
@@ -387,5 +396,7 @@ void ObjectInspectorView::SetEditable(bool Editable)
     AnchorObject->setEnabled(Editable);
     Actions->setEnabled(Editable);
     ComponentFilter->setEnabled(Editable);
+    for (auto* Remove : findChildren<QPushButton*>("RemoveStaticMeshComponent"))
+    { Remove->setEnabled(Editable); }
 }
 }

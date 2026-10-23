@@ -28,6 +28,7 @@ export default function MeshInspector({object,onChange,disabled,allowUpload=true
    </div></>}
   {error&&<p className="error-box" role="alert">{message(error)}</p>}
   {busy&&<p role="status">{tr("Проверяем модель…")}</p>}
+  {!object.model&&allowUpload&&<Field label={tr("Форма")}><Select value={object.primitive||'box'} options={[["box","Куб"],["sphere","Сфера"],["cylinder","Цилиндр"]]} onChange={primitive=>commit({primitive})}/></Field>}
   <Field label={tr("Назначить материал")}><Select value={slot} options={[['all','Весь объект'],...(object.model?.slots||[]).map(item=>[item.id,literalLabel(item.name)])]} onChange={setSlot}/></Field>
   <Field label={tr("Материал")}><Select value={config?.preset|| (config?'custom':'original')} options={[["original",slot==='all'?'Исходные материалы':'По умолчанию'],...Object.entries(MATERIAL_PRESETS).map(([id,p])=>[id,p.name]),...(config&&!config.preset?[["custom","Свой материал"]]:[])]} onChange={id=>assign(id==='original'?null:{...MATERIAL_PRESETS[id],preset:id})}/></Field>
   {config&&<><Field label={tr("Цвет материала")}><input type="color" value={effective.color} onChange={e=>assign({...effective,color:e.target.value,preset:undefined})}/></Field>

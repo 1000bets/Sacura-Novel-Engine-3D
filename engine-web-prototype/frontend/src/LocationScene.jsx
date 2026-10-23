@@ -3,6 +3,7 @@ import {createGameVisuals} from './GameVisuals.js';
 import {createGameControls,gameSceneHit} from './GameControls.js';
 import {createScenePhysics} from './scenePhysics.js';
 import {createMeshObject,updateMeshVisual,disposeMeshVisual,applyMaterialAssignments,disposeMaterialAssignments} from './meshVisual.js';
+import {hasStaticMesh} from './staticMeshComponent.js';
 import {createRendererViewport} from './rendererViewport.js';
 import {updateObjectHighlight,updateDoorEffect} from './sceneEffects.js';
 import React, { useEffect, useRef } from "react";
@@ -236,7 +237,7 @@ function Exterior({
           disposeCharacterVisual(mesh);disposeMeshVisual(mesh);mesh.visible = false;
           return;
         }
-        mesh.visible = o.active && state.visible?.[o.id] !== false && !(state.game?.active&&state.game.camera?.mode==='firstPerson'&&state.game.camera.targetId===o.id);
+        mesh.visible = o.active && (o.type==='Персонаж'||o.type==='Источник света'||hasStaticMesh(o)) && state.visible?.[o.id] !== false && !(state.game?.active&&state.game.camera?.mode==='firstPerson'&&state.game.camera.targetId===o.id);
         if(mesh.userData.marker)mesh.userData.marker.visible=(state.interactionTarget===o.id||state.interactionTargets?.includes(o.id))||state.highlights?.[o.id];
         gizmo.apply(mesh,o,resolvedPosition(o,state,kind));
         updateLightObject(mesh,o,live.current.mode==='scene');

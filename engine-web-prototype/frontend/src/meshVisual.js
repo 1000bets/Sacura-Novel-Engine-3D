@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {meshGeometry} from './SceneGizmo.js';
 import {parseMeshAsset,materialSlots} from './meshAssets.js';
 import {disposeCharacterAsset} from './characterAssets.js';
+import {hasStaticMesh} from './staticMeshComponent.js';
 
 export const MATERIAL_PRESETS={
  matte:{name:'Матовый',color:'#bb99aa',roughness:.85,metalness:0},
@@ -36,7 +37,9 @@ export function disposeMaterialAssignments(root){
 }
 export function updateMeshVisual(host,object){
  if(!host.userData.placeholder)return;
+ if(!hasStaticMesh(object)){if(host.userData.meshVisual)disposeMeshVisual(host);host.userData.placeholder.visible=false;return;}
  const source=object.model?.src||null;
+ if(!source)host.userData.placeholder.visible=true;
  let visual=host.userData.meshVisual;
  if(!visual||visual.source!==source){
   disposeMeshVisual(host);visual={source,active:true};host.userData.meshVisual=visual;

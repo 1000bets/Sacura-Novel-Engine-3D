@@ -19,6 +19,8 @@
 struct RenderFrameData;
 struct RenderViewFrame;
 struct ImGuiContext;
+class SharedFrameExporter;
+class SharedGpuFrameStream;
 
 namespace Diligent
 {
@@ -46,6 +48,7 @@ public:
     void QueueMaterialImage(std::shared_ptr<MaterialImageRequest> Request);
     void PollMaterialImages();
     void ClearMaterialResources();
+    void SetSharedFrameStream(std::shared_ptr<SharedGpuFrameStream> Stream);
 
     MeshHandle GetDefaultMesh() const { return DefaultMesh; }
     bool IsInitialized() const { return bInitialized; }
@@ -73,5 +76,6 @@ private:
     struct PipelineState;
     PipelineState* Pipeline = nullptr;
     ImGuiContext* OverlayImGuiContext = nullptr;
+    std::shared_ptr<SharedFrameExporter> FrameExporter;
     Diligent::ImGuiDiligentRenderer* OverlayImGuiRenderer = nullptr;
 };

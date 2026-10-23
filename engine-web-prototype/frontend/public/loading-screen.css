@@ -1,0 +1,17 @@
+.sacura-loading{position:fixed;inset:0;z-index:20000;display:grid;place-items:center;box-sizing:border-box;padding:32px;background:var(--bg-app,#11121b);color:var(--text-primary,#ece8ee);font-family:'Segoe UI',Arial,sans-serif;text-align:center}
+.sacura-loading-card{width:min(340px,100%);display:flex;flex-direction:column;align-items:center}
+.sacura-loading-mark{display:grid;place-items:center;width:76px;height:84px;margin-bottom:24px;border:1px solid #d9a3ba36;border-radius:22px 22px 22px 6px;background:#d9a3ba09;color:var(--brand-mark,#d9a3ba)}
+.sacura-loading-mark svg{width:44px;height:44px}
+.sacura-loading h1{margin:0;font-size:34px;font-weight:600;letter-spacing:-1.2px;line-height:1.2}
+.sacura-loading-brand{margin-top:8px;font-size:10px;letter-spacing:3.5px;color:var(--text-muted,#b1aabb)}
+.sacura-loading-track{width:180px;height:3px;margin:38px 0 20px;background:#d9a3ba20;overflow:hidden;border-radius:4px}
+.sacura-loading-track::after{content:'';display:block;width:45%;height:100%;background:var(--accent,#d9a3ba);border-radius:4px;animation:sacura-loading-travel 1.6s ease-in-out infinite}
+.sacura-loading-status{margin:0;min-height:22px;font-size:13px;line-height:1.6;color:var(--text-secondary,#c9c3d1)}
+.sacura-loading-project{max-width:100%;margin-top:8px;font-size:12px;color:var(--text-muted,#b1aabb);overflow-wrap:anywhere}
+.sacura-loading-footer{position:absolute;bottom:28px;font-size:11px;color:var(--text-muted,#b1aabb);opacity:.7;letter-spacing:.5px}
+.sacura-loading button{margin-top:20px;padding:10px 18px;border:1px solid #d9a3ba55;border-radius:6px;background:#d9a3ba12;color:inherit;font:inherit;cursor:pointer}
+.sacura-loading button:focus-visible{outline:2px solid #d9a3ba;outline-offset:4px}
+.sacura-loading [hidden]{display:none!important}
+.sacura-loading[data-failed] .sacura-loading-track{display:none}
+@keyframes sacura-loading-travel{0%{transform:translateX(-110%)}100%{transform:translateX(330%)}}
+@media(prefers-reduced-motion:reduce){.sacura-loading-track::after{animation:none;transform:translateX(60%);opacity:.8}}

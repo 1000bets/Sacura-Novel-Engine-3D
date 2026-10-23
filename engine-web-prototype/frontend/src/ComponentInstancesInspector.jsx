@@ -1,3 +1,4 @@
+import {ReflectedComponents} from './ReflectedFields.jsx';
 import React,{useId,useState} from 'react';
 import {ChevronRight,Code2,Copy,Plus,Puzzle,Search,Trash2,X} from 'lucide-react';
 import MechanicFields from './MechanicFields.jsx';
@@ -11,6 +12,8 @@ import {componentStateView,componentParameterView} from './componentFieldBinding
 import {reference,validateValue} from './valueSchemas.js';
 import ComponentCallFields from './ComponentCallFields.jsx';
 import {installLockedDoor} from './componentExamples.js';
+import MeshInspector from './MeshInspector.jsx';
+import {hasStaticMesh,canAddStaticMesh} from './staticMeshComponent.js';
 import './components.css';
 import './componentInspector.css';
 
@@ -24,7 +27,7 @@ function BoundFields({project,definition,instance,target,onChange}){
  });
 }
 
-export default function ComponentInstancesInspector({project,scope,onChange,onOpen,preview,running,onCreate,onOpenFunction}){
+function WebComponentInstancesInspector({project,scope,onChange,onOpen,preview,running,onCreate,onOpenFunction,onMeshChange,allowMeshUpload=true}){
  const [selected,setSelected]=useState(''),[type,setType]=useState(''),[query,setQuery]=useState(''),[searching,setSearching]=useState(false),[adding,setAdding]=useState(false),[error,setError]=useState('');
  const id=useId(),owns=m=>m.scope?.kind===scope.kind&&m.scope.id===scope.id;
  const definitions=project.gameplay.mechanicDefinitions.filter(d=>d.componentVersion===1&&d.scopes.includes(scope.kind));
@@ -34,6 +37,11 @@ export default function ComponentInstancesInspector({project,scope,onChange,onOp
  const m=instances.find(m=>m.id===selected),d=m&&descriptionFor(project,m.definitionId,m.definitionVersion),nativeSelected=native.find(m=>m.id===selected);
  const edit=fn=>{if(running)return;try{onChange(fn);setError('');}catch(e){setError(e.message);}};
  const add=()=>edit(p=>{
+  if(type==='__static-mesh'){
+   p.objects.find(o=>o.id===scope.id).staticMesh=true;
+   setSelected('__static-mesh');setAdding(false);setType('');setQuery('');setSearching(false);
+   return;
+  }
   let record;
   if(type==='__locked-door'){
    const definition=installLockedDoor(p);record=addMechanicInstance(p,definition.id,scope);
@@ -44,7 +52,7 @@ export default function ComponentInstancesInspector({project,scope,onChange,onOp
   }
   setSelected(record.id);setAdding(false);setType('');setQuery('');setSearching(false);
  });
- const object=scope.kind==='object'&&project.objects.find(o=>o.id===scope.id),count=instances.length+native.length;
+ const object=scope.kind==='object'&&project.objects.find(o=>o.id===scope.id),mesh=hasStaticMesh(object),count=instances.length+native.length+(mesh?1:0);
  const state=()=>{try{return componentStateView(project,m,d,preview?.world?.game?.mechanicStates?.[m.id]||{},preview?.variables||project.variables);}catch(e){return {error:e.message};}};
  const row=(record,isNative=false)=>{
   const definition=!isNative&&descriptionFor(project,record.definitionId,record.definitionVersion),name=isNative?(record.name||mechanicLabel(project,record)):componentInstanceName(project,record),subtitle=isNative?'Системный':definition.name;
@@ -64,15 +72,18 @@ export default function ComponentInstancesInspector({project,scope,onChange,onOp
     <small className="component-source-scope">Общий исходник · подключений: {sharedCount}</small>
    </>}
   </div>;
+ const meshMatches='статический меш static mesh'.includes(query.toLowerCase());
  return <section className="component-instances" aria-label="Компоненты владельца">
   <header className="component-inspector-heading"><h3>Компоненты <span>{count}</span></h3>{count>0&&<button type="button" className="component-icon-button" aria-label="Поиск компонентов" aria-expanded={searching} onClick={()=>{setSearching(!searching);setQuery('');}}><Search size={15} aria-hidden="true"/></button>}</header>
   {searching&&<label className="component-inspector-search"><Search size={14} aria-hidden="true"/><input autoFocus type="search" aria-label="Поиск компонентов" placeholder="Название или тип…" value={query} onChange={e=>setQuery(e.target.value)}/></label>}
-  <div className="component-instance-list">{instances.map(record=>row(record))}{native.map(record=>row(record,true))}</div>
+  <div className="component-instance-list">{mesh&&meshMatches&&<React.Fragment><button className="component-instance-row" type="button" aria-expanded={selected==='__static-mesh'} aria-controls={selected==='__static-mesh'?id+'-mesh':undefined} onClick={()=>setSelected(selected==='__static-mesh'?'':'__static-mesh')}><ChevronRight size={13} aria-hidden="true"/><Puzzle size={15} aria-hidden="true"/><span><strong>Статический меш</strong><small>Системный</small></span></button>{selected==='__static-mesh'&&<div id={id+'-mesh'} className="component-instance-properties"><MeshInspector object={object} disabled={running} allowUpload={allowMeshUpload} onChange={onMeshChange}/><div className="component-implementation-actions"><button type="button" className="component-icon-button component-remove" aria-label="Удалить компонент Статический меш" title="Удалить компонент" disabled={running} onClick={()=>edit(p=>{p.objects.find(o=>o.id===scope.id).staticMesh=false;setSelected('');})}><Trash2 size={15} aria-hidden="true"/></button></div></div>}</React.Fragment>}{instances.map(record=>row(record))}{native.map(record=>row(record,true))}</div>
   {!count&&<p className="component-empty">Нет компонентов</p>}
-  {query&&!instances.some(m=>(componentInstanceName(project,m)+' '+descriptionFor(project,m.definitionId,m.definitionVersion).name).toLowerCase().includes(query.toLowerCase()))&&!native.some(m=>((m.name||mechanicLabel(project,m))+' Системный').toLowerCase().includes(query.toLowerCase()))&&<p className="component-empty">Ничего не найдено</p>}
+  {query&&!(mesh&&meshMatches)&&!instances.some(m=>(componentInstanceName(project,m)+' '+descriptionFor(project,m.definitionId,m.definitionVersion).name).toLowerCase().includes(query.toLowerCase()))&&!native.some(m=>((m.name||mechanicLabel(project,m))+' Системный').toLowerCase().includes(query.toLowerCase()))&&<p className="component-empty">Ничего не найдено</p>}
 
-  {!running&&(adding?<div className="component-add-form"><header><strong>Добавить компонент</strong><button type="button" className="component-icon-button" aria-label="Отменить добавление компонента" onClick={()=>{setAdding(false);setType('');}}><X size={14} aria-hidden="true"/></button></header><label className="component-property-field"><span>Компонент</span><select autoFocus aria-label="Добавить компонент к владельцу" value={type} onChange={e=>setType(e.target.value)}><option value="">Выберите компонент…</option>{definitions.length>0&&<optgroup label="Компоненты проекта">{definitions.map(d=><option key={d.id+'@'+d.version} value={d.id+'@'+d.version}>{d.name}{d.version!==1?' · v'+d.version:''}</option>)}</optgroup>}{scope.kind==='object'&&<optgroup label="Готовые примеры"><option value="__locked-door">Дверь с замком</option></optgroup>}{compatible.length>0&&<optgroup label="Системные возможности">{compatible.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</optgroup>}</select></label><div className="component-add-actions"><button type="button" aria-label="Подключить компонент" disabled={!type} onClick={add}><Plus size={14} aria-hidden="true"/>Добавить</button>{onCreate&&<button type="button" onClick={()=>{setAdding(false);setType('');onCreate();}}>Создать новый…</button>}</div></div>:<button type="button" className="component-add-button" onClick={()=>setAdding(true)}><Plus size={15} aria-hidden="true"/>Добавить компонент</button>)}
+  {!running&&(adding?<div className="component-add-form"><header><strong>Добавить компонент</strong><button type="button" className="component-icon-button" aria-label="Отменить добавление компонента" onClick={()=>{setAdding(false);setType('');}}><X size={14} aria-hidden="true"/></button></header><label className="component-property-field"><span>Компонент</span><select autoFocus aria-label="Добавить компонент к владельцу" value={type} onChange={e=>setType(e.target.value)}><option value="">Выберите компонент…</option>{definitions.length>0&&<optgroup label="Компоненты проекта">{definitions.map(d=><option key={d.id+'@'+d.version} value={d.id+'@'+d.version}>{d.name}{d.version!==1?' · v'+d.version:''}</option>)}</optgroup>}{scope.kind==='object'&&<optgroup label="Готовые примеры"><option value="__locked-door">Дверь с замком</option></optgroup>}{scope.kind==='object'&&canAddStaticMesh(object)&&!mesh&&<optgroup label="Системные компоненты"><option value="__static-mesh">Статический меш</option></optgroup>}{compatible.length>0&&<optgroup label="Системные возможности">{compatible.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</optgroup>}</select></label><div className="component-add-actions"><button type="button" aria-label="Подключить компонент" disabled={!type} onClick={add}><Plus size={14} aria-hidden="true"/>Добавить</button>{onCreate&&<button type="button" onClick={()=>{setAdding(false);setType('');onCreate();}}>Создать новый…</button>}</div></div>:<button type="button" className="component-add-button" onClick={()=>setAdding(true)}><Plus size={15} aria-hidden="true"/>Добавить компонент</button>)}
   {object&&<details className="component-inspector-details component-interaction"><summary>Взаимодействие</summary><fieldset disabled={running}><ComponentCallFields project={project} call={object.interactionCall||{id:'sacura.component.call',version:1,parameters:{}}} allowLifetime={false} onChange={call=>edit(p=>{p.objects.find(o=>o.id===scope.id).interactionCall=call;})}/>{object.interactionCall&&<button type="button" onClick={()=>edit(p=>{delete p.objects.find(o=>o.id===scope.id).interactionCall;})}>Убрать вызов</button>}</fieldset></details>}
   {error&&<p role="alert">{error}</p>}
  </section>;
 }
+
+export default function ComponentInstancesInspector(props){return props.reflection?<ReflectedComponents {...props}/>:<WebComponentInstancesInspector {...props}/>;}

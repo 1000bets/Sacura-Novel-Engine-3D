@@ -502,6 +502,7 @@ void EditorMainWindow::RefreshSelectionUi()
 
     RefreshTransformUi();
     RebuildComponentInspectors();
+    ObjectView->SetEditable(bEditableSelection);
 
     bUpdatingSelectionUi = false;
 }

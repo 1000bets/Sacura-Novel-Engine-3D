@@ -4,16 +4,27 @@
   "private": true,
   "main": "main.cjs",
   "scripts": {
+    "native:configure": "cmake --preset windows-msvc-debug -S .. -DSAKURA_BUILD_ELECTRON_HOST=ON",
+    "native:build": "cmake --build ../build/windows-msvc-debug --config Debug --target SakuraElectronHost --parallel 8",
+    "native:start": "node scripts/native-start.cjs",
+    "native:smoke": "node scripts/native-start.cjs --smoke",
+    "native:probe": "electron scripts/probe-native-bridge.cjs",
     "desktop:dev": "node scripts/dev.cjs",
-    "desktop:build": "npm run build:ui && electron-builder --dir",
+    "desktop:build": "npm run native:build && npm run build:ui && electron-builder --dir",
     "smoke:editor": "node scripts/smoke-editor.cjs",
     "smoke:hmr": "node scripts/hmr-check.cjs",
     "build:ui": "npm --prefix ../engine-web-prototype/frontend run build -- --base ./ --outDir ../../desktop-electron/dist-ui --emptyOutDir",
-    "test": "node --test tests/*.test.cjs"
+    "test": "node --test tests/*.test.cjs",
+    "test:bridge": "node --test tests/bridge-contract.test.cjs tests/native-bridge.test.cjs ../engine-web-prototype/frontend/tests/nativeBridgeClient.test.js",
+    "native:configure:release": "cmake --preset windows-msvc-release -S .. -DSAKURA_BUILD_ELECTRON_HOST=ON \"-DCMAKE_POLICY_VERSION_MINIMUM=3.5\"",
+    "native:build:release": "cmake --build ../build/windows-msvc-release --config Release --target SakuraElectronHost SakuraEditor --parallel 8",
+    "desktop:production": "npm run native:build:release && npm run build:ui && electron-builder --config electron-builder.production.cjs --win zip",
+    "test:compat": "electron . --compat-roundtrip"
   },
   "devDependencies": {
-    "electron": "^45.0.0",
-    "electron-builder": "^26.0.0"
+    "electron": "45.0.0",
+    "electron-builder": "^26.0.0",
+    "typescript": "5.9.3"
   },
   "build": {
     "appId": "dev.sacura.desktop.experiment",
@@ -25,9 +36,25 @@
       "main.cjs",
       "preload.cjs",
       "project-store.cjs",
+      "native-viewport.cjs",
+      "bridge/**/*",
+      "scripts/native-smoke-main.cjs",
       "dist-ui/**/*",
-      "package.json"
+      "package.json",
+      "native-project.cjs",
+      "native-recents.cjs",
+      "scripts/compat-roundtrip.cjs"
     ],
-    "asar": true
+    "asar": true,
+    "extraResources": [
+      {
+        "from": "../build/windows-msvc-debug/ElectronNative/Debug",
+        "to": "native",
+        "filter": [
+          "**/*",
+          "!**/*.pdb"
+        ]
+      }
+    ]
   }
 }

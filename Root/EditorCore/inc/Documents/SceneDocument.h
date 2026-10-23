@@ -2,6 +2,7 @@
 
 #include "Core/Object/ObjectHandle.h"
 #include "Assets/Guid.h"
+#include "Assets/ContentHash.h"
 #include <filesystem>
 #include <cstdint>
 #include <string>
@@ -27,6 +28,7 @@ public:
     void RestoreRevision(uint64_t Revision) { CurrentRevision = Revision; }
     const AssetId& GetAssetId() const { return DocumentAsset; }
     void RefreshAssetPath();
+    bool HasExternalChanges() const;
 
     Scene* GetScene() const;
     const std::filesystem::path& GetDocumentPath() const { return DocumentPath; }
@@ -35,6 +37,7 @@ public:
 private:
     bool ReplaceBoundScene(Scene* NewScene, const std::filesystem::path& Path, std::string& OutError);
     void BindDocumentAsset();
+    void CaptureFingerprint();
 
     Engine* BoundEngine = nullptr;
     ObjectHandle BoundScene;
@@ -44,4 +47,5 @@ private:
     uint64_t SavedRevision = 0;
     uint64_t NextRevision = 1;
     std::string LastError;
+    ContentHash SavedFingerprint;
 };

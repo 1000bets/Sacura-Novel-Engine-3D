@@ -8,6 +8,9 @@ export const builtinTemplates=[standardTemplate,
  {id:'builtin-horror',name:'Последний обход · Point & click хоррор',description:'Ночная проходная, чужое отражение и последняя запись. WASD от третьего лица, предметы и загадка выхода.',builtin:true,path:'horror',guide:guide(['Что открыть → HauntedRoom.escape / mirror. Что изменить → условие выхода или реакцию зеркала. Результат → меняются загадка и появление силуэта.','Маршрут: предохранитель на столе → красный щит → магнитофон → зелёная дверь. Журнал, шкаф, зеркало и звонок можно осмотреть. WASD — идти, ЛКМ — предмет, ПКМ + мышь — осмотреться.'])},
  {id:'builtin-clicker',name:'UI-кликер · Монеты',description:'Кнопка, улучшение общего начисления и управляемый таймер. Полностью редактируемый игровой интерфейс.',builtin:true,extra:true,path:'ui-clicker',guide:guide(['Что открыть → Reward.award. Что изменить → прибавить 5 к формуле. Результат → кнопка и таймер дают больше монет.','PeriodicReward.collect и tick используют одну награду и скорость. Улучшение усиливает оба способа сбора; stop и start управляют единственным таймером.'])}
 ];
+export const nativeTemplateIds = new Set([
+ 'builtin-standard','builtin-quest','builtin-shooter','builtin-novel','builtin-horror'
+]);
 export async function loadBuiltinTemplate(id){const t=builtinTemplates.find(t=>t.id===id);if(!t)throw Error('Шаблон не найден.');const response=await fetch(`${import.meta.env?.BASE_URL||'/'}game-templates/${t.path}.sacura-template.json`);if(!response.ok)throw Error('Не удалось загрузить стандартный шаблон.');const pkg=await readAuthoringPackage(await response.json());if(pkg.roots.kind!=='template')throw Error('В библиотеке ожидался пакет шаблона.');return pkg;}
 
 // Bundled media already exists under the editor's public directory. Keep the

@@ -304,3 +304,9 @@ void RenderThread::ResizeSurface(RenderSurfaceId Surface, uint32_t Width, uint32
         });
     }
 }
+
+void RenderThread::SetSharedFrameStream(std::shared_ptr<SharedGpuFrameStream> Stream)
+{
+    AssertGameThread();
+    if (IsReady()) Enqueue([this, Stream = std::move(Stream)] { OwnedRenderer->SetSharedFrameStream(Stream); });
+}

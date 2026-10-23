@@ -1,8 +1,13 @@
 #include "Project/ProjectGenerator.h"
+#include "ProjectTemplateContent.h"
 
+#include "Story/StoryDocumentIO.h"
 #include "World/Serialization/SceneSerializer.h"
 
 #include <fstream>
+#include <algorithm>
+#include <cctype>
+#include <nlohmann/json.hpp>
 
 namespace
 {
@@ -62,7 +67,9 @@ bool IsSafeProjectName(const std::string& ProjectName)
         return false;
     }
 
-    const std::filesystem::path AsPath(ProjectName);
+    if(ProjectName.find_first_of("<>:\"|?*")!=std::string::npos || ProjectName.back()=='.' || ProjectName.back()==' ') return false;
+    for(unsigned char C:ProjectName) if(C<32) return false;
+    const std::filesystem::path AsPath=std::filesystem::u8path(ProjectName);
     if (AsPath.is_absolute() || AsPath.has_root_name() || AsPath.has_root_directory())
     {
         return false;
@@ -73,12 +80,8 @@ bool IsSafeProjectName(const std::string& ProjectName)
 
 std::string MakeEmptySceneJson(const std::string& SceneName)
 {
-    return std::string("{\n")
-        + "  \"format\": \"" + SceneSerializer::FormatId + "\",\n"
-        + "  \"formatVersion\": " + std::to_string(SceneSerializer::FormatVersion) + ",\n"
-        + "  \"name\": \"" + SceneName + "\",\n"
-        + "  \"objects\": []\n"
-        + "}\n";
+    return nlohmann::json{{"format",SceneSerializer::FormatId},{"formatVersion",SceneSerializer::FormatVersion},
+        {"name",SceneName},{"objects",nlohmann::json::array()}}.dump(2);
 }
 }
 
@@ -106,7 +109,7 @@ bool ProjectGenerator::CreateProject(
         return false;
     }
 
-    const std::filesystem::path ProjectRoot = (ParentAbsolute / Request.ProjectName).lexically_normal();
+    const std::filesystem::path ProjectRoot = (ParentAbsolute / std::filesystem::u8path(Request.ProjectName)).lexically_normal();
     if (!IsPathInsideRoot(ParentAbsolute, ProjectRoot))
     {
         OutError = "Project directory must stay inside the parent directory";
@@ -118,6 +121,21 @@ bool ProjectGenerator::CreateProject(
         OutError = "Project directory already exists";
         return false;
     }
+    if(!Request.StartupScene.empty() && !IsPathInsideRoot(ProjectRoot,ProjectRoot/std::filesystem::u8path(Request.StartupScene))) {
+        OutError="startupScene must stay inside the project root";return false;
+    }
+    if(!Request.EngineVersion.empty() && Request.EngineVersion!="0.1") {OutError="Unsupported project engineVersion";return false;}
+    const std::string TemplateId = Request.TemplateId.empty() ? "Empty" : Request.TemplateId;
+    if (!IsBuiltInProjectTemplate(TemplateId))
+    {
+        OutError = "Unknown project template: " + TemplateId;
+        return false;
+    }
+    if (TemplateId != "Empty" && Request.StartupScene.empty())
+    {
+        OutError = "Project templates require a startup scene";
+        return false;
+    }
 
     const std::filesystem::path Folders[] = {
         ProjectRoot / "Content" / "Scenes",
@@ -125,6 +143,7 @@ bool ProjectGenerator::CreateProject(
         ProjectRoot / "Content" / "Textures",
         ProjectRoot / "Content" / "Models",
         ProjectRoot / "Content" / "Audio",
+        ProjectRoot / "Content" / "Stories",
         ProjectRoot / "Scripts",
         ProjectRoot / "Config",
     };
@@ -142,9 +161,9 @@ bool ProjectGenerator::CreateProject(
     ProjectDescriptor Parsed{};
     Parsed.Name = Request.ProjectName;
     Parsed.EngineVersion = Request.EngineVersion.empty() ? "0.1" : Request.EngineVersion;
-    Parsed.TemplateId = Request.TemplateId.empty() ? "Empty" : Request.TemplateId;
+    Parsed.TemplateId = TemplateId;
     Parsed.ProjectRoot = ProjectRoot;
-    Parsed.ProjectFile = ProjectRoot / (Request.ProjectName + ".project");
+    Parsed.ProjectFile = ProjectRoot / std::filesystem::u8path(Request.ProjectName + ".project");
     if (!Request.StartupScene.empty())
     {
         const std::filesystem::path StartupAbsolute = (ProjectRoot / Request.StartupScene).lexically_normal();
@@ -155,13 +174,49 @@ bool ProjectGenerator::CreateProject(
         }
         Parsed.StartupScene = StartupAbsolute;
 
-        const SceneSerializeResult Written = SceneSerializer::WriteTextFileAtomically(
-            StartupAbsolute,
-            MakeEmptySceneJson(StartupAbsolute.stem().string()));
+        std::string SceneJson = MakeEmptySceneJson(StartupAbsolute.stem().string());
+        StoryDocument StarterStory;
+        std::string Guide;
+        if (TemplateId != "Empty"
+            && !BuildProjectTemplateContent(TemplateId, SceneJson, StarterStory, Guide))
+        {
+            OutError = "Could not build project template";
+            return false;
+        }
+        const SceneSerializeResult Written = SceneSerializer::WriteTextFileAtomically(StartupAbsolute, SceneJson);
         if (!Written.bOk)
         {
             OutError = Written.Error;
             return false;
+        }
+        if (TemplateId != "Empty")
+        {
+            std::string SceneStem = StartupAbsolute.stem().u8string();
+            std::transform(SceneStem.begin(), SceneStem.end(), SceneStem.begin(),
+                [](unsigned char Character) { return static_cast<char>(std::tolower(Character)); });
+            const std::string StoryName = SceneStem == "opening" ? "OpeningStory.story" : "Opening.story";
+            Parsed.StartupStory = ProjectRoot / "Content" / "Stories" / StoryName;
+            if (StoryName != "Opening.story")
+            {
+                const std::string Original = "Opening.story";
+                const size_t Position = Guide.find(Original);
+                if (Position != std::string::npos)
+                {
+                    Guide.replace(Position, Original.size(), StoryName);
+                }
+            }
+            const StorySerializeResult StoryWritten = StoryDocumentIO::SaveToFile(StarterStory, Parsed.StartupStory);
+            if (!StoryWritten.bOk)
+            {
+                OutError = StoryWritten.Error;
+                return false;
+            }
+            const SceneSerializeResult GuideWritten = SceneSerializer::WriteTextFileAtomically(ProjectRoot / "README.md", Guide);
+            if (!GuideWritten.bOk)
+            {
+                OutError = GuideWritten.Error;
+                return false;
+            }
         }
     }
 
