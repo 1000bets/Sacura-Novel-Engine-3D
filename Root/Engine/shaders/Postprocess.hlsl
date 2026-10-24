@@ -46,11 +46,14 @@ float4 ToneMapMain(FullscreenOutput Input) : SV_TARGET
 {
     float3 Radiance = SceneImage.SampleLevel(SceneImage_sampler, Input.Coordinates, 0).rgb;
     float3 Bloom = 0.0;
-    for (int Row = -2; Row <= 2; ++Row)
+    if (Parameters.y > 0.0)
     {
-        for (int Column = -2; Column <= 2; ++Column)
+        for (int Row = -2; Row <= 2; ++Row)
         {
-            Bloom += max(SceneImage.SampleLevel(SceneImage_sampler, Input.Coordinates + float2(Column, Row) * Resolution.xy * 2.0, 0).rgb - Parameters.z, 0.0);
+            for (int Column = -2; Column <= 2; ++Column)
+            {
+                Bloom += max(SceneImage.SampleLevel(SceneImage_sampler, Input.Coordinates + float2(Column, Row) * Resolution.xy * 2.0, 0).rgb - Parameters.z, 0.0);
+            }
         }
     }
     Radiance = (Radiance + Bloom * Parameters.y / 25.0) * Parameters.x;

@@ -1462,9 +1462,12 @@ void Renderer::RenderView(const RenderViewFrame& View, uint64_t FrameIndex, ITex
         return true;
     };
     BeginPass(0);
-    ITextureView* ShadowDepth = Target.ShadowAtlas->GetDefaultView(TEXTURE_VIEW_DEPTH_STENCIL);
-    Context->SetRenderTargets(0, nullptr, ShadowDepth, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
-    Context->ClearDepthStencil(ShadowDepth, CLEAR_DEPTH_FLAG, 1.f, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+    if (ShadowCount > 0 || View.Settings.Visualization == RenderVisualization::ShadowAtlas)
+    {
+        ITextureView* ShadowDepth = Target.ShadowAtlas->GetDefaultView(TEXTURE_VIEW_DEPTH_STENCIL);
+        Context->SetRenderTargets(0, nullptr, ShadowDepth, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+        Context->ClearDepthStencil(ShadowDepth, CLEAR_DEPTH_FLAG, 1.f, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+    }
     const Matrix CameraProjection = Frame.ViewProjection;
     for (uint32_t ShadowIndex = 0; ShadowIndex < ShadowCount; ++ShadowIndex)
     {
@@ -1545,17 +1548,23 @@ void Renderer::RenderView(const RenderViewFrame& View, uint64_t FrameIndex, ITex
     }
     EndPass(1);
     BeginPass(2);
-    ITextureView* TransparencyTargets[] = {Target.Accumulation->GetDefaultView(TEXTURE_VIEW_RENDER_TARGET), Target.Revealage->GetDefaultView(TEXTURE_VIEW_RENDER_TARGET)};
-    Context->SetRenderTargets(2, TransparencyTargets, Depth, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
-    const float Zero[] = {0.f, 0.f, 0.f, 0.f};
-    const float One[] = {1.f, 1.f, 1.f, 1.f};
-    Context->ClearRenderTarget(TransparencyTargets[0], Zero, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
-    Context->ClearRenderTarget(TransparencyTargets[1], One, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
-    for (const RenderObject* Object : Visible)
+    const bool bRenderTransparency = View.Settings.Visualization == RenderVisualization::TransparencyAccumulation
+        || View.Settings.Visualization == RenderVisualization::TransparencyRevealage
+        || std::any_of(Visible.begin(), Visible.end(), [&](const RenderObject* Object) { return IsTranslucent(*Object); });
+    if (bRenderTransparency)
     {
-        if (IsTranslucent(*Object))
+        ITextureView* TransparencyTargets[] = {Target.Accumulation->GetDefaultView(TEXTURE_VIEW_RENDER_TARGET), Target.Revealage->GetDefaultView(TEXTURE_VIEW_RENDER_TARGET)};
+        Context->SetRenderTargets(2, TransparencyTargets, Depth, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+        const float Zero[] = {0.f, 0.f, 0.f, 0.f};
+        const float One[] = {1.f, 1.f, 1.f, 1.f};
+        Context->ClearRenderTarget(TransparencyTargets[0], Zero, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+        Context->ClearRenderTarget(TransparencyTargets[1], One, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+        for (const RenderObject* Object : Visible)
         {
-            DrawObject(*Object, Pipeline->Transparent[Object->MaterialSnapshot && Object->MaterialSnapshot->Material->Definition.bDoubleSided]);
+            if (IsTranslucent(*Object))
+            {
+                DrawObject(*Object, Pipeline->Transparent[Object->MaterialSnapshot && Object->MaterialSnapshot->Material->Definition.bDoubleSided]);
+            }
         }
     }
     EndPass(2);
@@ -1571,15 +1580,21 @@ void Renderer::RenderView(const RenderViewFrame& View, uint64_t FrameIndex, ITex
     DrawAttribs FullscreenDraw;
     FullscreenDraw.NumVertices = 3;
     FullscreenDraw.Flags = DRAW_FLAG_VERIFY_ALL;
-    ITextureView* CompositeTarget = Target.PostTargets[0]->GetDefaultView(TEXTURE_VIEW_RENDER_TARGET);
-    Context->SetRenderTargets(1, &CompositeTarget, nullptr, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
-    BindTexture(Pipeline->Composite, "SceneImage", Target.Radiance->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE));
-    BindTexture(Pipeline->Composite, "AccumulationImage", Target.Accumulation->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE));
-    BindTexture(Pipeline->Composite, "RevealageImage", Target.Revealage->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE));
-    Context->SetPipelineState(Pipeline->Composite.State);
-    Context->CommitShaderResources(Pipeline->Composite.Binding, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
-    Context->Draw(FullscreenDraw);
-    ++Statistics.DrawCalls;
+    ITexture* CurrentColor = Target.Radiance;
+    if (bRenderTransparency)
+    {
+        CurrentColor = Target.PostTargets[0];
+        ITextureView* CompositeTarget = CurrentColor->GetDefaultView(TEXTURE_VIEW_RENDER_TARGET);
+        Context->SetRenderTargets(1, &CompositeTarget, nullptr, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+        BindTexture(Pipeline->Composite, "SceneImage", Target.Radiance->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE));
+        BindTexture(Pipeline->Composite, "AccumulationImage", Target.Accumulation->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE));
+        BindTexture(Pipeline->Composite, "RevealageImage", Target.Revealage->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE));
+        Context->SetPipelineState(Pipeline->Composite.State);
+        Context->CommitShaderResources(Pipeline->Composite.Binding, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+        Context->Draw(FullscreenDraw);
+        ++Statistics.DrawCalls;
+    }
+    ITextureView* CompositeTarget = CurrentColor->GetDefaultView(TEXTURE_VIEW_RENDER_TARGET);
     Context->SetRenderTargets(1, &CompositeTarget, Depth, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
     for (const RenderObject* Object : Visible)
     {
@@ -1588,7 +1603,6 @@ void Renderer::RenderView(const RenderViewFrame& View, uint64_t FrameIndex, ITex
             DrawObject(*Object, Pipeline->Opaque[Object->MaterialSnapshot && Object->MaterialSnapshot->Material->Definition.bDoubleSided]);
         }
     }
-    ITexture* CurrentColor = Target.PostTargets[0];
     auto ApplyPostEffects = [&](MaterialPostProcessStage Stage)
     {
         if (!View.Settings.bMaterialPostProcess || View.Settings.Visualization != RenderVisualization::Lit)
@@ -1707,8 +1721,13 @@ void Renderer::RenderView(const RenderViewFrame& View, uint64_t FrameIndex, ITex
     {
         RenderImGuiOverlay(Context, SwapChain, View.Overlay);
         if (FrameExporter && View.Surface.Value == 1)
+        {
             FrameExporter->Export(Device, BackBuffer->GetTexture(), FrameIndex);
-        SwapChain->Present(0);
+        }
+        else
+        {
+            SwapChain->Present(0);
+        }
     }
 }
 

@@ -30,6 +30,7 @@ const WorkspaceTabsRestore = process.argv.includes('--workspace-tabs-restore-che
 const WorkspaceTabsCheck = WorkspaceTabsRestore || process.argv.includes('--workspace-tabs-check');
 const LocalizationCheck = process.argv.includes('--localization-check');
 const CameraSpeedCheck = process.argv.includes('--camera-speed-check');
+const RenderPerformanceCheck = process.argv.includes('--render-performance-check');
 const SceneShortcutsCheck = process.argv.includes('--scene-shortcuts-check');
 const MaterialDropCheck = process.argv.includes('--material-drop-check');
 const MaterialCapture = process.argv.find(Argument => Argument.startsWith('--screenshot-material='));
@@ -37,7 +38,7 @@ const MigrationCheck = process.argv.includes('--qt-removal-check');
 const nativeSmoke = process.argv.includes('--native-smoke')||assetTransferTest||MigrationCheck;
 // CLI rendering checks must keep Chromium producing frames when another app
 // covers the test window. Production keeps normal background/visibility policy.
-if(ReflectedAssetsCheck || LocalizationCheck || AssetReferenceCheck || WorkspaceTabsCheck || nativeSmoke || MaterialCapture || ComponentNamesCheck || CameraSpeedCheck || SceneShortcutsCheck || MaterialDropCheck){
+if(RenderPerformanceCheck || ReflectedAssetsCheck || LocalizationCheck || AssetReferenceCheck || WorkspaceTabsCheck || nativeSmoke || MaterialCapture || ComponentNamesCheck || CameraSpeedCheck || SceneShortcutsCheck || MaterialDropCheck){
   app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
   app.commandLine.appendSwitch('disable-features','CalculateNativeWinOcclusion');
 }
@@ -322,6 +323,7 @@ app.whenReady().then(async () => {
     }
     if (LocalizationCheck) require('./scripts/localization-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
     if (CameraSpeedCheck) require('./scripts/camera-speed-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
+    if (RenderPerformanceCheck) require('./scripts/render-performance-check.cjs').Run({Application:app,Window:window,GetViewport:()=>nativeViewport,CreateNativeProject:createNativeProject,ReplaceProject:replaceProject});
     if (SceneShortcutsCheck) require('./scripts/scene-shortcuts-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
     if (MaterialDropCheck) require('./scripts/material-drop-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
     if (MigrationCheck) require('./scripts/qt-removal-check.cjs').Run({Application:app,Window:window,Editors:AssetWindows,GetViewport:()=>nativeViewport});

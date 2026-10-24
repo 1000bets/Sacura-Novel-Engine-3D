@@ -298,12 +298,16 @@ int main(int Argc, char** Argv)
                 {"residentMeshes", S.ResidentMeshes}, {"resolvedMeshes", ResolvedMeshes}, {"visible", Visible}, {"animate", Animate}});
             Emit({{"type","timing"},{"cpuMs",S.CpuMilliseconds},{"gpuAvailable",S.bGpuTimingsAvailable},
                 {"gpuMs",S.ShadowMilliseconds+S.OpaqueMilliseconds+S.TransparencyMilliseconds+S.PostprocessMilliseconds},
+                {"shadowMs",S.ShadowMilliseconds},{"opaqueMs",S.OpaqueMilliseconds},
+                {"transparencyMs",S.TransparencyMilliseconds},{"postprocessMs",S.PostprocessMilliseconds},
                 {"residentBytes",S.ResidentBytes},{"dropped",Frames ? Frames->Stream->Dropped.load() : 0},
                 {"sharedTextures",Frames ? Frames->Stream->TextureCount.load() : 0},
                 {"sharedTextureBytes",Frames ? Frames->Stream->TextureBytes.load() : 0}});
             Emit({{"type", "viewport"}, {"data", Controller->Status()}});
         }
     };
+    HANDLE FrameTimer = CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
+    const auto TickInterval = std::chrono::microseconds(16667);
     auto NextTick = std::chrono::steady_clock::now();
     while (bRunning)
     {
@@ -326,15 +330,33 @@ int main(int Argc, char** Argv)
         if (CurrentTime >= NextTick)
         {
             Tick();
-            NextTick = std::chrono::steady_clock::now() + std::chrono::milliseconds(16);
+            NextTick += TickInterval;
+            const auto CompletedTick = std::chrono::steady_clock::now();
+            if (NextTick < CompletedTick)
+            {
+                NextTick = CompletedTick;
+            }
         }
         if (bRunning)
         {
-            const auto Remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
-                NextTick - std::chrono::steady_clock::now()).count();
-            MsgWaitForMultipleObjectsEx(0, nullptr, static_cast<DWORD>(std::max<int64_t>(0, Remaining)),
-                QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+            const auto Remaining = NextTick - std::chrono::steady_clock::now();
+            LARGE_INTEGER DueTime;
+            DueTime.QuadPart = -std::max<int64_t>(1, std::chrono::duration_cast<std::chrono::nanoseconds>(Remaining).count() / 100);
+            if (FrameTimer && SetWaitableTimer(FrameTimer, &DueTime, 0, nullptr, nullptr, FALSE))
+            {
+                MsgWaitForMultipleObjectsEx(1, &FrameTimer, INFINITE, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+            }
+            else
+            {
+                const auto RemainingMilliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(Remaining).count();
+                MsgWaitForMultipleObjectsEx(0, nullptr, static_cast<DWORD>(std::max<int64_t>(0, RemainingMilliseconds)),
+                    QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+            }
         }
+    }
+    if (FrameTimer)
+    {
+        CloseHandle(FrameTimer);
     }
     Runtime.GetPlaySession().StopPlay();
     Runtime.StopPresenting();
