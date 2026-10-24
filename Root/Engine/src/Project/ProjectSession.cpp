@@ -1,4 +1,8 @@
 #include "Project/ProjectSession.h"
+#include "UI/WidgetDefinition.h"
+#include "UI/WidgetRuntime.h"
+#include "Input/InputDocument.h"
+#include <set>
 
 #include "Core/Object/MemorySubsystem.h"
 #include "Core/Threading/ThreadContext.h"
@@ -27,6 +31,76 @@ bool ProjectSession::UpdateSettings(const ProjectDescriptor& Settings, std::stri
         if (!Startup.empty() && !std::filesystem::is_regular_file(Startup, Error))
         {
             OutError = "Startup document does not exist";
+            return false;
+        }
+    }
+    for (const auto& Assignment : Settings.NarrativeWidgets)
+    {
+        if (std::set<std::string>{"dialogue", "hud", "mainMenu", "pauseMenu"}.count(Assignment.first) == 0)
+        {
+            OutError = "Unknown Narrative widget slot";
+            return false;
+        }
+        if (Assignment.second.empty())
+        {
+            continue;
+        }
+        AssetId Identity;
+        AssetRegistryEntry Entry;
+        nlohmann::json Document;
+        if (!AssetId::TryParse(Assignment.second, Identity)
+            || !BoundEngine->GetAssetRegistry().TryGetById(Identity, Entry)
+            || Entry.Metadata.Type != WidgetAssetType
+            || !WidgetDefinition::Read(Entry.AbsolutePath, Document, OutError)
+            || Document.at("widget").at("kind") != Assignment.first
+            || Document.value("controller", "").empty()
+            || !WidgetRuntime::ValidateController(Document, OutError))
+        {
+            OutError = "Invalid Narrative widget assignment: " + Assignment.first + " " + OutError;
+            return false;
+        }
+    }
+    InputConfiguration Input;
+    if (!InputDocument::LoadConfiguration(BoundEngine->GetAssetRegistry(), Input, OutError, Settings.ProjectFile, false))
+    {
+        return false;
+    }
+    if (Settings.StartupInputContexts)
+    {
+        Input.StartupContexts = *Settings.StartupInputContexts;
+    }
+    if (!InputSession::Validate(Input, OutError))
+    {
+        return false;
+    }
+    std::set<std::string> BoundActions;
+    for (const auto& Assignment : Settings.NarrativeInputActions)
+    {
+        if (std::set<std::string>{"advance", "pause", "nextChoice", "previousChoice", "confirmChoice"}.count(Assignment.first) == 0)
+        {
+            OutError = "Unknown Narrative input role";
+            return false;
+        }
+        if (Assignment.second.empty())
+        {
+            continue;
+        }
+        bool bFound = false;
+        for (const auto& Action : Input.Actions)
+        {
+            if (Action.Identifier == Assignment.second && Action.ValueType == InputValueType::Boolean)
+            {
+                bFound = true;
+                if (Assignment.first == "pause" && !Action.bExecuteWhenPaused)
+                {
+                    OutError = "Pause action must execute when paused";
+                    return false;
+                }
+            }
+        }
+        if (!bFound || !BoundActions.insert(Assignment.second).second)
+        {
+            OutError = "Narrative actions must reference distinct Boolean InputActions";
             return false;
         }
     }

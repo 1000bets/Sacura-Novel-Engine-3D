@@ -1,0 +1,201 @@
+{
+  "format": "sakura.widget",
+  "version": 1,
+  "controller": "engine.ui.PauseMenu",
+  "widget": {
+    "id": "widget-default-pauseMenu",
+    "name": "Меню паузы",
+    "kind": "pauseMenu",
+    "referenceSize": [
+      1280,
+      720
+    ],
+    "elements": [
+      {
+        "id": "widget-default-pauseMenu-panel",
+        "name": "Панель меню",
+        "type": "panel",
+        "parentId": null,
+        "role": "none",
+        "text": "",
+        "action": "none",
+        "visible": true,
+        "layout": {
+          "anchorMin": [
+            0.5,
+            0.5
+          ],
+          "anchorMax": [
+            0.5,
+            0.5
+          ],
+          "pivot": [
+            0.5,
+            0.5
+          ],
+          "x": 0,
+          "y": 0,
+          "width": 510,
+          "height": 440
+        },
+        "style": {
+          "background": "#211c29",
+          "color": "#fff4f8",
+          "opacity": 0.98,
+          "borderRadius": 20,
+          "borderWidth": 1,
+          "borderColor": "#ad849d",
+          "padding": 0
+        }
+      },
+      {
+        "id": "widget-default-pauseMenu-title",
+        "name": "Заголовок",
+        "type": "text",
+        "parentId": "widget-default-pauseMenu-panel",
+        "role": "none",
+        "text": "Пауза",
+        "action": "none",
+        "visible": true,
+        "layout": {
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            1,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "x": 30,
+          "y": 35,
+          "width": -60,
+          "height": 90
+        },
+        "style": {
+          "background": "transparent",
+          "color": "#fff4f8",
+          "fontSize": 36,
+          "fontWeight": 600,
+          "textAlign": "center",
+          "padding": 0
+        }
+      },
+      {
+        "id": "widget-default-pauseMenu-resume",
+        "name": "Продолжить",
+        "type": "button",
+        "parentId": "widget-default-pauseMenu-panel",
+        "role": "none",
+        "text": "Продолжить",
+        "action": "resume",
+        "visible": true,
+        "layout": {
+          "anchorMin": [
+            0.5,
+            0
+          ],
+          "anchorMax": [
+            0.5,
+            0
+          ],
+          "pivot": [
+            0.5,
+            0.5
+          ],
+          "x": 0,
+          "y": 160,
+          "width": 380,
+          "height": 60
+        },
+        "style": {
+          "background": "#704e7c",
+          "color": "#fff4f8",
+          "fontSize": 24,
+          "textAlign": "center",
+          "borderRadius": 10,
+          "padding": 8
+        },
+        "event": "Resume"
+      },
+      {
+        "id": "widget-default-pauseMenu-restart",
+        "name": "Начать заново",
+        "type": "button",
+        "parentId": "widget-default-pauseMenu-panel",
+        "role": "none",
+        "text": "Начать заново",
+        "action": "restart",
+        "visible": true,
+        "layout": {
+          "anchorMin": [
+            0.5,
+            0
+          ],
+          "anchorMax": [
+            0.5,
+            0
+          ],
+          "pivot": [
+            0.5,
+            0.5
+          ],
+          "x": 0,
+          "y": 240,
+          "width": 380,
+          "height": 60
+        },
+        "style": {
+          "background": "#704e7c",
+          "color": "#fff4f8",
+          "fontSize": 24,
+          "textAlign": "center",
+          "borderRadius": 10,
+          "padding": 8
+        },
+        "event": "restart"
+      },
+      {
+        "id": "widget-default-pauseMenu-mainMenu",
+        "name": "Главное меню",
+        "type": "button",
+        "parentId": "widget-default-pauseMenu-panel",
+        "role": "none",
+        "text": "Главное меню",
+        "action": "mainMenu",
+        "visible": true,
+        "layout": {
+          "anchorMin": [
+            0.5,
+            0
+          ],
+          "anchorMax": [
+            0.5,
+            0
+          ],
+          "pivot": [
+            0.5,
+            0.5
+          ],
+          "x": 0,
+          "y": 320,
+          "width": 380,
+          "height": 60
+        },
+        "style": {
+          "background": "#704e7c",
+          "color": "#fff4f8",
+          "fontSize": 24,
+          "textAlign": "center",
+          "borderRadius": 10,
+          "padding": 8
+        },
+        "event": "MainMenu"
+      }
+    ],
+    "css": ""
+  }
+}

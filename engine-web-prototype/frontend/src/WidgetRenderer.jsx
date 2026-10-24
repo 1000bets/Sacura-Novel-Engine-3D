@@ -4,14 +4,14 @@ import {boundText,widgetValue,widgetVisible} from './widgetBindings.js';
 import {scopeWidgetCss,widgetRects,isUnmodifiedDefaultWidget} from './widgetModel.js';
 import './widgets.css';
 
-export default function WidgetRenderer({widget,context={},onAction,onChoice,choiceEnabled=()=>true,editing=false,width,height,imageSource}){
+export default function WidgetRenderer({widget,context={},onAction,onChoice,choiceEnabled=()=>true,editing=false,width,height,imageSource,controlled:Controlled=false,onElementEvent:OnElementEvent}){
  useLocale();
  const ref=useRef(null),[size,setSize]=useState({width:width||1280,height:height||720}),token=useId().replace(/[^a-zA-Z0-9]/g,''),scope='widget-scope-'+token;
  useEffect(()=>{if(width&&height){setSize({width,height});return;}const node=ref.current;if(!node)return;const observer=new ResizeObserver(([entry])=>setSize({width:entry.contentRect.width,height:entry.contentRect.height}));observer.observe(node);return()=>observer.disconnect();},[width,height]);
  const rects=widgetRects(widget,size.width,size.height),scale=Math.min(size.width/widget.referenceSize[0],size.height/widget.referenceSize[1]);
  const custom=scopeWidgetCss(widget.css,'.'+scope);
  const standard=isUnmodifiedDefaultWidget(widget);
- const textFor=e=>({speaker:context.speaker,dialogueText:context.text,status:context.status,title:context.title}[e.role]??boundText(e,context,(standard?tr(e.text):e.text)));
+ const textFor=e=>{if(Controlled){return boundText(e,context,e.text);}return ({speaker:context.speaker,dialogueText:context.text,status:context.status,title:context.title}[e.role]??boundText(e,context,(standard?tr(e.text):e.text)));};
  return <div ref={ref} className={'widget-surface '+scope+(editing?' widget-editing':'')} style={width&&height?{width,height}:undefined} data-widget={widget.id} onPointerDown={e=>e.stopPropagation()} onPointerUp={e=>e.stopPropagation()}>
   {custom.css&&<style>{custom.css}</style>}
   {widget.elements.map((e,index)=>{
@@ -19,6 +19,17 @@ export default function WidgetRenderer({widget,context={},onAction,onChoice,choi
    if(!rect||hidden||(e.role==='choices'&&!context.choices?.length&&!editing))return null;
    const s=e.style||{},style={left:rect.x,top:rect.y,width:rect.width,height:rect.height,zIndex:index+1,'--we-bg':s.background||'transparent','--we-color':s.color||'#fff4f8','--we-font-size':Math.max(11,(s.fontSize||24)*scale)+'px','--we-font-family':s.fontFamily||'system-ui','--we-font-weight':s.fontWeight||400,'--we-radius':(s.borderRadius||0)*scale+'px','--we-border-width':(s.borderWidth||0)*scale+'px','--we-border-color':s.borderColor||'transparent','--we-padding':(s.padding||0)*scale+'px','--we-opacity':s.opacity??1,'--we-align':s.textAlign||'left','--we-gap':(s.gap??8)*scale+'px'};
    const props={key:e.id,className:'widget-element widget-'+e.type,style,'data-element':e.id,'data-role':e.role};
+   if (Controlled && e.type === 'button') {
+    const Enabled = !e.enabledField || !!context.variables?.[e.enabledField];
+    return <button {...props} disabled={!Enabled || !e.event} onClick={() => OnElementEvent?.(e)}>{textFor(e)}</button>;
+   }
+   if (Controlled && e.type === 'choices') {
+    const Choices = widgetValue(context,e.binding) || [];
+    const Enabled = !e.enabledField || !!context.variables?.[e.enabledField];
+    return <div {...props}>{Choices.map(Choice => <button key={Choice.id} disabled={!Enabled || Choice.enabled === false}
+      className={context.variables?.[e.selectedField] === Choice.id ? 'input-selected' : undefined}
+      onClick={() => OnElementEvent?.(e, Choice.id)}>{Choice.label}</button>)}</div>;
+   }
    if(e.type==='button')return <button {...props} disabled={!editing&&((e.action==='advance'&&!context.canAdvance)||(e.action==='resume'&&!context.paused))} onClick={()=>!editing&&onAction?.(e.action,e)}>{textFor(e)}</button>;
    if(e.type==='progress'){const min=e.min||0,max=Number(widgetValue(context,e.maxBinding)??context.variables?.[e.maxVariable]??e.max??100),value=Number(widgetValue(context,e.binding)??e.value??0);return <div {...props}><progress aria-label={e.name} max={Math.max(.001,max-min)} value={Math.min(Math.max(0,value-min),Math.max(.001,max-min))}/></div>;}
    if(e.type==='inventory'){const owner=e.binding?.source==='capability'?e.binding.owner.id:undefined,equipment=owner?Object.values(context.game?.inventories?.[e.binding.owner.type+':'+owner]?.equipment||{}):Object.values(context.game?.equipment||{}),action=(command,itemId)=>onAction?.('gameplay',owner?{command:'sacura.inventory.'+command,value:{owner:e.binding.owner,item:{kind:'reference',type:'item',mode:'direct',id:itemId}}}:{command:command==='use'?'useItem':'equip',value:{itemId}});return <div {...props}>{(widgetValue(context,e.binding)||context.game?.inventory||[]).map((slot,i)=>{const item=context.project?.gameplay?.items.find(x=>x.id===slot.itemId);return <div key={i}><span>{item?.name||slot.itemId} × {slot.count}{equipment.includes(slot.itemId)?' ✓':''}</span>{item?.slot&&<button onClick={()=>action('equip',slot.itemId)}>{tr('Экипировать')}</button>}{(item?.heal||item?.useEventId)&&<button onClick={()=>action('use',slot.itemId)}>{tr('Использовать')}</button>}</div>;})}{context.project?.gameplay?.recipes.map(r=><button key={r.id} onClick={()=>onAction?.('gameplay',owner?{command:'sacura.inventory.combine',value:{owner:e.binding.owner,recipe:{kind:'reference',type:'recipe',mode:'direct',id:r.id}}}:{command:'combine',value:{recipeId:r.id}})}>{r.name}</button>)}</div>;}

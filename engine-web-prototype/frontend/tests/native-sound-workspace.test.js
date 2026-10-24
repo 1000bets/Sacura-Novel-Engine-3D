@@ -39,3 +39,37 @@ test('native sound cards use registered WAV assets, import, preview and set star
   await act(async()=>render(React.createElement(NativeSoundWorkspace,{assets,session:'session',onImport:async()=>{},onSetStartup:async()=>{}})));
   assert.equal(screen.getByLabelText('Громкость 33%').value,'0.33');
 });
+
+test('native audio handles empty filters, failed imports and read-only startup selection', async () => {
+  soundDesk.waveform = async () => ({peaks:Array(100).fill(.25),duration:2});
+  const Assets = [{id:'builtin',name:'Voice.wav',typeId:'Audio',relativePath:'Voice.wav',path:'/Engine/Voice.wav',builtin:true}];
+  const View = render(React.createElement(NativeSoundWorkspace,{assets:[],session:'empty',onImport:async () => {throw Error('Invalid WAV header');},onSetStartup:async () => {}}));
+  assert.match(screen.getByRole('status').textContent,/WAV/);
+  fireEvent.click(screen.getByRole('button',{name:'Импортировать WAV'}));
+  await waitFor(() => assert.equal(screen.getByRole('alert').textContent,'Invalid WAV header'));
+  View.rerender(React.createElement(NativeSoundWorkspace,{assets:Assets,session:'empty',onImport:async () => {},onSetStartup:async () => {}}));
+  assert.equal(screen.getByRole('button',{name:'Сделать стартовым'}).disabled,true);
+  fireEvent.click(screen.getByRole('button',{name:'Музыка'}));
+  assert.equal(screen.getByRole('status').textContent,'Нет звуков выбранного типа.');
+  fireEvent.click(screen.getByRole('button',{name:'Все'}));
+  View.rerender(React.createElement(NativeSoundWorkspace,{assets:Assets,session:'empty',disabled:true,onImport:async () => {},onSetStartup:async () => {}}));
+  assert.equal(screen.getByRole('button',{name:'Импортировать WAV'}).disabled,true);
+  assert.equal(screen.getByRole('button',{name:'Слушать'}).disabled,true);
+});
+
+test('native preview stops when its project session changes or Play starts', async () => {
+  const OriginalStop = soundDesk.stopAll;
+  let Stops = 0;
+  soundDesk.stopAll = () => {Stops++;};
+  try {
+    const View = render(React.createElement(NativeSoundWorkspace,{session:'first'}));
+    View.rerender(React.createElement(NativeSoundWorkspace,{session:'second'}));
+    assert.equal(Stops,1);
+    View.rerender(React.createElement(NativeSoundWorkspace,{session:'second',disabled:true}));
+    assert.equal(Stops,2);
+    View.unmount();
+    assert.equal(Stops,3);
+  } finally {
+    soundDesk.stopAll = OriginalStop;
+  }
+});

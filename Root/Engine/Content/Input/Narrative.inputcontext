@@ -1,0 +1,50 @@
+{
+  "Version": 1,
+  "Context": {
+    "Name": "Narrative",
+    "Bindings": [
+      {
+        "Identifier": "Advance",
+        "Action": "103f4183-02f6-5e04-a659-afe0c842d7cb",
+        "Device": "Keyboard",
+        "Control": "Space"
+      },
+      {
+        "Identifier": "NextChoice",
+        "Action": "71c7c9e7-2225-5de4-b0ad-55031ac7eeac",
+        "Device": "Keyboard",
+        "Control": "ArrowDown"
+      },
+      {
+        "Identifier": "PreviousChoice",
+        "Action": "ee7b008c-346c-5951-88c0-708141775125",
+        "Device": "Keyboard",
+        "Control": "ArrowUp"
+      },
+      {
+        "Identifier": "ConfirmChoice",
+        "Action": "dfa02596-95a9-58da-8d8a-35c4d992e3e8",
+        "Device": "Keyboard",
+        "Control": "Enter"
+      },
+      {
+        "Identifier": "Pause",
+        "Action": "59ab05d2-911d-5e09-a0ea-1546bb1fd112",
+        "Device": "Keyboard",
+        "Control": "Escape"
+      },
+      {
+        "Identifier": "GamepadConfirm",
+        "Action": "103f4183-02f6-5e04-a659-afe0c842d7cb",
+        "Device": "Gamepad",
+        "Control": "South"
+      },
+      {
+        "Identifier": "GamepadPause",
+        "Action": "59ab05d2-911d-5e09-a0ea-1546bb1fd112",
+        "Device": "Gamepad",
+        "Control": "Start"
+      }
+    ]
+  }
+}

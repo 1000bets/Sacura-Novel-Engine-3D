@@ -18,6 +18,9 @@ export default function NativeDialogue({state,session,onAdvance,onChoice,onGameA
     if(state?.play==='playing')audio.current.play().catch(()=>{});
     else audio.current.pause();
   },[state?.play,session,state?.startupAudio,state?.startupAudioPath]);
+  if (state?.widgetSlots?.includes('dialogue') || state?.widgetInstances?.some(Instance => Instance.kind === 'dialogue')) {
+    return null;
+  }
   const dialogue=state?.dialogue;
   if(!dialogue||!['line','choice','failed'].includes(dialogue.phase))return null;
   const enabled=state.play==='playing'||state.gameRunning&&!state.gamePaused;

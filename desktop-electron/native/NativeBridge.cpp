@@ -1,3 +1,5 @@
+#include "UI/WidgetRuntime.h"
+#include "Input/InputDocument.h"
 #include "Core/Threading/CpuProfileScope.h"
 #include "Project/GameExporter.h"
 #include "Core/EnginePaths.h"
@@ -278,67 +280,46 @@ void NativeBridge::ResolveWidgetImages(Json& Widget)
 
 Json NativeBridge::GameViews()
 {
-    Json Views = Json::array();
-    if (!Runtime.IsGameRunning() && !Runtime.GetPlaySession().IsSimulating())
+    auto Views = WidgetRuntime::GameViews();
+    for (auto& View : Views)
     {
-        return Views;
-    }
-    for (auto* SceneObject : World()->GetAllObjects())
-    {
-        for (auto* Script : SceneObject->GetComponents<ScriptComponent>())
-        {
-            if (!Script->IsPlaying() || Script->IsScriptFailed())
-            {
-                continue;
-            }
-            for (const auto& Method : Script->GetClass()->Methods)
-            {
-                if (Method.Name != "GetGameView")
+                if (View.contains("widgetAssets"))
                 {
-                    continue;
-                }
-                ReflectedValue Result;
-                const auto Invoked = ScriptingSubsystem::Get().InvokeMethod(*Script, "GetGameView", {}, Result);
-                Require(Invoked.bOk, "GAME_VIEW_ERROR", Invoked.Message);
-                Require(Result.ValueKind == ReflectedValue::Kind::String && Result.StringValue.size() <= 65536,
-                    "GAME_VIEW_ERROR", "Game view must return a bounded JSON string");
-                auto View = Json::parse(Result.StringValue);
-                Require(View.is_object(), "GAME_VIEW_ERROR", "Game view must be an object");
-                if (View.contains("widgetLibrary"))
-                {
-                    const auto Library = Asset(View.at("widgetLibrary"));
-                    Require(Library.Metadata.Type == WidgetLibraryAssetType, "GAME_VIEW_ERROR", "widgetLibrary must reference a WidgetLibrary asset");
-                    auto& Cached = RuntimeWidgetLibraries[Library.Metadata.Guid.ToString()];
-                    if (Cached.second.is_null() || Cached.first != Library.Metadata.SourceFingerprint)
-                    {
-                        Json Document;
-                        std::string Error;
-                        Require(WidgetLibraryDocument::Read(std::filesystem::u8path(Library.AbsolutePath), Document, Error), "GAME_VIEW_ERROR", Error);
-                        Cached = {Library.Metadata.SourceFingerprint, std::move(Document)};
-                    }
+                    const auto Assignments = View.at("widgetAssets");
+                    Require(Assignments.is_object(), "GAME_VIEW_ERROR", "widgetAssets must map UI roles to widget asset GUIDs");
                     View["widgets"] = Json::object();
-                    for (auto Widget : Cached.second.at("widgets"))
+                    for (const auto& Assignment : Assignments.items())
                     {
-                        const auto Kind = Widget.at("kind").get<std::string>();
-                        if (Cached.second.at("ui").at(Kind) == Widget.at("id"))
+                        const auto& Kind = Assignment.key();
+                        Require(Kind == "dialogue" || Kind == "hud" || Kind == "mainMenu" || Kind == "pauseMenu",
+                            "GAME_VIEW_ERROR", "Unknown widget role");
+                        const auto WidgetAsset = Asset(Assignment.value());
+                        Require(WidgetAsset.Metadata.Type == WidgetAssetType, "GAME_VIEW_ERROR", "widgetAssets must reference Widget assets");
+                        auto& Cached = RuntimeWidgets[WidgetAsset.Metadata.Guid.ToString()];
+                        if (Cached.second.is_null() || Cached.first != WidgetAsset.Metadata.SourceFingerprint)
                         {
-                            ResolveWidgetImages(Widget);
-                            if (Kind == "hud")
-                            {
-                                View["widget"] = Widget;
-                            }
-                            else
-                            {
-                                View["widgets"][Kind] = Widget;
-                            }
+                            Json Document;
+                            std::string Error;
+                            Require(WidgetDocument::Read(std::filesystem::u8path(WidgetAsset.AbsolutePath), Document, Error), "GAME_VIEW_ERROR", Error);
+                            Cached = {WidgetAsset.Metadata.SourceFingerprint, std::move(Document)};
+                        }
+                        if (!Cached.second.value("controller", "").empty())
+                        {
+                            continue;
+                        }
+                        auto Widget = Cached.second.at("widget");
+                        Require(Widget.at("kind") == Kind, "GAME_VIEW_ERROR", "Widget kind does not match its assigned UI role");
+                        ResolveWidgetImages(Widget);
+                        if (Kind == "hud")
+                        {
+                            View["widget"] = std::move(Widget);
+                        }
+                        else
+                        {
+                            View["widgets"][Kind] = std::move(Widget);
                         }
                     }
                 }
-                View["objectId"] = SceneObject->GetPersistentId();
-                View["componentId"] = Script->GetPersistentId();
-                Views.push_back(std::move(View));
-            }
-        }
     }
     Require(Views.dump().size() <= 6291456, "GAME_VIEW_ERROR", "Resolved game UI exceeds the 6 MiB transport budget");
     return Views;
@@ -375,6 +356,16 @@ void NativeBridge::ExecuteGameAction(const Json& Parameters)
 }
 
 Json NativeBridge::Describe() {
+    WidgetRuntime::Update(Runtime);
+    auto WidgetInstances = WidgetRuntime::Snapshot();
+    for (auto& Instance : WidgetInstances)
+    {
+        if (Instance.contains("widget"))
+        {
+            ResolveWidgetImages(Instance.at("widget"));
+        }
+    }
+    Require(WidgetInstances.dump().size() <= 6291456, "GAME_VIEW_ERROR", "Widget instances exceed the transport budget");
     auto* Selected=Workspace.GetSelectedObject(World());auto& Play=Runtime.GetPlaySession();
     auto& Playback=Runtime.GetStoryRuntime();
     Json Choices=Json::array();
@@ -394,7 +385,7 @@ Json NativeBridge::Describe() {
         {"path",Workspace.GetDocument().GetDocumentPath().generic_string()},
         {"project",Project.GetProject()?Project.GetProject()->Name:""},
         {"play",Play.GetState()==PlaySessionState::Stopped?"stopped":Play.GetState()==PlaySessionState::Paused?"paused":"playing"},
-        {"dialogue",Dialogue},{"gameViews",GameViews()},{"startupAudio",Project.GetProject()&&!Project.GetProject()->StartupAudio.empty()},
+        {"dialogue",Dialogue},{"gameViews",GameViews()},{"widgetInstances",WidgetInstances},{"widgetSlots",WidgetRuntime::Slots()},{"startupAudio",Project.GetProject()&&!Project.GetProject()->StartupAudio.empty()},
         {"selection",Selected?Json(Selected->GetPersistentId()):Json(nullptr)},
         {"canUndo",Workspace.GetCommands().CanUndo()},{"canRedo",Workspace.GetCommands().CanRedo()},{"assetError",AssetError}};
 }
@@ -402,7 +393,17 @@ Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
     if (bRuntimeOnly)
     {
         Require(M == "bridge.describe" || M == "game.state" || M == "game.advance" || M == "game.choose"
-            || M == "game.pause" || M == "game.action" || M == "audio.resolveStartup", "PLAYER_READ_ONLY", "Editor operations are unavailable in Player");
+            || M == "widget.event" || M == "game.pause" || M == "game.action" || M == "audio.resolveStartup", "PLAYER_READ_ONLY", "Editor operations are unavailable in Player");
+    }
+    if (M == "widget.event")
+    {
+        std::string Error;
+        Require(WidgetRuntime::Dispatch(P.at("instanceId"), P.at("elementId"), P.value("value", Json()), Error), "WIDGET_EVENT_ERROR", Error);
+        return Describe();
+    }
+    if (M == "widget.controllers")
+    {
+        return WidgetRuntime::Controllers();
     }
     if (M == "game.action")
     {
@@ -509,7 +510,7 @@ Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
         {
             Require(!ProjectChanged(), "EXTERNAL_CHANGES", "Project descriptor changed on disk; reopen the project before saving settings");
             const auto& Settings = P.at("settings");
-            Require(Settings.is_object() && Settings.size() == 3, "INVALID_ARGUMENT", "Expected name, startupScene and startupStory");
+            Require(Settings.is_object() && Settings.size() >= 3 && Settings.size() <= 6, "INVALID_ARGUMENT", "Expected name, startupScene and startupStory");
             for (const auto* Key : {"name", "startupScene", "startupStory"})
             {
                 Require(Settings.contains(Key) && Settings.at(Key).is_string(), "INVALID_ARGUMENT", "Project settings must be strings");
@@ -551,6 +552,25 @@ Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
                 }
             }
             std::string Error;
+            try
+            {
+                if (Settings.contains("narrativeWidgets"))
+                {
+                    Updated.NarrativeWidgets = Settings.at("narrativeWidgets").get<std::map<std::string, std::string>>();
+                }
+                if (Settings.contains("narrativeInputActions"))
+                {
+                    Updated.NarrativeInputActions = Settings.at("narrativeInputActions").get<std::map<std::string, std::string>>();
+                }
+                if (Settings.contains("startupInputContexts"))
+                {
+                    Updated.StartupInputContexts = Settings.at("startupInputContexts").get<std::vector<InputContextActivation>>();
+                }
+            }
+            catch (const std::exception& Exception)
+            {
+                throw Failure("INVALID_ARGUMENT", Exception.what());
+            }
             const bool bSaved = Project.UpdateSettings(Updated, Error);
             Require(bSaved, "INVALID_ARGUMENT", Error);
             AssetDiagnostic Diagnostic;
@@ -565,7 +585,22 @@ Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
             }
             return Path.lexically_relative(Descriptor.ProjectRoot).generic_u8string();
         };
+        InputConfiguration Configuration;
+        std::string InputError;
+        Require(InputDocument::LoadConfiguration(Runtime.GetAssetRegistry(), Configuration, InputError, Descriptor.ProjectFile), "INPUT_ERROR", InputError);
+        Json InputActions = Json::array();
+        Json InputContexts = Json::array();
+        for (const auto& Action : Configuration.Actions)
+        {
+            InputActions.push_back({{"id", Action.Identifier}, {"name", Action.Name}});
+        }
+        for (const auto& Context : Configuration.Contexts)
+        {
+            InputContexts.push_back({{"id", Context.Identifier}, {"name", Context.Name}});
+        }
         return {{"name", Descriptor.Name}, {"engineVersion", Descriptor.EngineVersion},
+            {"narrativeWidgets", Descriptor.NarrativeWidgets}, {"narrativeInputActions", Descriptor.NarrativeInputActions},
+            {"startupInputContexts", Configuration.StartupContexts}, {"inputActions", InputActions}, {"inputContexts", InputContexts},
             {"startupScene", RelativePath(Descriptor.StartupScene)}, {"startupStory", RelativePath(Descriptor.StartupStory)}};
     }
     if (M == "project.export")
@@ -1519,9 +1554,9 @@ Json NativeBridge::AssetDocumentTools(const Json& Params)
         Require(Operation == "open", "NOT_FOUND", "Open the asset document first");
         AssetDocumentState State;
         std::string Error;
-        if (Type == WidgetLibraryAssetType)
+        if (Type == WidgetAssetType)
         {
-            State.Widgets = std::make_unique<WidgetLibraryDocument>(Registry);
+            State.Widgets = std::make_unique<WidgetDocument>(Registry);
             Require(State.Widgets->Open(Key, Error), "DOCUMENT_ERROR", Error);
         }
         else if (Type == PythonScriptAssetType)
@@ -1587,8 +1622,8 @@ Json NativeBridge::AssetDocumentTools(const Json& Params)
             }
             ++State.Revision;
         }
-        return {{"assetId", Key.Asset.ToString()}, {"type", "WidgetLibrary"}, {"revision", State.Revision},
-            {"document", State.Widgets->GetDocument()}, {"dirty", State.Widgets->IsDirty()},
+        return {{"assetId", Key.Asset.ToString()}, {"type", "Widget"}, {"revision", State.Revision},
+            {"document", State.Widgets->GetDocument()}, {"controllers", WidgetRuntime::Controllers()}, {"dirty", State.Widgets->IsDirty()},
             {"canUndo", State.Widgets->CanUndo()}, {"canRedo", State.Widgets->CanRedo()},
             {"readOnly", Entry.Mount == AssetMount::Engine || Runtime.GetPlaySession().IsSimulating()}};
     }

@@ -1,0 +1,25 @@
+{
+  "narrativeWidgets": {
+    "dialogue": "8bbc7e92-f2c9-585d-a2ad-6b15da745783",
+    "mainMenu": "61301868-e4fb-57c5-9932-9c606b182f7d",
+    "pauseMenu": "8c1a8b9e-08cc-5a1d-809d-6eeab022dfa4",
+    "hud": "8ac4faa1-0f0e-58c0-8a0a-dba6fecf600d"
+  },
+  "narrativeInputActions": {
+    "advance": "103f4183-02f6-5e04-a659-afe0c842d7cb",
+    "nextChoice": "71c7c9e7-2225-5de4-b0ad-55031ac7eeac",
+    "previousChoice": "ee7b008c-346c-5951-88c0-708141775125",
+    "confirmChoice": "dfa02596-95a9-58da-8d8a-35c4d992e3e8",
+    "pause": "59ab05d2-911d-5e09-a0ea-1546bb1fd112"
+  },
+  "startupInputContexts": [
+    {
+      "Context": "d60652e8-994b-5c10-b5d3-8e2addb54376",
+      "Priority": 100
+    },
+    {
+      "Context": "5bbcb204-05af-5f60-83eb-093af2f9b7d7",
+      "Priority": 20
+    }
+  ]
+}

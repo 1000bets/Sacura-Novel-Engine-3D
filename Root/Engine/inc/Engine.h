@@ -77,6 +77,9 @@ public:
     Scene* GetActiveScene() const;
     Scene* GetEditScene() const { return OwnedScene.get(); }
     bool StartGame();
+    bool RequestScene(const std::string& ScenePath, std::string& Error, const std::string& StoryPath = {});
+    bool IsSceneTransitionPending() const { return !RequestedScenePath.empty(); }
+    const std::string& GetSceneTransitionError() const { return SceneTransitionError; }
     InputSession* GetInputSession() const { return PlayerInput.get(); }
     bool BeginInputSession();
     void SetGamePaused(bool bPaused);
@@ -112,6 +115,8 @@ public:
 private:
     friend class PlaySession;
     void BeginStory(Scene* World);
+    void ProcessSceneTransition();
+    void FailSceneTransition(const std::string& Error);
     void TickWorld(Scene& World, float DeltaTime, bool bSinglePhysicsStep = false);
     void BeginFrame();
     void EndFrame(bool bReplacePending = false);
@@ -144,6 +149,11 @@ private:
     std::shared_ptr<Authoring::OperationRegistry> AuthoringOperations;
     PlaySession Play;
     std::unique_ptr<Scene> OwnedScene;
+    std::unique_ptr<Scene> RequestedScene;
+    std::filesystem::path RequestedScenePath;
+    std::filesystem::path RequestedStoryPath;
+    StoryDocument RequestedSceneStory;
+    std::string SceneTransitionError;
     StoryRuntime Story;
     std::filesystem::path StartupStory;
     bool bGameRunning = false;

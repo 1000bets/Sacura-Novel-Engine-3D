@@ -1,6 +1,6 @@
 #include "Assets/BuiltinAssetCreationFactories.h"
 #include <set>
-#include "Documents/WidgetLibraryDocument.h"
+#include "Documents/WidgetDocument.h"
 #include "Core/EnginePaths.h"
 #include "Assets/MaterialAssetCreation.h"
 #include "Assets/StoryAssetCreation.h"
@@ -12,10 +12,10 @@
 #include "Prefab/PrefabLibrary.h"
 #include "Input/InputDocument.h"
 
-bool CreateWidgetLibraryAssetFactory::Create(AssetRegistry& Registry, const std::filesystem::path& Destination, std::string& Error) const
+bool CreateWidgetAssetFactory::Create(AssetRegistry& Registry, const std::filesystem::path& Destination, std::string& Error) const
 {
     nlohmann::json Document;
-    if (!WidgetLibraryDocument::Read(EnginePaths::Config() / "UI" / "Default.widgets", Document, Error))
+    if (!WidgetDocument::Read(EnginePaths::Config() / "UI" / "Default.widget", Document, Error))
     {
         return false;
     }
@@ -152,7 +152,7 @@ bool CreatePythonScriptAssetFactory::Create(AssetRegistry& Registry, const std::
 
 void ForceTouchBuiltinAssetCreationFactories()
 {
-    (void)&CreateWidgetLibraryAssetFactory::s_ReflectionClassRegistrar;
+    (void)&CreateWidgetAssetFactory::s_ReflectionClassRegistrar;
     (void)&CreatePythonScriptAssetFactory::s_ReflectionClassRegistrar;
     (void)&AssetCreationFactory::s_ReflectionClassRegistrar;
     (void)&CreateSceneAssetFactory::s_ReflectionClassRegistrar;

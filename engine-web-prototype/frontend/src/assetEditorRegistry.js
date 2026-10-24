@@ -1,5 +1,5 @@
 const AssetEditors = new Map([
-  ['WidgetLibrary', 'widgets'], ['Prefab', 'prefab'], ['PythonScript', 'source'], ['Texture', 'texture'],
+  ['Widget', 'widgets'], ['Prefab', 'prefab'], ['PythonScript', 'source'], ['Texture', 'texture'],
   ['StaticMesh', 'mesh'], ['Material', 'material'], ['MaterialInstance', 'material']
 ]);
 

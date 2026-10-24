@@ -1,3 +1,4 @@
+import NativeRuntimeWidgets from './NativeRuntimeWidgets.jsx';
 import NativeGameHud from './NativeGameHud.jsx';
 import NativeDialogue from './NativeDialogue.jsx';
 import {WidgetMenu} from './WidgetRenderer.jsx';
@@ -72,6 +73,7 @@ export default function NativeGamePlayer() {
         if (Connection.connected) {
           Context.current = Connection.context;
           const CurrentState = await Request('game.state');
+          if ((CurrentState.widgetInstances || []).length) { SetMenu(false); MenuInitialized.current = true; }
           if (!MenuInitialized.current&&CurrentState.gameViews?.[0]?.widgets) {
             MenuInitialized.current=true;
             await Request('game.pause',{paused:true});
@@ -202,6 +204,7 @@ export default function NativeGamePlayer() {
   const Dialogue = State?.dialogue;
   return <main className="standalone-game scene-viewport native-game-player" style={{position: 'fixed', inset: 0, background: '#17171b'}}>
     <canvas ref={Canvas} data-native-surface data-native-owner="" style={{width: '100%', height: '100%', display: 'block'}}/>
+    <NativeRuntimeWidgets State={State} Execute={Parameters => Action('widget.event', Parameters)}/>
     {!Menu&&<NativeGameHud State={State} Execute={Parameters => Action('game.action', Parameters)}/>}
     <div className="standalone-bar"><button aria-label="Пауза / продолжить" disabled={!State} onClick={() => {if(Menu){MenuAction('start');}else{Action('game.pause', {paused: !State.gamePaused});}}}>⏯</button><button onClick={()=>MenuAction('save')}>Сохранить</button><button onClick={()=>MenuAction('load')}>Загрузить</button></div>
     {Menu&&State?.gameViews?.[0]?.widgets?.mainMenu&&<WidgetMenu widget={State.gameViews[0].widgets.mainMenu} label="Главное меню" context={{variables:State.gameViews[0].variables||{},title:State.gameViews[0].projectTitle,paused:true}} onAction={MenuAction}/>}

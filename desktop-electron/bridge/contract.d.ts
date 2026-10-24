@@ -9,8 +9,8 @@ export interface ObjectInfo {id:Id;name:string;parentId:Id|null;active:boolean;t
 export interface PropertyInfo {enumValues?:string[];id:string;typeId:string;editable:boolean;assetTypes?:string[];assetId?:Id|null;subAssetId?:Id|null;label:string;localizationKey?:string;category:string;value:JsonValue;error?:string;range?:[number,number]}
 /** engine.int64 is represented by a decimal string, including inside reflected arrays/structs. */
 export interface DialogueState {phase:'idle'|'line'|'choice'|'action'|'end'|'failed';speaker:string;text:string;choices:string[];canAdvance:boolean;canChoose:boolean;error:string}
-export interface GameView {widgetLibrary?:Id;variables?:{[key:string]:JsonValue};widget?:JsonValue;widgets?:{[key:string]:JsonValue};objectId:Id;componentId:Id;title?:string;values?:{label:string;value:string|number}[];actions?:{id:string;label:string;enabled?:boolean}[];text?:string;objective?:string;controls?:string;reticle?:boolean;pointerLock?:boolean}
-export interface State {gameViews:GameView[];gameRunning:boolean;gamePaused:boolean;dirty:boolean;storyDirty:boolean;assetDocumentsDirty?:boolean;externalChanges:boolean;projectExternalChanges:boolean;path:string;project:string;play:'stopped'|'playing'|'paused';dialogue:DialogueState;startupAudio:boolean;startupAudioPath:string|null;selection:Id|null;canUndo:boolean;canRedo:boolean;assetError?:string}
+export interface GameView {widgetAssets?:Partial<Record<'dialogue'|'hud'|'mainMenu'|'pauseMenu',Id>>;variables?:{[key:string]:JsonValue};widget?:JsonValue;widgets?:{[key:string]:JsonValue};objectId:Id;componentId:Id;title?:string;values?:{label:string;value:string|number}[];actions?:{id:string;label:string;enabled?:boolean}[];text?:string;objective?:string;controls?:string;reticle?:boolean;pointerLock?:boolean}
+export interface State {widgetInstances?:JsonValue[];widgetSlots?:string[];gameViews:GameView[];gameRunning:boolean;gamePaused:boolean;dirty:boolean;storyDirty:boolean;assetDocumentsDirty?:boolean;externalChanges:boolean;projectExternalChanges:boolean;path:string;project:string;play:'stopped'|'playing'|'paused';dialogue:DialogueState;startupAudio:boolean;startupAudioPath:string|null;selection:Id|null;canUndo:boolean;canRedo:boolean;assetError?:string}
 export type ReflectedPropertyChange =
   | {path:(string|number)[];operation:'set';value:JsonValue}
   | {path:(string|number)[];operation:'insert';value:JsonValue}
@@ -44,7 +44,9 @@ export interface Commands {
   'prefab.instantiate': {params:{assetId:Id;parentId?:Id|null};result:JsonValue};
   'prefab.modify': {params:{objectId:Id;operation:string;selection?:JsonValue};result:JsonValue};
   'project.export': {params:{destination:string;runtimeDirectory:string;executableName:string};result:JsonValue};
-  'project.settings.get': {params:Record<string,never>;result:{name:string;engineVersion:string;startupScene:string;startupStory:string}};
+  'project.settings.get': {params:Record<string,never>;result:{name:string;engineVersion:string;startupScene:string;startupStory:string;narrativeWidgets:Record<string,string>;narrativeInputActions:Record<string,string>;startupInputContexts:{Context:string;Priority:number}[];inputActions:{id:string;name:string}[];inputContexts:{id:string;name:string}[]}};
+  'widget.controllers': {params:Record<string,never>;result:JsonValue[]};
+  'widget.event': {params:{instanceId:Id;elementId:Id;value?:JsonValue};result:State};
   'project.settings.set': {params:{settings:JsonValue};result:Commands['project.settings.get']['result']};
   'assets.folders': {params:Record<string,never>;result:string[]};
   'assets.rename': {params:{assetId:string;name:string};result:JsonValue};
@@ -138,11 +140,10 @@ export interface Bridge {
   subscribe(callback:(event:Event)=>void):()=>void;
 }
 
-export interface WidgetLibraryDocument {
-  format:'sakura.widgets';
+export interface WidgetDocument {
+  format:'sakura.widget';
   version:1;
-  widgets:WidgetLayout[];
-  ui:Record<'dialogue'|'hud'|'mainMenu'|'pauseMenu',Id>;
+  widget:WidgetLayout;
 }
 export interface WidgetLayout {
   id:Id;

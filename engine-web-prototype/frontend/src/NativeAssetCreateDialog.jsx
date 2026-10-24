@@ -13,7 +13,7 @@ export default function NativeAssetCreateDialog({type: Type, folder: Folder, sel
   if (IsPythonScript && DestinationFolder !== 'Game/Scripts' && !DestinationFolder.startsWith('Game/Scripts/')) {
     DestinationFolder = 'Game/Scripts';
   }
-  if (Type.typeId === 'WidgetLibrary' && DestinationFolder === 'Game') {
+  if (Type.typeId === 'Widget' && DestinationFolder === 'Game') {
     DestinationFolder = 'Game/UI';
   }
   const [Settings, SetSettings] = useState(() => {

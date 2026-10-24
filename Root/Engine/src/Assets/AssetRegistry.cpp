@@ -16,7 +16,7 @@ AssetRegistry::AssetRegistry()
     RegisterAssetType({InputActionAssetType, "Input Action", {".inputaction"}, true});
     RegisterAssetType({InputMappingContextAssetType, "Input Mapping Context", {".inputcontext"}, true});
     RegisterAssetType({AudioAssetType, "Audio", {".wav"}, true});
-    RegisterAssetType({WidgetLibraryAssetType, "UI Widgets", {".widgets"}, true});
+    RegisterAssetType({WidgetAssetType, "UI Widget", {".widget"}, true});
     RegisterAssetType({ModelAssetType, "Model", {".glb"}, false});
     RegisterAssetType({TextureAssetType, "Texture", {".png", ".jpg", ".jpeg"}, true});
     RegisterAssetType({MaterialAssetType, "Material", {".material"}, true});

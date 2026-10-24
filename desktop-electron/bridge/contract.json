@@ -287,6 +287,8 @@
     },
     "story.validate": {},
     "game.state": {},
+    "widget.controllers": {},
+    "widget.event": {"instanceId":"id", "elementId":"id", "value?":"json"},
     "game.action": {"objectId":"id", "componentId":"id", "action":"string"},
     "game.advance": {},
     "game.choose": {

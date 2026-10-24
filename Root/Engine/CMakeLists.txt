@@ -17,6 +17,8 @@ endif()
 # Engine library (explicit sources РІР‚вЂќ do not use file(GLOB) for compilation units)
 # ---------------------------------------------------------------
 set(ENGINE_SRC
+    src/UI/WidgetDefinition.cpp
+    src/UI/WidgetRuntime.cpp
     src/Assets/StaticMeshDefaults.cpp
     src/Characters/CharacterDefinition.cpp
     src/Characters/CharacterAnimationIO.cpp
@@ -118,6 +120,7 @@ set(ENGINE_SRC
     src/Scripting/ScriptingSubsystem.cpp
     src/Story/StoryDocumentIO.cpp
     src/Story/StoryRuntime.cpp
+    src/World/Simulation/RuntimeScenes.cpp
     src/Story/StoryEventPlayer.cpp
     src/Story/StoryEventSerialization.cpp
 )

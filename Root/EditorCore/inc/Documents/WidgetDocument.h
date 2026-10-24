@@ -2,10 +2,10 @@
 #include "Assets/AssetRegistry.h"
 #include <nlohmann/json.hpp>
 
-class WidgetLibraryDocument
+class WidgetDocument
 {
 public:
-    explicit WidgetLibraryDocument(AssetRegistry& InRegistry) : Registry(InRegistry) {}
+    explicit WidgetDocument(AssetRegistry& InRegistry) : Registry(InRegistry) {}
     static bool Validate(const nlohmann::json& Document, std::string& Error);
     static bool Read(const std::filesystem::path& Path, nlohmann::json& Document, std::string& Error);
     bool Open(const AssetKey& Asset, std::string& Error);

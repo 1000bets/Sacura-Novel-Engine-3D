@@ -14,16 +14,16 @@ public:
 };
 ENGINE_CLASS_END(CreatePythonScriptAssetFactory)
 
-class CreateWidgetLibraryAssetFactory : public AssetCreationFactory
+class CreateWidgetAssetFactory : public AssetCreationFactory
 {
-    ENGINE_CLASS(CreateWidgetLibraryAssetFactory, AssetCreationFactory, "editor.CreateWidgetLibraryAssetFactory")
+    ENGINE_CLASS(CreateWidgetAssetFactory, AssetCreationFactory, "editor.CreateWidgetAssetFactory")
 public:
-    AssetType GetAssetType() const override { return WidgetLibraryAssetType; }
-    const char* GetDisplayName() const override { return "Библиотека виджетов UI"; }
-    const char* GetExtension() const override { return ".widgets"; }
+    AssetType GetAssetType() const override { return WidgetAssetType; }
+    const char* GetDisplayName() const override { return "UI Widget"; }
+    const char* GetExtension() const override { return ".widget"; }
     bool Create(AssetRegistry& Registry, const std::filesystem::path& Destination, std::string& Error) const override;
 };
-ENGINE_CLASS_END(CreateWidgetLibraryAssetFactory)
+ENGINE_CLASS_END(CreateWidgetAssetFactory)
 
 class CreateSceneAssetFactory : public AssetCreationFactory
 {

@@ -33,6 +33,7 @@ public:
     bool IsSimulating() const { return State != PlaySessionState::Stopped; }
 
 private:
+    friend class Engine;
     void DestroyPlayWorld();
 
     Engine* BoundEngine = nullptr;

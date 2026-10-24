@@ -8,8 +8,8 @@ const {BridgeTransport} = require('../bridge/transport.cjs');
 const Root = Path.resolve(__dirname, '../..');
 const Host = process.env.SACURA_NATIVE_HOST || Path.join(Root, 'build/ElectronNative/Debug/SakuraElectronHost.exe');
 
-Test('widget libraries preserve authored layouts, validate history, save explicitly and feed native gameplay', {timeout:120000,skip:process.platform !== 'win32'}, async () => {
-  const Parent = Path.join(Root, 'build/widget-library-tests');
+Test('individual widget assets preserve authored layouts, validate history, save explicitly and feed native gameplay', {timeout:120000,skip:process.platform !== 'win32'}, async () => {
+  const Parent = Path.join(Root, 'build/widget-asset-tests');
   await FileSystem.mkdir(Parent, {recursive:true});
   const Directory = await FileSystem.mkdtemp(Path.join(Parent, 'run-'));
   const Create = Spawn(Host, ['--project-create',Directory,'WidgetProject','builtin-novel'], {windowsHide:true});
@@ -55,23 +55,23 @@ Test('widget libraries preserve authored layouts, validate history, save explici
   }
   try {
     await Start();
-    const Factory = (await Call('assets.creationTypes')).find(Type => Type.typeId === 'WidgetLibrary');
+    const Factory = (await Call('assets.creationTypes')).find(Type => Type.typeId === 'Widget');
     Assert.ok(Factory);
     await Call('assets.createFolder', {folder:'Game',name:'UI'});
-    const Created = await Call('assets.create', {factoryId:Factory.id,path:'UI/Interface.widgets',settings:{}});
+    const Created = await Call('assets.create', {factoryId:Factory.id,path:'UI/Interface.widget',settings:{}});
     const Identity = {assetId:Created.id};
-    const File = Path.join(ProjectDirectory, 'Content/UI/Interface.widgets');
+    const File = Path.join(ProjectDirectory, 'Content/UI/Interface.widget');
     const Original = await FileSystem.readFile(File, 'utf8');
     let Snapshot = await Call('assetDocument.execute', {...Identity,operation:'open'});
-    Assert.equal(Snapshot.document.widgets.length, 4);
+    Assert.equal(Snapshot.document.format, 'sakura.widget');
     Assert.equal(Snapshot.dirty, false);
     const Edited = structuredClone(Snapshot.document);
-    Edited.widgets[0].elements[1].style.color = '#123456';
-    Edited.widgets[0].elements[1].layout.x = 123;
+    Edited.widget.elements[1].style.color = '#123456';
+    Edited.widget.elements[1].layout.x = 123;
     Edited.customProjectData = {retained:true};
     const Texture = (await Call('assets.list')).find(Asset => Asset.typeId === 'Texture');
     Assert.ok(Texture);
-    Edited.widgets[0].elements.push({...structuredClone(Edited.widgets[0].elements[1]),id:'widget-image-check',type:'image',role:'none',parentId:null,imageAssetId:Texture.id});
+    Edited.widget.elements.push({...structuredClone(Edited.widget.elements[1]),id:'widget-image-check',type:'image',role:'none',parentId:null,imageAssetId:Texture.id});
     Snapshot = await Call('assetDocument.execute', {...Identity,operation:'edit',revision:Snapshot.revision,value:Edited});
     Assert.equal(Snapshot.dirty, true);
     Assert.equal((await Call('bridge.describe')).assetDocumentsDirty, true);
@@ -79,7 +79,7 @@ Test('widget libraries preserve authored layouts, validate history, save explici
     const Stale = await Bridge.request('assetDocument.execute', {...Identity,operation:'edit',revision:1,value:Edited});
     Assert.equal(Stale.error.code, 'STALE_DOCUMENT');
     const Invalid = structuredClone(Edited);
-    Invalid.widgets[0].elements[0].parentId = Invalid.widgets[0].elements[0].id;
+    Invalid.widget.elements[0].parentId = Invalid.widget.elements[0].id;
     Assert.equal((await Bridge.request('assetDocument.execute', {...Identity,operation:'edit',revision:Snapshot.revision,value:Invalid})).ok, false);
     Snapshot = await Call('assetDocument.execute', {...Identity,operation:'undo',revision:Snapshot.revision});
     Assert.equal(Snapshot.dirty, false);
@@ -96,23 +96,37 @@ Test('widget libraries preserve authored layouts, validate history, save explici
     Assert.equal((await Bridge.request('assetDocument.execute', {...Identity,operation:'save',revision:Snapshot.revision})).ok, false);
     Snapshot = await Call('assetDocument.execute', {...Identity,operation:'reload',revision:Snapshot.revision});
     Assert.deepEqual(Snapshot.document, Edited);
+    const Second = await Call('assets.create', {factoryId:Factory.id,path:'UI/Hud.widget',settings:{}});
+    Assert.notEqual(Second.id, Created.id);
+    let Hud = await Call('assetDocument.execute', {assetId:Second.id,operation:'open'});
+    const HudDocument = structuredClone(Hud.document);
+    HudDocument.widget.kind = 'hud';
+    HudDocument.controller = 'engine.ui.Hud';
+    Hud = await Call('assetDocument.execute', {assetId:Second.id,operation:'edit',revision:Hud.revision,value:HudDocument});
+    await Call('assetDocument.execute', {assetId:Second.id,operation:'save',revision:Hud.revision});
+    Assert.deepEqual((await Call('assetDocument.execute', {...Identity,operation:'get'})).document, Edited);
+    const LibraryShape = {...Edited,widget:undefined,widgets:[Edited.widget]};
+    Assert.equal((await Bridge.request('assetDocument.execute', {...Identity,operation:'edit',revision:Snapshot.revision,value:LibraryShape})).ok,false);
+    const Settings = await Call('project.settings.get');
+    await Call('project.settings.set', {settings:{name:Settings.name,startupScene:Settings.startupScene,startupStory:Settings.startupStory,
+      narrativeWidgets:{...Settings.narrativeWidgets,dialogue:Created.id,hud:Second.id}}});
     await Stop();
     const ScriptPath = Path.join(ProjectDirectory, 'Content/Scripts/template_game.py');
     let Script = await FileSystem.readFile(ScriptPath, 'utf8');
     Assert.ok(Script.includes("View['projectTitle'] ="));
-    Script = Script.replace("        View['projectTitle'] =", "        View['widgetLibrary'] = '" + Created.id + "'\n        View['variables'] = {'hp':73}\n        View['projectTitle'] =");
+    Script = Script.replace("        View['projectTitle'] =", "        View['widgetAssets'] = {'dialogue':'" + Created.id + "','hud':'" + Second.id + "'}\n        View['variables'] = {'hp':73}\n        View['projectTitle'] =");
     await FileSystem.writeFile(ScriptPath, Script);
     await Start();
     Snapshot = await Call('assetDocument.execute', {...Identity,operation:'open'});
     Assert.deepEqual(Snapshot.document, Edited);
     const State = await Call('play.start');
-    Assert.equal(State.gameViews[0].widgets.dialogue.elements[1].style.color, '#123456');
-    Assert.equal(State.gameViews[0].widget.id, Edited.ui.hud);
+    Assert.equal(State.widgetInstances.find(Entry => Entry.kind === 'dialogue').widget.elements[1].style.color, '#123456');
+    Assert.equal(State.widgetInstances.find(Entry => Entry.kind === 'hud').widget.kind, 'hud');
     Assert.equal(State.gameViews[0].variables.hp, 73);
     let ImageSource = '';
     for (let Attempt = 0; Attempt < 200; ++Attempt) {
       const Current = await Call('bridge.describe');
-      ImageSource = Current.gameViews[0].widgets.dialogue.elements.find(Element => Element.id === 'widget-image-check').src || '';
+      ImageSource = Current.widgetInstances.find(Entry => Entry.kind === 'dialogue').widget.elements.find(Element => Element.id === 'widget-image-check').src || '';
       if (ImageSource) {
         break;
       }
@@ -120,7 +134,7 @@ Test('widget libraries preserve authored layouts, validate history, save explici
     }
     Assert.ok(ImageSource.startsWith('data:image/png;base64,'));
     await Call('play.stop');
-    console.log('Widget library checks passed:', Project);
+    console.log('Widget asset checks passed:', Project);
   } finally {
     await Stop();
   }

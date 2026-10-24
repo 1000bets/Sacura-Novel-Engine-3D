@@ -28,3 +28,24 @@ if(SAKURA_PYTHON_AVAILABLE)
         VERBATIM)
 endif()
 add_test(NAME Engine.Character.Runtime COMMAND SakuraCharacterRuntimeTest)
+
+add_executable(SakuraSceneTransitionTest SceneTransitionTest.cpp)
+target_link_libraries(SakuraSceneTransitionTest PRIVATE Engine)
+sakura_link_whole_archive_engine(SakuraSceneTransitionTest)
+sakura_copy_engine_runtime_dlls(SakuraSceneTransitionTest)
+sakura_stage_engine_runtime(SakuraSceneTransitionTest)
+add_custom_command(TARGET SakuraSceneTransitionTest POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:SDL3::SDL3>" "$<TARGET_FILE_DIR:SakuraSceneTransitionTest>"
+    VERBATIM)
+if(SAKURA_PYTHON_AVAILABLE)
+    get_property(SceneTransitionTestPythonRoot GLOBAL PROPERTY SAKURA_DISTRIBUTION_PYTHON_ROOT)
+    get_property(SceneTransitionTestPythonVersion GLOBAL PROPERTY SAKURA_DISTRIBUTION_PYTHON_VERSION)
+    add_custom_command(TARGET SakuraSceneTransitionTest POST_BUILD
+        COMMAND ${CMAKE_COMMAND}
+            "-DPYTHON_ROOT=${SceneTransitionTestPythonRoot}"
+            "-DPYTHON_VERSION=${SceneTransitionTestPythonVersion}"
+            "-DDEST_DIR=$<TARGET_FILE_DIR:SakuraSceneTransitionTest>"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/DeployPythonRuntime.cmake"
+        VERBATIM)
+endif()
+add_test(NAME Engine.Scene.Transitions COMMAND SakuraSceneTransitionTest)

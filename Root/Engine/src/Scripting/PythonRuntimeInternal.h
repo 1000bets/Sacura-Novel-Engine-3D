@@ -24,6 +24,8 @@ extern std::deque<std::string> OwnedAttributeStrings;
 py::object FindRegisteredPythonType(const std::string& TypeIdString);
 void ClearRegisteredPythonTypes();
 void ClearNarrativeBindings();
+void ClearWidgetBindings();
+void RegisterWidgetBindings(py::module_& Module);
 void RegisterNarrativeBindings(py::module_& Module);
 const char* InternAttributeString(const std::string& Text);
 TypeId ResolvePythonValueTypeId(const py::object& TypeObject);

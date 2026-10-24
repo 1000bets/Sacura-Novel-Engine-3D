@@ -1,0 +1,268 @@
+{
+  "format": "sakura.widget",
+  "version": 1,
+  "controller": "game.ui.TemplateHud",
+  "widget": {
+    "id": "shooter-hud",
+    "name": "Интерфейс примера",
+    "kind": "hud",
+    "referenceSize": [
+      1280,
+      720
+    ],
+    "elements": [
+      {
+        "id": "hero-hp",
+        "name": "Здоровье",
+        "type": "text",
+        "parentId": null,
+        "role": "none",
+        "text": "Здоровье",
+        "action": "none",
+        "visible": true,
+        "layout": {
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "x": 24,
+          "y": 24,
+          "width": 380,
+          "height": 42
+        },
+        "style": {
+          "background": "transparent",
+          "color": "#fff4f8",
+          "fontSize": 24,
+          "fontFamily": "system-ui",
+          "fontWeight": 400,
+          "borderColor": "#ad849d",
+          "borderWidth": 0,
+          "borderRadius": 12,
+          "padding": 12,
+          "opacity": 1,
+          "textAlign": "left",
+          "gap": 8
+        },
+        "binding": {
+          "source": "variable",
+          "path": "Health",
+          "format": "HP: {value}"
+        }
+      },
+      {
+        "id": "score",
+        "name": "Очки",
+        "type": "text",
+        "parentId": null,
+        "role": "none",
+        "text": "Очки",
+        "action": "none",
+        "visible": true,
+        "layout": {
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "x": 24,
+          "y": 70,
+          "width": 380,
+          "height": 42
+        },
+        "style": {
+          "background": "transparent",
+          "color": "#fff4f8",
+          "fontSize": 24,
+          "fontFamily": "system-ui",
+          "fontWeight": 400,
+          "borderColor": "#ad849d",
+          "borderWidth": 0,
+          "borderRadius": 12,
+          "padding": 12,
+          "opacity": 1,
+          "textAlign": "left",
+          "gap": 8
+        },
+        "binding": {
+          "source": "variable",
+          "path": "Score",
+          "format": "Очки: {value}"
+        }
+      },
+      {
+        "id": "ammo",
+        "name": "Патроны",
+        "type": "text",
+        "parentId": null,
+        "role": "none",
+        "text": "Патроны",
+        "action": "none",
+        "visible": true,
+        "layout": {
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "x": 24,
+          "y": 116,
+          "width": 380,
+          "height": 42
+        },
+        "style": {
+          "background": "transparent",
+          "color": "#fff4f8",
+          "fontSize": 24,
+          "fontFamily": "system-ui",
+          "fontWeight": 400,
+          "borderColor": "#ad849d",
+          "borderWidth": 0,
+          "borderRadius": 12,
+          "padding": 12,
+          "opacity": 1,
+          "textAlign": "left",
+          "gap": 8
+        },
+        "binding": {
+          "source": "variable",
+          "path": "Ammunition",
+          "format": "Патроны: {value}"
+        }
+      },
+      {
+        "id": "medkit-button",
+        "name": "Аптечка · H",
+        "type": "button",
+        "parentId": null,
+        "role": "none",
+        "text": "Аптечка · H",
+        "action": "gameplay",
+        "visible": true,
+        "layout": {
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "x": 24,
+          "y": 180,
+          "width": 380,
+          "height": 50
+        },
+        "style": {
+          "background": "#704e7c",
+          "color": "#fff4f8",
+          "fontSize": 24,
+          "fontFamily": "system-ui",
+          "fontWeight": 400,
+          "borderColor": "#ad849d",
+          "borderWidth": 0,
+          "borderRadius": 12,
+          "padding": 12,
+          "opacity": 1,
+          "textAlign": "left",
+          "gap": 8
+        },
+        "command": "sacura.component.call",
+        "value": {
+          "instance": {
+            "kind": "reference",
+            "type": "mechanic",
+            "mode": "direct",
+            "id": "hero-medkit"
+          },
+          "methodId": "use",
+          "args": {}
+        },
+        "operationVersion": 1,
+        "event": "medkit"
+      },
+      {
+        "id": "stop-battle",
+        "name": "Остановить бой",
+        "type": "button",
+        "parentId": null,
+        "role": "none",
+        "text": "Остановить бой",
+        "action": "gameplay",
+        "visible": true,
+        "layout": {
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "x": 24,
+          "y": 242,
+          "width": 380,
+          "height": 50
+        },
+        "style": {
+          "background": "#704e7c",
+          "color": "#fff4f8",
+          "fontSize": 24,
+          "fontFamily": "system-ui",
+          "fontWeight": 400,
+          "borderColor": "#ad849d",
+          "borderWidth": 0,
+          "borderRadius": 12,
+          "padding": 12,
+          "opacity": 1,
+          "textAlign": "left",
+          "gap": 8
+        },
+        "command": "sacura.component.call",
+        "value": {
+          "instance": {
+            "kind": "reference",
+            "type": "mechanic",
+            "mode": "direct",
+            "id": "battle-owner"
+          },
+          "methodId": "stop",
+          "args": {}
+        },
+        "operationVersion": 1,
+        "event": "stop"
+      }
+    ],
+    "css": ""
+  }
+}

@@ -1,0 +1,111 @@
+{
+  "format": "sakura.widget",
+  "version": 1,
+  "controller": "game.ui.TemplateHud",
+  "widget": {
+    "id": "relationship-hud",
+    "name": "Интерфейс примера",
+    "kind": "hud",
+    "referenceSize": [
+      1280,
+      720
+    ],
+    "elements": [
+      {
+        "id": "relationship-text",
+        "name": "Отношение",
+        "type": "text",
+        "parentId": null,
+        "role": "none",
+        "text": "Отношение",
+        "action": "none",
+        "visible": true,
+        "layout": {
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "x": 24,
+          "y": 24,
+          "width": 380,
+          "height": 42
+        },
+        "style": {
+          "background": "transparent",
+          "color": "#fff4f8",
+          "fontSize": 24,
+          "fontFamily": "system-ui",
+          "fontWeight": 400,
+          "borderColor": "#ad849d",
+          "borderWidth": 0,
+          "borderRadius": 12,
+          "padding": 12,
+          "opacity": 1,
+          "textAlign": "left",
+          "gap": 8
+        },
+        "binding": {
+          "source": "variable",
+          "path": "Relationship",
+          "format": "Отношение: {value}"
+        }
+      },
+      {
+        "id": "snapshot-text",
+        "name": "Запомнено",
+        "type": "text",
+        "parentId": null,
+        "role": "none",
+        "text": "Запомнено",
+        "action": "none",
+        "visible": true,
+        "layout": {
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "x": 24,
+          "y": 70,
+          "width": 380,
+          "height": 42
+        },
+        "style": {
+          "background": "transparent",
+          "color": "#fff4f8",
+          "fontSize": 24,
+          "fontFamily": "system-ui",
+          "fontWeight": 400,
+          "borderColor": "#ad849d",
+          "borderWidth": 0,
+          "borderRadius": 12,
+          "padding": 12,
+          "opacity": 1,
+          "textAlign": "left",
+          "gap": 8
+        },
+        "binding": {
+          "source": "variable",
+          "path": "Snapshot",
+          "format": "Запомнено: {value}"
+        }
+      }
+    ],
+    "css": ""
+  }
+}

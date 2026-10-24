@@ -20,8 +20,8 @@ exports.run = async ({app: Application, window: Window, windows: Windows, getVie
     }
   }
   async function Click(Label) {
-    await Wait(() => Evaluate(`Array.from(document.querySelectorAll('.native-sound-workspace button')).find(Button=>Button.textContent===${JSON.stringify(Label)})?.disabled===false`), Label);
-    await Evaluate(`Array.from(document.querySelectorAll('.native-sound-workspace button')).find(Button=>Button.textContent===${JSON.stringify(Label)}).click()`);
+    await Wait(() => Evaluate(`Array.from(document.querySelectorAll('.native-sound-workspace button')).find(Button=>Button.textContent.trim()===${JSON.stringify(Label)})?.disabled===false`), Label);
+    await Evaluate(`Array.from(document.querySelectorAll('.native-sound-workspace button')).find(Button=>Button.textContent.trim()===${JSON.stringify(Label)}).click()`);
   }
   async function Call(Method, Parameters = {}) {
     const Result = await GetViewport().bridge.request(Method, Parameters);
@@ -51,7 +51,7 @@ exports.run = async ({app: Application, window: Window, windows: Windows, getVie
     await Click('Остановить всё');
     await Click('Сделать стартовым');
     await Wait(async () => (await Call('bridge.describe')).startupAudioPath === 'Audio/Preview.wav','Startup persisted');
-    await Wait(() => Evaluate('Array.from(document.querySelectorAll(".sound-footer button")).some(Button=>Button.textContent==="Стартовый звук" && Button.disabled)'),'Startup UI');
+    await Wait(() => Evaluate('Array.from(document.querySelectorAll(".sound-footer button")).some(Button=>Button.textContent.trim()==="Стартовый звук" && Button.disabled)'),'Startup UI');
     await Evaluate(`(() => {
       const Input = document.querySelector('.sound-controls input[type=range]');
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(Input,'0.23');
@@ -67,22 +67,39 @@ exports.run = async ({app: Application, window: Window, windows: Windows, getVie
     await Click('Убрать стартовый звук');
     await Wait(async () => !(await Call('bridge.describe')).startupAudio,'Clear startup');
     await Click('Сделать стартовым');
+    await Evaluate(`(() => {
+      const Selector = document.querySelector('.sound-card select');
+      Selector.value = 'music';
+      Selector.dispatchEvent(new Event('change',{bubbles:true}));
+      const Input = document.querySelector('.audio-marker-add input');
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(Input,'2');
+      Input.dispatchEvent(new Event('input',{bubbles:true}));
+    })()`);
+    await Wait(() => Evaluate('document.querySelector(".audio-marker-add button")?.disabled===false'),'Marker input');
+    await Evaluate('document.querySelector(".audio-marker-add button").click()');
+    await Wait(() => Evaluate('document.querySelectorAll(".audio-marker-list input").length===1 && !!document.querySelector(".audio-music-grid")'),'Marker and music grid');
     Panel = await require('./workspace-capture.cjs').DetachDocument(Window,Windows,'sound');
     await Wait(() => Evaluate('!!document.querySelector(".native-sound-workspace .wave svg")'),'Detached sound');
     Panel.setSize(1200,900);
     await Delay(400);
     await FileSystem.writeFile(Destination,(await Panel.webContents.capturePage()).toPNG());
+    await Evaluate('document.querySelector(".sound-footer").scrollIntoView({block:"end"})');
+    await Delay(150);
+    await FileSystem.writeFile(Destination.replace('.png','-controls.png'),(await Panel.webContents.capturePage()).toPNG());
     await Click('Слушать');
     await Call('play.start');
-    await Wait(() => Evaluate('Array.from(document.querySelectorAll(".native-sound-workspace button")).find(Button=>Button.textContent==="Слушать")?.disabled===true'),'Stop preview during Play');
+    await Wait(() => Evaluate('Array.from(document.querySelectorAll(".native-sound-workspace button")).find(Button=>Button.textContent.trim()==="Слушать")?.disabled===true'),'Stop preview during Play');
     await Call('play.stop');
-    await Wait(() => Evaluate('Array.from(document.querySelectorAll(".native-sound-workspace button")).find(Button=>Button.textContent==="Слушать")?.disabled===false'),'Play exit');
+    await Wait(() => Evaluate('Array.from(document.querySelectorAll(".native-sound-workspace button")).find(Button=>Button.textContent.trim()==="Слушать")?.disabled===false'),'Play exit');
     Panel.setMinimumSize(320,400);
     Panel.setSize(480,720);
     await Delay(400);
     Assert.equal(await Evaluate('document.documentElement.scrollWidth<=innerWidth'),true);
     Assert.equal(await Evaluate('document.querySelector(".native-sound-workspace").scrollWidth<=document.querySelector(".native-sound-workspace").clientWidth'),true);
     await FileSystem.writeFile(Destination.replace('.png','-mobile.png'),(await Panel.webContents.capturePage()).toPNG());
+    await Evaluate('document.querySelector(".sound-footer").scrollIntoView({block:"end"})');
+    await Delay(150);
+    await FileSystem.writeFile(Destination.replace('.png','-mobile-controls.png'),(await Panel.webContents.capturePage()).toPNG());
     console.log('Audio editor check passed: empty, import, decode, play/pause/resume/stop, local settings, filter, error, startup set/clear, detached, Play protection, desktop/mobile');
     Dialog.showOpenDialog = OriginalDialog;
     if (Localization) {
@@ -95,6 +112,9 @@ exports.run = async ({app: Application, window: Window, windows: Windows, getVie
     console.error('Audio editor check failed:',Failure);
     console.error(await Evaluate('document.body.innerText').catch(() => ''));
     await FileSystem.writeFile(Destination.replace('.png','-failure.png'),(await Panel.webContents.capturePage()).toPNG()).catch(() => {});
+    if (Localization) {
+      await Window.webContents.executeJavaScript(`window.sacuraDesktop.editorLocalization(${JSON.stringify(Localization)})`).catch(() => {});
+    }
     await GetViewport()?.stop();
     Application.exit(1);
   }

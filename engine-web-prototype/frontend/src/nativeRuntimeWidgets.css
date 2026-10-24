@@ -1,0 +1,6 @@
+.native-runtime-widgets{position:absolute;inset:0;pointer-events:none;z-index:14}
+.native-runtime-widget{position:absolute;inset:0;pointer-events:none}
+.native-runtime-widget .widget-surface{pointer-events:none}
+.native-runtime-widget .widget-element{pointer-events:auto}
+.native-runtime-widget-mainMenu,.native-runtime-widget-pauseMenu{background:#0008;pointer-events:auto;z-index:2}
+.native-runtime-widgets>p{pointer-events:auto;background:var(--surface-1);color:var(--text-primary);padding:12px}

@@ -88,7 +88,7 @@ Test('Quest: original HUD, persistent key, independent unlock and rotation', {ti
     Assert.ok(Math.abs(Door.transform.rotation[1])>0.5,JSON.stringify(Door));
     const View=(await Command('bridge.describe')).gameViews[0];
     Assert.equal(View.values[0].value,1);
-    Assert.equal(View.widget.elements.filter(Entry=>Entry.type==='button').length,3);
+    Assert.equal((await Command('bridge.describe')).widgetInstances.find(Entry => Entry.kind === 'hud').widget.elements.filter(Entry=>Entry.type==='button').length,3);
   });
 });
 

@@ -57,7 +57,6 @@ class TemplateController(engine.ScriptComponent):
                                      ('Jump', Self.Jump)]:
                 Self.SubscriptionIds.append(engine.BindAction(Self, '/Game/Input/' + Action + '.inputaction',
                                             engine.InputPhase.Triggered, Callback))
-            engine.SetInputContexts([('/Game/Input/Gameplay.inputcontext', 20), ('engine.input.system', 100), ('engine.input.dialogue', 10)])
         Self.UpdateScene()
         Self.InitialState = Self.CaptureGame('intro')
 
@@ -453,30 +452,16 @@ class TemplateController(engine.ScriptComponent):
             View['values'] = [{'label':'Предохранитель', 'value':Labels[Self.Horror.Fuse]},
                               {'label':'Питание', 'value':Labels[Self.Horror.Power]},
                               {'label':'Запись', 'value':Labels[Self.Horror.Record]}]
-        Widget = json.loads(json.dumps(next(Entry for Entry in TemplateData['widgets'] if Entry['id'] == TemplateData['ui']['hud'])))
-        Bindings = {
-            'hero-hp':Self.Shooter.Health.Current, 'score':Self.Shooter.Score.Value,
-            'ammo':Self.Shooter.Weapons[Self.Shooter.Selected].Ammo,
-            'relationship-text':Self.Novel.Relationship.Value, 'snapshot-text':Self.Novel.Snapshot,
-            'horror-objective':Self.Horror.Objective
+        View['variables'] = {
+            'Health':float(Self.Shooter.Health.Current), 'Score':float(Self.Shooter.Score.Value),
+            'Ammunition':Self.Shooter.Weapons[Self.Shooter.Selected].Ammo,
+            'Relationship':float(Self.Novel.Relationship.Value), 'Snapshot':float(Self.Novel.Snapshot),
+            'Objective':Self.Horror.Objective
         }
-        Actions = {'take-key':'pickup','key-door-button':'door','story-door-button':'warehouse',
-                   'medkit-button':'medkit','stop-battle':'stop'}
-        View['actions'] = []
-        for Element in Widget['elements']:
-            Binding = Element.pop('binding',None)
-            if Binding is not None:
-                Value = Bindings[Element['id']]
-                if isinstance(Value,float) and Value.is_integer():
-                    Value = int(Value)
-                Element['text'] = Binding.get('format','{value}').replace('{value}',str(Value))
-            if Element['id'] in Actions:
-                Element['nativeAction'] = Actions[Element['id']]
-                View['actions'].append({'id':Actions[Element['id']],'label':Element['text'],'enabled':True})
-        View['widget'] = Widget
+        View['actions'] = [{'id':Action, 'label':Action, 'enabled':True}
+                           for Action in ('pickup', 'door', 'warehouse', 'medkit', 'stop')]
         for Action,Label in [('save','Сохранить'),('load','Загрузить'),('restart','Начать заново')]:
             View['actions'].append({'id':Action,'label':Label,'enabled':True,'allowWhilePaused':True})
-        View['widgets'] = {Kind:next(Entry for Entry in TemplateData['widgets'] if Entry['id'] == TemplateData['ui'][Kind]) for Kind in ('dialogue','mainMenu','pauseMenu')}
         View['projectTitle'] = TemplateData.get('name','')
         Endings = [Beat for Chapter in TemplateData['chapters'] for Beat in Chapter['beats'] if Beat['kind'] == 'end']
         Ending = Endings[0]

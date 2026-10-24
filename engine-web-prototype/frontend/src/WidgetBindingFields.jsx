@@ -6,6 +6,10 @@ export default function WidgetBindingFields({element:e,project,onChange,native:N
  useLocale();const binding=(key,value)=>onChange({binding:{...e.binding,[key]:value}});
  if (Native) {
   return <>
+   {['button','choices'].includes(e.type) && <>
+    <label>{Translate('Editor.Widgets.Event')}<input value={e.event || ''} onChange={Event => onChange({event:Event.target.value})}/></label>
+    <label>{Translate('Editor.Widgets.EnabledField')}<input value={e.enabledField || ''} onChange={Event => onChange({enabledField:Event.target.value})}/></label>
+   </>}
    <label>{Translate('Editor.Widgets.Binding')}<input value={e.binding?.path||''} onChange={Event=>onChange({binding:{source:'variable',path:Event.target.value,format:e.binding?.format||''}})}/></label>
    <label>{Translate('Editor.Widgets.TextFormat')}<input placeholder="{value}" value={e.binding?.format||''} onChange={Event=>binding('format',Event.target.value)}/></label>
    <label>{Translate('Editor.Widgets.Visibility')}<input value={e.showIf?.path||''} onChange={Event=>{

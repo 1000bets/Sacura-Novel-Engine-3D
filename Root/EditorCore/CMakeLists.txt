@@ -5,7 +5,7 @@ set(EDITOR_CORE_SRC
     src/Assets/AssetCreationFactory.cpp
     src/Assets/BuiltinAssetCreationFactories.cpp
     src/Commands/StaticMeshCommands.cpp
-    src/Documents/WidgetLibraryDocument.cpp
+    src/Documents/WidgetDocument.cpp
     src/Documents/PythonScriptDocument.cpp
     src/Documents/StaticMeshDocument.cpp
     src/Project/GameExporter.cpp

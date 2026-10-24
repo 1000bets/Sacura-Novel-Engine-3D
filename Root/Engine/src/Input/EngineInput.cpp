@@ -1,4 +1,6 @@
 #include "Engine.h"
+#include "UI/WidgetRuntime.h"
+#include "Project/ProjectDescriptor.h"
 #include "Input/InputDocument.h"
 #include "Core/Threading/ThreadContext.h"
 #include "World/Scene.h"
@@ -19,16 +21,27 @@ bool Engine::BeginInputSession()
         PrintString("Input session failed: " + Error);
         return false;
     }
-    const auto SystemAction = [this](const InputActionEvent& Event)
+    ProjectDescriptor Descriptor;
+    if (!OpenProjectFile.empty() && !ProjectDescriptor::TryLoadFromFile(OpenProjectFile, Descriptor, Error))
+    {
+        PrintString("Input project settings failed: " + Error);
+        return false;
+    }
+    std::map<std::string, std::string> Actions{{"advance", "engine.input.advance"}, {"pause", "engine.input.pause"}};
+    for (const auto& Entry : Descriptor.NarrativeInputActions)
+    {
+        Actions[Entry.first] = Entry.second;
+    }
+    const auto SystemAction = [this, Actions](const InputActionEvent& Event)
     {
         if (Event.Phase == InputPhase::Triggered)
         {
-            if (Event.Action == "engine.input.advance" && !bGamePaused
+            if (Event.Action == Actions.at("advance") && !bGamePaused
                 && Play.GetState() != PlaySessionState::Paused)
             {
-                Story.AdvanceDialogue();
+                WidgetRuntime::NarrativeAction("advance");
             }
-            else if (Event.Action == "engine.input.pause")
+            else if (Event.Action == Actions.at("pause"))
             {
                 if (Play.GetState() == PlaySessionState::Playing)
                 {
@@ -45,8 +58,29 @@ bool Engine::BeginInputSession()
             }
         }
     };
-    Session->BindAction("engine.input.advance", InputPhase::Triggered, SystemAction);
-    Session->BindAction("engine.input.pause", InputPhase::Triggered, SystemAction);
+    for (const auto& Entry : Actions)
+    {
+        if (Entry.second.empty())
+        {
+            continue;
+        }
+        if (Session->BindAction(Entry.second, InputPhase::Triggered,
+            [SystemAction, Entry](const InputActionEvent& Event)
+            {
+                if (Entry.first == "advance" || Entry.first == "pause")
+                {
+                    SystemAction(Event);
+                }
+                else
+                {
+                    WidgetRuntime::NarrativeAction(Entry.first);
+                }
+            }) == 0)
+        {
+            PrintString("Narrative input action is unavailable: " + Entry.second);
+            return false;
+        }
+    }
     if (!OpenProjectFile.empty())
     {
         nlohmann::json Document;
@@ -78,6 +112,11 @@ bool Engine::BeginInputSession()
             PrintString(std::string("Invalid input story bindings: ") + Exception.what());
             return false;
         }
+    }
+    if (!WidgetRuntime::Start(*this, OpenProjectFile, Error))
+    {
+        PrintString("Widget session failed: " + Error);
+        return false;
     }
     PlayerInput = std::move(Session);
     bGamePaused = false;

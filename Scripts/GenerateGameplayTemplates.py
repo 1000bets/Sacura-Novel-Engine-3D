@@ -3,6 +3,7 @@ import uuid
 from pathlib import Path
 from WebTemplateContent import BuildReferenceObjects
 import GeneratePrimitiveModels
+import GenerateWidgetTemplates
 
 
 Repository = Path(__file__).resolve().parents[1]
@@ -97,7 +98,7 @@ def Generate(Scenario):
     ScriptDirectory = Content / 'Scripts'
     ScriptDirectory.mkdir(exist_ok=True)
     PickingGeometry = {Name:{Field:Geometry[Field] for Field in ('positions','indices')} for Name,Geometry in Geometries.items() if Name in ('TemplateBox','TemplateSphere','TemplateCylinder')}
-    (ScriptDirectory / 'template_data.py').write_text('import json\nTemplateData = json.loads(' + repr(json.dumps(Reference,ensure_ascii=False)) + ')\nPickingGeometry = json.loads(' + repr(json.dumps(PickingGeometry)) + ')\n',encoding='utf-8')
+    (ScriptDirectory / 'template_data.py').write_text('import json\nTemplateData = json.loads(' + repr(json.dumps({Name:Value for Name,Value in Reference.items() if Name not in ('widgets','ui')},ensure_ascii=False)) + ')\nPickingGeometry = json.loads(' + repr(json.dumps(PickingGeometry)) + ')\n',encoding='utf-8')
 
     Nodes = []
     def Line(Identifier, Text, Next):
@@ -197,6 +198,7 @@ def Generate(Scenario):
             Bindings.append({'Identifier':Name + Device + Control,'Action':ActionIds[Name], 'Device':Device,
                              'Control':Control,'Modifiers':{'Scale':dict(zip(['Horizontal','Vertical','Depth'],Scale)), 'AxisOrder':AxisOrder}})
         Write(Content / 'Input/Gameplay.inputcontext', {'Version':1,'Context':{'Name':'Gameplay','Bindings':Bindings}}, 'InputMappingContext')
+    GenerateWidgetTemplates.Generate(Scenario, Reference)
     (Destination / 'README.md').write_text('''# Gameplay template
 
 Open Content/Stories/Opening.story to edit the story and its Python actions.

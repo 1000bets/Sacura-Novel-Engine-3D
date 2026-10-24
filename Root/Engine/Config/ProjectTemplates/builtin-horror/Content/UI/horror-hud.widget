@@ -1,0 +1,122 @@
+{
+  "format": "sakura.widget",
+  "version": 1,
+  "controller": "game.ui.TemplateHud",
+  "widget": {
+    "id": "horror-hud",
+    "name": "Интерфейс примера",
+    "kind": "hud",
+    "referenceSize": [
+      1280,
+      720
+    ],
+    "elements": [
+      {
+        "id": "horror-title",
+        "name": "ПОСЛЕДНИЙ ОБХОД",
+        "type": "text",
+        "parentId": null,
+        "role": "none",
+        "text": "ПОСЛЕДНИЙ ОБХОД",
+        "action": "none",
+        "visible": true,
+        "layout": {
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "x": 24,
+          "y": 20,
+          "width": 380,
+          "height": 42
+        },
+        "style": {
+          "color": "#e5c38f",
+          "fontSize": 24,
+          "fontWeight": 600,
+          "padding": 0
+        }
+      },
+      {
+        "id": "horror-objective",
+        "name": "Задача",
+        "type": "text",
+        "parentId": null,
+        "role": "none",
+        "text": "Задача",
+        "action": "none",
+        "visible": true,
+        "layout": {
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "x": 24,
+          "y": 55,
+          "width": 650,
+          "height": 70
+        },
+        "style": {
+          "color": "#f5eee0",
+          "fontSize": 21,
+          "padding": 0
+        },
+        "binding": {
+          "source": "variable",
+          "path": "Objective",
+          "format": ""
+        }
+      },
+      {
+        "id": "horror-controls",
+        "name": "WASD — идти · ЛКМ — предмет · ПКМ + мышь — осмотр",
+        "type": "text",
+        "parentId": null,
+        "role": "none",
+        "text": "WASD — идти · ЛКМ — предмет · ПКМ + мышь — осмотр",
+        "action": "none",
+        "visible": true,
+        "layout": {
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "x": 24,
+          "y": 135,
+          "width": 740,
+          "height": 34
+        },
+        "style": {
+          "color": "#d1c6b5",
+          "fontSize": 18,
+          "padding": 0
+        }
+      }
+    ],
+    "css": ""
+  }
+}

@@ -1,0 +1,182 @@
+{
+  "format": "sakura.widget",
+  "version": 1,
+  "controller": "game.ui.TemplateHud",
+  "widget": {
+    "id": "doors-hud",
+    "name": "Интерфейс примера",
+    "kind": "hud",
+    "referenceSize": [
+      1280,
+      720
+    ],
+    "elements": [
+      {
+        "id": "take-key",
+        "name": "Подобрать ключ",
+        "type": "button",
+        "parentId": null,
+        "role": "none",
+        "text": "Подобрать ключ",
+        "action": "gameplay",
+        "visible": true,
+        "layout": {
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "x": 24,
+          "y": 24,
+          "width": 380,
+          "height": 50
+        },
+        "style": {
+          "background": "#704e7c",
+          "color": "#fff4f8",
+          "fontSize": 24,
+          "fontFamily": "system-ui",
+          "fontWeight": 400,
+          "borderColor": "#ad849d",
+          "borderWidth": 0,
+          "borderRadius": 12,
+          "padding": 12,
+          "opacity": 1,
+          "textAlign": "left",
+          "gap": 8
+        },
+        "command": "sacura.component.call",
+        "value": {
+          "instance": {
+            "kind": "reference",
+            "type": "mechanic",
+            "mode": "direct",
+            "id": "key-pickup"
+          },
+          "methodId": "pickup",
+          "args": {}
+        },
+        "operationVersion": 1,
+        "event": "pickup"
+      },
+      {
+        "id": "key-door-button",
+        "name": "Дверь с ключом",
+        "type": "button",
+        "parentId": null,
+        "role": "none",
+        "text": "Дверь с ключом",
+        "action": "gameplay",
+        "visible": true,
+        "layout": {
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "x": 24,
+          "y": 85,
+          "width": 380,
+          "height": 50
+        },
+        "style": {
+          "background": "#704e7c",
+          "color": "#fff4f8",
+          "fontSize": 24,
+          "fontFamily": "system-ui",
+          "fontWeight": 400,
+          "borderColor": "#ad849d",
+          "borderWidth": 0,
+          "borderRadius": 12,
+          "padding": 12,
+          "opacity": 1,
+          "textAlign": "left",
+          "gap": 8
+        },
+        "command": "sacura.component.call",
+        "value": {
+          "instance": {
+            "kind": "reference",
+            "type": "mechanic",
+            "mode": "direct",
+            "id": "key-door"
+          },
+          "methodId": "interact",
+          "args": {}
+        },
+        "operationVersion": 1,
+        "event": "door"
+      },
+      {
+        "id": "story-door-button",
+        "name": "Дверь склада",
+        "type": "button",
+        "parentId": null,
+        "role": "none",
+        "text": "Дверь склада",
+        "action": "gameplay",
+        "visible": true,
+        "layout": {
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "x": 24,
+          "y": 146,
+          "width": 380,
+          "height": 50
+        },
+        "style": {
+          "background": "#704e7c",
+          "color": "#fff4f8",
+          "fontSize": 24,
+          "fontFamily": "system-ui",
+          "fontWeight": 400,
+          "borderColor": "#ad849d",
+          "borderWidth": 0,
+          "borderRadius": 12,
+          "padding": 12,
+          "opacity": 1,
+          "textAlign": "left",
+          "gap": 8
+        },
+        "command": "sacura.component.call",
+        "value": {
+          "instance": {
+            "kind": "reference",
+            "type": "mechanic",
+            "mode": "direct",
+            "id": "story-door-lock"
+          },
+          "methodId": "interact",
+          "args": {}
+        },
+        "operationVersion": 1,
+        "event": "warehouse"
+      }
+    ],
+    "css": ""
+  }
+}

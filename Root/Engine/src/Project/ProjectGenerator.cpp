@@ -1,3 +1,4 @@
+#include "Input/InputDocument.h"
 #include "Project/ProjectGenerator.h"
 #include "ProjectTemplateContent.h"
 #include "Core/EnginePaths.h"
@@ -290,6 +291,27 @@ bool ProjectGenerator::CreateProject(
         }
     }
 
+    auto WidgetSettings = EnginePaths::Config() / "UI" / "Defaults.json";
+    if (std::filesystem::is_regular_file(TemplateDirectory / "WidgetSettings.json"))
+    {
+        WidgetSettings = TemplateDirectory / "WidgetSettings.json";
+    }
+    if (std::filesystem::is_regular_file(WidgetSettings))
+    {
+        try
+        {
+            std::ifstream Input(WidgetSettings);
+            const auto Settings = nlohmann::json::parse(Input);
+            Parsed.NarrativeWidgets = Settings.at("narrativeWidgets").get<std::map<std::string, std::string>>();
+            Parsed.NarrativeInputActions = Settings.at("narrativeInputActions").get<std::map<std::string, std::string>>();
+            Parsed.StartupInputContexts = Settings.at("startupInputContexts").get<std::vector<InputContextActivation>>();
+        }
+        catch (const std::exception& Exception)
+        {
+            OutError = std::string("Invalid widget template settings: ") + Exception.what();
+            return false;
+        }
+    }
     if (!Parsed.TrySaveToFile(OutError))
     {
         return false;

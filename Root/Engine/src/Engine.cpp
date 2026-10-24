@@ -3,6 +3,7 @@
 #include "World/Components/CameraComponent.h"
 #include "World/GameObject.h"
 #include "Engine.h"
+#include "UI/WidgetRuntime.h"
 #include "Prefab/PrefabLibrary.h"
 #include "Input/InputDocument.h"
 #include "Core/EnginePaths.h"
@@ -403,6 +404,7 @@ void Engine::BeginStory(Scene* World)
     {
         Story.LoadFromFile(StartupStory);
     }
+    WidgetRuntime::Update(*this);
 }
 
 bool Engine::StartGame()
@@ -457,6 +459,11 @@ std::shared_ptr<DynamicMaterialInstance> Engine::CreateDynamicMaterialInstance(c
 
 void Engine::StopGame()
 {
+    WidgetRuntime::Stop();
+    RequestedScene.reset();
+    RequestedScenePath.clear();
+    RequestedStoryPath.clear();
+    RequestedSceneStory = {};
     if (PlayerInput)
     {
         PlayerInput->Close();
@@ -600,7 +607,9 @@ void Engine::Tick(float DeltaTime)
     {
         MaterialTime += std::max(0.f, DeltaTime);
     }
+    WidgetRuntime::Update(*this);
     TickSubsystems(DeltaTime);
+    ProcessSceneTransition();
 
     if (!bHeadless)
     {

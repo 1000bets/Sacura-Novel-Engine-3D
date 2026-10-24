@@ -1,0 +1,9 @@
+{
+  "Version": 1,
+  "Action": {
+    "Name": "PreviousChoice",
+    "ValueType": 0,
+    "Trigger": 0,
+    "bExecuteWhenPaused": false
+  }
+}

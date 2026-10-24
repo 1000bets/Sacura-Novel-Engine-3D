@@ -1,3 +1,4 @@
+import NativeRuntimeWidgets from './NativeRuntimeWidgets.jsx';
 import NativeScriptsWorkspace from './NativeScriptsWorkspace.jsx';
 import NativeGameHud from './NativeGameHud.jsx';
 import {NativePrefabControls} from './NativePrefab.jsx';
@@ -30,7 +31,7 @@ import {inputContextsFor,inputHelp} from './inputModel.js';
 import EditorPreferences from './EditorPreferences.jsx';
 import ProjectSettings from './ProjectSettings.jsx';
 import {LocalizeEditorText} from './i18n.js';
-import {NativeWidgetLibraries} from './NativeWidgetEditor.jsx';
+import {NativeWidgets} from './NativeWidgetEditor.jsx';
 import WidgetWorkspace from './WidgetWorkspace.jsx';
 import WidgetRenderer,{WidgetMenu} from './WidgetRenderer.jsx';
 import WidgetAssignment from './WidgetAssignment.jsx';
@@ -737,7 +738,11 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     accountStorage.setItem(LAYOUT_KEY, JSON.stringify(layout));
   }, [layout]);
   useEffect(() => soundDesk.subscribe(() => setAudioTick((n) => n + 1)), []);
-  useEffect(()=>soundDesk.setAssets(projectAudioAssets(project)),[project]);
+  useEffect(() => {
+    if (!isNative) {
+      soundDesk.setAssets(projectAudioAssets(project));
+    }
+  }, [project, isNative]);
   useEffect(() => rt?.setSidechain(project.audioSettings?.sidechain), [project.audioSettings?.sidechain]);
   useEffect(() => {
     if (running && follow && preview.beatId) {
@@ -2423,7 +2428,7 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
     }
   }
   async function CreateNativeAsset(Parameters) {
-    if (Parameters.factoryId === 'editor.CreateWidgetLibraryAssetFactory' && Parameters.path.startsWith('UI/')) {
+    if (Parameters.factoryId === 'editor.CreateWidgetAssetFactory' && Parameters.path.startsWith('UI/')) {
       const Folders = await native.adapter.command('assets.folders', {}, native.context);
       if (!Folders.includes('Game/UI')) {
         await native.adapter.command('assets.createFolder', {folder:'Game', name:'UI'}, native.context);
@@ -2472,7 +2477,7 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
         if(results.length&&!mesh)throw Error('В импортированном файле нет статического меша.');
         return mesh?{assetId:imported.id,subAssetId:mesh.id,name:imported.name?.replace(/\.glb$/i,'')}:null;}}/>;
     if (dock==='widgets') {
-      return <NativeWidgetLibraries Assets={native.assets} OpenAsset={OpenNativeAsset} Disabled={nativeEditing}
+      return <NativeWidgets Assets={native.assets} OpenAsset={OpenNativeAsset} Disabled={nativeEditing}
         CreationTypes={()=>native.adapter.command('assets.creationTypes',{},native.context)}
         Create={CreateNativeAsset}/>;
     }
@@ -2981,6 +2986,7 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
                 onPlayerInteract={()=>rt?.playerInteract()}
                 onInteract={interact}
               />
+              {isNative&&nativePlaying&&<NativeRuntimeWidgets State={native.state} Execute={Parameters=>nativeCommand('widget.event',Parameters)}/>}
               {isNative&&nativePlaying&&<NativeGameHud State={native.state} Execute={Parameters=>nativeCommand('game.action',Parameters)}/>}
               {isNative&&nativePlaying&&<NativeDialogue onGameAction={Parameters=>nativeCommand('game.action',Parameters)} state={native.state} session={native.context?.session} onAdvance={()=>nativeCommand('play.advanceDialogue')} onChoice={index=>nativeCommand('play.selectChoice',{index})}/>}
               {!isNative&&<>{mode==='game'&&<TouchInput settings={playProject.input} contexts={world.inputContexts||[]} active={world.inputActive} playerMode={world.playerControl?.mode} paused={world.paused||!world.inputReady}/>}

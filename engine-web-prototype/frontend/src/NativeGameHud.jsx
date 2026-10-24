@@ -8,6 +8,7 @@ import './gameplay.css';
 export default function NativeGameHud({State, Execute}) {
   useLocale();
   const Views = State?.gameViews || [];
+  const HasHud = State?.widgetSlots?.includes('hud') || State?.widgetInstances?.some(Instance => Instance.kind === 'hud');
   const Disabled = State?.gamePaused || State?.play === 'paused';
   return <>{Views.map(View => <React.Fragment key={View.componentId}>
     {State.dialogue?.phase === 'end' && View.ending && <div className="game-ending">
@@ -18,7 +19,7 @@ export default function NativeGameHud({State, Execute}) {
     </div>}
     {View.reticle && <span className="native-game-reticle" aria-hidden="true">+</span>}
     {View.message&&<div className="gameplay-task" role="status">{View.message}</div>}
-    {View.widget ? <div className="gameplay-hud">
+    {!HasHud && (View.widget ? <div className="gameplay-hud">
       <WidgetRenderer widget={View.widget} context={{paused:Disabled,variables:View.variables||{},game:View.game||{}}} onAction={(Action,Element)=>{
         if (!Disabled && Element.nativeAction) {
           Execute({objectId:View.objectId,componentId:View.componentId,action:Element.nativeAction});
@@ -32,6 +33,6 @@ export default function NativeGameHud({State, Execute}) {
       <div className="native-game-actions">{(View.actions || []).map(Action => <button key={Action.id}
         disabled={Disabled || Action.enabled === false} onClick={() => Execute({objectId:View.objectId,componentId:View.componentId,action:Action.id})}>{Action.label}</button>)}</div>
       {View.controls && <small>{View.controls}</small>}
-    </section>}
+    </section>)}
   </React.Fragment>)}</>;
 }

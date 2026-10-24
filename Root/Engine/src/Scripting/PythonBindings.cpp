@@ -531,6 +531,33 @@ void RegisterInputBindings(py::module_& Module);
 PYBIND11_EMBEDDED_MODULE(engine, Module)
 {
     Module.doc() = "Sacura Novel Engine scripting bindings";
+    Module.def("RequestScene", [](const std::string& ScenePath, const std::string& StoryPath)
+    {
+        auto* Runtime = ScriptingSubsystem::Get().GetMaterialEngine();
+        std::string Error;
+        if (Runtime == nullptr)
+        {
+            throw py::value_error("Scene transitions require a game session");
+        }
+        if (!Runtime->RequestScene(ScenePath, Error, StoryPath))
+        {
+            throw py::value_error(Error);
+        }
+    }, py::arg("ScenePath"), py::arg("StoryPath") = "");
+    Module.def("IsSceneTransitionPending", []()
+    {
+        auto* Runtime = ScriptingSubsystem::Get().GetMaterialEngine();
+        return Runtime != nullptr && Runtime->IsSceneTransitionPending();
+    });
+    Module.def("GetSceneTransitionError", []()
+    {
+        auto* Runtime = ScriptingSubsystem::Get().GetMaterialEngine();
+        if (Runtime == nullptr)
+        {
+            throw py::value_error("Scene transition state requires an engine");
+        }
+        return Runtime->GetSceneTransitionError();
+    });
     Module.def("RequestStoryNode", [](const std::string& NodeId)
     {
         auto* Runtime = ScriptingSubsystem::Get().GetMaterialEngine();
@@ -951,6 +978,7 @@ def method(*, Parameters=None, Result=None):
     RegisterPhysicsNavigationBindings(Module);
     RegisterInputBindings(Module);
     RegisterNarrativeBindings(Module);
+    RegisterWidgetBindings(Module);
 }
 #else
 ReflectionDiagnostic ScriptingSubsystem::InvokeMethod(

@@ -2,6 +2,7 @@
 #include "Project/ProjectDescriptor.h"
 
 #include <fstream>
+#include "Input/InputDocument.h"
 #include <nlohmann/json.hpp>
 
 namespace
@@ -195,6 +196,20 @@ bool ProjectDescriptor::TryLoadFromFile(
         }
     }
 
+    try
+    {
+        Parsed.NarrativeWidgets = Document.value("narrativeWidgets", std::map<std::string, std::string>{});
+        Parsed.NarrativeInputActions = Document.value("narrativeInputActions", std::map<std::string, std::string>{});
+        if (Document.contains("input") && Document.at("input").contains("Contexts"))
+        {
+            Parsed.StartupInputContexts = Document.at("input").at("Contexts").get<std::vector<InputContextActivation>>();
+        }
+    }
+    catch (const std::exception& Exception)
+    {
+        OutError = std::string("Invalid project UI or input settings: ") + Exception.what();
+        return false;
+    }
     OutDescriptor = std::move(Parsed);
     return true;
 }
@@ -278,5 +293,11 @@ bool ProjectDescriptor::TrySaveToFile(std::string& OutError) const
         Document["startupAudio"] = Relative.generic_string();
     }
 
+    Document["narrativeWidgets"] = NarrativeWidgets;
+    Document["narrativeInputActions"] = NarrativeInputActions;
+    if (StartupInputContexts)
+    {
+        Document["input"]["Contexts"] = *StartupInputContexts;
+    }
     return AtomicFileWriter::WriteText(ProjectFile, Document.dump(2), OutError);
 }

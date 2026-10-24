@@ -19,7 +19,7 @@ if (Smoke) {
   app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 }
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
-const AllowedMethods = new Set(['bridge.describe', 'game.state', 'game.advance', 'game.choose', 'game.pause', 'game.action', 'audio.resolveStartup']);
+const AllowedMethods = new Set(['bridge.describe', 'game.state', 'game.advance', 'game.choose', 'game.pause', 'game.action', 'widget.event', 'audio.resolveStartup']);
 
 app.whenReady().then(async () => {
   let Project = Path.join(process.resourcesPath, 'Game', 'Game.project');
