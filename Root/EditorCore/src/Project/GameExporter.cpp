@@ -1,9 +1,13 @@
 #include "Project/GameExporter.h"
 #include "Project/ProjectDescriptor.h"
 
-#include <QString>
-#include <QUuid>
+#include "Assets/Guid.h"
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include <fstream>
+#include <thread>
+#include <chrono>
 #include <nlohmann/json.hpp>
 #include <stdexcept>
 
@@ -12,13 +16,26 @@ class GameExportFiles
 public:
     static bool IsInside(const std::filesystem::path& Candidate, const std::filesystem::path& Root)
     {
-        const QString CandidateText = QString::fromStdWString(std::filesystem::weakly_canonical(Candidate).generic_wstring());
-        const QString RootText = QString::fromStdWString(std::filesystem::weakly_canonical(Root).generic_wstring());
-        Qt::CaseSensitivity Sensitivity = Qt::CaseSensitive;
+        const auto CandidatePath = std::filesystem::weakly_canonical(Candidate);
+        const auto RootPath = std::filesystem::weakly_canonical(Root);
+        auto CandidatePart = CandidatePath.begin();
+        for (const auto& RootPart : RootPath)
+        {
+            if (CandidatePart == CandidatePath.end())
+            {
+                return false;
+            }
 #ifdef _WIN32
-        Sensitivity = Qt::CaseInsensitive;
+            if (CompareStringOrdinal(CandidatePart->c_str(), -1, RootPart.c_str(), -1, TRUE) != CSTR_EQUAL)
+#else
+            if (*CandidatePart != RootPart)
 #endif
-        return CandidateText.compare(RootText, Sensitivity) == 0 || CandidateText.startsWith(RootText + "/", Sensitivity);
+            {
+                return false;
+            }
+            ++CandidatePart;
+        }
+        return true;
     }
 
     static void Copy(const std::filesystem::path& Source, const std::filesystem::path& Destination)
@@ -52,6 +69,7 @@ bool GameExporter::Export(const std::filesystem::path& ProjectFile,
     const std::filesystem::path& RuntimeDirectory,
     const std::filesystem::path& EngineRoot,
     const std::filesystem::path& Destination,
+    const std::string& ExecutableName,
     std::string& OutError)
 {
     OutError.clear();
@@ -88,7 +106,8 @@ bool GameExporter::Export(const std::filesystem::path& ProjectFile,
             OutError = "Choose a new output folder outside the project and runtime folders. Existing folders are never overwritten.";
             return false;
         }
-        if (!std::filesystem::is_regular_file(RuntimeDirectory / "SakuraPlayer.exe") ||
+        if (!std::filesystem::is_regular_file(RuntimeDirectory / ExecutableName)
+            || std::filesystem::u8path(ExecutableName).filename().u8string() != ExecutableName ||
             !std::filesystem::is_directory(EngineRoot / "Engine" / "Content") ||
             !std::filesystem::is_directory(EngineRoot / "Engine" / "Shaders"))
         {
@@ -100,26 +119,21 @@ bool GameExporter::Export(const std::filesystem::path& ProjectFile,
             OutError = "The output parent folder does not exist.";
             return false;
         }
-        StagingDirectory = OutputDirectory.parent_path() / (".sakura-export-" + QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString());
+        StagingDirectory = OutputDirectory.parent_path() / (".sakura-export-" + Guid::Generate().ToString());
         std::filesystem::create_directory(StagingDirectory);
-        GameExportFiles::Copy(RuntimeDirectory / "SakuraPlayer.exe", StagingDirectory / "Game.exe");
         for (const auto& Entry : std::filesystem::directory_iterator(RuntimeDirectory))
         {
-            const auto Extension = Entry.path().extension();
-            if (Extension == ".dll" || Extension == "._pth")
+            if (Entry.path().filename() == "resources") { continue; }
+            if (Entry.path().filename().u8string() == ExecutableName)
+            {
+                GameExportFiles::Copy(Entry.path(), StagingDirectory / "Game.exe");
+            }
+            else
             {
                 GameExportFiles::Copy(Entry.path(), StagingDirectory / Entry.path().filename());
             }
         }
-        for (const auto& Folder : {"platforms", "imageformats", "Python"})
-        {
-            if (std::filesystem::exists(RuntimeDirectory / Folder))
-            {
-                GameExportFiles::Copy(RuntimeDirectory / Folder, StagingDirectory / Folder);
-            }
-        }
-        GameExportFiles::Copy(EngineRoot / "Engine", StagingDirectory / "Engine");
-        GameExportFiles::Copy(Project.ProjectFile, StagingDirectory / "Game" / "Game.project");
+        GameExportFiles::Copy(Project.ProjectFile, StagingDirectory / "resources" / "Game" / "Game.project");
         nlohmann::json DescriptorJson;
         std::ifstream DescriptorInput(Project.ProjectFile);
         DescriptorInput >> DescriptorJson;
@@ -128,7 +142,7 @@ bool GameExporter::Export(const std::filesystem::path& ProjectFile,
         {
             DescriptorJson["startupStory"] = Project.StartupStory.lexically_relative(Project.ProjectRoot).generic_u8string();
         }
-        std::ofstream DescriptorOutput(StagingDirectory / "Game" / "Game.project", std::ios::trunc);
+        std::ofstream DescriptorOutput(StagingDirectory / "resources" / "Game" / "Game.project", std::ios::trunc);
         DescriptorOutput.exceptions(std::ios::badbit | std::ios::failbit);
         DescriptorOutput << DescriptorJson.dump(2);
         DescriptorOutput.close();
@@ -136,10 +150,23 @@ bool GameExporter::Export(const std::filesystem::path& ProjectFile,
         {
             if (std::filesystem::exists(Project.ProjectRoot / Folder))
             {
-                GameExportFiles::Copy(Project.ProjectRoot / Folder, StagingDirectory / "Game" / Folder);
+                GameExportFiles::Copy(Project.ProjectRoot / Folder, StagingDirectory / "resources" / "Game" / Folder);
             }
         }
-        std::filesystem::rename(StagingDirectory, OutputDirectory);
+        for (int Attempt = 0; ; ++Attempt)
+        {
+            std::error_code PublishError;
+            std::filesystem::rename(StagingDirectory, OutputDirectory, PublishError);
+            if (!PublishError)
+            {
+                break;
+            }
+            if (Attempt >= 10 || PublishError != std::errc::permission_denied)
+            {
+                throw std::filesystem::filesystem_error("Publish exported game", StagingDirectory, OutputDirectory, PublishError);
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        }
         return true;
     }
     catch (const std::exception& Error)

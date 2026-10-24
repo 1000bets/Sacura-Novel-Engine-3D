@@ -1,0 +1,10 @@
+{
+  "Version": 1,
+  "Action": {
+    "Name": "LookEnable",
+    "ValueType": 0,
+    "Trigger": 3,
+    "bClampMagnitude": true,
+    "bRequireNeutral": true
+  }
+}

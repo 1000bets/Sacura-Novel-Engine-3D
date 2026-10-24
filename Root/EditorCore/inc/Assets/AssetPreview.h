@@ -1,5 +1,5 @@
 #pragma once
 #include "Assets/AssetTypes.h"
-#include <QImage>
+#include "Core/IO/ImageBuffer.h"
 class AssetRegistry;
-QImage GenerateAssetPreview(const AssetRegistry& Registry, const AssetKey& Key);
+ImageBuffer GenerateAssetPreview(const AssetRegistry& Registry, const AssetKey& Key);

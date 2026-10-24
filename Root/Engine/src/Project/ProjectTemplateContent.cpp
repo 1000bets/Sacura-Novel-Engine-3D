@@ -1,6 +1,10 @@
 #include "ProjectTemplateContent.h"
 
 #include "Assets/Guid.h"
+#include "Core/EnginePaths.h"
+#include "Story/StoryDocumentIO.h"
+#include <fstream>
+#include <sstream>
 #include "World/Serialization/SceneSerializer.h"
 
 #include <nlohmann/json.hpp>
@@ -12,8 +16,7 @@ namespace
 using Json = nlohmann::json;
 constexpr const char* StarterMeshId = "5bcbb1a6-db24-4248-b7d9-40555c563724";
 constexpr const char* StarterSubMeshId = "997a9fc2-2f8e-4e5d-82a1-af384af37962";
-constexpr const char* StarterCharacterId = "38ab7fb7-d867-5017-9e75-dcb9cb20f0e8";
-constexpr const char* StarterCharacterSubMeshId = "a7380ae6-1d02-5203-8261-518f678d7b0c";
+constexpr const char* StarterCharacterId = "832edba4-24e9-52cb-bf25-8e53c14497ef";
 constexpr const char* StarterMaterialId = "42b33bd1-5bf7-5462-920b-297de12b0f18";
 
 StoryNode Line(const std::string& Id, const std::string& Speaker, const std::string& Text, const std::string& Next)
@@ -104,9 +107,13 @@ Json BlockMesh()
 
 Json CharacterMesh()
 {
-    return SceneComponentJson("engine.MeshRendererComponent",
-        {{"mesh_asset_id", StarterCharacterId}, {"mesh_sub_asset_id", StarterCharacterSubMeshId},
-            {"material_asset_id", StarterMaterialId}, {"visible", true}});
+    return SceneComponentJson("engine.CharacterComponent",
+        {{"character", {{"assetId", StarterCharacterId}, {"subAssetId", nullptr}}},
+         {"description", "Starter story character"},
+         {"material_slots", {{"entries", Json::array({
+             {{"slot", 0}, {"material", {{"assetId", "8bc585c9-10fe-5172-99bd-5a5a8a0e8dc0"}, {"subAssetId", nullptr}}}},
+             {{"slot", 1}, {"material", {{"assetId", "8d074e29-7bd3-5f8d-a037-b58ce0898d8b"}, {"subAssetId", nullptr}}}}
+         })}}}});
 }
 }
 
@@ -124,6 +131,25 @@ bool BuildProjectTemplateContent(const std::string& TemplateId,
     if (!IsBuiltInProjectTemplate(TemplateId) || TemplateId == "Empty")
     {
         return false;
+    }
+
+    if (TemplateId == "builtin-quest" || TemplateId == "builtin-shooter"
+        || TemplateId == "builtin-novel" || TemplateId == "builtin-horror")
+    {
+        const auto TemplateDirectory = EnginePaths::Config() / "ProjectTemplates" / TemplateId;
+        std::ifstream SceneFile(TemplateDirectory / "Content" / "Scenes" / "Main.scene");
+        std::ifstream GuideFile(TemplateDirectory / "README.md");
+        if (!SceneFile || !GuideFile)
+        {
+            return false;
+        }
+        std::ostringstream SceneText;
+        SceneText << SceneFile.rdbuf();
+        OutSceneJson = SceneText.str();
+        std::ostringstream GuideText;
+        GuideText << GuideFile.rdbuf();
+        OutGuide = GuideText.str();
+        return StoryDocumentIO::LoadFromFile(TemplateDirectory / "Content" / "Stories" / "Opening.story", OutStory).bOk;
     }
 
     const bool bQuest = TemplateId == "builtin-quest";
@@ -148,8 +174,7 @@ bool BuildProjectTemplateContent(const std::string& TemplateId,
     Objects.push_back(SceneObject(bQuest ? "Locked Door" : bShooter ? "Training Target"
         : bHorror ? "Exit Door" : bNovel ? "Мира" : bCharacter ? "Mira" : "Story Focus", FocusId,
         bCharacter ? Json::array({-1.05, 0.0, -1.0}) : Json::array({0.0, 0.0, 0.0}),
-        bCharacter ? Json::array({CharacterMesh(), SceneComponentJson("engine.CharacterComponent",
-            {{"description", "Starter story character"}})}) : Json::array({BlockMesh()}),
+        bCharacter ? Json::array({CharacterMesh()}) : Json::array({BlockMesh()}),
         bCharacter ? Json::array({1.0, 1.0, 1.0})
             : Json::array({bQuest || bHorror ? 0.5 : 1.0,
                 bQuest || bHorror ? 2.0 : 1.0, 0.5})));

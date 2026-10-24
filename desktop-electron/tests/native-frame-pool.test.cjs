@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-test('shared frames retain imports across frames and retire resized resources after consumption', async () => {
+test('shared frames reacquire updated textures and retire resized resources after consumption', async () => {
   const Imported = [];
   const Acknowledged = [];
   const Module = {exports: {}};
@@ -40,15 +40,16 @@ test('shared frames retain imports across frames and retire resized resources af
   assert.equal(Acknowledged.length, 0);
   assert.equal(Owner.frameConsumed('1'), true);
   await Owner.receiveFrame(Packet(2, 100));
-  assert.equal(Imported.length, 1);
+  assert.equal(Imported.length, 2);
+  assert.equal(Imported[0].releases, 1);
   assert.equal(Owner.frameConsumed('1'), false);
   await Owner.receiveFrame(Packet(3, 101, 128));
-  assert.equal(Imported[0].releases, 0);
+  assert.equal(Imported[1].releases, 0);
   assert.equal(Owner.frameConsumed('2'), true);
   assert.equal(Owner.frameConsumed('3'), true);
   await Owner.receiveFrame(Packet(4, 100, 128));
-  assert.equal(Imported.length, 3);
-  assert.equal(Imported[0].releases, 1);
+  assert.equal(Imported.length, 4);
+  assert.equal(Imported[1].releases, 1);
   assert.equal(Owner.frameConsumed('4'), true);
   assert.equal(Owner.imports, 0);
   assert.deepEqual(Acknowledged, ['1', '2', '3', '4']);

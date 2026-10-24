@@ -19,7 +19,7 @@ export function EditorWindowsMenu({windows:Windows, onSelect:Select, onClose:Clo
   const [Query, SetQuery] = useState('');
   return <div className="editor-windows-menu" role="menu" aria-label={tr("Вкладки редактора")}>
     <label className="window-menu-search"><Icon name="Search" size={14}/><input autoFocus type="search" aria-label={tr("Найти вкладку")} placeholder={tr("Найти вкладку…")} value={Query} onChange={Event => SetQuery(Event.target.value)}/></label>
-    {[...EDITOR_WINDOWS.map(([Identifier, Caption, Icon]) => [Identifier, tr(Caption), Icon]), ...Object.entries(Windows.documents || {}).map(([Identifier, Definition]) => [Identifier, Definition.label, 'File'])].filter(([,Label]) => Label.toLocaleLowerCase().includes(Query.toLocaleLowerCase())).map(([Identifier, Label, IconName]) => <div className="window-menu-row" key={Identifier}>
+    {EDITOR_WINDOWS.map(([Identifier, Caption, Icon]) => [Identifier, tr(Caption), Icon]).filter(([,Label]) => Label.toLocaleLowerCase().includes(Query.toLocaleLowerCase())).map(([Identifier, Label, IconName]) => <div className="window-menu-row" key={Identifier}>
       <button role="menuitemcheckbox" aria-checked={isWindowOpen(Windows, Identifier)} onClick={() => Select(Identifier)}><Icon name={IconName} size={15}/><span>{Label}</span></button>
       {isWindowOpen(Windows, Identifier) && <button className="window-reveal" aria-label={'Закрыть вкладку «' + Label + '»'} onClick={() => Close(Identifier)}><Icon name="X" size={14}/></button>}
     </div>)}

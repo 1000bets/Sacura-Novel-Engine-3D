@@ -2,7 +2,7 @@
 #include "Core/IO/AtomicFileWriter.h"
 #include "Story/StoryDocumentIO.h"
 #include "Story/StoryEvents.h"
-#include <QString>
+#include <SDL3/SDL_stdinc.h>
 #include <algorithm>
 #include <set>
 #include <regex>
@@ -345,11 +345,12 @@ bool StoryGraphDocument::ImportEventPackage(const std::string& Text, const std::
         Origin.erase("sources");
         Sources.push_back(Origin);
         Event["sources"] = Sources;
-        QString Name = QString::fromStdString(Preview.Metadata.Name), Unique = Name;
-        auto Exists = [&](const QString& Candidate) {
+        const std::string Name = Preview.Metadata.Name;
+        std::string Unique = Name;
+        auto Exists = [&](const std::string& Candidate) {
             for (const auto& Item : Story.Events)
             {
-                if (QString::fromStdString(Item.Name).compare(Candidate, Qt::CaseInsensitive) == 0)
+                if (SDL_strcasecmp(Item.Name.c_str(), Candidate.c_str()) == 0)
                 {
                     return true;
                 }
@@ -359,9 +360,9 @@ bool StoryGraphDocument::ImportEventPackage(const std::string& Text, const std::
         int Suffix = 2;
         while (Exists(Unique))
         {
-            Unique = Name + QStringLiteral(" (%1)").arg(Suffix++);
+            Unique = Name + " (" + std::to_string(Suffix++) + ")";
         }
-        Event["name"] = Unique.toStdString();
+        Event["name"] = Unique;
         const auto PlacementId = Guid::Generate().ToString();
         const bool Applied = Apply(
             "Import event package",

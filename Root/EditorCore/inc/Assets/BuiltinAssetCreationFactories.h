@@ -92,10 +92,13 @@ public:
     ENGINE_REFLECT_FIELD(CreateInputActionAssetFactory, ValueType, "value_type", RF_EDITOR_EDITABLE, RF_DISPLAY_NAME("Тип значения"))
     bool bExecuteWhenPaused = false;
     ENGINE_REFLECT_FIELD(CreateInputActionAssetFactory, bExecuteWhenPaused, "execute_when_paused", RF_EDITOR_EDITABLE, RF_DISPLAY_NAME("Выполнять на паузе"))
+    bool bClampMagnitude = true;
+    ENGINE_REFLECT_FIELD(CreateInputActionAssetFactory, bClampMagnitude, "clamp_magnitude", RF_EDITOR_EDITABLE, RF_DISPLAY_NAME("Ограничивать величину единицей"))
 };
 ENGINE_CLASS_END(CreateInputActionAssetFactory)
 ENGINE_IMPLEMENT_FIELD(CreateInputActionAssetFactory, ValueType)
 ENGINE_IMPLEMENT_FIELD(CreateInputActionAssetFactory, bExecuteWhenPaused)
+ENGINE_IMPLEMENT_FIELD(CreateInputActionAssetFactory, bClampMagnitude)
 
 class CreateInputContextAssetFactory : public AssetCreationFactory
 {
@@ -119,16 +122,7 @@ public:
 };
 ENGINE_CLASS_END(CreatePrefabAssetFactory)
 
-class CreateWidgetLibraryAssetFactory : public AssetCreationFactory
-{
-    ENGINE_CLASS(CreateWidgetLibraryAssetFactory, AssetCreationFactory, "editor.CreateWidgetLibraryAssetFactory")
-public:
-    AssetType GetAssetType() const override { return AssetType{"WidgetLibrary"}; }
-    const char* GetDisplayName() const override { return "Библиотека UI"; }
-    const char* GetExtension() const override { return ".widgets"; }
-    bool Create(AssetRegistry& Registry, const std::filesystem::path& Destination, std::string& Error) const override;
-};
-ENGINE_CLASS_END(CreateWidgetLibraryAssetFactory)
+
 
 class CreatePostProcessMaterialAssetFactory : public CreateMaterialAssetFactory
 {

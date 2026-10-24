@@ -1,0 +1,1968 @@
+{
+  "format": "sakura.scene",
+  "formatVersion": 1,
+  "name": "horror",
+  "objects": [
+    {
+      "id": "74f6df09-e2aa-5dbb-88f5-fd0f948fe425",
+      "name": "camera",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          8,
+          7,
+          12
+        ],
+        "rotation": [
+          -0.2052690372537552,
+          0.2660737776085753,
+          0.058099797906967426,
+          0.940049882026049
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "8c2d72d3-c406-5c7e-bc57-f9ccd6aae4de",
+          "type": "engine.CameraComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "primary": true,
+            "field_of_view": 64
+          }
+        },
+        {
+          "id": "869ed17d-3556-58d1-8ea6-3136b70afed5",
+          "type": "game.TemplateController",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "Scenario": "horror",
+            "ObjectIds": "{\"camera\": \"74f6df09-e2aa-5dbb-88f5-fd0f948fe425\", \"sun\": \"f6ee0700-0e9b-51dc-bace-343c58d00b76\", \"sky\": \"31c39974-acc2-59bd-a810-5c86b2ddf02c\", \"horror-floor-0\": \"32aa0eda-3e15-522c-8251-1c837796faa6\", \"horror-west-0\": \"47b0370f-a423-59ea-a066-3ab8eec27f19\", \"horror-east-0\": \"6d6a1159-1958-5f78-b318-a2fb94687d91\", \"horror-floor-1\": \"73aacf39-f650-5c2a-ac5e-32e3ede54462\", \"horror-west-1\": \"633ccbdf-dc7e-5992-8aba-51d9ef82a57b\", \"horror-east-1\": \"8ce29271-b95c-5ea2-8b9b-95f15659f715\", \"horror-end\": \"9edafd85-9aa2-55c5-a0f0-185f833668eb\", \"floor-seam-0\": \"1acc3b6b-eead-598e-97de-6f1bf1e01bbd\", \"floor-seam-1\": \"d83b0b4e-290c-53b7-b78f-2ba3de30ad51\", \"floor-seam-2\": \"6914c338-8171-5e7b-b9b6-bfae47e10261\", \"floor-seam-3\": \"515323bd-9e6a-591a-aea4-a419ae403e5a\", \"floor-seam-4\": \"1931016d-9bf3-5bbd-99a2-36b9b35331bf\", \"floor-seam-5\": \"fa0a71d2-a89f-5810-b552-61ebbba0ecb9\", \"floor-seam-6\": \"16035674-55ba-595f-8470-051b539dfe7e\", \"floor-seam-7\": \"6402768b-dbe0-5fbb-897b-4946ce61df01\", \"player\": \"2860399f-4ecc-59b0-a75a-0dd239207e84\", \"horror-player\": \"2860399f-4ecc-59b0-a75a-0dd239207e84\", \"player/visual\": \"928f1435-c64b-5b3b-91e1-75b7c50c196b\", \"horror-wall-light-0\": \"4b951422-8519-52e7-a6b6-e40eb959428a\", \"horror-light-cover-0\": \"ac24c185-16c1-5300-80c8-2e89ebcba2d4\", \"horror-wall-light-1\": \"b51129da-5c64-5243-97af-d799d1733656\", \"horror-light-cover-1\": \"65c22c0f-92c4-5e01-ab07-654572d255ac\", \"horror-wall-light-2\": \"c5474a47-84cc-5d62-bbef-3afaa967308c\", \"horror-light-cover-2\": \"e3b72e46-2ab0-5434-8f7a-661f7456ce06\", \"desk\": \"9a877eea-57db-5761-ba70-5028aebe55e2\", \"horror-desk\": \"9a877eea-57db-5761-ba70-5028aebe55e2\", \"fuse\": \"759fd409-8259-521d-b428-1d3a9464ea0d\", \"horror-fuse\": \"759fd409-8259-521d-b428-1d3a9464ea0d\", \"journal\": \"06749f16-85eb-52ae-a598-2d669c7bb0b3\", \"horror-journal\": \"06749f16-85eb-52ae-a598-2d669c7bb0b3\", \"cabinet\": \"c3b9cae9-5eae-598f-99f4-44e4b0157bc7\", \"horror-cabinet\": \"c3b9cae9-5eae-598f-99f4-44e4b0157bc7\", \"mirror\": \"ac7c9d68-46ee-5fe1-88b7-c93c76455957\", \"horror-mirror\": \"ac7c9d68-46ee-5fe1-88b7-c93c76455957\", \"horror-tape-table\": \"7f887958-f5e0-5903-ae14-05d572525cce\", \"record\": \"35f79261-23b0-53bd-9b16-79546029ee93\", \"horror-tape\": \"35f79261-23b0-53bd-9b16-79546029ee93\", \"tape-reel-0\": \"72cadefc-be99-59bc-abcd-fb7be35d036d\", \"tape-reel-1\": \"413f5b21-aec0-531a-b2f5-f7049de05654\", \"power\": \"2fe86b20-a8bb-510c-b68d-1c656f08f6df\", \"horror-power\": \"2fe86b20-a8bb-510c-b68d-1c656f08f6df\", \"exit\": \"49b05acd-5991-5264-ac31-dc7d75b0eeea\", \"horror-exit\": \"49b05acd-5991-5264-ac31-dc7d75b0eeea\", \"shadow\": \"efd9be3d-d658-5daa-acea-c0e2849355a9\", \"horror-shadow\": \"efd9be3d-d658-5daa-acea-c0e2849355a9\", \"shadow/visual\": \"49de49ff-c457-5d14-a722-64da33363f5e\", \"lamp\": \"fcf00d9e-6422-5d35-a4e8-9924447e6e0c\", \"horror-alarm-light\": \"fcf00d9e-6422-5d35-a4e8-9924447e6e0c\", \"bell\": \"ba1263fd-6bec-5cec-aa39-3144073b3616\", \"horror-bell\": \"ba1263fd-6bec-5cec-aa39-3144073b3616\"}",
+            "MoveSpeed": 2.8,
+            "LookSensitivity": 0.004,
+            "RequireRecord": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "f6ee0700-0e9b-51dc-bace-343c58d00b76",
+      "name": "sun",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          -4,
+          9,
+          3
+        ],
+        "rotation": [
+          -0.4537387777352828,
+          -0.3852923350226961,
+          -0.22678567513597295,
+          0.7708691171043052
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "01b9949a-9cea-5bb5-baa7-f842c4149b78",
+          "type": "engine.LightComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "light_type": "Directional",
+            "intensity": 0.65,
+            "light_color": [
+              0.471,
+              0.592,
+              0.816,
+              1
+            ],
+            "cast_shadows": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "31c39974-acc2-59bd-a810-5c86b2ddf02c",
+      "name": "sky",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "fc1a1e8a-4155-5160-ad52-d107dc0f6563",
+          "type": "engine.SkyLightComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "intensity": 0.85,
+            "light_color": [
+              0.773,
+              0.843,
+              0.918,
+              1
+            ]
+          }
+        },
+        {
+          "id": "7f53591d-6127-5042-96ec-f13892f9bd6d",
+          "type": "engine.SkySphereComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "zenith_color": [
+              0.01825887834107066,
+              0.033168703640480586,
+              0.05819761873491538,
+              1
+            ],
+            "horizon_color": [
+              0.01825887834107066,
+              0.033168703640480586,
+              0.05819761873491538,
+              1
+            ],
+            "ground_color": [
+              0.01825887834107066,
+              0.033168703640480586,
+              0.05819761873491538,
+              1
+            ],
+            "sun_intensity": 0,
+            "brightness": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "32aa0eda-3e15-522c-8251-1c837796faa6",
+      "name": "Плитка проходной 1",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          -0.16,
+          5
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          18,
+          0.6,
+          20
+        ]
+      },
+      "components": [
+        {
+          "id": "5cabff29-eada-5d7c-b53e-5086d5930488",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "228831ea-2fcc-505f-8701-353c735e8e19",
+            "visible": true
+          }
+        },
+        {
+          "id": "95f99085-9d1b-55e2-b55f-dd09311d9392",
+          "type": "engine.PhysicsBodyComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "use_mesh_defaults": false,
+            "motion_type": "Static",
+            "shape_type": "Box",
+            "half_extents": [
+              0.25,
+              0.25,
+              0.25
+            ],
+            "center": [
+              0,
+              0,
+              0
+            ],
+            "collision_layer": 1,
+            "use_gravity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "47b0370f-a423-59ea-a066-3ab8eec27f19",
+      "name": "Западная стена 1",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          -4.45,
+          1.4,
+          5
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          0.6,
+          5.6,
+          20
+        ]
+      },
+      "components": [
+        {
+          "id": "53b91be0-2b35-5dd4-8a0a-10c482435baf",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "6edb1766-ea68-5422-8fd9-827e9bc5fc7f",
+            "visible": true
+          }
+        },
+        {
+          "id": "e4ac2a29-1450-5f03-854f-983625decd7f",
+          "type": "engine.PhysicsBodyComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "use_mesh_defaults": false,
+            "motion_type": "Static",
+            "shape_type": "Box",
+            "half_extents": [
+              0.25,
+              0.25,
+              0.25
+            ],
+            "center": [
+              0,
+              0,
+              0
+            ],
+            "collision_layer": 1,
+            "use_gravity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "6d6a1159-1958-5f78-b318-a2fb94687d91",
+      "name": "Восточная стена 1",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          4.45,
+          1.4,
+          5
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          0.6,
+          5.6,
+          20
+        ]
+      },
+      "components": [
+        {
+          "id": "04ce4b19-fe27-585e-9efe-65a2dc7d47d9",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "6edb1766-ea68-5422-8fd9-827e9bc5fc7f",
+            "visible": true
+          }
+        },
+        {
+          "id": "c6f94bf5-6dbe-5b4a-9a12-7e8fea308501",
+          "type": "engine.PhysicsBodyComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "use_mesh_defaults": false,
+            "motion_type": "Static",
+            "shape_type": "Box",
+            "half_extents": [
+              0.25,
+              0.25,
+              0.25
+            ],
+            "center": [
+              0,
+              0,
+              0
+            ],
+            "collision_layer": 1,
+            "use_gravity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "73aacf39-f650-5c2a-ac5e-32e3ede54462",
+      "name": "Плитка проходной 2",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          -0.16,
+          -5
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          18,
+          0.6,
+          20
+        ]
+      },
+      "components": [
+        {
+          "id": "8db5f641-6af9-5ced-af45-b5b040c49c40",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "228831ea-2fcc-505f-8701-353c735e8e19",
+            "visible": true
+          }
+        },
+        {
+          "id": "4ae84bae-e12d-5239-97ba-2de76b55cd67",
+          "type": "engine.PhysicsBodyComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "use_mesh_defaults": false,
+            "motion_type": "Static",
+            "shape_type": "Box",
+            "half_extents": [
+              0.25,
+              0.25,
+              0.25
+            ],
+            "center": [
+              0,
+              0,
+              0
+            ],
+            "collision_layer": 1,
+            "use_gravity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "633ccbdf-dc7e-5992-8aba-51d9ef82a57b",
+      "name": "Западная стена 2",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          -4.45,
+          1.4,
+          -5
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          0.6,
+          5.6,
+          20
+        ]
+      },
+      "components": [
+        {
+          "id": "5a85af01-63de-5e21-8a51-d9956c608de3",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "6edb1766-ea68-5422-8fd9-827e9bc5fc7f",
+            "visible": true
+          }
+        },
+        {
+          "id": "f11672a5-589b-54eb-b26c-06ca76e391e9",
+          "type": "engine.PhysicsBodyComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "use_mesh_defaults": false,
+            "motion_type": "Static",
+            "shape_type": "Box",
+            "half_extents": [
+              0.25,
+              0.25,
+              0.25
+            ],
+            "center": [
+              0,
+              0,
+              0
+            ],
+            "collision_layer": 1,
+            "use_gravity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "8ce29271-b95c-5ea2-8b9b-95f15659f715",
+      "name": "Восточная стена 2",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          4.45,
+          1.4,
+          -5
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          0.6,
+          5.6,
+          20
+        ]
+      },
+      "components": [
+        {
+          "id": "1c15f1f1-8cd1-516f-b5ba-2f5fb9ead5a0",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "6edb1766-ea68-5422-8fd9-827e9bc5fc7f",
+            "visible": true
+          }
+        },
+        {
+          "id": "38ed9993-554c-583b-aa3b-4f59dff26392",
+          "type": "engine.PhysicsBodyComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "use_mesh_defaults": false,
+            "motion_type": "Static",
+            "shape_type": "Box",
+            "half_extents": [
+              0.25,
+              0.25,
+              0.25
+            ],
+            "center": [
+              0,
+              0,
+              0
+            ],
+            "collision_layer": 1,
+            "use_gravity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "9edafd85-9aa2-55c5-a0f0-185f833668eb",
+      "name": "Стена дальней смены",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          1.4,
+          -9.8
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          18,
+          5.6,
+          0.6
+        ]
+      },
+      "components": [
+        {
+          "id": "abb38abe-6e34-566d-b46c-c974d11afd3b",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "afe643f9-8d2a-50c2-b2bc-b22be18ad2c0",
+            "visible": true
+          }
+        },
+        {
+          "id": "ceeb77a9-2fee-565e-8b22-3f2f5a84439c",
+          "type": "engine.PhysicsBodyComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "use_mesh_defaults": false,
+            "motion_type": "Static",
+            "shape_type": "Box",
+            "half_extents": [
+              0.25,
+              0.25,
+              0.25
+            ],
+            "center": [
+              0,
+              0,
+              0
+            ],
+            "collision_layer": 1,
+            "use_gravity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "1acc3b6b-eead-598e-97de-6f1bf1e01bbd",
+      "name": "Шов плитки 1",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          0.002,
+          8
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          17.2,
+          0.024,
+          0.05
+        ]
+      },
+      "components": [
+        {
+          "id": "9b667d66-56b4-5357-8c5d-b6964de26e8e",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "f8a6707e-5b26-5655-8e1c-258c6857f66c",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "d83b0b4e-290c-53b7-b78f-2ba3de30ad51",
+      "name": "Шов плитки 2",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          0.002,
+          5.7
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          17.2,
+          0.024,
+          0.05
+        ]
+      },
+      "components": [
+        {
+          "id": "ccc8df32-e4e7-51d5-b61c-5a9044fd915b",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "f8a6707e-5b26-5655-8e1c-258c6857f66c",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "6914c338-8171-5e7b-b9b6-bfae47e10261",
+      "name": "Шов плитки 3",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          0.002,
+          3.4000000000000004
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          17.2,
+          0.024,
+          0.05
+        ]
+      },
+      "components": [
+        {
+          "id": "ba95157b-04cf-5283-adcd-d43eb7619baf",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "f8a6707e-5b26-5655-8e1c-258c6857f66c",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "515323bd-9e6a-591a-aea4-a419ae403e5a",
+      "name": "Шов плитки 4",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          0.002,
+          1.1000000000000005
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          17.2,
+          0.024,
+          0.05
+        ]
+      },
+      "components": [
+        {
+          "id": "5ddacf1c-9ab4-5a7b-b94a-38b84e2591d5",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "f8a6707e-5b26-5655-8e1c-258c6857f66c",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "1931016d-9bf3-5bbd-99a2-36b9b35331bf",
+      "name": "Шов плитки 5",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          0.002,
+          -1.1999999999999993
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          17.2,
+          0.024,
+          0.05
+        ]
+      },
+      "components": [
+        {
+          "id": "a83b8df8-88b2-5ec8-82fc-b587bc271852",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "f8a6707e-5b26-5655-8e1c-258c6857f66c",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "fa0a71d2-a89f-5810-b552-61ebbba0ecb9",
+      "name": "Шов плитки 6",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          0.002,
+          -3.5
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          17.2,
+          0.024,
+          0.05
+        ]
+      },
+      "components": [
+        {
+          "id": "3b960bbb-ea8b-557b-ab0d-6c31707b8afe",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "f8a6707e-5b26-5655-8e1c-258c6857f66c",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "16035674-55ba-595f-8470-051b539dfe7e",
+      "name": "Шов плитки 7",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          0.002,
+          -5.799999999999999
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          17.2,
+          0.024,
+          0.05
+        ]
+      },
+      "components": [
+        {
+          "id": "6a126b0e-940a-55e8-ac2a-d471fdbcc06f",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "f8a6707e-5b26-5655-8e1c-258c6857f66c",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "6402768b-dbe0-5fbb-897b-4946ce61df01",
+      "name": "Шов плитки 8",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          0.002,
+          -8.099999999999998
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          17.2,
+          0.024,
+          0.05
+        ]
+      },
+      "components": [
+        {
+          "id": "ea0ab2da-a216-5877-8d13-84e7a5e09bf5",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "f8a6707e-5b26-5655-8e1c-258c6857f66c",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "2860399f-4ecc-59b0-a75a-0dd239207e84",
+      "name": "Смотритель · игрок",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          0,
+          6.5
+        ],
+        "rotation": [
+          0.0,
+          1.0,
+          0.0,
+          6.123233995736766e-17
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "1dedbef7-bd73-551f-9615-3a8c480517c0",
+          "type": "engine.PhysicsBodyComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "use_mesh_defaults": false,
+            "motion_type": "Kinematic",
+            "shape_type": "Box",
+            "half_extents": [
+              0.24,
+              0.8,
+              0.24
+            ],
+            "center": [
+              0,
+              0.8,
+              0
+            ],
+            "collision_layer": 4,
+            "use_gravity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "928f1435-c64b-5b3b-91e1-75b7c50c196b",
+      "name": "player/visual",
+      "parent": "2860399f-4ecc-59b0-a75a-0dd239207e84",
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          0.83,
+          0.83,
+          0.83
+        ]
+      },
+      "components": [
+        {
+          "id": "9c10a72a-f74c-50fa-b78b-f8fbae320a32",
+          "type": "engine.CharacterComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "description": "Смотритель · игрок",
+            "character": {
+              "assetId": "832edba4-24e9-52cb-bf25-8e53c14497ef",
+              "subAssetId": null
+            },
+            "material_slots": {
+              "entries": [
+                {
+                  "slot": 0,
+                  "material": {
+                    "assetId": "8bc585c9-10fe-5172-99bd-5a5a8a0e8dc0",
+                    "subAssetId": null
+                  }
+                },
+                {
+                  "slot": 1,
+                  "material": {
+                    "assetId": "8d074e29-7bd3-5f8d-a037-b58ce0898d8b",
+                    "subAssetId": null
+                  }
+                }
+              ]
+            },
+            "automatic_walk": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "4b951422-8519-52e7-a6b6-e40eb959428a",
+      "name": "Дежурный свет 1",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          -3.8,
+          2.25,
+          5
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "effb45bb-cb71-5c6a-b153-8d81bd9f9f75",
+          "type": "engine.LightComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "light_type": "Point",
+            "intensity": 16,
+            "range": 9,
+            "cast_shadows": false,
+            "light_color": [
+              0.8156862745098039,
+              0.7098039215686275,
+              0.5490196078431373,
+              1
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "ac24c185-16c1-5300-80c8-2e89ebcba2d4",
+      "name": "Плафон 1",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          -4.1,
+          2.25,
+          5
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          0.36,
+          0.4,
+          1.6
+        ]
+      },
+      "components": [
+        {
+          "id": "32ba1bcc-28d0-569f-9b26-865868163d9e",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "dc427632-6c68-5534-be63-6d3b07901d78",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "b51129da-5c64-5243-97af-d799d1733656",
+      "name": "Дежурный свет 2",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          3.8,
+          2.25,
+          -2
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "14c258ef-cee0-5f1a-97ff-126b7123d473",
+          "type": "engine.LightComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "light_type": "Point",
+            "intensity": 16,
+            "range": 9,
+            "cast_shadows": false,
+            "light_color": [
+              0.8156862745098039,
+              0.7098039215686275,
+              0.5490196078431373,
+              1
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "65c22c0f-92c4-5e01-ab07-654572d255ac",
+      "name": "Плафон 2",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          4.1,
+          2.25,
+          -2
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          0.36,
+          0.4,
+          1.6
+        ]
+      },
+      "components": [
+        {
+          "id": "78bbb592-8ef5-58c6-83cd-9fc052ab0ca4",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "dc427632-6c68-5534-be63-6d3b07901d78",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "c5474a47-84cc-5d62-bbef-3afaa967308c",
+      "name": "Дежурный свет 3",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          -3.8,
+          2.25,
+          -7
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "18fd52f6-5520-5e17-b3f5-9483ffdbb68a",
+          "type": "engine.LightComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "light_type": "Point",
+            "intensity": 16,
+            "range": 9,
+            "cast_shadows": false,
+            "light_color": [
+              0.8156862745098039,
+              0.7098039215686275,
+              0.5490196078431373,
+              1
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "e3b72e46-2ab0-5434-8f7a-661f7456ce06",
+      "name": "Плафон 3",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          -4.1,
+          2.25,
+          -7
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          0.36,
+          0.4,
+          1.6
+        ]
+      },
+      "components": [
+        {
+          "id": "9d26d13f-ecdb-5315-9f6f-2b2b20c5cd34",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "dc427632-6c68-5534-be63-6d3b07901d78",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "9a877eea-57db-5761-ba70-5028aebe55e2",
+      "name": "Стол смотрителя",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          -2.8,
+          0.55,
+          4.4
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          3.2,
+          2.2,
+          3.6
+        ]
+      },
+      "components": [
+        {
+          "id": "6844483d-a6ca-59b5-ad29-b703c7d4a3b1",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "ef3ed5cf-007e-561e-9435-1c50901ab638",
+            "visible": true
+          }
+        },
+        {
+          "id": "bd61b508-fc8a-57ad-aac6-b9071b7cd997",
+          "type": "engine.PhysicsBodyComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "use_mesh_defaults": false,
+            "motion_type": "Static",
+            "shape_type": "Box",
+            "half_extents": [
+              0.25,
+              0.25,
+              0.25
+            ],
+            "center": [
+              0,
+              0,
+              0
+            ],
+            "collision_layer": 1,
+            "use_gravity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "759fd409-8259-521d-b428-1d3a9464ea0d",
+      "name": "Керамический предохранитель",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          -2.7,
+          1.22,
+          4.1
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          0.8,
+          0.56,
+          1.3
+        ]
+      },
+      "components": [
+        {
+          "id": "20f45066-1e1b-54ea-8db9-34a1bfe2e23b",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "14be1eed-6452-55b5-8bf0-9b5354ba7893",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "06749f16-85eb-52ae-a598-2d669c7bb0b3",
+      "name": "Журнал смен",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          -2.9,
+          1.14,
+          4.9
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.4,
+          0.16,
+          1.1
+        ]
+      },
+      "components": [
+        {
+          "id": "5644ba82-157c-5518-b142-de9859faa17a",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "e39edd1d-4a5d-5cad-b143-8595e8e762d4",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "c3b9cae9-5eae-598f-99f4-44e4b0157bc7",
+      "name": "Шкаф пропавшей смены",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          3,
+          0.9,
+          1.6
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          2.2,
+          3.6,
+          3
+        ]
+      },
+      "components": [
+        {
+          "id": "9ca5b0a6-708a-552f-9b0f-472a15245a7d",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "89d90f99-07ae-5aa4-8eef-c5e5166ef06c",
+            "visible": true
+          }
+        },
+        {
+          "id": "0a7f8970-936c-59c0-8d15-e5ffa3443af3",
+          "type": "engine.PhysicsBodyComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "use_mesh_defaults": false,
+            "motion_type": "Static",
+            "shape_type": "Box",
+            "half_extents": [
+              0.25,
+              0.25,
+              0.25
+            ],
+            "center": [
+              0,
+              0,
+              0
+            ],
+            "collision_layer": 1,
+            "use_gravity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "ac7c9d68-46ee-5fe1-88b7-c93c76455957",
+      "name": "Тусклое зеркало",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          -4.15,
+          1.4,
+          -0.7
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          0.2,
+          3.4,
+          3
+        ]
+      },
+      "components": [
+        {
+          "id": "fa6b6cdc-918a-50e2-8aee-91e79b07c7a2",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "daa623d2-ba96-5e12-90f9-6ea93889e9f1",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "7f887958-f5e0-5903-ae14-05d572525cce",
+      "name": "Тумба магнитофона",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          2.7,
+          0.45,
+          -2.8
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          3.2,
+          1.8,
+          2.8
+        ]
+      },
+      "components": [
+        {
+          "id": "90f35f20-8a77-547d-8917-3ffd737a67c5",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "bb45ddce-0298-58c1-a36e-b33a3b0b7cc1",
+            "visible": true
+          }
+        },
+        {
+          "id": "e0d659df-a9ad-5bef-81a8-127f79919ef2",
+          "type": "engine.PhysicsBodyComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "use_mesh_defaults": false,
+            "motion_type": "Static",
+            "shape_type": "Box",
+            "half_extents": [
+              0.25,
+              0.25,
+              0.25
+            ],
+            "center": [
+              0,
+              0,
+              0
+            ],
+            "collision_layer": 1,
+            "use_gravity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "35f79261-23b0-53bd-9b16-79546029ee93",
+      "name": "Магнитофон последней смены",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          2.7,
+          1.08,
+          -2.8
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          2.4,
+          0.7,
+          1.5
+        ]
+      },
+      "components": [
+        {
+          "id": "36688603-ca49-5531-8b7e-72074173ac5a",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "0da2c99f-6ea6-59b2-a2ff-26754999322e",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "72cadefc-be99-59bc-abcd-fb7be35d036d",
+      "name": "Катушка 1",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          2.35,
+          1.31,
+          -2.8
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          0.56,
+          0.2,
+          0.56
+        ]
+      },
+      "components": [
+        {
+          "id": "fa35ddb7-ebce-551d-9a24-6c08ec85d0ec",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "ddec64e3-ac0a-511d-93b2-0f567311a04b",
+            "mesh_sub_asset_id": "86bc959b-0fbe-53fa-8aea-257bc85959af",
+            "material_asset_id": "458a8bb5-f862-5d67-b4e4-03d7bd27ab4f",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "413f5b21-aec0-531a-b2f5-f7049de05654",
+      "name": "Катушка 2",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          3.05,
+          1.31,
+          -2.8
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          0.56,
+          0.2,
+          0.56
+        ]
+      },
+      "components": [
+        {
+          "id": "ac58b0a1-3080-503b-9af9-50c56a9a34f7",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "ddec64e3-ac0a-511d-93b2-0f567311a04b",
+            "mesh_sub_asset_id": "86bc959b-0fbe-53fa-8aea-257bc85959af",
+            "material_asset_id": "458a8bb5-f862-5d67-b4e4-03d7bd27ab4f",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "2fe86b20-a8bb-510c-b68d-1c656f08f6df",
+      "name": "Красный электрощит",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          -4.05,
+          1.1,
+          -5.2
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1,
+          2.6,
+          2.4
+        ]
+      },
+      "components": [
+        {
+          "id": "f060a66f-e381-5684-a2ed-31a043116823",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "39ff5cac-c64e-5733-a669-7e623140fdb5",
+            "visible": true
+          }
+        },
+        {
+          "id": "64b84773-1a1e-55e0-b610-3ebd0d3de25c",
+          "type": "engine.PhysicsBodyComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "use_mesh_defaults": false,
+            "motion_type": "Static",
+            "shape_type": "Box",
+            "half_extents": [
+              0.25,
+              0.25,
+              0.25
+            ],
+            "center": [
+              0,
+              0,
+              0
+            ],
+            "collision_layer": 1,
+            "use_gravity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "49b05acd-5991-5264-ac31-dc7d75b0eeea",
+      "name": "Зелёная дверь выхода",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          1,
+          -9.55
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          3,
+          4,
+          0.36
+        ]
+      },
+      "components": [
+        {
+          "id": "17b84ed6-32da-5447-ba93-d7c53b3aa8ad",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "f4a07000-d023-5898-bff5-95cb493699e6",
+            "mesh_sub_asset_id": "ac3a9c47-b85e-5b70-a81a-d8629fb8bdcf",
+            "material_asset_id": "40a92e0d-9973-5791-8e02-c2634de1af2b",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "efd9be3d-d658-5daa-acea-c0e2849355a9",
+      "name": "Чужой силуэт",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          0,
+          -7
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": []
+    },
+    {
+      "id": "49de49ff-c457-5d14-a722-64da33363f5e",
+      "name": "shadow/visual",
+      "parent": "efd9be3d-d658-5daa-acea-c0e2849355a9",
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          0.83,
+          0.83,
+          0.83
+        ]
+      },
+      "components": [
+        {
+          "id": "788cb098-add2-55a6-ab10-e80eee6b9898",
+          "type": "engine.CharacterComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "description": "Чужой силуэт",
+            "character": {
+              "assetId": "832edba4-24e9-52cb-bf25-8e53c14497ef",
+              "subAssetId": null
+            },
+            "material_slots": {
+              "entries": [
+                {
+                  "slot": 0,
+                  "material": {
+                    "assetId": "8bc585c9-10fe-5172-99bd-5a5a8a0e8dc0",
+                    "subAssetId": null
+                  }
+                },
+                {
+                  "slot": 1,
+                  "material": {
+                    "assetId": "8d074e29-7bd3-5f8d-a037-b58ce0898d8b",
+                    "subAssetId": null
+                  }
+                }
+              ]
+            },
+            "automatic_walk": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "fcf00d9e-6422-5d35-a4e8-9924447e6e0c",
+      "name": "Аварийный свет",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          2.5,
+          -5
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "0d8a2d02-9dbc-5bfc-b43c-d0c75fba94d2",
+          "type": "engine.LightComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "light_type": "Point",
+            "intensity": 24,
+            "range": 12,
+            "cast_shadows": false,
+            "light_color": [
+              0.8862745098039215,
+              0.4392156862745098,
+              0.34901960784313724,
+              1
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "ba1263fd-6bec-5cec-aa39-3144073b3616",
+      "name": "Звонок охраны",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          3,
+          1.1,
+          6
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1,
+          0.6,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "aac6bc1f-973d-5e3f-954c-ac38a6e2e12b",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "40d6a209-8d96-5ff5-89f6-40cee23bcfbf",
+            "mesh_sub_asset_id": "5f7da312-8f19-52c7-b700-6d24e56f241b",
+            "material_asset_id": "fc4d3436-6708-57cd-8385-9ec9d1080c9e",
+            "visible": true
+          }
+        }
+      ]
+    }
+  ]
+}

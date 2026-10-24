@@ -16,11 +16,19 @@ function validate(method, params) {
   const spec=Object.hasOwn(contract.methods,method)&&contract.methods[method];
   if(!spec)throw Error('Unknown method');
   if(!params||typeof params!=='object'||Array.isArray(params))throw Error('params must be an object');
-  validJson(params);const allowed=new Set();
+  const allowed=new Set();
   for(const [field,type] of Object.entries(spec)) {
     const optional=field.endsWith('?'),key=optional?field.slice(0,-1):field;allowed.add(key);
     if(!Object.hasOwn(params,key)){if(!optional)throw Error('Missing '+key);continue;}
     const value=params[key];
+    if (type === 'serializedJson') {
+      if (typeof value !== 'string' || Buffer.byteLength(value, 'utf8') > 1024 * 1024) {
+        throw Error('Invalid ' + key);
+      }
+      validJson(JSON.parse(value));
+      continue;
+    }
+    validJson(value, 1);
     if(type==='json')continue;
     if(type==='number'){if(typeof value!=='number'||!Number.isFinite(value)||Math.abs(value)>1e8)throw Error('Invalid '+key);continue;}
     if(type==='boolean'){if(typeof value!=='boolean')throw Error('Invalid '+key);continue;}
@@ -72,7 +80,7 @@ class BridgeTransport extends EventEmitter {
     const id=String(++this.sequence);
     const request={type:'bridge.command',version:1,id,session:context.session,epoch:context.epoch,method,params};
     const body=Buffer.from(JSON.stringify(request));
-    if(body.length>65536)return Promise.resolve(errorResult('INVALID_ARGUMENT','Request exceeds 64 KiB',this.context));
+    if(body.length>8*1024*1024)return Promise.resolve(errorResult('INVALID_ARGUMENT','Request exceeds 8 MiB',this.context));
     const packet=Buffer.alloc(4+body.length);packet.writeUInt32LE(body.length);body.copy(packet,4);
     return new Promise(resolve=>{
       const timer=setTimeout(()=>{this.pending.delete(id);resolve({...errorResult('TIMEOUT','Command outcome unknown; refresh before retrying',this.context),id});},30000);

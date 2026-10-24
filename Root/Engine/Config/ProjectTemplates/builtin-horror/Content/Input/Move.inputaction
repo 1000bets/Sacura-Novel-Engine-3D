@@ -1,0 +1,10 @@
+{
+  "Version": 1,
+  "Action": {
+    "Name": "Move",
+    "ValueType": 2,
+    "Trigger": 3,
+    "bClampMagnitude": true,
+    "bRequireNeutral": true
+  }
+}

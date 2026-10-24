@@ -1,3 +1,5 @@
+import NativeGameHud from './NativeGameHud.jsx';
+import {NativePrefabControls} from './NativePrefab.jsx';
 import {GetNativeMeshPlacement} from './nativeScenePlacement.js';
 import {nativePlacementMenuItems} from './nativePlacementMenu.js';
 import {NativeAssetsContext, AssetThumbnail} from './NativeAssets.jsx';
@@ -284,6 +286,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
  useEffect(()=>{SetNativeReveal(null);},[native.context?.session]);
  const nativeLastFocus=useRef('scene');
  useEffect(()=>{if(nativeFocus!=='sceneSettings')nativeLastFocus.current=nativeFocus;},[nativeFocus]);
+ const [bAutoFocusStorySelection,SetAutoFocusStorySelection]=useState(false);
  const [nativeAssetId,setNativeAssetId]=useState(null),[nativeStorySelection,setNativeStorySelection]=useState(null),[nativeStoryPath,setNativeStoryPath]=useState('New.story');
  const nativeFlow=useMemo(()=>nativeStoryPresentation(native.story,native.objects),[native.story,native.objects]);
  const nativeFiles=useMemo(()=>native.assets.filter(Asset => Asset.browserVisible !== false || Asset.id === NativeReveal?.assetId).map(a=>({...a,path:a.path.replace(/^\//,''),kind:a.typeId==='Texture'&&/\.(png|jpe?g|bmp|webp)$/i.test(a.path)?'image':a.typeId==='Model'?'model':'file',src:`sacura://native-asset/${native.context?.session}/${a.id}?v=${encodeURIComponent(a.version||'')}`,users:[]})),[native.assets,native.context?.session,NativeReveal?.assetId]);
@@ -430,6 +433,7 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     if(command.action==='create-story'){await createNativeStory();await window.sacuraDesktop.bridgeTestResult({action:'create-story',done:true});}
   }),[native.context,nativeStoryPath,nativeStoryCreating]);
   useEffect(()=>window.sacuraDesktop?.onNativeTest?.(command=>{
+    if (command.action === 'migration-story') { setNativeStorySelection({nodeId: command.nodeId}); setNativeFocus('story'); setDock('story'); }
     if(command.action==='layout')setLayout(l=>({...l,left:command.left,right:command.right,height:command.height,
       windows:{...l.windows,position:command.position||'bottom'}}));
   }),[]);
@@ -1555,7 +1559,7 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
           }}
           onChange={t=>native.adapter.command('transform.set',{objectId:id,transform:{position:t.position.map(Number),rotation:eulerToQuaternion(t.rotation),scale:t.scale.map(Number)}},native.context)}
           onReset={()=>nativeCommand('transform.set',{objectId:id,transform:{position:[0,0,0],rotation:[0,0,0,1],scale:[1,1,1]}})} onFocus={()=>setFocusRequest({nonce:uid('focus')})}
-          onDelete={()=>nativeCommand('object.destroy',{objectId:id})}/>
+          onDuplicate={duplicateObjects} onDelete={()=>nativeCommand('object.destroy',{objectId:id})}/>
         <ComponentInstancesInspector project={project} running={nativeEditing} reflection={{components:native.components,types:native.types,
           assets:native.assets,objectId:id,command:nativeCommand,revision:native.context?.revision,onAsset:(componentId,property,{assetId,subAssetId})=>nativeCommand('component.setAsset',{objectId:id,componentId,property,assetId,subAssetId}),
           onAdd:typeId=>nativeCommand('object.addComponent',{objectId:id,typeId}),onRemove:componentId=>nativeCommand('object.removeComponent',{objectId:id,componentId}),onEnabled:(componentId,enabled)=>nativeCommand('component.setEnabled',{objectId:id,componentId,enabled}),
@@ -2418,7 +2422,7 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
     }
     let SubassetId = Identity.subAssetId;
     if (Asset.typeId==='Model' && !SubassetId) { SubassetId = Asset.subassets.find(Entry=>Entry.typeId==='StaticMesh')?.id; }
-    if (['Material','MaterialInstance','Texture','PythonScript'].includes(Asset.typeId) || SubassetId && Asset.subassets.some(Entry=>Entry.id===SubassetId&&Entry.typeId==='StaticMesh')) {
+    if (['Material','MaterialInstance','Texture','PythonScript','Prefab'].includes(Asset.typeId) || SubassetId && Asset.subassets.some(Entry=>Entry.id===SubassetId&&Entry.typeId==='StaticMesh')) {
       try { await window.sacuraDesktop.nativeOpenAssetEditor({assetId:Asset.id, subAssetId:SubassetId || null}); }
       catch (ErrorValue) { setNotice(ErrorValue.message); }
       return;
@@ -2447,15 +2451,29 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
     if(dock!=='story'&&dock!=='event')return <p role="status">{tr("Эта панель ещё не подключена к C++ Engine. Доступны Hierarchy, Inspector, Сцена, Файлы и История.")}</p>;
     const doc=native.story?.document;
     const select=value=>{setNativeFocus('story');setNativeStorySelection(!value?null:typeof value==='string'?{nodeId:value}:{nodeId:value.flowBeatId,eventId:value.event?.id,bindingId:value.binding?.id});};
-    const connect=async value=>{const changes=value.changes||[value];for(const c of changes){const node=doc.nodes.find(n=>n.id===c.source);if(!node)continue;const port=c.sourceHandle==='next'?-1:(node.choices||[]).findIndex(p=>'choice:'+p.id===c.sourceHandle);await nativeCommand('story.connect',{sourceId:c.source,port,targetId:c.target||null});}};
+    const connect = async Value => {
+      for (const Connection of Value.changes || [Value]) {
+        if (Connection.targetHandle?.startsWith('data:')) {
+          if (!Connection.sourceHandle?.startsWith('data:')) { throw new Error('Connect a data output to a data input'); }
+          await nativeCommand('story.connectData', {sourceId: Connection.disconnect ? '' : Connection.source, output: Connection.disconnect ? '' : Connection.sourceHandle.slice(5), targetId: Connection.target, input: Connection.targetHandle.slice(5)});
+          continue;
+        }
+        if (Connection.sourceHandle?.startsWith('data:')) { throw new Error('Data outputs require a data input'); }
+        const Node = doc.nodes.find(Entry => Entry.id === Connection.source);
+        if (!Node) { continue; }
+        let Port = -1;
+        if (Connection.sourceHandle !== 'next') { Port = (Node.choices || []).findIndex(Exit => 'choice:' + Exit.id === Connection.sourceHandle); }
+        await nativeCommand('story.connect', {sourceId: Node.id, port: Port, targetId: Connection.target || null});
+      }
+    };
     return <div style={{height:'100%',display:'flex',flexDirection:'column'}} onPointerDown={()=>setNativeFocus('story')}>
       <div className="dock-toolbar"><select aria-label="Story asset" value={native.assets.find(a=>a.typeId==='Story'&&native.story?.path?.replaceAll('\\','/').endsWith('/'+a.relativePath))?.id||''} onChange={e=>nativeCommand('story.open',{assetId:e.target.value})}><option value="">{tr("Открыть историю…")}</option>{native.assets.filter(a=>a.typeId==='Story').map(a=><option key={a.id} value={a.id}>{a.path}</option>)}</select>
         <input aria-label={tr("Новый story asset")} disabled={nativeStoryCreating} value={nativeStoryPath} onChange={e=>setNativeStoryPath(e.target.value)}/><Button disabled={nativeEditing||nativeStoryCreating} onClick={createNativeStory}>{tr(nativeStoryCreating?'Создание…':'Создать историю')}</Button>
         <Button disabled={!doc||nativeEditing} onClick={()=>nativeCommand('story.save')}>{tr("Сохранить")}</Button><Button disabled={!native.story?.canUndo||nativeEditing} onClick={()=>nativeCommand('story.undo')}>Undo</Button><Button disabled={!native.story?.canRedo||nativeEditing} onClick={()=>nativeCommand('story.redo')}>Redo</Button>
-        <span className="muted" title={tr("Кнопка + у фазы открывает меню событий")}>{tr("ПКМ — добавить ноду")}</span>
+        <Button icon="LocateFixed" title={tr("Фокусироваться при выборе ноды")} aria-pressed={bAutoFocusStorySelection} onClick={()=>SetAutoFocusStorySelection(Previous=>!Previous)}/>
         <span>{native.story?.dirty?'Изменено':''}{native.story?.externalChanges?' · Файл изменён извне':''}</span>
       </div>
-      {doc?<div style={{flex:1,minHeight:220}}><StoryFlow key={native.story.path} nativeMode model={nativeFlow.model} project={nativeFlow.project} running={nativeEditing||native.story.readOnly} selectedId={nativeStorySelection?.nodeId} selectionId={nativeStorySelection?.bindingId} positions={native.story.positions} onPositions={positions=>nativeCommand('story.moveNodes',{positions})} onSelect={select} onOpen={select} onConnect={connect}
+      {doc?<div style={{flex:1,minHeight:220}}><StoryFlow NativeCommand={nativeCommand} bAutoFocusSelection={bAutoFocusStorySelection} key={native.story.path} nativeMode model={nativeFlow.model} project={nativeFlow.project} running={nativeEditing||native.story.readOnly} selectedId={nativeStorySelection?.nodeId} selectionId={nativeStorySelection?.bindingId} positions={native.story.positions} onPositions={positions=>nativeCommand('story.moveNodes',{positions})} onSelect={select} onOpen={select} onConnect={connect}
         onClipboard={()=>setNotice("Копирование и вставка native-нод пока не подключены.")} onReady={api=>onGraphReady(dock,api)} onDeleteNode={ids=>ids.forEach(nodeId=>nativeCommand('story.deleteNode',{nodeId}))} onContext={point=>{if(!nativeEditing)setContextMenu({...point,kind:'native-story'});}}
         onAdd={(nodeId,phase)=>openNativeEvents({nodeId,phase})} onScene={()=>{}}
         onChoice={(nodeId,choiceId,patch)=>{const node=doc.nodes.find(n=>n.id===nodeId),choices=[...(node.choices||[])];if(!choiceId)choices.push({label:patch.label,nextNodeId:''});else{const i=choices.findIndex(c=>c.id===choiceId);if(patch)choices[i]={...choices[i],label:patch.label};else choices.splice(i,1);}nativeCommand('story.updateNode',{nodeId,patch:{choices}});}}
@@ -2488,6 +2506,7 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
             {["story", "timeline", "staging", "event"].includes(dock) && !detailEditor && (
               <div className="graph-toolbar">
                 {dock==='event'?<><Button icon="ArrowLeft" title={tr("Вернуться в поток истории")} onClick={()=>setDock('story')}/><span className="graph-breadcrumb">{event?.name}</span></>:<><Icon name="Route" size={15}/><span className="flow-toolbar-context">{project.subscenes.length} {tr("сабсцены · ")}{nodes.length} {tr("реплик · единый поток")}</span><Button icon="Focus" onClick={()=>graphApis.current[dock]?.focus(beat.id)}>{tr("К реплике")}</Button><Button icon="Scan" onClick={()=>graphApis.current[dock]?.fit()}>{tr("Вся история")}</Button></>}
+        {dock==='story' && <Button icon="LocateFixed" title={tr("Фокусироваться при выборе ноды")} aria-pressed={bAutoFocusStorySelection} onClick={()=>SetAutoFocusStorySelection(Previous=>!Previous)}/>}
         <div className="flex-space" />
                 <details className="viewport-help graph-help"><summary title={tr("Навигация по графу")} aria-label={tr("Навигация по графу")}><Icon name="CircleHelp" size={15}/></summary><div>{tr("ПКМ — панорама")}<br/>{tr("Колесо — масштаб")}<br/>{tr("Пин → пин — соединить")}<br/>{tr("Alt + щелчок по пину — разорвать связи")}<br/>{tr("Ctrl + перетаскивание пина — перенести связи")}<br/>{tr("Выбрать провод + Delete — разорвать")}<br/>{tr("ЛКМ — выбор и перемещение узла")}<br/>{tr("Двойной щелчок — открыть узел")}</div></details>
                 {dock !== "event" && beat.kind === "choice" && (
@@ -2582,7 +2601,7 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
                   onPreview={()=>audition(event.id)}
                 />
               ) : ["story", "timeline", "staging"].includes(dock) ? (
-                <StoryFlow running={running} onVariableEdit={updateVariable} onVariableAdd={(variable,kind,point)=>{if(!rt?.running)addBeat(kind,{...point,variable});}} onInspectVariable={inspectVariable} selectedVariable={inspectedVariable} onVariableDrop={point=>{if(rt?.running)return;if(point.get||point.set)addBeat(point.set&&point.variable!==ANSWER_VARIABLE?'set-variable':'variable',point);else setContextMenu({...point,kind:'variable-drop'});}} onLogicChange={(id,patch)=>{if(!rt?.running)mutate(p=>Object.assign(allBeats(p).find(n=>n.id===id),patch));}} onVariable={(id,name,type,value)=>{if(!rt?.running)mutate(p=>{const node=allBeats(p).find(n=>n.id===id);node.valueType=type;node.variable=name.trim();if(node.variable&&node.variable!==ANSWER_VARIABLE)p.variables[node.variable]=typedValue(value,type);});}} onChoice={(id,choiceId,patch)=>{if(!rt?.running)mutate(p=>{const b=allBeats(p).find(n=>n.id===id);if(!choiceId)b.choices.push(newChoice(uid('choice'),patch.label));else if(!patch)b.choices=b.choices.filter(c=>c.id!==choiceId);else Object.assign(b.choices.find(c=>c.id===choiceId),patch);});}} onClipboard={graphClipboard} contextNodeId={contextNodeId} project={project} issues={issues} selectedId={beat.id} selectionId={selection.id} preview={preview}
+                <StoryFlow bAutoFocusSelection={bAutoFocusStorySelection} running={running} onVariableEdit={updateVariable} onVariableAdd={(variable,kind,point)=>{if(!rt?.running)addBeat(kind,{...point,variable});}} onInspectVariable={inspectVariable} selectedVariable={inspectedVariable} onVariableDrop={point=>{if(rt?.running)return;if(point.get||point.set)addBeat(point.set&&point.variable!==ANSWER_VARIABLE?'set-variable':'variable',point);else setContextMenu({...point,kind:'variable-drop'});}} onLogicChange={(id,patch)=>{if(!rt?.running)mutate(p=>Object.assign(allBeats(p).find(n=>n.id===id),patch));}} onVariable={(id,name,type,value)=>{if(!rt?.running)mutate(p=>{const node=allBeats(p).find(n=>n.id===id);node.valueType=type;node.variable=name.trim();if(node.variable&&node.variable!==ANSWER_VARIABLE)p.variables[node.variable]=typedValue(value,type);});}} onChoice={(id,choiceId,patch)=>{if(!rt?.running)mutate(p=>{const b=allBeats(p).find(n=>n.id===id);if(!choiceId)b.choices.push(newChoice(uid('choice'),patch.label));else if(!patch)b.choices=b.choices.filter(c=>c.id!==choiceId);else Object.assign(b.choices.find(c=>c.id===choiceId),patch);});}} onClipboard={graphClipboard} contextNodeId={contextNodeId} project={project} issues={issues} selectedId={beat.id} selectionId={selection.id} preview={preview}
                   onSelect={graphSelect} onOpen={openGraph} onMoveBinding={moveBinding} onBatch={changeBatch} onConnect={connect} onDeleteNode={deleteFlowNode}
                   onScene={id=>openSubscenes('edit',id)}
                   onContext={point=>{if(!rt?.running)setContextMenu({...point,kind:point.kind||'story'});}}
@@ -2778,7 +2797,7 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
                 onFrameObject={id=>{editScene();showBaseDock('inspector');setLayout(l=>({...l,hiddenInspector:false}));setSelection({kind:'object',id});setFocusRequest({nonce:uid('focus')});}}
                 onVisibility={id=>mutate(p=>{const o=p.objects.find(o=>o.id===id);o.active=o.active===false;})}
                 onPoint={point=>{editScene();setSelection({kind:'point',id:point.id});openObjectTransform();setFocusRequest({nonce:uid('focus'),position:point.position,objectId:point.objectId});}}
-                onSelectCamera={selectCamera} {...(isNative?{scene:nativeScene,objects:native.objects,groups:[],points:[],playerId:undefined,disabled:nativeEditing,selected:native.state?.selection,selectedIds:native.state?.selection?[native.state.selection]:[],onSelectObject:selectNative,onFrameObject:id=>{selectNative(id);setFocusRequest({nonce:uid('focus')});},onVisibility:undefined,onReparent:(objectId,parentId)=>nativeCommand('object.setParent',{objectId,parentId}),onRootDrop:ids=>ids.forEach(objectId=>nativeCommand('object.setParent',{objectId,parentId:null})),onRename:id=>{selectNative(id);setNotice('Измените имя объекта в Inspector.');},onDelete:objectId=>nativeCommand('object.destroy',{objectId})}: {})}/>
+                onSelectCamera={selectCamera} {...(isNative?{scene:nativeScene,objects:native.objects,groups:[],points:[],playerId:undefined,disabled:nativeEditing,selected:native.state?.selection,selectedIds:native.state?.selection?[native.state.selection]:[],onSelectObject:selectNative,onFrameObject:id=>{selectNative(id);setFocusRequest({nonce:uid('focus')});},onVisibility:undefined,onReparent:(objectId,parentId)=>nativeCommand('object.setParent',{objectId,parentId}),onRootDrop:ids=>ids.forEach(objectId=>nativeCommand('object.setParent',{objectId,parentId:null})),onRename:(objectId,name)=>nativeCommand('object.rename',{objectId,name}),renderObjectActions:Object=><NativePrefabControls ObjectId={Object.id} Disabled={nativeEditing} Command={nativeCommand}/>,onDelete:objectId=>nativeCommand('object.destroy',{objectId})}: {})}/>
 
           </div>
           <div className="hierarchy-footer">
@@ -2898,7 +2917,7 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
                 }
               }}
             >
-              <SceneViewport onAssetDrop={DropNativeAsset} onCreateProject={()=>openProjectDialog('new')} onActivate={()=>setNativeFocus('scene')} blocked={!!(contextMenu || picker || projectDialog || detailEditor || menu || running || positionPick)}
+              <SceneViewport pointerLock={native.state?.play==='playing' && native.state?.gameViews?.some(View=>View.pointerLock)} playing={nativePlaying} onAssetDrop={DropNativeAsset} onCreateProject={()=>openProjectDialog('new')} onActivate={()=>setNativeFocus('scene')} blocked={!!(contextMenu || picker || projectDialog || detailEditor || menu || running || positionPick)}
                 sceneId={displayScene.id}
                 editTool={editTool} editSpace={editSpace} snap={snap} focusRequest={cameraPilotId?0:focusRequest} editing={!running&&!cameraPilotId&&!positionPick&&(!isNative||!nativeEditing)} onTransform={transformObject} onTransforms={transformObjects}
                 cameraScene={displayScene} selectedCameraId={selection.kind==='camera'?selection.id:null} cameraPreviewId={cameraPreviewId} cameraPilotId={cameraPilotId} onCameraChange={changeCamera} onCameraSelect={selectCamera} cameraApi={cameraApi} physicsApi={physicsApi}
@@ -2927,6 +2946,7 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
                 onPlayerInteract={()=>rt?.playerInteract()}
                 onInteract={interact}
               />
+              {isNative&&nativePlaying&&<NativeGameHud State={native.state} Execute={Parameters=>nativeCommand('game.action',Parameters)}/>}
               {isNative&&nativePlaying&&<NativeDialogue state={native.state} session={native.context?.session} onAdvance={()=>nativeCommand('play.advanceDialogue')} onChoice={index=>nativeCommand('play.selectChoice',{index})}/>}
               {!isNative&&<>{mode==='game'&&<TouchInput settings={playProject.input} contexts={world.inputContexts||[]} active={world.inputActive} playerMode={world.playerControl?.mode} paused={world.paused||!world.inputReady}/>}
               {positionPick&&<div className="viewport-caption"><strong>{tr("Выберите точку на сцене")}</strong><Button icon="X" onClick={()=>setPositionPick(null)}>{tr("Отмена")}</Button></div>}
@@ -3085,7 +3105,7 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
           className={"editor-menu"+(menu==='Окна'?' windows-menu-container':'')}
           style={menuAnchor}
         >
-          {isNative&&menu === "Файл" ? (<><button onClick={()=>openProjectDialog('new')}>{tr("Новый C++ проект…")}</button><button onClick={openProjectFile}>{tr("Открыть C++ проект…")}</button><button disabled={!native.connected} onClick={saveProject}>{tr("Сохранить сцену и историю")}<kbd>Ctrl S</kbd></button><button disabled={!native.connected} onClick={()=>nativeCommand('project.save',{useCurrentAsStartup:true})}>{tr("Использовать текущие сцену и историю при запуске")}</button><button disabled={!native.connected} onClick={()=>openProjectDialog('sceneNew')}>{tr("Новая сцена…")}</button><button disabled={!native.connected} onClick={()=>openProjectDialog('sceneCopy')}>{tr("Сохранить сцену как…")}</button></>) : menu === "Файл" ? (
+          {isNative&&menu === "Файл" ? (<><button onClick={()=>openProjectDialog('new')}>{tr("Новый C++ проект…")}</button><button onClick={openProjectFile}>{tr("Открыть C++ проект…")}</button><button disabled={!native.connected || nativeEditing || projectFileBusy} onClick={() => {setMenu(null);runFileOperation(async () => {const Result = await window.sacuraDesktop.nativeExportGame();if (Result) {setNotice('Game exported: ' + Result.path);}});}}>Export game…</button><button disabled={!native.connected} onClick={saveProject}>{tr("Сохранить сцену и историю")}<kbd>Ctrl S</kbd></button><button disabled={!native.connected} onClick={()=>nativeCommand('project.save',{useCurrentAsStartup:true})}>{tr("Использовать текущие сцену и историю при запуске")}</button><button disabled={!native.connected} onClick={()=>openProjectDialog('sceneNew')}>{tr("Новая сцена…")}</button><button disabled={!native.connected} onClick={()=>openProjectDialog('sceneCopy')}>{tr("Сохранить сцену как…")}</button></>) : menu === "Файл" ? (
             <>
               <button disabled={projectFileBusy} onClick={()=>openProjectDialog('new')}><Icon name="FilePlus2"/>{tr("Новый пустой проект…")}</button>
               {serverStorageEnabled&&window.sacuraDesktop?.isDesktop!==true&&<button disabled={projectFileBusy} onClick={showServerProjects}><Icon name="Database"/>{tr("Открыть с сервера…")}</button>}

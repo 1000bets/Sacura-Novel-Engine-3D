@@ -1,0 +1,219 @@
+{
+  "horror": [
+    {
+      "method": "power",
+      "result": false,
+      "state": {
+        "fuse": false,
+        "power": false,
+        "record": false,
+        "mirrorSeen": false,
+        "escaped": false,
+        "objective": "Найдите предохранитель на столе у входа."
+      },
+      "message": "Пустое гнездо. Нужен предохранитель со стола смотрителя.",
+      "shadow": false,
+      "doorSeconds": 0
+    },
+    {
+      "method": "listen",
+      "result": false,
+      "state": {
+        "fuse": false,
+        "power": false,
+        "record": false,
+        "mirrorSeen": false,
+        "escaped": false,
+        "objective": "Найдите предохранитель на столе у входа."
+      },
+      "message": "Катушки неподвижны. Сначала восстановите питание щита.",
+      "shadow": false,
+      "doorSeconds": 0
+    },
+    {
+      "method": "escape",
+      "result": false,
+      "state": {
+        "fuse": false,
+        "power": false,
+        "record": false,
+        "mirrorSeen": false,
+        "escaped": false,
+        "objective": "Найдите предохранитель на столе у входа."
+      },
+      "message": "Заперто. В журнале сказано: восстановить питание и прослушать последнюю запись.",
+      "shadow": false,
+      "doorSeconds": 0
+    },
+    {
+      "method": "takeFuse",
+      "result": true,
+      "state": {
+        "fuse": true,
+        "power": false,
+        "record": false,
+        "mirrorSeen": false,
+        "escaped": false,
+        "objective": "Установите предохранитель в красный щит у дальней стены."
+      },
+      "message": "Керамика ещё тёплая. Кто-то вынул предохранитель перед вашим приходом.",
+      "shadow": false,
+      "doorSeconds": 0
+    },
+    {
+      "method": "takeFuse",
+      "result": false,
+      "state": {
+        "fuse": true,
+        "power": false,
+        "record": false,
+        "mirrorSeen": false,
+        "escaped": false,
+        "objective": "Установите предохранитель в красный щит у дальней стены."
+      },
+      "message": "Керамика ещё тёплая. Кто-то вынул предохранитель перед вашим приходом.",
+      "shadow": false,
+      "doorSeconds": 0
+    },
+    {
+      "method": "power",
+      "result": true,
+      "state": {
+        "fuse": true,
+        "power": true,
+        "record": false,
+        "mirrorSeen": false,
+        "escaped": false,
+        "objective": "Прослушайте магнитофон на синем столе. Не оборачивайтесь на стук."
+      },
+      "message": "Свет вспыхнул. В конце коридора стоит человек в вашей форме. У него нет лица.",
+      "shadow": true,
+      "doorSeconds": 0
+    },
+    {
+      "method": "power",
+      "result": true,
+      "state": {
+        "fuse": true,
+        "power": true,
+        "record": false,
+        "mirrorSeen": false,
+        "escaped": false,
+        "objective": "Прослушайте магнитофон на синем столе. Не оборачивайтесь на стук."
+      },
+      "message": "Щит гудит. Теперь работает магнитофон.",
+      "shadow": true,
+      "doorSeconds": 0
+    },
+    {
+      "method": "mirror",
+      "result": null,
+      "state": {
+        "fuse": true,
+        "power": true,
+        "record": false,
+        "mirrorSeen": true,
+        "escaped": false,
+        "objective": "Прослушайте магнитофон на синем столе. Не оборачивайтесь на стук."
+      },
+      "message": "В зеркале вы всё ещё стоите у входа. Отражение поднимает руку, хотя вы не двигались.",
+      "shadow": true,
+      "doorSeconds": 0
+    },
+    {
+      "method": "mirror",
+      "result": null,
+      "state": {
+        "fuse": true,
+        "power": true,
+        "record": false,
+        "mirrorSeen": false,
+        "escaped": false,
+        "objective": "Прослушайте магнитофон на синем столе. Не оборачивайтесь на стук."
+      },
+      "message": "Отражение исчезло. На стекле изнутри проступило: «Не оставайся на вторую смену».",
+      "shadow": false,
+      "doorSeconds": 0
+    },
+    {
+      "method": "listen",
+      "result": true,
+      "state": {
+        "fuse": true,
+        "power": true,
+        "record": true,
+        "mirrorSeen": false,
+        "escaped": false,
+        "objective": "Выход разблокирован. Вернитесь к зелёной двери и завершите обход."
+      },
+      "message": "Ваш голос на ленте: «Смена закончилась тридцать лет назад. Не отвечай, если назовут по имени». Замок выхода щёлкнул.",
+      "shadow": false,
+      "doorSeconds": 0
+    },
+    {
+      "method": "escape",
+      "result": true,
+      "state": {
+        "fuse": true,
+        "power": true,
+        "record": true,
+        "mirrorSeen": false,
+        "escaped": true,
+        "objective": "Вы выбрались. Сегодня в журнале впервые появилась новая дата."
+      },
+      "message": "Ваш голос на ленте: «Смена закончилась тридцать лет назад. Не отвечай, если назовут по имени». Замок выхода щёлкнул.",
+      "shadow": false,
+      "doorSeconds": 1
+    }
+  ],
+  "movement": [
+    {
+      "delta": [
+        2,
+        0,
+        2
+      ],
+      "position": [
+        0.775,
+        0,
+        2
+      ]
+    },
+    {
+      "delta": [
+        0,
+        -1,
+        0
+      ],
+      "position": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "delta": [
+        -1,
+        0,
+        -2
+      ],
+      "position": [
+        -1,
+        0,
+        -2
+      ]
+    },
+    {
+      "delta": [
+        0,
+        1,
+        0
+      ],
+      "position": [
+        0,
+        1,
+        0
+      ]
+    }
+  ]
+}

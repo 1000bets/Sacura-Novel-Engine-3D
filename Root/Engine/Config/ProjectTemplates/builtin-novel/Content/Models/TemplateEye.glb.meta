@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "guid": "2027eef4-2f7a-5523-8985-41301ba6b687",
+  "assetType": "Model",
+  "sourceFingerprint": "c32b49842bb75103",
+  "loadSettings": {},
+  "importInfo": {},
+  "subAssets": [
+    {
+      "id": "5d09d476-e303-570c-bf2a-0b1f04cac0c8",
+      "type": "StaticMesh",
+      "name": "TemplateEye",
+      "selector": {
+        "kind": "mesh",
+        "index": 0
+      }
+    }
+  ]
+}

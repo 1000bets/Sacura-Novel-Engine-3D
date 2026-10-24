@@ -1,3 +1,4 @@
+import {NativeNarrativeInspector} from './NativeNarrative.jsx';
 import {AssetReferenceField} from './NativeAssets.jsx';
 import React from 'react';
 import Fold from './InspectorSection.jsx';
@@ -20,8 +21,26 @@ export function NativeInspectorEmpty({children}){
 }
 
 function CommitText({label,value='',onCommit,disabled,multiline=false}){
- const props={defaultValue:value,disabled,'aria-label':label,onBlur:e=>{if(e.target.value!==value)onCommit(e.target.value);},onKeyDown:e=>{if(!multiline&&e.key==='Enter')e.currentTarget.blur();}};
- return multiline?<textarea key={label+value} {...props} className="dialogue-text-field" rows={4}/>:<input key={label+value} {...props}/>;
+ const Properties={defaultValue:value,disabled,'aria-label':label,onBlur:Event=>{
+  if (!disabled && Event.target.value!==value) {
+   onCommit(Event.target.value);
+  }
+ },onKeyDown:Event=>{
+  if (Event.key==='Escape') {
+   Event.preventDefault();
+   Event.stopPropagation();
+   Event.currentTarget.value=value;
+   Event.currentTarget.blur();
+  }
+  if (Event.key==='Enter' && (!multiline || Event.ctrlKey || Event.metaKey)) {
+   Event.preventDefault();
+   Event.currentTarget.blur();
+  }
+ }};
+ if (multiline) {
+  return <textarea key={label+value} {...Properties} className="dialogue-text-field" rows={4}/>;
+ }
+ return <input key={label+value} {...Properties}/>;
 }
 
 function ActionFields({action,onChange,objects,disabled}){
@@ -45,7 +64,6 @@ export default function NativeStoryInspector({story,selection,objects=[],disable
  const nextOptions=[["",'Выход не подключён'],...document.nodes.filter(n=>n.id!==node.id).map(n=>[n.id,(n.kind==='Line'?n.text:n.kind==='Choice'?n.prompt:n.kind)+' · '+n.id])];
  const connect=(port,targetId)=>command('story.connect',{sourceId:node.id,port,targetId:targetId||null});
  const updateChoices=choices=>edit({choices});
- const updateActions=actions=>edit({actions});
  const updateEvent=patch=>command('story.updateEvent',{eventId:event.id,event:{...event,...patch}});
  const updateOverride=action=>command('story.setOverrides',{nodeId:node.id,bindingId:binding.id,actions:[...Object.values(binding.actionOverrides||{}).filter(a=>a.id!==action.id),action]});
  const icon=event?'Layers':heading[node.kind]?.[0]||'Circle';
@@ -64,9 +82,8 @@ export default function NativeStoryInspector({story,selection,objects=[],disable
    <div className="native-inspector-actions"><Button icon="RotateCcw" disabled={disabled||!Object.keys(binding.actionOverrides||{}).length} onClick={()=>command('story.setOverrides',{nodeId:node.id,bindingId:binding.id,actions:[]})}>Параметры шаблона</Button><Button icon="ArrowLeft" onClick={()=>onSelect({nodeId:node.id})}>К реплике</Button><Button icon="Trash2" disabled={disabled} onClick={()=>command('story.removeEvent',{nodeId:node.id,bindingId:binding.id}).then(result=>{if(result)onSelect({nodeId:node.id});})}>Удалить размещение</Button></div>
   </>:<>
    <fieldset className="inspector-primary-fields" disabled={disabled}>
-    <Field label="Тип блока"><Select aria-label="Тип блока" value={node.kind} options={kinds} onChange={kind=>edit({kind})}/></Field>
-    {node.kind==='Line'&&<><Field label="Говорит"><AssetReferenceField label="Персонаж-говорящий" assetId={SpeakerAssetIdentifier(node.speaker)} allowedTypes={['Character']} disabled={disabled} onChange={Identity=>{let Speaker='Narrator';if(Identity.assetId){Speaker='character:'+Identity.assetId;}edit({speaker:Speaker});}}/><Select aria-label="Говорит" value={node.speaker||'Narrator'} options={[['Narrator','Рассказчик'],...objects.map(o=>[o.name,o.name]),...(node.speaker&&!objects.some(o=>o.name===node.speaker)&&node.speaker!=='Narrator'?[[node.speaker,node.speaker]]:[])]} onChange={speaker=>edit({speaker})}/></Field><CommitText label="Текст выбранной реплики" value={node.text} onCommit={text=>edit({text})} disabled={disabled} multiline/></>}
-    {node.kind==='Choice'&&<CommitText label="Текст выбора" value={node.prompt} onCommit={prompt=>edit({prompt})} disabled={disabled} multiline/>}
+    {node.kind === 'Narrative' && <NativeNarrativeInspector Node={node} Story={story} Disabled={disabled} Command={command}/>}
+    <NativeStoryNodeFields Node={node} Objects={objects} Disabled={disabled} Edit={edit}/>
    </fieldset>
    {['Line','Choice'].includes(node.kind)&&<><Fold title="Постановка реплики" open={false} extra={<span className="inspector-count">{node.bindings?.length||0}</span>}>
     {phases.map(([phase,label])=><button key={phase} className="phase-inspector-row" disabled={disabled} onClick={()=>onEvents({nodeId:node.id,phase})}><Icon name="CornerDownRight" size={14}/><span>{label}</span><b>{node.batches?.[phase]?.reduce((sum,b)=>sum+b.bindingIds.length,0)||0}</b><Icon name="ChevronRight" size={13}/></button>)}
@@ -76,10 +93,22 @@ export default function NativeStoryInspector({story,selection,objects=[],disable
     {(node.choices||[]).map((choice,i)=><div className="native-choice-row" key={choice.id||i}><CommitText label={'Ответ '+(i+1)} value={choice.label} disabled={disabled} onCommit={label=>updateChoices(node.choices.map((c,j)=>j===i?{...c,label}:c))}/><Select aria-label={'Продолжение ответа '+(i+1)} disabled={disabled} value={choice.nextNodeId||''} options={nextOptions} onChange={nextNodeId=>updateChoices(node.choices.map((c,j)=>j===i?{...c,nextNodeId}:c))}/><Button icon="Trash2" title="Удалить ответ" disabled={disabled} onClick={()=>updateChoices(node.choices.filter((_,j)=>j!==i))}/></div>)}
     <Button icon="Plus" disabled={disabled} onClick={()=>updateChoices([...(node.choices||[]),{label:'Новый ответ',nextNodeId:''}])}>Добавить ответ</Button>
    </Fold>}
-   {node.kind==='Action'&&<Fold title="Действия">{(node.actions||[]).map((action,i)=><div key={action.id||i} className="native-action-row"><ActionFields action={action} objects={objects} disabled={disabled} onChange={changed=>updateActions(node.actions.map((a,j)=>j===i?changed:a))}/><Button icon="Trash2" disabled={disabled} onClick={()=>updateActions(node.actions.filter((_,j)=>j!==i))}>Удалить действие</Button></div>)}<Button icon="Plus" disabled={disabled} onClick={()=>updateActions([...(node.actions||[]),{kind:'Wait',durationSeconds:1}])}>Добавить действие</Button></Fold>}
+   {node.kind==='Action'&&<Fold title="Действия"><NativeStoryActionFields Node={node} Objects={objects} Disabled={disabled} Edit={edit}/></Fold>}
    {['Line','Action'].includes(node.kind)&&<Fold title="Продолжение"><Select aria-label="Продолжение реплики" disabled={disabled} value={node.nextNodeId||''} options={nextOptions} onChange={next=>connect(-1,next)}/></Fold>}
    {['Line','Choice'].includes(node.kind)&&<Fold title="Виджет диалогового окна" open={false}><p className="native-inspector-note">C++ история использует общий виджет диалога проекта.</p></Fold>}
    <div className="native-inspector-actions"><Button icon="Focus" onClick={onFocus}>Показать ноду</Button><Button icon="Flag" disabled={disabled||document.startNodeId===node.id} onClick={()=>command('story.setStart',{nodeId:node.id})}>Сделать начальной</Button><Button icon="Trash2" disabled={disabled} onClick={()=>command('story.deleteNode',{nodeId:node.id}).then(result=>{if(result)onSelect(null);})}>Удалить ноду</Button></div>
   </>}
  </div>;
+}
+
+export function NativeStoryNodeFields({Node:node,Objects:objects=[],Disabled:disabled,Edit:edit}) {
+ useLocale();
+ return <>    <Field label="Тип блока"><Select disabled={node.kind === 'Narrative'} aria-label="Тип блока" value={node.kind} options={node.kind === 'Narrative' ? [['Narrative','Python Narrative']] : kinds} onChange={kind=>edit({kind})}/></Field>
+    {node.kind==='Line'&&<><Field label="Говорит"><AssetReferenceField label="Персонаж-говорящий" assetId={SpeakerAssetIdentifier(node.speaker)} allowedTypes={['Character']} disabled={disabled} onChange={Identity=>{let Speaker='Narrator';if(Identity.assetId){Speaker='character:'+Identity.assetId;}edit({speaker:Speaker});}}/><Select aria-label="Говорит" value={node.speaker||'Narrator'} options={[['Narrator','Рассказчик'],...objects.map(o=>[o.name,o.name]),...(node.speaker&&!objects.some(o=>o.name===node.speaker)&&node.speaker!=='Narrator'?[[node.speaker,node.speaker]]:[])]} onChange={speaker=>edit({speaker})}/></Field><CommitText label="Текст выбранной реплики" value={node.text} onCommit={text=>edit({text})} disabled={disabled} multiline/></>}
+    {node.kind==='Choice'&&<CommitText label="Текст выбора" value={node.prompt} onCommit={prompt=>edit({prompt})} disabled={disabled} multiline/>}</>;
+}
+
+export function NativeStoryActionFields({Node:node,Objects:objects=[],Disabled:disabled,Edit:edit}) {
+ const updateActions=actions=>edit({actions});
+ return <>{(node.actions||[]).map((action,i)=><div key={action.id||i} className="native-action-row"><ActionFields action={action} objects={objects} disabled={disabled} onChange={changed=>updateActions(node.actions.map((a,j)=>j===i?changed:a))}/><Button icon="Trash2" disabled={disabled} onClick={()=>updateActions(node.actions.filter((_,j)=>j!==i))}>Удалить действие</Button></div>)}<Button icon="Plus" disabled={disabled} onClick={()=>updateActions([...(node.actions||[]),{kind:'Wait',durationSeconds:1}])}>Добавить действие</Button></>;
 }

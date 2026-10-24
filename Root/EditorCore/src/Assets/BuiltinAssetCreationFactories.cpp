@@ -9,8 +9,6 @@
 #include "World/Serialization/SceneSerializer.h"
 #include "Prefab/PrefabLibrary.h"
 #include "Input/InputDocument.h"
-#include "UI/WidgetLayout.h"
-#include <QJsonDocument>
 
 bool CreateSceneAssetFactory::Create(AssetRegistry& Registry, const std::filesystem::path& Destination, std::string& Error) const
 {
@@ -62,6 +60,7 @@ bool CreateInputActionAssetFactory::Create(AssetRegistry& Registry, const std::f
     Action.Identifier = Guid::Generate().ToString();
     Action.ValueType = ValueType;
     Action.bExecuteWhenPaused = bExecuteWhenPaused;
+    Action.bClampMagnitude = bClampMagnitude;
     return InputDocument::Write(Destination, {{"Action", Action}}, Error);
 }
 
@@ -86,11 +85,6 @@ bool CreatePrefabAssetFactory::Create(AssetRegistry& Registry, const std::filesy
     }
     return PrefabLibrary::WriteDocumentFile(Destination,
         PrefabLibrary::MakeDocument(Destination.stem().u8string(), nlohmann::json::parse(Serialized).at("objects")), Error);
-}
-
-bool CreateWidgetLibraryAssetFactory::Create(AssetRegistry& Registry, const std::filesystem::path& Destination, std::string& Error) const
-{
-    return AtomicFileWriter::WriteText(Destination, QJsonDocument(WidgetLayout::Defaults()).toJson().toStdString(), Error);
 }
 
 bool CreatePythonScriptAssetFactory::Create(AssetRegistry& Registry, const std::filesystem::path& Destination, std::string& Error) const
@@ -156,7 +150,6 @@ void ForceTouchBuiltinAssetCreationFactories()
     (void)&CreateInputActionAssetFactory::s_ReflectionClassRegistrar;
     (void)&CreateInputContextAssetFactory::s_ReflectionClassRegistrar;
     (void)&CreatePrefabAssetFactory::s_ReflectionClassRegistrar;
-    (void)&CreateWidgetLibraryAssetFactory::s_ReflectionClassRegistrar;
     (void)&CreatePostProcessMaterialAssetFactory::s_ReflectionClassRegistrar;
     (void)&CreateUserInterfaceMaterialAssetFactory::s_ReflectionClassRegistrar;
 }

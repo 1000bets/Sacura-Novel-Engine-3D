@@ -32,6 +32,12 @@ export function nativeStoryMenu({context,story,selection,disabled,command,onSele
   const phases=[['BEFORE','До текста'],['ON_START','Вместе с текстом'],['AFTER','После ответа игрока']];
   return [
     ...[['Line','Реплика','MessageSquare'],['Choice','Выбор игрока','GitFork'],['Action','Действие','Zap'],['End','Концовка','Flag']].map(([kind,label,icon])=>({label,icon,group:'Добавить ноду',disabled:disabled||!document||(context.pin?.handleType==='target'&&kind==='End')||(context.valueType&&context.valueType!=='flow'),action:()=>add(kind)})),
+    ...(story?.narrativeCatalog || []).map(Definition => ({label: Definition.label || Definition.type, icon: 'Code', group: 'Python Narrative', disabled: disabled || !document || Boolean(context.pin), action: async () => {
+      const Before = new Set(document.nodes.map(Node => Node.id));
+      const Result = await command('story.addNarrative', {type: Definition.type, ...(context.position || {x: 0, y: 0})});
+      const Created = Result?.document.nodes.find(Node => !Before.has(Node.id));
+      if (Created) { onSelect({nodeId: Created.id}); }
+    }})),
     {label:'Добавить событие к выбранной реплике…',icon:'Layers',group:'События',disabled:disabled||!node||!['Line','Choice'].includes(node.kind),children:phases.map(([phase,label])=>({label,action:()=>onEvents({nodeId:node.id,phase,x:context.x,y:context.y})}))},
     ...['If · Если','Ждать взаимодействие','Скриптинг','Переменные проекта'].map(label=>({label,group:'Недоступно в C++',...unavailable(reason)})),
   ];

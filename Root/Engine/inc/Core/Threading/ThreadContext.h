@@ -3,10 +3,12 @@
 #include "Core/Threading/ThreadRole.h"
 
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <vector>
 
 void PrintString(const std::string& Message);
+void SetPrintLogDirectory(const std::filesystem::path& Directory);
 std::vector<std::string> GetPrintMessages(uint64_t& AfterSequence);
 
 void SetCurrentThreadRole(ThreadRole Role);

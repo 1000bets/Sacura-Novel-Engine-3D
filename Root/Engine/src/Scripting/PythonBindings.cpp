@@ -8,6 +8,7 @@
 #include "Core/Threading/ThreadContext.h"
 #include "Core/Transform.h"
 #include "World/GameObject.h"
+#include "World/Scene.h"
 #include "World/Components/ScriptComponent.h"
 #include "Reflection/PropertyAccess.h"
 #include "Reflection/ReflectionValueCodec.h"
@@ -24,8 +25,6 @@
 #if defined(SAKURA_ENABLE_PYTHON)
 #include <pybind11/embed.h>
 #include <pybind11/stl.h>
-#include "UI/MaterialWidget.h"
-#include <QApplication>
 
 
 
@@ -532,6 +531,65 @@ void RegisterInputBindings(py::module_& Module);
 PYBIND11_EMBEDDED_MODULE(engine, Module)
 {
     Module.doc() = "Sacura Novel Engine scripting bindings";
+    Module.def("RequestStoryNode", [](const std::string& NodeId)
+    {
+        auto* Runtime = ScriptingSubsystem::Get().GetMaterialEngine();
+        if (Runtime == nullptr || Runtime->GetInputSession() == nullptr)
+        {
+            throw py::value_error("Story transitions require a game session");
+        }
+        if (!Runtime->GetStoryRuntime().RequestNode(NodeId))
+        {
+            throw py::value_error("Story node does not exist");
+        }
+    });
+    Module.def("GetStoryNode", []()
+    {
+        auto* Runtime = ScriptingSubsystem::Get().GetMaterialEngine();
+        if (Runtime == nullptr || Runtime->GetInputSession() == nullptr)
+        {
+            throw py::value_error("Story state requires a game session");
+        }
+        return Runtime->GetStoryRuntime().GetCurrentNodeId();
+    });
+
+    Module.def("FindSceneObject", [](const py::object& Context, const std::string& PersistentId)
+    {
+        auto* Owner = dynamic_cast<GameObject*>(ResolveObjectOrThrow(
+            Context.attr("_id").cast<uint64_t>(), Context.attr("_generation").cast<uint32_t>()));
+        if (Owner == nullptr || Owner->GetScene() == nullptr)
+        {
+            throw py::value_error("Context must be a scene object");
+        }
+        auto* Found = Owner->GetScene()->FindByPersistentId(PersistentId);
+        if (Found == nullptr)
+        {
+            return py::object(py::none());
+        }
+        return py::object(py::module_::import("engine").attr("Object")(Found->GetID(), Found->GetGeneration()));
+    });
+    Module.def("SetObjectActive", [](const py::object& Target, bool bActive)
+    {
+        auto* Owner = dynamic_cast<GameObject*>(ResolveObjectOrThrow(
+            Target.attr("_id").cast<uint64_t>(), Target.attr("_generation").cast<uint32_t>()));
+        if (Owner == nullptr)
+        {
+            throw py::value_error("Target must be a scene object");
+        }
+        Owner->SetActive(bActive);
+    });
+    Module.def("SetObjectLook", [](const py::object& Target, float Yaw, float Pitch, float Roll)
+    {
+        auto* Owner = dynamic_cast<GameObject*>(ResolveObjectOrThrow(
+            Target.attr("_id").cast<uint64_t>(), Target.attr("_generation").cast<uint32_t>()));
+        if (Owner == nullptr)
+        {
+            throw py::value_error("Target must be a scene object");
+        }
+        Transform Placement = Owner->GetTransform();
+        Placement.Rotation = Quaternion::CreateFromYawPitchRoll(Yaw, Pitch, Roll);
+        Owner->SetTransform(Placement);
+    }, py::arg("Target"), py::arg("Yaw"), py::arg("Pitch"), py::arg("Roll") = 0.f);
 
     Module.def("invoke_method", [](uint64_t Identifier, uint32_t Generation,
         const std::string& MethodName, const py::dict& Arguments)
@@ -618,40 +676,6 @@ PYBIND11_EMBEDDED_MODULE(engine, Module)
             }
         })
         .def("reset_parameter", &DynamicMaterialInstance::ResetParameter);
-    py::class_<MaterialWidget>(Module, "MaterialWidget")
-        .def(py::init([]()
-        {
-            AssertGameThread();
-            Engine* Runtime = ScriptingSubsystem::Get().GetMaterialEngine();
-            if (Runtime == nullptr || qobject_cast<QApplication*>(QCoreApplication::instance()) == nullptr)
-            {
-                throw py::value_error("MaterialWidget requires an active UI runtime");
-            }
-            return std::make_unique<MaterialWidget>(*Runtime);
-        }))
-        .def("set_material", [](MaterialWidget& Widget, const std::string& AssetPath)
-        {
-            Engine* Runtime = ScriptingSubsystem::Get().GetMaterialEngine();
-            AssetRegistryEntry Entry;
-            if (!Runtime->GetAssetRegistry().TryGetByPath(AssetPath, Entry)
-                || (Entry.Metadata.Type != MaterialAssetType && Entry.Metadata.Type != MaterialInstanceAssetType))
-            {
-                throw py::key_error(AssetPath);
-            }
-            Widget.SetMaterial(AssetKey{Entry.Metadata.Guid, {}});
-        })
-        .def("set_dynamic_material", &MaterialWidget::SetDynamicMaterial)
-        .def("resize", [](MaterialWidget& Widget, int Width, int Height) { Widget.resize(Width, Height); })
-        .def("show", &MaterialWidget::show)
-        .def("hide", &MaterialWidget::hide);
-    Module.def("assign_ui_material", [](MaterialWidget& Widget, std::shared_ptr<DynamicMaterialInstance> Material)
-    {
-        if (Material && Material->GetResolvedMaterial().Definition.Domain != MaterialDomain::UserInterface)
-        {
-            throw py::value_error("UI widget requires a UserInterface material");
-        }
-        Widget.SetDynamicMaterial(std::move(Material));
-    });
     Module.def("create_dynamic_material_instance", [](const std::string& AssetPath)
     {
         Engine* Runtime = ScriptingSubsystem::Get().GetMaterialEngine();

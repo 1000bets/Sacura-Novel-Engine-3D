@@ -1,0 +1,275 @@
+{
+  "format": "sakura.scene",
+  "formatVersion": 1,
+  "name": "novel",
+  "objects": [
+    {
+      "id": "13cb6432-b43c-5801-b594-7ba1fe1d354d",
+      "name": "camera",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          -2.8,
+          1.65,
+          2.8
+        ],
+        "rotation": [
+          -0.05777672590365974,
+          -0.31748165201615086,
+          -0.019383884855783025,
+          0.9463041348239194
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "f6cb3354-4ba4-58d0-b61d-016fee8b462b",
+          "type": "engine.CameraComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "primary": true,
+            "field_of_view": 58
+          }
+        },
+        {
+          "id": "ecc05fa8-c5c1-5d76-bb0d-21f6e865305e",
+          "type": "game.TemplateController",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "Scenario": "novel",
+            "ObjectIds": "{\"camera\": \"13cb6432-b43c-5801-b594-7ba1fe1d354d\", \"sun\": \"aba59275-add5-5c7e-99a3-fa72be655f45\", \"sky\": \"5c4a23d7-43cb-505f-9fb4-70366b5832d8\", \"relationship-owner\": \"4ef9e359-6bff-58a0-9934-943df22466b8\", \"snapshot-owner\": \"340be737-3a18-5c38-8eed-185be0bd96a7\", \"player\": \"1417e670-198d-55bc-aeaa-c1a41a5cc209\"}",
+            "MoveSpeed": 3.5,
+            "LookSensitivity": 0.003,
+            "RequireRecord": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "aba59275-add5-5c7e-99a3-fa72be655f45",
+      "name": "sun",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          -4,
+          9,
+          3
+        ],
+        "rotation": [
+          -0.4537387777352828,
+          -0.3852923350226961,
+          -0.22678567513597295,
+          0.7708691171043052
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "9c9eb653-e656-5228-9312-3330a5ea8444",
+          "type": "engine.LightComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "light_type": "Directional",
+            "intensity": 3.2,
+            "light_color": [
+              1,
+              0.965,
+              0.875,
+              1
+            ],
+            "cast_shadows": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "5c4a23d7-43cb-505f-9fb4-70366b5832d8",
+      "name": "sky",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "3d914338-a3c1-542a-a12d-055cc3bf59ec",
+          "type": "engine.SkyLightComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "intensity": 1.7,
+            "light_color": [
+              0.773,
+              0.843,
+              0.918,
+              1
+            ]
+          }
+        },
+        {
+          "id": "4a440cae-b346-563a-86a3-ed25eb69fcb0",
+          "type": "engine.SkySphereComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "zenith_color": [
+              0.1700791678610122,
+              0.36534830656017403,
+              0.6775136368066321,
+              1
+            ],
+            "horizon_color": [
+              0.1700791678610122,
+              0.36534830656017403,
+              0.6775136368066321,
+              1
+            ],
+            "ground_color": [
+              0.1700791678610122,
+              0.36534830656017403,
+              0.6775136368066321,
+              1
+            ],
+            "sun_intensity": 0,
+            "brightness": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "4ef9e359-6bff-58a0-9934-943df22466b8",
+      "name": "Отношение",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          -1,
+          0,
+          0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "7f7f4400-62f8-5650-af1d-0025faecfbd3",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "c60f2b25-7091-5fec-9139-70f687881066",
+            "mesh_sub_asset_id": "c8446e76-a5a7-5b8b-9005-84a082232299",
+            "material_asset_id": "ac8b2e85-5b20-500a-87d7-2be397239c40",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "340be737-3a18-5c38-8eed-185be0bd96a7",
+      "name": "Запомненное отношение",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          1,
+          0,
+          0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "e84c940f-7be1-586c-b0ca-00005acf96c3",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "c60f2b25-7091-5fec-9139-70f687881066",
+            "mesh_sub_asset_id": "c8446e76-a5a7-5b8b-9005-84a082232299",
+            "material_asset_id": "ac8b2e85-5b20-500a-87d7-2be397239c40",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "1417e670-198d-55bc-aeaa-c1a41a5cc209",
+      "name": "player",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": []
+    }
+  ]
+}

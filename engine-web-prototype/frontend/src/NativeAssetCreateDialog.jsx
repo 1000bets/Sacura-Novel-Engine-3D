@@ -8,6 +8,11 @@ import ColorField from './ColorField.jsx';
 export default function NativeAssetCreateDialog({type: Type, folder: Folder, selectedAsset: SelectedAsset, create: Create, close: Close}) {
   const [OwnerDocument] = useState(ActiveWorkspaceDocument);
   const [Name, SetName] = useState('');
+  const IsPythonScript = Type.typeId === 'PythonScript';
+  let DestinationFolder = Folder || 'Game';
+  if (IsPythonScript && DestinationFolder !== 'Game/Scripts' && !DestinationFolder.startsWith('Game/Scripts/')) {
+    DestinationFolder = 'Game/Scripts';
+  }
   const [Settings, SetSettings] = useState(() => {
     const Defaults = Object.fromEntries(Type.settings.map(Field => [Field.id, Field.value]));
     if (SelectedAsset) {
@@ -33,7 +38,7 @@ export default function NativeAssetCreateDialog({type: Type, folder: Folder, sel
     if (Busy) { return; }
     SetBusy(true); SetErrorMessage('');
     try {
-      let Directory = Folder.replace(/^Game\/?/, '');
+      let Directory = DestinationFolder.replace(/^Game\/?/, '');
       if (Directory) { Directory += '/'; }
       await Create({factoryId:Type.id, path:Directory + Name.trim() + Type.extension, settings:Settings});
       Close();
@@ -43,8 +48,9 @@ export default function NativeAssetCreateDialog({type: Type, folder: Folder, sel
   return createPortal(<div className="asset-create-backdrop" onPointerDown={Event => {if (Event.target === Event.currentTarget && !Busy) {Close();}}}>
     <form className="asset-create-dialog" role="dialog" aria-modal="true" aria-label={'Создать: '+Type.label} onSubmit={Submit}
       onContextMenu={Event => Event.stopPropagation()} onKeyDown={Event => {Event.stopPropagation();if (Event.key === 'Escape' && !Busy) {Event.stopPropagation();Close();}}}>
-      <strong>Создать: {Type.label}</strong><small>/{Folder || 'Game'}</small>
-      <label>Имя ассета<input ref={Input} aria-label="Имя ассета" required disabled={Busy} value={Name} onChange={Event => SetName(Event.target.value)}/></label>
+      <strong>Создать: {Type.label}</strong><small>/{DestinationFolder}</small>
+      <label>Имя ассета<input ref={Input} aria-label="Имя ассета" aria-describedby={IsPythonScript ? 'python-script-name-help' : undefined} pattern={IsPythonScript ? '[A-Za-z_][A-Za-z0-9_]*' : undefined} title={IsPythonScript ? 'Латинские буквы, цифры и _. Первый символ — буква или _.' : undefined} required disabled={Busy} value={Name} onChange={Event => SetName(Event.target.value)}/></label>
+      {IsPythonScript && <small id="python-script-name-help">Имя модуля без .py: латинские буквы, цифры и _. Первый символ — буква или _. Скрипт создаётся в папке Scripts.</small>}
       {Type.settings.map(Field => {
         const Value = Settings[Field.id];
         if (Field.typeId === 'engine.Color') {

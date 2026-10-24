@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "parent": {
+    "assetId": "ee2149ca-5934-541f-a855-c7b1f8d937a0",
+    "subAssetId": null
+  },
+  "overrides": {
+    "BaseColor": {
+      "type": "Color",
+      "value": [
+        0.184474994500441,
+        0.0822827071298148,
+        0.08021982031446832,
+        1
+      ]
+    }
+  }
+}

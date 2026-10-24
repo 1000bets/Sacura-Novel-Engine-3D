@@ -7,7 +7,7 @@
 #include <DetourNavMesh.h>
 #include <DetourNavMeshBuilder.h>
 #include <DetourNavMeshQuery.h>
-#include <QByteArray>
+#include "Core/IO/Base64.h"
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
@@ -891,8 +891,7 @@ void NavigationMesh::Serialize(nlohmann::json& Document) const
         const dtMeshTile* Tile = Mesh.getTile(TileIndex);
         if (Tile->header != nullptr && Tile->data != nullptr && Tile->dataSize > 0)
         {
-            const QByteArray Bytes(reinterpret_cast<const char*>(Tile->data), Tile->dataSize);
-            Document["tiles"].push_back({{"data", Bytes.toBase64().toStdString()},
+            Document["tiles"].push_back({{"data", Base64::Encode(Tile->data, Tile->dataSize)},
                 {"checksum", ContentHash::FromBytes(Tile->data, Tile->dataSize).Value}});
         }
     }
@@ -903,14 +902,14 @@ static size_t AlignedNavigationBytes(size_t Size)
     return (Size + 3) & ~size_t(3);
 }
 
-static bool ValidateNavigationTileBytes(const QByteArray& Bytes)
+static bool ValidateNavigationTileBytes(const std::vector<uint8_t>& Bytes)
 {
-    if (Bytes.size() < static_cast<qsizetype>(sizeof(dtMeshHeader)))
+    if (Bytes.size() < sizeof(dtMeshHeader))
     {
         return false;
     }
     dtMeshHeader Header;
-    std::memcpy(&Header, Bytes.constData(), sizeof(Header));
+    std::memcpy(&Header, Bytes.data(), sizeof(Header));
     if (Header.magic != DT_NAVMESH_MAGIC || Header.version != DT_NAVMESH_VERSION
         || Header.polyCount < 1 || Header.polyCount >= 16384 || Header.vertCount < 3 || Header.vertCount > 65535
         || Header.maxLinkCount < 1 || Header.maxLinkCount > 1000000 || Header.detailMeshCount < 1
@@ -942,7 +941,7 @@ static bool ValidateNavigationTileBytes(const QByteArray& Bytes)
     {
         return false;
     }
-    const char* Data = Bytes.constData() + AlignedNavigationBytes(sizeof(dtMeshHeader));
+    const char* Data = reinterpret_cast<const char*>(Bytes.data()) + AlignedNavigationBytes(sizeof(dtMeshHeader));
     const char* VertexData = Data;
     Data += AlignedNavigationBytes(sizeof(float) * 3 * Header.vertCount);
     const char* PolygonData = Data;
@@ -1131,14 +1130,19 @@ std::shared_ptr<NavigationMesh> NavigationMesh::Deserialize(const nlohmann::json
                 Error = "Saved navigation tile exceeds storage limits";
                 return {};
             }
-            const QByteArray Bytes = QByteArray::fromBase64(QByteArray::fromStdString(Encoded), QByteArray::AbortOnBase64DecodingErrors);
+            std::vector<uint8_t> Bytes;
+            if (!Base64::Decode(Encoded, Bytes))
+            {
+                Error = "Saved navigation tile contains invalid Base64";
+                return {};
+            }
             if (Result->State->Statistics.DataBytes + Bytes.size() > 256 * 1024 * 1024)
             {
                 Error = "Saved navigation exceeds the total storage budget";
                 return {};
             }
             if (!ValidateNavigationTileBytes(Bytes)
-                || ContentHash::FromBytes(Bytes.constData(), Bytes.size()).Value != TileDocument.at("checksum").get<uint64_t>())
+                || ContentHash::FromBytes(Bytes.data(), Bytes.size()).Value != TileDocument.at("checksum").get<uint64_t>())
             {
                 Error = "Saved navigation tile is corrupt";
                 return {};
@@ -1149,7 +1153,7 @@ std::shared_ptr<NavigationMesh> NavigationMesh::Deserialize(const nlohmann::json
                 Error = "Saved navigation allocation failed";
                 return {};
             }
-            std::memcpy(Data, Bytes.constData(), Bytes.size());
+            std::memcpy(Data, Bytes.data(), Bytes.size());
             if (dtStatusFailed(Result->State->Mesh->addTile(Data, static_cast<int>(Bytes.size()), DT_TILE_FREE_DATA, 0, nullptr)))
             {
                 dtFree(Data);

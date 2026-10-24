@@ -3,7 +3,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import {nativeScenePlacement, NativeAssetDragMimeType} from './nativeScenePlacement.js';
 
 const modifiers = e => ({ctrl: !!(e.ctrlKey || e.metaKey), alt: !!e.altKey, shift: !!e.shiftKey});
-export default function NativeViewport({desktop:Desktop = window.sacuraDesktop, CameraSpeed = 4, assetPreview = false, blocked = false, editing = false, onContext, onAssetDrop, editTool, editSpace, snap, showGrid, focusRequest, onActivate, onCreateProject}) {
+export default function NativeViewport({desktop:Desktop = window.sacuraDesktop, CameraSpeed = 4, assetPreview = false, playing = false, pointerLock = false, blocked = false, editing = false, onContext, onAssetDrop, editTool, editSpace, snap, showGrid, focusRequest, onActivate, onCreateProject}) {
   useLocale();
   const surface = useRef(null);
   const rightGesture = useRef(null);
@@ -19,6 +19,12 @@ export default function NativeViewport({desktop:Desktop = window.sacuraDesktop, 
   const fail = error => setStatus(s => ({...s, error: error.message}));
   const input = event => api.nativeInput(event).catch(fail);
   const reset = () => {rightGesture.current=null;input({kind: 'reset'});};
+  useEffect(() => {
+    const OwnerDocument = surface.current?.ownerDocument;
+    if ((!pointerLock || !playing || blocked) && OwnerDocument?.pointerLockElement === surface.current) {
+      OwnerDocument.exitPointerLock();
+    }
+  }, [pointerLock, playing, blocked]);
   useEffect(() => {api.nativeTools({tool: editTool || 'translate', space: editSpace || 'local', snap: !!snap, grid: !!showGrid, visualization:Visualization, depthRange:DepthRange, cameraSpeed:CameraSpeed}).catch(fail);}, [editTool, editSpace, snap, showGrid, Visualization, DepthRange, CameraSpeed, ready]);
   useEffect(() => {if (focusRequest) {input({kind:'key',code:'KeyF',down:true}); input({kind:'key',code:'KeyF',down:false});}}, [focusRequest]);
   useEffect(() => {if (blocked || hidden) reset();}, [blocked, hidden]);
@@ -80,6 +86,26 @@ export default function NativeViewport({desktop:Desktop = window.sacuraDesktop, 
     const click=phase === 'up' && e.button === 2 && rightGesture.current?.id === e.pointerId && !rightGesture.current.moved && !e.altKey && editing;
     if (phase === 'up' && e.button === 2) rightGesture.current=null;
     const r = e.currentTarget.getBoundingClientRect(), scale = e.currentTarget.ownerDocument.defaultView.devicePixelRatio;
+    if (playing) {
+      if (pointerLock && phase === 'down' && e.button === 0 && e.currentTarget.ownerDocument.pointerLockElement !== e.currentTarget) {
+        e.currentTarget.requestPointerLock()?.catch(fail);
+      }
+      input({kind:'gameControl',device:'Mouse',control:'Position',value:[(2 * (e.clientX-r.left) / r.width - 1) * r.width / r.height,1 - 2 * (e.clientY-r.top) / r.height,0],source:'ElectronPointer'});
+      if (phase === 'move') {
+        input({kind:'gameControl',device:'Mouse',control:'Delta',value:[e.movementX,e.movementY,0],transient:true,source:'ElectronPointer'});
+      } else {
+        const Control = ['Primary','Middle','Secondary'][e.button];
+        let Value = 0;
+        if (phase === 'down') {
+          Value = 1;
+        }
+        input({kind:'gameControl',device:'Mouse',control:Control,value:[Value,0,0],source:'ElectronPointer'});
+      }
+      if (phase === 'up' && e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+      return;
+    }
     input({kind: 'pointer', phase, x: (e.clientX-r.left)*scale, y: (e.clientY-r.top)*scale,
       button: e.button, buttons: e.buttons, ...modifiers(e)});
     if (phase === 'up' && e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
@@ -137,7 +163,7 @@ export default function NativeViewport({desktop:Desktop = window.sacuraDesktop, 
     if ((e.ctrlKey || e.metaKey) && ['KeyS','KeyZ','KeyY','KeyC','KeyX','KeyV','KeyD'].includes(e.code)) {
       return;
     }
-    if (!['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','KeyR','KeyF','KeyZ','KeyY','Escape','ShiftLeft','ShiftRight','AltLeft','AltRight','ControlLeft','ControlRight'].includes(e.code)) return;
+    if (!playing && !['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','KeyR','KeyF','KeyZ','KeyY','Escape','ShiftLeft','ShiftRight','AltLeft','AltRight','ControlLeft','ControlRight'].includes(e.code)) return;
     if (down && rightGesture.current && ['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE'].includes(e.code)) rightGesture.current.moved=true;
     e.preventDefault(); e.stopPropagation(); input({kind:'key', code:e.code, down, repeat:e.repeat, ...modifiers(e)});
   }

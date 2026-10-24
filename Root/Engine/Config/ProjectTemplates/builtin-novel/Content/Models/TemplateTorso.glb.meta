@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "guid": "23713b29-39fa-5050-a940-b1746454f06f",
+  "assetType": "Model",
+  "sourceFingerprint": "636e38332cc60f40",
+  "loadSettings": {},
+  "importInfo": {},
+  "subAssets": [
+    {
+      "id": "62ead21c-ca1e-5bea-beae-e4aa1ce8971f",
+      "type": "StaticMesh",
+      "name": "TemplateTorso",
+      "selector": {
+        "kind": "mesh",
+        "index": 0
+      }
+    }
+  ]
+}

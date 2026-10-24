@@ -17,7 +17,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(SAKURA_BUILD_EDITOR
-    "Build the Qt editor application (Engine and EditorCore remain available)"
+    "Build editor services for the Electron application"
     ON)
 
 include(CTest)

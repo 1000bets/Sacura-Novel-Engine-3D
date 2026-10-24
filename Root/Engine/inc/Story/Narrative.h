@@ -40,6 +40,8 @@ public:
     ~NarrativeRuntime();
     void Reset(ObjectHandle World);
     void Stop();
+    void CancelAction();
+    void BeginTransition();
     bool Start(const StoryDocument& Document, const StoryNode& Node, std::string& Error);
     bool Tick(float DeltaTime, bool& Completed, std::string& Exit, std::string& Error);
     const std::map<std::string, nlohmann::json>& GetVariables() const;

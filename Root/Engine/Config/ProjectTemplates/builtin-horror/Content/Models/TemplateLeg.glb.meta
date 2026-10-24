@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "guid": "e0f333d3-5635-5378-8229-111b6622b2d4",
+  "assetType": "Model",
+  "sourceFingerprint": "b2261fd6d972a990",
+  "loadSettings": {},
+  "importInfo": {},
+  "subAssets": [
+    {
+      "id": "a82690f4-2e32-56f4-b698-27dd28148035",
+      "type": "StaticMesh",
+      "name": "TemplateLeg",
+      "selector": {
+        "kind": "mesh",
+        "index": 0
+      }
+    }
+  ]
+}

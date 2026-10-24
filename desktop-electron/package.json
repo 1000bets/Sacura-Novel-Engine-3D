@@ -14,12 +14,11 @@
     "smoke:editor": "node scripts/smoke-editor.cjs",
     "smoke:hmr": "node scripts/hmr-check.cjs",
     "build:ui": "npm --prefix ../engine-web-prototype/frontend run build -- --base ./ --outDir ../../desktop-electron/dist-ui --emptyOutDir",
-    "test": "node --test tests/*.test.cjs",
+    "test": "node --test tests",
     "test:bridge": "node --test tests/bridge-contract.test.cjs tests/native-bridge.test.cjs ../engine-web-prototype/frontend/tests/nativeBridgeClient.test.js",
     "native:configure:release": "cmake --preset windows-msvc-release -S .. -DSAKURA_BUILD_ELECTRON_HOST=ON \"-DCMAKE_POLICY_VERSION_MINIMUM=3.5\"",
-    "native:build:release": "cmake --build ../build/windows-msvc-release --config Release --target SakuraElectronHost SakuraEditor --parallel 8",
-    "desktop:production": "npm run native:build:release && npm run build:ui && electron-builder --config electron-builder.production.cjs --win zip",
-    "test:compat": "electron . --compat-roundtrip"
+    "native:build:release": "cmake --build ../build/windows-msvc-release --config Release --target SakuraElectronHost --parallel 8",
+    "desktop:production": "npm run native:build:release && npm run build:ui && electron-builder --config electron-builder.production.cjs --win zip"
   },
   "devDependencies": {
     "electron": "45.0.0",
@@ -44,7 +43,9 @@
       "package.json",
       "native-project.cjs",
       "native-recents.cjs",
-      "scripts/compat-roundtrip.cjs"
+      "player-main.cjs",
+      "game-export.cjs",
+      "scripts/player-smoke.cjs"
     ],
     "asar": true,
     "extraResources": [
@@ -53,7 +54,13 @@
         "to": "native",
         "filter": [
           "**/*",
-          "!**/*.pdb"
+          "!**/*.pdb",
+          "!**/Qt*.dll",
+          "!platforms/**/*",
+          "!imageformats/**/*",
+          "!**/*Test.exe",
+          "!**/*.lib",
+          "!**/*.exp"
         ]
       }
     ]

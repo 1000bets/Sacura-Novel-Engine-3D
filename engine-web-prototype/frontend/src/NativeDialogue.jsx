@@ -1,7 +1,10 @@
 import React,{useEffect,useRef} from 'react';
 import './nativeDialogue.css';
+import WidgetRenderer from './WidgetRenderer.jsx';
+import {t as Translate, useLocale} from './i18n.jsx';
 
 export default function NativeDialogue({state,session,onAdvance,onChoice}){
+  useLocale();
   const audio=useRef(null);
   useEffect(()=>{
     if(!state?.startupAudio||!session)return;
@@ -17,7 +20,18 @@ export default function NativeDialogue({state,session,onAdvance,onChoice}){
   },[state?.play,session,state?.startupAudio]);
   const dialogue=state?.dialogue;
   if(!dialogue||!['line','choice','failed'].includes(dialogue.phase))return null;
-  const enabled=state.play==='playing';
+  const enabled=state.play==='playing'||state.gameRunning&&!state.gamePaused;
+  const View=state.gameViews?.find(Entry=>Entry.widgets?.dialogue);
+  if(View&&dialogue.phase!=='failed'){
+    let Choices=dialogue.choices.map((Label,Index)=>({id:String(Index),label:Label,enabled:true}));
+    if(View.dialogueChoices){Choices=View.dialogueChoices;}
+    let Status = Translate('Нажмите, чтобы продолжить');
+    if (dialogue.phase === 'choice') {
+      Status = Translate('Выберите ответ');
+    }
+    return <WidgetRenderer widget={View.widgets.dialogue} context={{speaker:dialogue.speaker,text:dialogue.text,status:Status,choices:Choices,ready:enabled,canAdvance:enabled&&dialogue.canAdvance}}
+      onAction={Action=>{if(Action==='advance'){onAdvance();}}} onChoice={Identifier=>onChoice(Number(Identifier))} choiceEnabled={Choice=>Choice.enabled!==false}/>;
+  }
   return <div className="native-dialogue" role="region" aria-label="Диалог истории">
     {dialogue.speaker&&<strong className="native-dialogue-speaker">{dialogue.speaker}</strong>}
     <p aria-live="polite">{dialogue.text||dialogue.error}</p>

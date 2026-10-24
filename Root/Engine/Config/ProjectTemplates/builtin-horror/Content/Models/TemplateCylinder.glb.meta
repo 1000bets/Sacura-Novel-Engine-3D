@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "guid": "ddec64e3-ac0a-511d-93b2-0f567311a04b",
+  "assetType": "Model",
+  "sourceFingerprint": "084877cfb1036257",
+  "loadSettings": {},
+  "importInfo": {},
+  "subAssets": [
+    {
+      "id": "86bc959b-0fbe-53fa-8aea-257bc85959af",
+      "type": "StaticMesh",
+      "name": "TemplateCylinder",
+      "selector": {
+        "kind": "mesh",
+        "index": 0
+      }
+    }
+  ]
+}

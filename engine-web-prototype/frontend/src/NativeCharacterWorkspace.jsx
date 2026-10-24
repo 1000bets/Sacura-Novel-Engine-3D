@@ -30,6 +30,9 @@ export default function NativeCharacterWorkspace({objects=[],components=[],asset
   const renderer=character&&components.find(item=>item.typeId===meshType);
   const sceneUtility=character?.components?.some(component=>utilityTypes.has(component.typeId));
   const description=marker?.properties?.find(item=>item.id==='description')?.value||'';
+  const CharacterAsset=marker?.properties?.find(item=>item.id==='character');
+  const Animation=marker?.properties?.find(item=>item.id==='animation');
+  const AutomaticWalk=marker?.properties?.find(item=>item.id==='automatic_walk');
   const mesh=renderer?.properties?.find(item=>item.id==='mesh_asset_id');
   const modelKey=mesh?.value&&mesh?.subAssetId?`${mesh.value}|${mesh.subAssetId}`:'';
   const create=async event=>{
@@ -52,7 +55,8 @@ export default function NativeCharacterWorkspace({objects=[],components=[],asset
           const hierarchy=await command('scene.getHierarchy');
           componentId=hierarchy?.find(item=>item.id===objectId)?.components
             ?.find(component=>component.typeId===meshType)?.id;
-        }else if(!componentId){
+        }
+        if(!componentId){
           componentId=(await command('object.addComponent',{objectId,typeId:meshType}))?.id;
         }
         if(!componentId)throw Error(tr('Не удалось добавить меш персонажу.'));
@@ -83,7 +87,7 @@ export default function NativeCharacterWorkspace({objects=[],components=[],asset
       <label className="subscene-search"><Icon name="Search" size={14}/><input aria-label={tr('Найти персонажа')} placeholder={tr('Найти персонажа…')} value={query} onChange={event=>setQuery(event.target.value)}/></label>
       <form onSubmit={create}><label>{tr('Новый персонаж')}<input aria-label={tr('Имя нового персонажа')} required placeholder={tr('Например, Алиса')} value={name} onChange={event=>setName(event.target.value)}/></label><Button icon="UserPlus" type="submit" disabled={disabled||busy}>{tr('Создать персонажа')}</Button></form>
       {available.length>0&&<form onSubmit={adopt} className="native-character-adopt"><label>{tr('Объект сцены')}<select aria-label={tr('Объект для персонажа')} value={available.some(item=>item.id===adoptId)?adoptId:available[0].id} onChange={event=>setAdoptId(event.target.value)}>{available.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label><Button icon="UserPlus" type="submit" disabled={disabled||busy}>{tr('Сделать персонажем')}</Button></form>}
-      <div className="character-list">{characters.filter(item=>item.name.toLowerCase().includes(query.toLowerCase())).map(item=><button key={item.id} type="button" className={character?.id===item.id?'active':''} onClick={()=>select(item.id)}><Icon name="PersonStanding"/><span>{item.name}<small>{tr(item.active?'В сцене':'Выключен')} · {tr(item.components.some(component=>component.typeId===meshType)?'3D модель':'Без модели')}</small></span></button>)}</div>
+      <div className="character-list">{characters.filter(item=>item.name.toLowerCase().includes(query.toLowerCase())).map(item=><button key={item.id} type="button" className={character?.id===item.id?'active':''} onClick={()=>select(item.id)}><Icon name="PersonStanding"/><span>{item.name}<small>{tr(item.active?'В сцене':'Выключен')}</small></span></button>)}</div>
       {!characters.length&&<p className="native-character-note">{tr('Создайте первого персонажа. Он появится в сцене со стартовой 3D моделью.')}</p>}
     </aside><main>{character?<>
       <div className="subscene-edit-heading"><div><small>{tr('ПЕРСОНАЖ СЦЕНЫ')}</small><h2>{character.name}</h2></div><div className="character-buttons"><Button icon="Focus" onClick={()=>onFocus(character.id)}>{tr('Показать в сцене')}</Button><Button icon="Copy" disabled={disabled||busy} onClick={duplicate}>{tr('Дублировать')}</Button><Button icon="Trash2" disabled={disabled||busy} onClick={()=>command('object.destroy',{objectId:character.id})}>{tr('Удалить')}</Button></div></div>
@@ -91,11 +95,21 @@ export default function NativeCharacterWorkspace({objects=[],components=[],asset
       <fieldset className="character-details" disabled={disabled||busy}>
         <div className="subscene-form-grid two"><label>{tr('Имя')}<input key={character.id+character.name} aria-label={tr('Имя персонажа')} defaultValue={character.name} onBlur={event=>{const value=event.target.value.trim();if(value&&value!==character.name)command('object.rename',{objectId:character.id,name:value});}} onKeyDown={event=>{if(event.key==='Enter')event.currentTarget.blur();}}/></label><label className="check"><input type="checkbox" checked={character.active} onChange={event=>command('object.setActive',{objectId:character.id,active:event.target.checked})}/>{tr('Персонаж включён')}</label></div>
         <label>{tr('Описание')}<textarea key={character.id+description} aria-label={tr('Описание персонажа')} rows={3} defaultValue={description} placeholder={tr('Кто этот персонаж?')} onBlur={event=>{if(marker&&event.target.value!==description)command('component.setProperty',{objectId:character.id,componentId:marker.id,property:'description',value:event.target.value});}}/></label>
-        <section className="native-character-model"><h3>{tr('3D модель')}</h3><p>{tr('Выберите статический меш проекта или импортируйте GLB/FBX. Стартовая модель позволяет видеть персонажа сразу после создания.')}</p>
+        <section className="native-character-model"><h3>{tr('3D модель')}</h3>
+          {CharacterAsset&&<div>
+            <AssetReferenceField label={tr('Editor.Character.AnimatedAsset')} assetId={CharacterAsset.assetId} allowedTypes={['Character']} disabled={disabled||busy} onChange={Identity=>command('component.setAsset',{objectId:character.id,componentId:marker.id,property:'character',assetId:Identity.assetId,subAssetId:null})}/>
+            {CharacterAsset.assetId&&<>
+              <label>{tr('Editor.Character.Animation')}<select aria-label={tr('Editor.Character.Animation')} value={Animation?.value||''} onChange={Event=>command('component.setProperty',{objectId:character.id,componentId:marker.id,property:'animation',value:Event.target.value})}>
+                <option value="">{tr('Editor.Character.DefaultAnimation')}</option>
+                {(Animation?.choices||[]).map(Choice=><option key={Choice.id} value={Choice.id}>{Choice.name}</option>)}
+              </select></label>
+              {AutomaticWalk&&<label className="check"><input type="checkbox" checked={AutomaticWalk.value} onChange={Event=>command('component.setProperty',{objectId:character.id,componentId:marker.id,property:'automatic_walk',value:Event.target.checked})}/>{tr('Editor.Character.AutomaticWalk')}</label>}
+            </>}
+          </div>}
           {renderer?<div><span>{tr('Меш персонажа')}</span><AssetReferenceField label="Меш персонажа" assetId={mesh?.value} subAssetId={mesh?.subAssetId} allowedTypes={['StaticMesh']} disabled={disabled||busy} onChange={Identity=>command('component.setAsset',{objectId:character.id,componentId:renderer.id,property:'mesh_asset_id',assetId:Identity.assetId,subAssetId:Identity.subAssetId})}/></div>
-            :<Button icon="Box" onClick={()=>command('object.addComponent',{objectId:character.id,typeId:meshType})}>{tr('Добавить меш')}</Button>}
+            :!CharacterAsset?.assetId&&<Button icon="Box" onClick={()=>command('object.addComponent',{objectId:character.id,typeId:meshType})}>{tr('Добавить меш')}</Button>}
           <Button icon="Upload" onClick={importModel} disabled={disabled||busy}>{tr('Импортировать модель')}</Button>
-          <small>{tr('FBX с ригом загружается как статическая поза. Риг и анимации пока не воспроизводятся в C++ viewport.')}</small>
+          <small>{tr('Editor.Character.ImportNote')}</small>
           <Button icon="UserMinus" disabled={disabled||busy} onClick={()=>command('object.removeComponent',{objectId:character.id,componentId:marker.id})}>{tr('Убрать признак персонажа')}</Button>
         </section>
         <div className="native-character-actions"><Button icon="Save" onClick={()=>command('scene.save')} disabled={!dirty||disabled}>{tr('Сохранить сцену')}</Button><span>{tr('Позиция и поворот редактируются в сцене и Inspector.')}</span></div>

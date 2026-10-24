@@ -463,3 +463,11 @@ button:focus-visible { outline-color: var(--accent); }
 .editor-app:has(> .error-box) {display:flex;flex-direction:column}
 .editor-app:has(> .error-box) > .editor-workspace {flex:1;min-height:0}
 .editor-app:has(> .error-box) > header,.editor-app:has(> .error-box) > footer {flex-shrink:0}
+
+.hierarchy-rename { flex: 1; width: 0; min-width: 0; margin: 2px 4px; }
+.hierarchy-prefab-popover { padding: 12px; }
+.hierarchy-prefab-popover fieldset { display: grid; gap: 8px; min-width: 0; margin: 8px 0 0; padding: 0; border: 0; }
+.hierarchy-prefab-popover label { display: grid; gap: 4px; }
+.hierarchy-prefab-popover input { min-width: 0; width: 100%; }
+.hierarchy-prefab-popover input[type="checkbox"] { width: auto; }
+.hierarchy-prefab-popover p { color: var(--text-secondary); font-size: 12px; }

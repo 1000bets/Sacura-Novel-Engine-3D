@@ -124,6 +124,7 @@ dist/
 coverage/
 .nyc_output/
 playwright-report/
+.playwright-mcp/
 test-results/
 blob-report/
 
@@ -186,3 +187,4 @@ $RECYCLE.BIN/
 /engine-web-prototype/frontend/public/game-exports/
 
 /Root/Engine/ThirdParty/python/
+**/Saved/Logs/

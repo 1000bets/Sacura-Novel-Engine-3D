@@ -49,6 +49,8 @@ public:
     bool TriggerEvent(const std::string& EventId);
     bool SelectChoice(size_t ChoiceIndex);
     void Tick(float DeltaTime);
+    bool RequestNode(const StoryNodeId& NodeId);
+    const StoryNodeId& GetCurrentNodeId() const { return CurrentNodeId; }
 
     std::vector<StoryEventSnapshot> GetEventSnapshots() const;
     bool SetEventPaused(uint64_t InstanceId, bool bPaused);
@@ -99,6 +101,7 @@ private:
     ObjectHandle BoundScene;
     StoryDocument Document;
     StoryNodeId CurrentNodeId;
+    StoryNodeId RequestedNodeId;
     StoryPlaybackPhase Phase = StoryPlaybackPhase::Idle;
 
     std::string DisplayedSpeaker;

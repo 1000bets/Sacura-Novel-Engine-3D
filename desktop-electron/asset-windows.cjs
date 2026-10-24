@@ -16,7 +16,7 @@ exports.createAssetWindows = function({dialog, NativeViewport, waitForNative, ge
     if (Asset.typeId === 'Model' && !Identity.subAssetId) {
       Identity = {...Identity, subAssetId:Asset.subassets.find(Entry => Entry.typeId === 'StaticMesh')?.id};
     }
-    if (!['Material','MaterialInstance','Texture','PythonScript'].includes(Asset.typeId) && !Asset.subassets.some(Entry => Entry.id === Identity.subAssetId && Entry.typeId === 'StaticMesh')) {
+    if (!['Material','MaterialInstance','Texture','PythonScript','Prefab'].includes(Asset.typeId) && !Asset.subassets.some(Entry => Entry.id === Identity.subAssetId && Entry.typeId === 'StaticMesh')) {
       getMainWindow().webContents.send('native-reveal-asset', {...Identity,open:true});
       return null;
     }
@@ -199,6 +199,14 @@ exports.createAssetWindows = function({dialog, NativeViewport, waitForNative, ge
       }
     }
     return false;
+  };
+  Editors.requireSaved = async () => {
+    await Promise.all(Pending.values());
+    for (const Editor of Editors.values()) {
+      await Flush(Editor);
+      const Result = await Editor.viewport.bridge.request('assetDocument.execute', {...Editor.identity, operation:'get'});
+      if (!Result.ok || Result.value.dirty) { throw new Error('Save every asset document before exporting'); }
+    }
   };
   Editors.open = Open;
   Editors.list = () => Array.from(Editors.values()).filter(Editor => Editor.ready).map(Describe);

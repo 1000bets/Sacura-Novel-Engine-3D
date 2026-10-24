@@ -96,7 +96,12 @@ if (process.argv.includes('--native-viewport')) sharedTexture.setSharedTextureRe
       const percentile=(a,p)=>a.length?[...a].sort((a,b)=>a-b)[Math.floor((a.length-1)*p)]:0;
       Object.assign(Metrics,{frameMs:percentile(Timing.intervals,.5),frameP95Ms:percentile(Timing.intervals,.95),readyToDrawP50Ms:percentile(Timing.latencies,.5),readyToDrawP95Ms:percentile(Timing.latencies,.95),inputToDrawP50Ms:percentile(Timing.inputLatencies,.5),inputToDrawP95Ms:percentile(Timing.inputLatencies,.95)});
     }
-  } catch (error) {Metrics.error = error.message; Metrics.error = error.message;}
+  } catch (error) {
+    if (Metrics.error !== error.message) {
+      console.error('Native frame presentation failed:', error.message);
+    }
+    Metrics.error = error.message;
+  }
   finally {
     frame?.close();
     importedSharedTexture.release();
@@ -197,6 +202,9 @@ contextBridge.exposeInMainWorld('sacuraDesktop', Object.freeze({
   },
   onRevealAsset: Callback => {const Listener = (_, Identity) => Callback(Identity); ipcRenderer.on('native-reveal-asset', Listener); return () => ipcRenderer.removeListener('native-reveal-asset', Listener);},
   nativeViewport: process.argv.includes('--native-viewport'),
+  nativePlayer: process.argv.includes('--sakura-player'),
+  playerQuit: () => ipcRenderer.invoke('desktop:player-quit'),
+  nativeExportGame: () => ipcRenderer.invoke('desktop:native-export-game'),
   nativeSession: () => ipcRenderer.invoke('desktop:native-session'),
   nativeListProjects: () => ipcRenderer.invoke('desktop:native-list-projects'),
   nativeOpenRecent: id => ipcRenderer.invoke('desktop:native-open-recent',id),

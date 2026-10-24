@@ -10,5 +10,6 @@ public:
         const std::filesystem::path& RuntimeDirectory,
         const std::filesystem::path& EngineRoot,
         const std::filesystem::path& Destination,
+        const std::string& ExecutableName,
         std::string& OutError);
 };

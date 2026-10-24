@@ -1,7 +1,8 @@
 #include "Documents/PythonScriptDocument.h"
 #include "Core/IO/AtomicFileWriter.h"
-#include <QFile>
-#include <QStringDecoder>
+#include <fstream>
+#include <iterator>
+#include <nlohmann/json.hpp>
 
 bool PythonScriptDocument::Open(const AssetKey& Asset, std::string& Error)
 {
@@ -12,26 +13,33 @@ bool PythonScriptDocument::Open(const AssetKey& Asset, std::string& Error)
         Error = "Python script asset not found";
         return false;
     }
-    QFile File(QString::fromStdString(Resolved.AbsolutePath));
-    if (!File.open(QIODevice::ReadOnly))
+    std::ifstream File(std::filesystem::u8path(Resolved.AbsolutePath), std::ios::binary);
+    if (!File)
     {
-        Error = File.errorString().toStdString();
+        Error = "Failed to open Python source";
         return false;
     }
-    const QByteArray Bytes = File.readAll();
-    if (File.error() != QFileDevice::NoError)
+    const std::string Bytes((std::istreambuf_iterator<char>(File)), std::istreambuf_iterator<char>());
+    if (File.bad())
     {
-        Error = File.errorString().toStdString();
+        Error = "Failed to read Python source";
         return false;
     }
-    QStringDecoder Decoder(QStringDecoder::Utf8);
-    const QString Decoded = Decoder.decode(Bytes);
-    if (Decoder.hasError() || Decoded.contains(QChar::Null))
+    try
+    {
+        nlohmann::json(Bytes).dump();
+    }
+    catch (const nlohmann::json::type_error&)
     {
         Error = "Python source must use UTF-8 encoding without null characters";
         return false;
     }
-    Saved = Bytes.toStdString();
+    if (Bytes.find('\0') != std::string::npos)
+    {
+        Error = "Python source must use UTF-8 encoding without null characters";
+        return false;
+    }
+    Saved = Bytes;
     History = {Saved};
     Position = 0;
     Entry = std::move(Resolved);
@@ -78,14 +86,14 @@ bool PythonScriptDocument::Save(std::string& Error)
         Error = "Python script is unavailable or read-only";
         return false;
     }
-    QFile File(QString::fromStdString(Current.AbsolutePath));
-    if (!File.open(QIODevice::ReadOnly))
+    std::ifstream File(std::filesystem::u8path(Current.AbsolutePath), std::ios::binary);
+    if (!File)
     {
-        Error = File.errorString().toStdString();
+        Error = "Failed to open Python source";
         return false;
     }
-    const QByteArray Bytes = File.readAll();
-    if (File.error() != QFileDevice::NoError || Bytes.toStdString() != Saved)
+    const std::string Bytes((std::istreambuf_iterator<char>(File)), std::istreambuf_iterator<char>());
+    if (File.bad() || Bytes != Saved)
     {
         Error = "Python script changed on disk; preserve your draft and reload before saving";
         return false;

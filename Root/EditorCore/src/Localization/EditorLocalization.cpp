@@ -1,13 +1,10 @@
 #include "Localization/EditorLocalization.h"
-
-#include <QCoreApplication>
-#include <QEvent>
-#include <QFile>
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QSettings>
-#include <QRegularExpression>
+#include "Core/IO/AtomicFileWriter.h"
+#include "Core/EnginePaths.h"
 #include <algorithm>
+#include <cstdlib>
+#include <fstream>
+#include <regex>
 
 EditorLocalization& EditorLocalization::Get()
 {
@@ -17,172 +14,88 @@ EditorLocalization& EditorLocalization::Get()
 
 EditorLocalization::EditorLocalization()
 {
-    Q_INIT_RESOURCE(editor_localization);
-    QFile Catalog(":/editor-localization/Editor.json");
-    if (Catalog.open(QIODevice::ReadOnly))
+    std::ifstream Catalog(EnginePaths::Config() / "EditorLocalization.json", std::ios::binary);
+    Entries = nlohmann::json::parse(Catalog).at("entries");
+    const char* SettingsRoot = std::getenv("APPDATA");
+    if (!SettingsRoot)
     {
-        Entries = QJsonDocument::fromJson(Catalog.readAll()).object().value("entries").toObject();
-        for (auto Entry = Entries.begin(); Entry != Entries.end(); ++Entry)
+        throw std::runtime_error("APPDATA is unavailable for editor preferences");
+    }
+    SettingsPath = std::filesystem::u8path(SettingsRoot) / "SakuraNovel" / "EditorLocalization.json";
+    std::ifstream Input(SettingsPath, std::ios::binary);
+    if (Input)
+    {
+        const auto Values = nlohmann::json::parse(Input, nullptr, false);
+        if (Values.is_object())
         {
-            for (const auto& Alias : Entry.value().toObject().value("aliases").toArray())
+            const auto Language = Values.value("language", std::string("en"));
+            if (Language == "ru")
             {
-                Aliases.insert(Alias.toString(), Entry.key());
+                CurrentLanguage = Language;
+            }
+            if (Values.contains("overrides") && Values["overrides"].is_object())
+            {
+                Overrides = Values["overrides"];
             }
         }
     }
-    QSettings Settings("SakuraNovel", "SakuraNovel Studio");
-    CurrentLanguage = Settings.value("Editor/Language", "en").toString();
-    Overrides = QJsonDocument::fromJson(Settings.value("Editor/TranslationOverrides").toByteArray()).object();
-    if (CurrentLanguage != "ru")
-    {
-        CurrentLanguage = "en";
-    }
 }
 
-QString EditorLocalization::GetLanguage() const
-{
-    return CurrentLanguage;
-}
-
-bool EditorLocalization::SetLanguage(const QString& Language)
-{
-    QString Error;
-    return ApplyPreferences({{"language", Language}}, Error);
-}
-
-QString EditorLocalization::Text(const QString& Identifier, const QString& Fallback) const
-{
-    const auto Entry = Entries.value(Identifier).toObject();
-    if (Entry.isEmpty())
-    {
-        return Fallback;
-    }
-    const QString Source = Entry.value("source").toString();
-    if (CurrentLanguage == "en")
-    {
-        return Source;
-    }
-    const auto Override = Overrides.value(Identifier).toObject();
-    if (Override.value("source").toString() == Source && !Override.value("text").toString().isEmpty())
-    {
-        return Override.value("text").toString();
-    }
-    const QString Translation = Entry.value("translations").toObject().value(CurrentLanguage).toString();
-    if (Translation.isEmpty())
-    {
-        return Source;
-    }
-    return Translation;
-}
-
-QString EditorLocalization::Caption(const QString& Source) const
-{
-    return Text(Aliases.value(Source), Source);
-}
-
-QString EditorLocalization::translate(const char*, const char* Source, const char*, int) const
-{
-    const QString Original = QString::fromUtf8(Source);
-    const auto Found = Aliases.constFind(Original);
-    if (Found == Aliases.constEnd())
-    {
-        return {};
-    }
-    return Text(Found.value(), Original);
-}
-
-bool EditorLocalization::isEmpty() const
-{
-    return Entries.isEmpty();
-}
-
-QJsonObject EditorLocalization::Preferences() const
+nlohmann::json EditorLocalization::Preferences() const
 {
     return {{"language", CurrentLanguage}, {"overrides", Overrides}};
 }
 
-bool EditorLocalization::ApplyPreferences(const QJsonObject& Values, QString& Error)
+bool EditorLocalization::ApplyPreferences(const nlohmann::json& Values, std::string& Error)
 {
-    const QString Language = Values.value("language").toString(CurrentLanguage);
-    if ((Values.contains("language") && !Values.value("language").isString()) || (Language != "en" && Language != "ru"))
+    if (!Values.is_object() || (Values.contains("language") && !Values["language"].is_string()))
+    {
+        Error = "Localization preferences must be an object with a string language";
+        return false;
+    }
+    const auto Language = Values.value("language", CurrentLanguage);
+    if (Language != "en" && Language != "ru")
     {
         Error = "Language must be en or ru";
         return false;
     }
-    QJsonObject Updated = Overrides;
-    if (Values.contains("overrides"))
+    auto Updated = Values.value("overrides", Overrides);
+    if (!Updated.is_object())
     {
-        if (!Values.value("overrides").isObject())
-        {
-            Error = "Translation overrides must be an object";
-            return false;
-        }
-        Updated = Values.value("overrides").toObject();
-        auto Slots = [](const QString& Text)
-        {
-            QStringList Result;
-            auto Matches = QRegularExpression("\\{[a-zA-Z_0-9]+\\}|%[1-9][0-9]*").globalMatch(Text);
-            while (Matches.hasNext())
-            {
-                Result.push_back(Matches.next().captured());
-            }
-            Result.sort();
-            return Result;
-        };
-        for (auto Entry = Updated.begin(); Entry != Updated.end(); ++Entry)
-        {
-            const auto Source = Entries.value(Entry.key()).toObject();
-            const auto Value = Entry.value().toObject();
-            const QString Original = Source.value("source").toString();
-            const QString Translation = Value.value("text").toString();
-            if (Source.isEmpty() || Value.value("source").toString() != Original || !Value.value("text").isString()
-                || Translation.size() > 16384 || (!Translation.isEmpty() && Slots(Original) != Slots(Translation)))
-            {
-                Error = "Invalid or outdated translation entry: " + Entry.key();
-                return false;
-            }
-        }
-    }
-    QSettings Settings("SakuraNovel", "SakuraNovel Studio");
-    Settings.setValue("Editor/Language", Language);
-    Settings.setValue("Editor/TranslationOverrides", QJsonDocument(Updated).toJson(QJsonDocument::Compact));
-    Settings.sync();
-    if (Settings.status() != QSettings::NoError)
-    {
-        Error = "Failed to save editor localization preferences";
+        Error = "Translation overrides must be an object";
         return false;
     }
-    Overrides = Updated;
-    CurrentLanguage = Language;
-    RefreshBindings();
-    if (QCoreApplication::instance())
+    const auto Slots = [](const std::string& Text)
     {
-        QEvent Changed(QEvent::LanguageChange);
-        QCoreApplication::sendEvent(QCoreApplication::instance(), &Changed);
-    }
-    return true;
-}
-
-void EditorLocalization::Bind(QObject* Owner, std::function<void()> Refresh)
-{
-    Bindings.erase(std::remove_if(Bindings.begin(), Bindings.end(), [](const Binding& Entry)
-    {
-        return Entry.Owner.isNull();
-    }), Bindings.end());
-    Refresh();
-    Bindings.push_back({Owner, std::move(Refresh)});
-}
-
-void EditorLocalization::RefreshBindings()
-{
-    auto Current = std::move(Bindings);
-    Bindings.clear();
-    for (auto& Entry : Current)
-    {
-        if (Entry.Owner)
+        static const std::regex Pattern(R"(\{[a-zA-Z_0-9]+\}|%[1-9][0-9]*)");
+        std::vector<std::string> Result;
+        for (std::sregex_iterator Match(Text.begin(), Text.end(), Pattern), End; Match != End; ++Match)
         {
-            Entry.Refresh();
-            Bindings.push_back(std::move(Entry));
+            Result.push_back(Match->str());
+        }
+        std::sort(Result.begin(), Result.end());
+        return Result;
+    };
+    for (const auto& [Key, Value] : Updated.items())
+    {
+        if (!Entries.contains(Key) || !Value.is_object() || !Value.contains("text") || !Value["text"].is_string()
+            || Value.value("source", nlohmann::json()) != Entries[Key]["source"])
+        {
+            Error = "Invalid or outdated translation entry: " + Key;
+            return false;
+        }
+        const auto Text = Value["text"].get<std::string>();
+        if (Text.size() > 65536 || (!Text.empty() && Slots(Text) != Slots(Entries[Key]["source"])))
+        {
+            Error = "Invalid translation placeholders or size: " + Key;
+            return false;
         }
     }
+    if (!AtomicFileWriter::WriteText(SettingsPath, nlohmann::json{{"language", Language}, {"overrides", Updated}}.dump(), Error))
+    {
+        return false;
+    }
+    CurrentLanguage = Language;
+    Overrides = std::move(Updated);
+    return true;
 }

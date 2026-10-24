@@ -1,8 +1,15 @@
 #include "Core/IO/AtomicFileWriter.h"
+#include "Assets/Guid.h"
 
-#include <QDir>
-#include <QFileInfo>
-#include <QSaveFile>
+#include <cerrno>
+#include <cstdio>
+#include <system_error>
+#ifdef _WIN32
+#include <windows.h>
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
 
 bool AtomicFileWriter::WriteText(
     const std::filesystem::path& Destination,
@@ -15,34 +22,75 @@ bool AtomicFileWriter::WriteText(
         OutError = "Output path is empty";
         return false;
     }
-
-    const QString Filename = QString::fromStdWString(Destination.wstring());
-    if (!QDir().mkpath(QFileInfo(Filename).absolutePath()))
+    std::error_code Error;
+    const auto AbsoluteDestination = std::filesystem::absolute(Destination, Error);
+    if (Error)
     {
-        OutError = "Failed to create output directories";
+        OutError = Error.message();
         return false;
     }
-
-    QSaveFile Output(Filename);
-    Output.setDirectWriteFallback(false);
-    if (!Output.open(QIODevice::WriteOnly))
+    std::filesystem::create_directories(AbsoluteDestination.parent_path(), Error);
+    if (Error)
     {
-        OutError = Output.errorString().toStdString();
+        OutError = Error.message();
         return false;
     }
-
-    if (Output.write(Contents.data(), static_cast<qint64>(Contents.size())) != static_cast<qint64>(Contents.size()))
+    auto Temporary = AbsoluteDestination;
+    Temporary += "." + Guid::Generate().ToString() + ".tmp";
+#ifdef _WIN32
+    FILE* Output = nullptr;
+    _wfopen_s(&Output, Temporary.c_str(), L"wbx");
+#else
+    FILE* Output = std::fopen(Temporary.c_str(), "wbx");
+#endif
+    if (!Output)
     {
-        OutError = Output.errorString().toStdString();
-        Output.cancelWriting();
+        OutError = std::error_code(errno, std::generic_category()).message();
         return false;
     }
-
-    if (!Output.commit())
+    bool bSuccess = std::fwrite(Contents.data(), 1, Contents.size(), Output) == Contents.size();
+    if (bSuccess)
     {
-        OutError = Output.errorString().toStdString();
-        return false;
+        bSuccess = std::fflush(Output) == 0;
     }
-
-    return true;
+    if (bSuccess)
+    {
+#ifdef _WIN32
+        bSuccess = _commit(_fileno(Output)) == 0;
+#else
+        bSuccess = fsync(fileno(Output)) == 0;
+#endif
+    }
+    if (!bSuccess)
+    {
+        OutError = std::error_code(errno, std::generic_category()).message();
+    }
+    if (std::fclose(Output) != 0 && bSuccess)
+    {
+        bSuccess = false;
+        OutError = std::error_code(errno, std::generic_category()).message();
+    }
+    if (bSuccess)
+    {
+#ifdef _WIN32
+        bSuccess = MoveFileExW(Temporary.c_str(), AbsoluteDestination.c_str(),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
+        if (!bSuccess)
+        {
+            OutError = std::error_code(GetLastError(), std::system_category()).message();
+        }
+#else
+        std::filesystem::rename(Temporary, AbsoluteDestination, Error);
+        bSuccess = !Error;
+        if (!bSuccess)
+        {
+            OutError = Error.message();
+        }
+#endif
+    }
+    if (!bSuccess)
+    {
+        std::filesystem::remove(Temporary, Error);
+    }
+    return bSuccess;
 }

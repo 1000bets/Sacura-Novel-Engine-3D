@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "parent": {
+    "assetId": "42b33bd1-5bf7-5462-920b-297de12b0f18",
+    "subAssetId": null
+  },
+  "overrides": {
+    "BaseColor": {
+      "type": "Color",
+      "value": [
+        0.266666680574417,
+        0.0996231064200401,
+        0.0808117911219597,
+        1.0
+      ]
+    },
+    "Metallic": {
+      "type": "Float",
+      "value": 0.400000005960464
+    },
+    "Roughness": {
+      "type": "Float",
+      "value": 0.70710676908493
+    }
+  }
+}

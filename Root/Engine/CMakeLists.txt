@@ -5,7 +5,7 @@ add_subdirectory(ThirdParty)
 
 # Diligent exports /GR- in Release through its INTERFACE build settings. Sacura
 # uses dynamic_cast for generation-checked objects, reflection and scene IO.
-# Keep RTTI enabled throughout consumers (including generated Qt MOC sources).
+# Keep RTTI enabled throughout consumers.
 # Override dependency integration here; never edit the fetched source tree.
 if(MSVC AND TARGET Diligent-BuildSettings)
     get_target_property(SakuraDiligentOptions Diligent-BuildSettings INTERFACE_COMPILE_OPTIONS)
@@ -33,7 +33,6 @@ set(ENGINE_SRC
     src/Input/InputDocument.cpp
     src/Input/EngineInput.cpp
     src/Scripting/InputBindings.cpp
-    src/UI/GameInputAdapter.cpp
     src/Authoring/AuthoringTypes.cpp
     src/Authoring/OperationRegistry.cpp
     src/Authoring/OperationContext.cpp
@@ -62,6 +61,7 @@ set(ENGINE_SRC
     src/Assets/Loaders/SkeletalLoader.cpp
     src/Assets/Loaders/TextureLoader.cpp
     src/Core/IO/AtomicFileWriter.cpp
+    src/Core/IO/ImageBuffer.cpp
     src/Core/EnginePaths.cpp
     src/Core/Object/MemorySubsystem.cpp
     src/Core/Subsystem.cpp
@@ -244,17 +244,7 @@ set(ENGINE_HDR
     inc/Story/StoryTypes.h
 )
 
-add_library(Engine STATIC ${ENGINE_SRC} ${ENGINE_HDR}
-    inc/UI/RenderViewportWidget.h
-    src/UI/RenderViewportWidget.cpp
-    inc/UI/MaterialWidget.h
-    src/UI/MaterialWidget.cpp
-    inc/UI/StoryWidget.h
-    src/UI/StoryWidget.cpp
-    src/UI/WidgetLayout.cpp
-    src/UI/WidgetSurface.cpp
-)
-set_target_properties(Engine PROPERTIES AUTOMOC ON)
+add_library(Engine STATIC ${ENGINE_SRC} ${ENGINE_HDR})
 
 target_include_directories(Engine PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
@@ -274,7 +264,7 @@ if(NOT WIN32)
 endif()
 
 target_link_libraries(Engine
-    PUBLIC Sakura::EngineQtThirdParty nlohmann_json::nlohmann_json ozz_animation
+    PUBLIC nlohmann_json::nlohmann_json ozz_animation
     PRIVATE Sakura::EngineThirdParty
 )
 

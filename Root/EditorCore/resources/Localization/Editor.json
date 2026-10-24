@@ -2,6 +2,16 @@
   "schemaVersion": 1,
   "sourceLanguage": "en",
   "entries": {
+    "Editor.Character.AnimatedAsset": {"source":"Animated character","translations":{"ru":"Анимированный персонаж"}},
+    "Editor.Character.Animation": {"source":"Animation","translations":{"ru":"Анимация"}},
+    "Editor.Character.DefaultAnimation": {"source":"Default idle","translations":{"ru":"Ожидание по умолчанию"}},
+    "Editor.Character.AutomaticWalk": {"source":"Walk animation when moving","translations":{"ru":"Анимация ходьбы при движении"}},
+    "Editor.Character.ImportNote": {"source":"Character assets play skeletal animations. Model import below adds a static mesh.","translations":{"ru":"Ресурсы Character воспроизводят скелетные анимации. Импорт модели ниже добавляет статический меш."}},
+    "Editor.Story.AutoFocusSelection": {
+      "source": "Focus selected node automatically",
+      "translations": {"ru": "Фокусироваться при выборе ноды"},
+      "aliases": ["Фокусироваться при выборе ноды"]
+    },
     "Editor.Python.ScriptType": {
       "source": "Python Script",
       "translations": {

@@ -287,17 +287,28 @@ NarrativeRuntime::NarrativeRuntime() : Session(std::make_shared<State>()) {}
 NarrativeRuntime::~NarrativeRuntime() { Stop(); }
 void NarrativeRuntime::Stop()
 {
+    CancelAction();
+    Session->bActive = false;
+}
+void NarrativeRuntime::CancelAction()
+{
 #if defined(SAKURA_ENABLE_PYTHON)
     CancelNarrativeInvocation(Session->Invocation);
 #endif
     Session->Invocation = 0;
-    Session->bActive = false;
+    Session->bCompleted = false;
+    Session->Exit.clear();
 }
 void NarrativeRuntime::Reset(ObjectHandle World)
 {
     Stop();
     Session = std::make_shared<State>();
     Session->World = World;
+}
+void NarrativeRuntime::BeginTransition()
+{
+    CancelAction();
+    Session->bActive = true;
 }
 const std::map<std::string, nlohmann::json>& NarrativeRuntime::GetVariables() const { return Session->Variables; }
 

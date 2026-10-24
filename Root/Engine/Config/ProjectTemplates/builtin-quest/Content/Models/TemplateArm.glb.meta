@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "guid": "1426b0ad-0747-5838-81b2-16a8a91dceee",
+  "assetType": "Model",
+  "sourceFingerprint": "620bea7d52deb4c3",
+  "loadSettings": {},
+  "importInfo": {},
+  "subAssets": [
+    {
+      "id": "d06f3163-6063-5d81-804f-19096d9e33ac",
+      "type": "StaticMesh",
+      "name": "TemplateArm",
+      "selector": {
+        "kind": "mesh",
+        "index": 0
+      }
+    }
+  ]
+}

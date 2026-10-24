@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "guid": "801c2297-a11d-5b17-8fb5-f9ea55946734",
+  "assetType": "Model",
+  "loadSettings": {},
+  "importInfo": {},
+  "subAssets": [
+    {
+      "id": "c994c384-0a0f-50b2-b9dd-609e5736830f",
+      "type": "Skeleton",
+      "name": "HumanoidSkeleton",
+      "selector": {
+        "kind": "skin",
+        "index": 0
+      }
+    },
+    {
+      "id": "424bcecd-6df5-5139-bfcd-41e43f410e66",
+      "type": "SkeletalMesh",
+      "name": "HumanoidMesh",
+      "selector": {
+        "kind": "skin",
+        "index": 0
+      }
+    },
+    {
+      "id": "2c33529a-5ad6-51d1-a523-0fb6f710d6b7",
+      "type": "AnimationClip",
+      "name": "HipHopDance",
+      "selector": {
+        "kind": "animation",
+        "index": 0
+      }
+    },
+    {
+      "id": "df6f9e37-f5fa-5034-8316-6d21b6e321f5",
+      "type": "AnimationClip",
+      "name": "Idle",
+      "selector": {
+        "kind": "animation",
+        "index": 1
+      }
+    },
+    {
+      "id": "b1cfcd60-8359-59a7-85b6-49ac25f2ecb4",
+      "type": "AnimationClip",
+      "name": "Walk",
+      "selector": {
+        "kind": "animation",
+        "index": 2
+      }
+    }
+  ]
+}

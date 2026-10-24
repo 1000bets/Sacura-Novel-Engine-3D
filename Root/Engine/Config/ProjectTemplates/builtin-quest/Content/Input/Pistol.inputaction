@@ -1,0 +1,10 @@
+{
+  "Version": 1,
+  "Action": {
+    "Name": "Pistol",
+    "ValueType": 0,
+    "Trigger": 0,
+    "bClampMagnitude": true,
+    "bRequireNeutral": true
+  }
+}

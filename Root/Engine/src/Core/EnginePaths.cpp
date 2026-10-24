@@ -35,6 +35,7 @@ void EnginePaths::InitializeFromRoot(const std::filesystem::path& EngineInstalla
         InstallationRoot = std::filesystem::absolute(EngineInstallationRoot).lexically_normal();
     }
     bInitialized = true;
+    SetPrintLogDirectory(InstallationRoot / "Saved" / "Logs");
     PrintString(std::string("EnginePaths: root = ") + InstallationRoot.generic_string());
 }
 

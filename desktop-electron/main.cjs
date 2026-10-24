@@ -22,7 +22,6 @@ const devUrl = process.env.SACURA_DESKTOP_DEV_URL;
 const uiRoot = path.join(__dirname, 'dist-ui');
 const smoke = process.argv.includes('--desktop-smoke');
 const nativePrototype = true;
-const compatibilityTest=process.argv.includes('--compat-roundtrip');
 const assetTransferTest=process.argv.includes('--asset-transfer-check');
 const AssetReferenceCheck = process.argv.includes('--asset-reference-check');
 const ComponentNamesCheck = process.argv.includes('--component-names-check');
@@ -33,7 +32,8 @@ const CameraSpeedCheck = process.argv.includes('--camera-speed-check');
 const SceneShortcutsCheck = process.argv.includes('--scene-shortcuts-check');
 const MaterialDropCheck = process.argv.includes('--material-drop-check');
 const MaterialCapture = process.argv.find(Argument => Argument.startsWith('--screenshot-material='));
-const nativeSmoke = process.argv.includes('--native-smoke')||compatibilityTest||assetTransferTest;
+const MigrationCheck = process.argv.includes('--qt-removal-check');
+const nativeSmoke = process.argv.includes('--native-smoke')||assetTransferTest||MigrationCheck;
 // CLI rendering checks must keep Chromium producing frames when another app
 // covers the test window. Production keeps normal background/visibility policy.
 if(LocalizationCheck || AssetReferenceCheck || WorkspaceTabsCheck || nativeSmoke || MaterialCapture || ComponentNamesCheck || CameraSpeedCheck || SceneShortcutsCheck || MaterialDropCheck){
@@ -238,6 +238,13 @@ app.whenReady().then(async () => {
       }finally{loading=null;}
     });
     releaseNativeProject = () => replaceProject(null);
+    handle('native-export-game', async () => {
+      await AssetWindows.requireSaved();
+      const Choice = await dialog.showSaveDialog(window, {title: 'Export game to a new folder', buttonLabel: 'Export', defaultPath: 'Game'});
+      if (Choice.canceled || !Choice.filePath) { return null; }
+      return require('./game-export.cjs').ExportGame({Destination: Choice.filePath, Bridge: nativeViewport.bridge,
+        RuntimeExecutable: process.execPath, NativeExecutable: hostPath(app), ApplicationDirectory: __dirname});
+    });
     handle('native-bounds', value => {const result=nativeViewport.bounds(value);requestedBounds={...value};return result;});
     handle('native-status', () => nativeViewport.state);
     handle('native-frame-consumed', Token => nativeViewport.frameConsumed(Token));
@@ -251,7 +258,7 @@ app.whenReady().then(async () => {
     handle('native-copy-text', Text => {if(typeof Text !== 'string' || Text.length > 4096){throw Error('Invalid clipboard text');}clipboard.writeText(Text);return true;});
     handle('bridge-command', async request => {
       if(!request||typeof request.method!=='string'||!request.context||typeof request.context.session!=='string'||!Number.isSafeInteger(request.context.epoch))return {version:1,type:'bridge.result',id:null,context:nativeViewport.bridge.context,ok:false,error:{code:'INVALID_ARGUMENT',message:'Invalid Bridge request or missing context'}};
-      if(['assets.import','assets.resolve'].includes(request.method))return {version:1,id:null,context:nativeViewport.bridge.context,ok:false,error:{code:'FORBIDDEN',message:'This operation requires the main-process asset capability'}};
+      if(['assets.import','assets.resolve','project.export'].includes(request.method))return {version:1,id:null,context:nativeViewport.bridge.context,ok:false,error:{code:'FORBIDDEN',message:'This operation requires the main-process asset capability'}};
       if (await AssetWindows.blocksMutation(request.method, request.params)) {
         return {version:1,id:null,context:nativeViewport.bridge.context,ok:false,error:{code:'DOCUMENT_OPEN',message:'Закройте редакторы затронутых ассетов перед переименованием, перемещением или удалением.'}};
       }
@@ -315,8 +322,8 @@ app.whenReady().then(async () => {
     if (CameraSpeedCheck) require('./scripts/camera-speed-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
     if (SceneShortcutsCheck) require('./scripts/scene-shortcuts-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
     if (MaterialDropCheck) require('./scripts/material-drop-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
-    if (assetTransferTest) require('./scripts/asset-transfer-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
-    if (compatibilityTest) require('./scripts/compat-roundtrip.cjs').run({app,window,getViewport:()=>nativeViewport,replaceProject,createNativeProject});
+    if (MigrationCheck) require('./scripts/qt-removal-check.cjs').Run({Application:app,Window:window,Editors:AssetWindows,GetViewport:()=>nativeViewport});
+    else if (assetTransferTest) require('./scripts/asset-transfer-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
     else if (nativeSmoke && !assetTransferTest && !process.argv.some(Argument => Argument.startsWith('--screenshot-texture='))) require('./scripts/native-smoke-main.cjs').run({app, window, getViewport:()=>nativeViewport, replaceProject});
   }
   if (smoke) {

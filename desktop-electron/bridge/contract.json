@@ -26,7 +26,7 @@
       "objectId": "id"
     },
     "object.paste": {
-      "subtree": "string"
+      "subtree": "serializedJson"
     },
     "object.duplicate": {
       "objectId": "id"
@@ -267,6 +267,54 @@
     "project.settings.get": {},
     "project.settings.set": {
       "settings": "json"
+    },
+    "story.addNarrative": {
+      "type": "string",
+      "x": "number",
+      "y": "number"
+    },
+    "story.setNarrativeInput": {
+      "nodeId": "id",
+      "input": "string",
+      "value": "json"
+    },
+    "story.connectData": {
+      "sourceId": "string",
+      "output": "string",
+      "targetId": "id",
+      "input": "string"
+    },
+    "story.validate": {},
+    "game.state": {},
+    "game.action": {"objectId":"id", "componentId":"id", "action":"string"},
+    "game.advance": {},
+    "game.choose": {
+      "index": "number"
+    },
+    "game.pause": {
+      "paused": "boolean"
+    },
+    "prefab.inspect": {
+      "objectId": "id"
+    },
+    "prefab.create": {
+      "objectId": "id",
+      "path": "string",
+      "variant?": "boolean"
+    },
+    "prefab.instantiate": {
+      "assetId": "id",
+      "parentId?": "nullableId"
+    },
+    "prefab.modify": {
+      "objectId": "id",
+      "operation": "string",
+      "selection?": "json"
+    },
+    "project.export": {
+      "destination": "string",
+      "runtimeDirectory": "string",
+      "executableName": "string"
     }
   }
 }

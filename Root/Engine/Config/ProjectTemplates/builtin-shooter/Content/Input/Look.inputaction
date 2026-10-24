@@ -1,0 +1,10 @@
+{
+  "Version": 1,
+  "Action": {
+    "Name": "Look",
+    "ValueType": 2,
+    "Trigger": 3,
+    "bClampMagnitude": false,
+    "bRequireNeutral": true
+  }
+}

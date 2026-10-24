@@ -9,13 +9,28 @@ export interface ObjectInfo {id:Id;name:string;parentId:Id|null;active:boolean;t
 export interface PropertyInfo {enumValues?:string[];id:string;typeId:string;editable:boolean;assetTypes?:string[];assetId?:Id|null;subAssetId?:Id|null;label:string;localizationKey?:string;category:string;value:JsonValue;error?:string;range?:[number,number]}
 /** engine.int64 is represented by a decimal string, including inside reflected arrays/structs. */
 export interface DialogueState {phase:'idle'|'line'|'choice'|'action'|'end'|'failed';speaker:string;text:string;choices:string[];canAdvance:boolean;canChoose:boolean;error:string}
-export interface State {dirty:boolean;storyDirty:boolean;assetDocumentsDirty?:boolean;externalChanges:boolean;projectExternalChanges:boolean;path:string;project:string;play:'stopped'|'playing'|'paused';dialogue:DialogueState;startupAudio:boolean;selection:Id|null;canUndo:boolean;canRedo:boolean;assetError?:string}
+export interface GameView {objectId:Id;componentId:Id;title?:string;values?:{label:string;value:string|number}[];actions?:{id:string;label:string;enabled?:boolean}[];text?:string;objective?:string;controls?:string;reticle?:boolean;pointerLock?:boolean}
+export interface State {gameViews:GameView[];gameRunning:boolean;gamePaused:boolean;dirty:boolean;storyDirty:boolean;assetDocumentsDirty?:boolean;externalChanges:boolean;projectExternalChanges:boolean;path:string;project:string;play:'stopped'|'playing'|'paused';dialogue:DialogueState;startupAudio:boolean;selection:Id|null;canUndo:boolean;canRedo:boolean;assetError?:string}
 export interface AssetInfo {id:Id;name:string;path:string;relativePath:string;typeId:string;builtin:boolean;browserVisible?:boolean;bytes:number;version:string;subassets:JsonValue[]}
-export interface StorySnapshot {open:boolean;revision:number;error?:string;dirty?:boolean;readOnly?:boolean;externalChanges?:boolean;canUndo?:boolean;canRedo?:boolean;path?:string;document?:JsonValue;positions?:Record<string,{x:number;y:number}>}
+export interface StorySnapshot {narrativeCatalog?:JsonValue[];open:boolean;revision:number;error?:string;dirty?:boolean;readOnly?:boolean;externalChanges?:boolean;canUndo?:boolean;canRedo?:boolean;path?:string;document?:JsonValue;positions?:Record<string,{x:number;y:number}>}
 export interface AssetCreationType {id:string;label:string;typeId:string;category:string;extension:string;settings:(PropertyInfo & {required:boolean;enumValues?:string[]})[]}
 export interface Commands {
+  'story.addNarrative': {params:{type:string;x:number;y:number};result:StorySnapshot};
+  'story.setNarrativeInput': {params:{nodeId:Id;input:string;value:JsonValue};result:StorySnapshot};
+  'story.connectData': {params:{sourceId:string;output:string;targetId:Id;input:string};result:StorySnapshot};
+  'story.validate': {params:{};result:StorySnapshot};
+  'game.action': {params:{objectId:Id;componentId:Id;action:string};result:State};
+  'game.state': {params:{};result:State};
+  'game.advance': {params:{};result:State};
+  'game.choose': {params:{index:number};result:State};
+  'game.pause': {params:{paused:boolean};result:State};
+  'prefab.inspect': {params:{objectId:Id};result:JsonValue};
+  'prefab.create': {params:{objectId:Id;path:string;variant?:boolean};result:JsonValue};
+  'prefab.instantiate': {params:{assetId:Id;parentId?:Id|null};result:JsonValue};
+  'prefab.modify': {params:{objectId:Id;operation:string;selection?:JsonValue};result:JsonValue};
+  'project.export': {params:{destination:string;runtimeDirectory:string;executableName:string};result:JsonValue};
   'project.settings.get': {params:Record<string,never>;result:{name:string;engineVersion:string;startupScene:string;startupStory:string}};
-  'project.settings.set': {params:{settings:{name:string;startupScene:string;startupStory:string}};result:Commands['project.settings.get']['result']};
+  'project.settings.set': {params:{settings:JsonValue};result:Commands['project.settings.get']['result']};
   'assets.folders': {params:Record<string,never>;result:string[]};
   'assets.rename': {params:{assetId:string;name:string};result:JsonValue};
   'assets.move': {params:{assetId:string;folder:string};result:JsonValue};

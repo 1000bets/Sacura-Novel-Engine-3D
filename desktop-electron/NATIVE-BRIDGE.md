@@ -138,7 +138,7 @@ snapshots; они не становятся вторым изменяемым wo
 Это корректный базовый контракт для небольших сцен; O(scene) polling следует заменить
 native change journal при масштабировании.
 
-В очереди не более 64 запросов, request ≤64 KiB, response ≤8 MiB, timeout 30 s.
+В очереди не более 64 запросов, request ≤8 MiB, response ≤8 MiB, timeout 30 s. Clipboard `subtree` uses `serializedJson`: up to 1 MiB of UTF-8 JSON, validated after parsing; ordinary text limits remain unchanged.
 Timeout означает неизвестный результат выполнения: автоматического повтора mutations нет.
 При закрытии/сбое/смене проекта все pending Promises завершаются `DISCONNECTED`,
 подписчики получают событие. Старые ответы не восстанавливают context прежнего процесса.

@@ -8,7 +8,7 @@ class AssetRegistry;
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(InputValue, Horizontal, Vertical, Depth)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(InputModifiers, Scale, AxisOrder, DeadZone, bNormalize)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(InputAction, Identifier, Name, ValueType, Trigger, Accumulation, Modifiers, HoldSeconds, Threshold, ChordAction, bExecuteWhenPaused)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(InputAction, Identifier, Name, ValueType, Trigger, Accumulation, Modifiers, HoldSeconds, Threshold, ChordAction, bExecuteWhenPaused, bClampMagnitude, bRequireNeutral)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(InputBinding, Identifier, Action, Device, Control, Modifiers, bConsume)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(InputMappingContext, Identifier, Name, Bindings)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(InputContextActivation, Context, Priority)

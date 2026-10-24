@@ -18,7 +18,6 @@
       "cacheVariables": {
         "CMAKE_CXX_STANDARD": "17",
         "SAKURA_BUILD_EDITOR": "ON",
-        "SAKURA_BUILD_QT_FROM_SOURCE": "ON",
         "SAKURA_ENABLE_PYTHON": "ON",
         "SAKURA_BUILD_DILIGENT_SAMPLES": "OFF"
       }

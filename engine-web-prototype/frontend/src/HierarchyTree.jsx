@@ -1,9 +1,18 @@
 import {t as tr, useLocale} from './i18n.jsx';
-import React from 'react';
+import React,{useState} from 'react';
 import {Icon,Button} from './StudioParts.jsx';
 
-export default function HierarchyTree({scene,objects,groups=[],onAddObject,onRootDrop,onSelectGroup,onGroupDrop,disabled,playerId,points=[],query,selected,selectedIds=[],expanded,onExpanded,onSelectObject,onFrameObject,onVisibility,onPoint,onSelectCamera,onReparent,onRename,onDelete}){
+export default function HierarchyTree({scene,objects,groups=[],onAddObject,onRootDrop,onSelectGroup,onGroupDrop,disabled,playerId,points=[],query,selected,selectedIds=[],expanded,onExpanded,onSelectObject,onFrameObject,onVisibility,onPoint,onSelectCamera,onReparent,onRename,onDelete,renderObjectActions}){
  useLocale();
+ const [Renaming, SetRenaming] = useState(null);
+ const [DraftName, SetDraftName] = useState('');
+ const FinishRename = Object => {
+  SetRenaming(null);
+  const Name = DraftName.trim();
+  if (!disabled && Name && Name !== Object.name) {
+   onRename(Object.id, Name);
+  }
+ };
  const prefix=scene.id+':',search=query.trim().toLowerCase();
  const isOpen=key=>!!search||(expanded[prefix+key]??true);
  const toggle=key=>onExpanded({...expanded,[prefix+key]:!isOpen(key)});
@@ -27,10 +36,24 @@ export default function HierarchyTree({scene,objects,groups=[],onAddObject,onRoo
  };
  const dragOver=e=>{if(!disabled&&Array.from(e.dataTransfer.types).includes('application/sacura-asset')){e.preventDefault();e.stopPropagation();}};
  const renderObject=o=><div className={'tree-object '+(o.type==='Персонаж'?'character ':'')+(selectedIds.includes(o.id)?'selected':'')} key={o.id}>
-  <button draggable={!disabled} title={o.name+tr(' · Shift — добавить к выделению · двойной щелчок — в кадр')} aria-label={o.name} aria-pressed={selectedIds.includes(o.id)} onDragStart={e=>e.dataTransfer.setData('application/sacura-asset',JSON.stringify({id:o.id,kind:'objects'}))} onClick={e=>onSelectObject(o.id,{additive:e.shiftKey||e.ctrlKey||e.metaKey})} onDoubleClick={e=>{if(!e.shiftKey&&!e.ctrlKey&&!e.metaKey)onFrameObject(o.id);}}>
+  {Renaming === o.id && <input className="hierarchy-rename" aria-label={tr('Имя объекта')} autoFocus value={DraftName} disabled={disabled}
+   onFocus={Event => Event.currentTarget.select()} onChange={Event => SetDraftName(Event.target.value)}
+   onBlur={() => FinishRename(o)} onKeyDown={Event => {
+    Event.stopPropagation();
+    if (Event.key === 'Enter') {
+     Event.preventDefault();
+     Event.currentTarget.blur();
+    }
+    if (Event.key === 'Escape') {
+     Event.preventDefault();
+     SetRenaming(null);
+    }
+   }}/> }
+  {Renaming !== o.id && <button draggable={!disabled} title={o.name+tr(' · Shift — добавить к выделению · двойной щелчок — в кадр')} aria-label={o.name} aria-pressed={selectedIds.includes(o.id)} onDragStart={e=>e.dataTransfer.setData('application/sacura-asset',JSON.stringify({id:o.id,kind:'objects'}))} onClick={e=>onSelectObject(o.id,{additive:e.shiftKey||e.ctrlKey||e.metaKey})} onDoubleClick={e=>{if(!e.shiftKey&&!e.ctrlKey&&!e.metaKey)onFrameObject(o.id);}}>
    <Icon name={o.id===playerId?'Gamepad2':o.type==='Персонаж'?'PersonStanding':o.type==='Источник света'?'Lightbulb':'Box'} size={14}/><span>{o.name}</span>{o.id===playerId&&<small className="tree-player-badge">{tr("Игрок")}</small>}
-  </button>
-  {onRename&&<button disabled={disabled} title={tr('Переименовать')} onClick={()=>onRename(o.id)}><Icon name="Pencil" size={13}/></button>}
+  </button>}
+  {onRename&&<button disabled={disabled} title={tr('Переименовать')} onClick={()=>{SetDraftName(o.name);SetRenaming(o.id);}}><Icon name="Pencil" size={13}/></button>}
+  {renderObjectActions?.(o)}
   {onDelete&&<button disabled={disabled} title={tr('Удалить')} onClick={()=>onDelete(o.id)}><Icon name="Trash2" size={13}/></button>}
   {onVisibility&&<button disabled={disabled} title={(o.active!==false?tr('Скрыть '):tr('Показать '))+o.name} aria-pressed={o.active!==false} onClick={()=>onVisibility(o.id)}><Icon name={o.active!==false?'Eye':'EyeOff'} size={13}/></button>}
  </div>;

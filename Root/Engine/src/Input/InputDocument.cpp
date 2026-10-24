@@ -56,12 +56,14 @@ InputConfiguration InputDocument::CreateDefaults()
     Dialogue.Name = "Диалог";
     Dialogue.Bindings = {{"advance-space", Advance.Identifier, "Keyboard", "Space"},
         {"advance-enter", Advance.Identifier, "Keyboard", "Enter"},
-        {"advance-gamepad", Advance.Identifier, "Gamepad", "South"}};
+        {"advance-gamepad", Advance.Identifier, "Gamepad", "South"},
+        {"advance-touch", Advance.Identifier, "Touch", "advance"}};
     InputMappingContext System;
     System.Identifier = "engine.input.system";
     System.Name = "Система";
     System.Bindings = {{"pause-key", Pause.Identifier, "Keyboard", "Escape"},
-        {"pause-gamepad", Pause.Identifier, "Gamepad", "Start"}};
+        {"pause-gamepad", Pause.Identifier, "Gamepad", "Start"},
+        {"pause-touch", Pause.Identifier, "Touch", "pause"}};
     Configuration.Contexts = {Dialogue, System};
     Configuration.StartupContexts = {{Dialogue.Identifier, 10}, {System.Identifier, 100}};
     return Configuration;

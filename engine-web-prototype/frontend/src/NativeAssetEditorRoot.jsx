@@ -1,3 +1,4 @@
+import {NativePrefabWorkspace} from './NativePrefab.jsx';
 import {t as tr, useLocale} from './i18n.jsx';
 import React, { useEffect, useRef, useState } from 'react';
 import { createNativeBridgeClient } from './nativeBridgeClient.js';
@@ -224,6 +225,7 @@ export default function NativeAssetEditorRoot({desktop:Desktop = window.sacuraDe
   if (!Snapshot) {
     return <p role="status">{ErrorMessage || 'Открытие документа…'}</p>;
   }
+  if (Snapshot.type === 'Prefab') { return <NativePrefabWorkspace Snapshot={Snapshot} Execute={Execute} Desktop={Desktop} Assets={Assets} Error={ErrorMessage}/>; }
   if (Snapshot.type === 'PythonScript') {
     return <main className="native-python-editor" data-document-tab={Desktop.documentId} onKeyDown={Event => {
       if ((Event.ctrlKey || Event.metaKey) && Event.code === 'KeyS') {

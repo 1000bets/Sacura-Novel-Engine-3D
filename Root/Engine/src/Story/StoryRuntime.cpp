@@ -165,6 +165,7 @@ bool StoryRuntime::LoadDocument(const StoryDocument& InDocument)
 
 void StoryRuntime::Reset()
 {
+    RequestedNodeId.clear();
     Narrative.Reset(BoundScene);
     bNarrativeRunning = false;
     Events.reset();
@@ -192,6 +193,7 @@ void StoryRuntime::Reset()
 
 void StoryRuntime::Stop()
 {
+    RequestedNodeId.clear();
     Narrative.Stop();
     bNarrativeRunning = false;
     Events.reset();
@@ -291,8 +293,31 @@ bool StoryRuntime::TriggerEvent(const std::string& EventId)
     return Events->Trigger(Document, EventId);
 }
 
+bool StoryRuntime::RequestNode(const StoryNodeId& NodeId)
+{
+    if (FindNode(NodeId) == nullptr)
+    {
+        return false;
+    }
+    RequestedNodeId = NodeId;
+    return true;
+}
+
 void StoryRuntime::Tick(float DeltaTime)
 {
+    if (!RequestedNodeId.empty())
+    {
+        const auto Destination = std::move(RequestedNodeId);
+        RequestedNodeId.clear();
+        Narrative.BeginTransition();
+        bNarrativeRunning = false;
+        Events.reset();
+        StagingPhase = 0;
+        CancelAllActions();
+        LastError.clear();
+        Phase = StoryPlaybackPhase::Idle;
+        EnterNode(Destination);
+    }
     if (!std::isfinite(DeltaTime) || DeltaTime < 0) { return; }
     if (Events)
     {
@@ -473,7 +498,7 @@ void StoryRuntime::DisplayNode()
         {
             ChoicePrompt = Node->Text;
         }
-        DisplayedSpeaker.clear();
+        DisplayedSpeaker = Node->Speaker;
         DisplayedLine = ChoicePrompt;
         PendingChoices = Node->Choices;
         break;

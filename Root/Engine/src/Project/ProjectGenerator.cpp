@@ -1,5 +1,6 @@
 #include "Project/ProjectGenerator.h"
 #include "ProjectTemplateContent.h"
+#include "Core/EnginePaths.h"
 
 #include "Story/StoryDocumentIO.h"
 #include "World/Serialization/SceneSerializer.h"
@@ -245,11 +246,46 @@ bool ProjectGenerator::CreateProject(
                 OutError = GuideWritten.Error;
                 return false;
             }
-            if (TemplateId == "builtin-novel" || TemplateId == "VisualNovel")
+            if (TemplateId == "VisualNovel")
             {
                 Parsed.StartupAudio = ProjectRoot / "Content" / "Audio" / "RainTheme.wav";
                 if (!WriteNovelCue(Parsed.StartupAudio))
                 { OutError = "Failed to write visual novel audio cue"; return false; }
+            }
+        }
+    }
+
+    const auto TemplateDirectory = EnginePaths::Config() / "ProjectTemplates" / TemplateId;
+    if (std::filesystem::is_directory(TemplateDirectory))
+    {
+        std::error_code CopyError;
+        for (const auto& Entry : std::filesystem::directory_iterator(TemplateDirectory / "Content"))
+        {
+            const auto Name = Entry.path().filename();
+            if (Name == "Scenes" || Name == "Stories")
+            {
+                continue;
+            }
+            std::filesystem::copy(Entry.path(), ProjectRoot / "Content" / Name,
+                std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing, CopyError);
+            if (CopyError)
+            {
+                OutError = "Failed to copy gameplay template assets: " + CopyError.message();
+                return false;
+            }
+        }
+        for (const auto& Entry : std::filesystem::directory_iterator(EnginePaths::Config() / "ProjectTemplates" / "Gameplay"))
+        {
+            if (Entry.path().extension() != ".py")
+            {
+                continue;
+            }
+            std::filesystem::copy_file(Entry.path(), ProjectRoot / "Content" / "Scripts" / Entry.path().filename(),
+                std::filesystem::copy_options::overwrite_existing, CopyError);
+            if (CopyError)
+            {
+                OutError = "Failed to copy gameplay template scripts: " + CopyError.message();
+                return false;
             }
         }
     }

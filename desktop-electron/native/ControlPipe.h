@@ -24,7 +24,7 @@ public:
         size_t Offset=0;
         while(Pending.size()-Offset>=4 && Out.size()<16) {
             uint32_t N=0;std::memcpy(&N,Pending.data()+Offset,4);
-            if(N>65536||N==0)throw std::runtime_error("Bridge request size limit");
+            if(N>8*1024*1024||N==0)throw std::runtime_error("Bridge request size limit");
             if(Pending.size()-Offset<4+N)break;
             // Syntax errors receive a protocol error; they do not terminate Engine.
             auto J=nlohmann::json::parse(Pending.begin()+Offset+4,Pending.begin()+Offset+4+N,nullptr,false);

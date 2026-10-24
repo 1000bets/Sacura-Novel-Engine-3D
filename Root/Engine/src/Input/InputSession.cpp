@@ -229,11 +229,12 @@ void InputSession::CancelStates()
 
 void InputSession::BlockHeld()
 {
-    for (const auto& Entry : Resolve())
+    const auto Values = Resolve();
+    for (const auto& Action : Configuration.Actions)
     {
-        if (Entry.second.Magnitude() > 0.0001f)
+        if (Action.bRequireNeutral && Values.at(Action.Identifier).Magnitude() > 0.0001f)
         {
-            Blocked.insert(Entry.first);
+            Blocked.insert(Action.Identifier);
         }
     }
 }
@@ -275,7 +276,9 @@ void InputSession::RemoveSource(const std::string& Source)
         {
             Emit(Action, InputPhase::Canceled);
         }
-        if (Values.at(Action).Magnitude() > 0.0001f)
+        const auto Definition = std::find_if(Configuration.Actions.begin(), Configuration.Actions.end(),
+            [&](const auto& Candidate) { return Candidate.Identifier == Action; });
+        if (Definition->bRequireNeutral && Values.at(Action).Magnitude() > 0.0001f)
         {
             Blocked.insert(Action);
         }
@@ -439,7 +442,7 @@ std::map<std::string, InputValue> InputSession::Resolve() const
             }
         }
         const float Magnitude = Value.Magnitude();
-        if (Magnitude > 1.f)
+        if (Action.bClampMagnitude && Magnitude > 1.f)
         {
             Value.Horizontal /= Magnitude;
             Value.Vertical /= Magnitude;

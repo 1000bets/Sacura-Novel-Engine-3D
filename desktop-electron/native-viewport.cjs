@@ -3,6 +3,7 @@ const {createInterface} = require('node:readline');
 const path = require('node:path');
 const net = require('node:net');
 const {randomUUID} = require('node:crypto');
+const FileSystem = require('node:fs');
 const {sharedTexture, app} = require('electron');
 const {setTimeout: delay} = require('node:timers/promises');
 const {BridgeTransport} = require('./bridge/transport.cjs');
@@ -54,24 +55,70 @@ class NativeViewport {
       return;
     }
     const handle = window.getNativeWindowHandle();
+    const LogDirectory = path.join(path.dirname(project), 'Saved', 'Logs');
+    const LogPath = path.join(LogDirectory, `Electron-${new Date().toISOString().replace(/[:.]/g, '-')}-${process.pid}-${randomUUID()}.log`);
+    let bLogAvailable = true;
+    try {
+      FileSystem.mkdirSync(LogDirectory, {recursive: true});
+    } catch (Failure) {
+      bLogAvailable = false;
+      console.error('Logging: cannot create log directory:', Failure.message);
+    }
+    const WriteLog = (Category, Message) => {
+      if (!bLogAvailable) {
+        return;
+      }
+      try {
+        FileSystem.appendFileSync(LogPath, `${new Date().toISOString()} [${Category}] ${Message}\n`, 'utf8');
+      } catch (Failure) {
+        bLogAvailable = false;
+        console.error('Logging: session log write failed:', Failure.message);
+      }
+    };
+    const LogConsole = Details => {
+      WriteLog('Renderer', Details.message);
+    };
+    const LogRendererExit = (Event, Details) => {
+      WriteLog('RendererExit', JSON.stringify(Details));
+    };
+    window.webContents.on('console-message', LogConsole);
+    window.webContents.on('render-process-gone', LogRendererExit);
+    WriteLog('Session', `Project: ${project}`);
     this.parent = (handle.length === 8 ? handle.readBigUInt64LE() : BigInt(handle.readUInt32LE())).toString();
-    this.child = spawn(executable, [this.parent, project, pipe, String(process.pid), bridge.path], {windowsHide: true, stdio: ['pipe', 'pipe', 'pipe']});
+    this.child = spawn(executable, [this.parent, project, pipe, String(process.pid), bridge.path], {windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], env: {...process.env, ...(DocumentIdentifier ? {SACURA_ASSET_WORKSPACE: '1'} : {})}});
     this.closed = new Promise(resolve => this.child.once('close', code => {
       this.state = {...this.state, phase: code === 0 ? 'stopped' : 'error', exitCode: code};
       if (!this.stopping) this.state.error = `Native host exited (${code})`;
       console.log('Native host exit:', code);
+      WriteLog('HostExit', String(code));
+      if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
+        window.webContents.removeListener('console-message', LogConsole);
+        window.webContents.removeListener('render-process-gone', LogRendererExit);
+      }
       bridge.close();
       this.socket?.destroy(); this.server.close();
       resolve(code);
     }));
-    this.child.on('error', error => {this.state = {...this.state, phase: 'error', error: error.message};});
+    this.child.on('error', error => {
+      this.state = {...this.state, phase: 'error', error: error.message};
+      WriteLog('HostError', error.message);
+    });
     this.child.stdin.on('error', error => {if (!this.stopping) this.state = {...this.state, phase: 'error', error: error.message};});
-    this.child.stderr.on('data', data => process.stderr.write(data));
+    this.child.stderr.on('data', data => {
+      process.stderr.write(data);
+      WriteLog('HostStderr', data.toString('utf8'));
+    });
     createInterface({input: this.child.stdout}).on('line', line => {
       console.log(line);
+      if (!line.startsWith('@sacura ')) {
+        WriteLog('Host', line);
+      }
       if (!line.startsWith('@sacura ')) return;
       try {
         const message = JSON.parse(line.slice(8));
+        if (message.error) {
+          WriteLog('HostError', message.error);
+        }
         if (message.error) this.state = {...this.state, phase: 'error', error: message.error};
         else if (message.type === 'ready') this.state = {...this.state, phase: 'ready', ready: message};
         else this.state[message.type] = message;
@@ -134,10 +181,21 @@ class NativeViewport {
     if (!this.stopping && this.child?.stdin.writable) this.child.stdin.write(JSON.stringify(message) + '\n');
   }
   input(value) {
-    if (!value || !['reset','key','pointer','wheel'].includes(value.kind)) throw new Error('Invalid input');
+    if (!value || !['reset','key','pointer','wheel','gameControl','removeSource'].includes(value.kind)) throw new Error('Invalid input');
     const event = {kind:value.kind, ctrl:!!value.ctrl, alt:!!value.alt, shift:!!value.shift};
+    if (value.kind === 'gameControl' || value.kind === 'removeSource') {
+      if (!/^Electron(Pointer|Gamepad[0-9]+|Touch[A-Za-z]{1,24})$/.test(value.source)) { throw new Error('Invalid input source'); }
+      event.source = value.source;
+      if (value.kind === 'gameControl') {
+        if (!['Mouse', 'Gamepad', 'Touch'].includes(value.device) || !/^[A-Za-z]{1,24}$/.test(value.control)
+          || !Array.isArray(value.value) || value.value.length !== 3 || !value.value.every(Number.isFinite)) {
+          throw new Error('Invalid game control');
+        }
+        Object.assign(event, {device: value.device, control: value.control, value: value.value, transient: !!value.transient});
+      }
+    }
     if (value.kind === 'key') {
-      if (!/^(Key[A-Z]|Escape|ShiftLeft|ShiftRight|AltLeft|AltRight|ControlLeft|ControlRight)$/.test(value.code)) throw new Error('Invalid key');
+      if (!/^[A-Za-z][A-Za-z0-9]{0,47}$/.test(value.code)) throw new Error('Invalid key');
       Object.assign(event, {code:value.code, down:!!value.down, repeat:!!value.repeat});
     }
     if (value.kind === 'pointer') {

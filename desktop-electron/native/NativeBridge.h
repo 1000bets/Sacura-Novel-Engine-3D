@@ -18,7 +18,7 @@ class NativeBridge {
 public:
     using Json = nlohmann::json;
     NativeBridge(Engine& Runtime, SceneWorkspace& Workspace, ProjectSession& Project,
-        const std::filesystem::path& Contract, std::function<void()> ResetInput);
+        const std::filesystem::path& Contract, std::function<void()> ResetInput, bool bRuntimeOnly = false);
     ~NativeBridge();
     void TickPreview();
     Scene* GetPreviewScene() const { return PreviewScene; }
@@ -35,6 +35,10 @@ public:
     void ScanAssets();
     std::function<Json(float, float)> PickViewportMesh;
 private:
+    bool bRuntimeOnly = false;
+    AssetId OpenPrefab;
+    Json PrefabTools(const std::string& Method, const Json& Params);
+    Json PrefabDocumentTools(const Json& Params, const AssetRegistryEntry& Entry);
     struct AssetDocumentState
     {
         std::unique_ptr<PythonScriptDocument> Script;
@@ -69,6 +73,8 @@ private:
     Json MeshTools(const std::string& Method, const Json& Params);
     Json Dispatch(const std::string& Method, const Json& Params);
     Json Describe();
+    Json GameViews();
+    void ExecuteGameAction(const Json& Parameters);
     Json Hierarchy();
     Json Properties(Component* Instance);
     Json Components(GameObject* Object);

@@ -1,0 +1,68 @@
+{
+  "format": "sakura.character",
+  "version": 1,
+  "name": "Starter Humanoid",
+  "description": "Skinned humanoid with idle, walk and Hip Hop Dance clips.",
+  "enabled": true,
+  "model": {
+    "asset": "801c2297-a11d-5b17-8fb5-f9ea55946734",
+    "subAsset": "424bcecd-6df5-5139-bfcd-41e43f410e66"
+  },
+  "skeleton": {
+    "asset": "801c2297-a11d-5b17-8fb5-f9ea55946734",
+    "subAsset": "c994c384-0a0f-50b2-b9dd-609e5736830f"
+  },
+  "dialogueWidget": "",
+  "idleAnimation": "idle",
+  "walkAnimation": "walk",
+  "color": [
+    1,
+    1,
+    1,
+    1
+  ],
+  "animations": [
+    {
+      "id": "idle",
+      "name": "Idle",
+      "description": "",
+      "clip": {
+        "asset": "801c2297-a11d-5b17-8fb5-f9ea55946734",
+        "subAsset": "df6f9e37-f5fa-5034-8316-6d21b6e321f5"
+      },
+      "pose": "idle",
+      "speed": 1,
+      "enabled": true,
+      "loop": true,
+      "inPlace": true
+    },
+    {
+      "id": "walk",
+      "name": "Walk",
+      "description": "",
+      "clip": {
+        "asset": "801c2297-a11d-5b17-8fb5-f9ea55946734",
+        "subAsset": "b1cfcd60-8359-59a7-85b6-49ac25f2ecb4"
+      },
+      "pose": "walk",
+      "speed": 1,
+      "enabled": true,
+      "loop": true,
+      "inPlace": true
+    },
+    {
+      "id": "dance",
+      "name": "HipHopDance",
+      "description": "",
+      "clip": {
+        "asset": "801c2297-a11d-5b17-8fb5-f9ea55946734",
+        "subAsset": "2c33529a-5ad6-51d1-a523-0fb6f710d6b7"
+      },
+      "pose": "dance",
+      "speed": 1,
+      "enabled": true,
+      "loop": true,
+      "inPlace": true
+    }
+  ]
+}

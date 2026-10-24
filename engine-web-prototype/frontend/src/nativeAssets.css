@@ -9,7 +9,7 @@
 .native-asset-options>button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:4px;background:transparent;color:inherit;border:0}
 .native-asset-options>button:hover{background:var(--surface-hover)}
 .native-asset-options input{width:100%;box-sizing:border-box}
-.asset-file-tile>.native-asset-thumbnail{width:100px!important;height:100px!important}
+.asset-file-tile>.native-asset-thumbnail{width:88px!important;height:88px!important}
 .native-mesh-section{padding:8px 0}
 .native-mesh-section h4{margin:8px 0}
 .native-mesh-slot{margin:8px 0}

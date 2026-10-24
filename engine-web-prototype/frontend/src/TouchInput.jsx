@@ -17,14 +17,14 @@ function Control({action,send}){
    {action.valueType==='axis2d'?<><span className="touch-stick-knob" style={{transform:`translate(${position[0]*26}px,${-position[1]*26}px)`}}/><small>{inputLabel(action)}</small></>:inputLabel(action)}
  </button>;
 }
-export default function TouchInput({settings,contexts,active,paused,playerMode}){
+export default function TouchInput({settings,contexts,active,paused,playerMode,onInput}){
  useLocale();const root=useRef(),[coarse,setCoarse]=useState(false);
  useEffect(()=>{const media=window.matchMedia('(pointer: coarse)');const update=()=>setCoarse(media.matches);update();media.addEventListener('change',update);return()=>media.removeEventListener('change',update);},[]);
  if(!active||settings.touchMode==='off'||settings.touchMode==='auto'&&!coarse)return null;
  const bindings=settings.contexts.filter(c=>(paused?['system']:contexts).includes(c.id)).sort((a,b)=>b.priority-a.priority).flatMap(c=>c.bindings.filter(b=>b.device==='touch'));
  const ids=new Set(bindings.map(b=>b.actionId));
  const actions=settings.actions.filter(a=>ids.has(a.id)&&a.behavior!=='point'&&(a.behavior!=='move'||['wasd','both'].includes(playerMode)));
- const send=(id,value)=>{const viewport=root.current?.closest('.scene-viewport');if(!viewport)return;viewport.dispatchEvent(new CustomEvent('sacura-input',{detail:{device:'touch',control:bindings.find(b=>b.actionId===id)?.control||id,sourceId:'touch:'+id,value}}));};
+ const send=(id,value)=>{const detail={device:'touch',control:bindings.find(b=>b.actionId===id)?.control||id,sourceId:'touch:'+id,value};if(onInput){onInput(detail);return;}const viewport=root.current?.closest('.scene-viewport');if(!viewport)return;viewport.dispatchEvent(new CustomEvent('sacura-input',{detail}));};
  return <div className="touch-input" ref={root} aria-label={tr('Экранное управление')} onPointerDown={e=>e.stopPropagation()} onPointerUp={e=>e.stopPropagation()}>
    <div className="touch-axes">{actions.filter(a=>a.valueType!=='boolean').map(a=><Control key={a.id} action={a} send={send}/>)}</div>
    <div className="touch-buttons">{actions.filter(a=>a.valueType==='boolean').map(a=><Control key={a.id} action={a} send={send}/>)}</div>

@@ -6,6 +6,11 @@
 #include <mutex>
 #include <string>
 #include <deque>
+#include <chrono>
+#include <fstream>
+#include <iomanip>
+#include <ctime>
+#include <thread>
 
 #if defined(_WIN32)
 #ifndef NOMINMAX
@@ -24,12 +29,67 @@ std::atomic<uint64_t> RenderFrameIndex{0};
 std::mutex PrintMutex;
 std::deque<std::pair<uint64_t, std::string>> PrintHistory;
 uint64_t PrintSequence = 0;
+std::ofstream PrintLog;
+std::filesystem::path PrintLogPath;
+const std::string PrintSessionName = "Engine-" + std::to_string(
+    std::chrono::system_clock::now().time_since_epoch().count()) + ".log";
+}
+
+void SetPrintLogDirectory(const std::filesystem::path& Directory)
+{
+    std::lock_guard<std::mutex> Lock(PrintMutex);
+    const auto Destination = Directory / PrintSessionName;
+    if (Destination == PrintLogPath)
+    {
+        return;
+    }
+    std::error_code Error;
+    std::filesystem::create_directories(Directory, Error);
+    if (!Error && !PrintLogPath.empty())
+    {
+        PrintLog.flush();
+        std::filesystem::copy_file(PrintLogPath, Destination,
+            std::filesystem::copy_options::none, Error);
+    }
+    if (Error)
+    {
+        std::cerr << "Logging: cannot prepare session log: " << Error.message() << std::endl;
+        return;
+    }
+    std::ofstream DestinationLog(Destination, std::ios::app | std::ios::binary);
+    if (!DestinationLog)
+    {
+        std::cerr << "Logging: cannot open session log" << std::endl;
+        return;
+    }
+    PrintLog = std::move(DestinationLog);
+    PrintLogPath = Destination;
 }
 
 void PrintString(const std::string& Message)
 {
     std::lock_guard<std::mutex> Lock(PrintMutex);
     std::cout << Message << '\n';
+    if (PrintLog.is_open() && PrintLog.good())
+    {
+        const auto Now = std::chrono::system_clock::now();
+        const auto Milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(Now.time_since_epoch());
+        const auto Seconds = std::chrono::system_clock::to_time_t(Now);
+        std::tm Calendar{};
+#if defined(_WIN32)
+        gmtime_s(&Calendar, &Seconds);
+#else
+        gmtime_r(&Seconds, &Calendar);
+#endif
+        PrintLog << std::put_time(&Calendar, "%Y-%m-%dT%H:%M:%S") << '.'
+                 << std::setfill('0') << std::setw(3) << Milliseconds.count() % 1000
+                 << "Z [" << LocalThreadDebugName << ':' << std::this_thread::get_id()
+                 << "] " << Message << std::endl;
+        if (!PrintLog)
+        {
+            std::cerr << "Logging: session log write failed" << std::endl;
+        }
+    }
     PrintHistory.emplace_back(++PrintSequence, Message.substr(0, 16384));
     if (PrintHistory.size() > 1000)
     {

@@ -6,7 +6,7 @@
 #include "Assets/Resources/TextureResource.h"
 #include "Characters/CharacterDefinition.h"
 #include "Materials/MaterialDocumentIO.h"
-#include <QColor>
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -14,14 +14,34 @@
 class AssetPreviewGenerator
 {
 public:
-    static QImage Background()
+    static void SetPixel(ImageBuffer& Image, int Column, int Row, const DirectX::SimpleMath::Vector3& Color)
     {
-        QImage Image(128, 128, QImage::Format_ARGB32);
-        Image.fill(QColor(30, 31, 39));
+        const size_t Offset = (static_cast<size_t>(Row) * Image.Width + Column) * 4;
+        Image.Pixels[Offset] = static_cast<uint8_t>(std::clamp(Color.x, 0.f, 1.f) * 255.f);
+        Image.Pixels[Offset + 1] = static_cast<uint8_t>(std::clamp(Color.y, 0.f, 1.f) * 255.f);
+        Image.Pixels[Offset + 2] = static_cast<uint8_t>(std::clamp(Color.z, 0.f, 1.f) * 255.f);
+        Image.Pixels[Offset + 3] = 255;
+    }
+
+    static DirectX::SimpleMath::Vector3 GetPixel(const ImageBuffer& Image, int Column, int Row)
+    {
+        const size_t Offset = (static_cast<size_t>(Row) * Image.Width + Column) * 4;
+        return {Image.Pixels[Offset] / 255.f, Image.Pixels[Offset + 1] / 255.f, Image.Pixels[Offset + 2] / 255.f};
+    }
+    static ImageBuffer Background()
+    {
+        ImageBuffer Image{128, 128, std::vector<uint8_t>(128 * 128 * 4)};
+        for (int Row = 0; Row < 128; ++Row)
+        {
+            for (int Column = 0; Column < 128; ++Column)
+            {
+                SetPixel(Image, Column, Row, {30.f / 255.f, 31.f / 255.f, 39.f / 255.f});
+            }
+        }
         return Image;
     }
 
-    static QImage Texture(const AssetLoadContext& Context)
+    static ImageBuffer Texture(const AssetLoadContext& Context)
     {
         AssetDiagnostic Diagnostic;
         TextureLoader Loader;
@@ -30,29 +50,29 @@ public:
         {
             return {};
         }
-        return QImage(Resource->Pixels.data(), Resource->Width, Resource->Height,
-            Resource->RowStride, QImage::Format_RGBA8888).scaled(512, 512, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        return ImageBuffer::FromRgba(Resource->Pixels.data(), Resource->Width, Resource->Height,
+            Resource->RowStride).ResizeToFit(512, 512);
     }
 
-    static QColor Sample(const QImage& TextureImage, float Horizontal, float Vertical, const QColor& Tint)
+    static DirectX::SimpleMath::Vector3 Sample(const ImageBuffer& TextureImage, float Horizontal, float Vertical, const DirectX::SimpleMath::Vector3& Tint)
     {
-        if (TextureImage.isNull())
+        if (TextureImage.Pixels.empty())
         {
             return Tint;
         }
-        const int Column = std::clamp(static_cast<int>((Horizontal - std::floor(Horizontal)) * TextureImage.width()), 0, TextureImage.width() - 1);
-        const int Row = std::clamp(static_cast<int>((Vertical - std::floor(Vertical)) * TextureImage.height()), 0, TextureImage.height() - 1);
-        const QColor Pixel = TextureImage.pixelColor(Column, Row);
-        return QColor::fromRgbF(Pixel.redF() * Tint.redF(), Pixel.greenF() * Tint.greenF(), Pixel.blueF() * Tint.blueF());
+        const int Column = std::clamp(static_cast<int>((Horizontal - std::floor(Horizontal)) * TextureImage.Width), 0, TextureImage.Width - 1);
+        const int Row = std::clamp(static_cast<int>((Vertical - std::floor(Vertical)) * TextureImage.Height), 0, TextureImage.Height - 1);
+        const DirectX::SimpleMath::Vector3 Pixel = GetPixel(TextureImage, Column, Row);
+        return DirectX::SimpleMath::Vector3(Pixel.x * Tint.x, Pixel.y * Tint.y, Pixel.z * Tint.z);
     }
 
-    static QColor Shade(const QColor& Color, float Light)
+    static DirectX::SimpleMath::Vector3 Shade(const DirectX::SimpleMath::Vector3& Color, float Light)
     {
-        return QColor::fromRgbF(std::clamp(static_cast<float>(Color.redF()) * Light, 0.0f, 1.0f),
-            std::clamp(static_cast<float>(Color.greenF()) * Light, 0.0f, 1.0f), std::clamp(static_cast<float>(Color.blueF()) * Light, 0.0f, 1.0f));
+        return DirectX::SimpleMath::Vector3(std::clamp(static_cast<float>(Color.x) * Light, 0.0f, 1.0f),
+            std::clamp(static_cast<float>(Color.y) * Light, 0.0f, 1.0f), std::clamp(static_cast<float>(Color.z) * Light, 0.0f, 1.0f));
     }
 
-    static QImage Mesh(const StaticMeshResource& Resource)
+    static ImageBuffer Mesh(const StaticMeshResource& Resource)
     {
         if (Resource.Vertices.empty() || Resource.Indices.empty())
         {
@@ -82,7 +102,7 @@ public:
             Position.x = 64.0f + (Position.x - (MinimumHorizontal + MaximumHorizontal) * 0.5f) * Scale;
             Position.y = 64.0f - (Position.y - (MinimumVertical + MaximumVertical) * 0.5f) * Scale;
         }
-        QImage Image = Background();
+        ImageBuffer Image = Background();
         std::vector<float> Depth(128 * 128, std::numeric_limits<float>::lowest());
         for (size_t Triangle = 0; Triangle + 2 < Resource.Indices.size(); Triangle += 3)
         {
@@ -104,7 +124,7 @@ public:
             auto Normal = (Resource.Vertices[SecondIndex].Position - Resource.Vertices[FirstIndex].Position).Cross(
                 Resource.Vertices[ThirdIndex].Position - Resource.Vertices[FirstIndex].Position);
             Normal.Normalize();
-            const QColor Color = Shade(QColor(180, 188, 205), 0.35f + 0.65f * std::abs(Normal.Dot({0.3f, 0.8f, 0.5f})));
+            const DirectX::SimpleMath::Vector3 Color = Shade(DirectX::SimpleMath::Vector3(180.f / 255.f, 188.f / 255.f, 205.f / 255.f), 0.35f + 0.65f * std::abs(Normal.Dot({0.3f, 0.8f, 0.5f})));
             for (int Row = std::max(0, static_cast<int>(std::floor(std::min({First.y, Second.y, Third.y}))));
                 Row <= std::min(127, static_cast<int>(std::ceil(std::max({First.y, Second.y, Third.y})))); ++Row)
             {
@@ -118,7 +138,7 @@ public:
                     if (FirstWeight >= 0 && SecondWeight >= 0 && ThirdWeight >= 0 && Distance > Depth[Row * 128 + Column])
                     {
                         Depth[Row * 128 + Column] = Distance;
-                        Image.setPixelColor(Column, Row, Color);
+                        SetPixel(Image, Column, Row, Color);
                     }
                 }
             }
@@ -126,7 +146,7 @@ public:
         return Image;
     }
 
-    static QImage Generate(const AssetRegistry& Registry, const AssetKey& Key, int Depth = 0)
+    static ImageBuffer Generate(const AssetRegistry& Registry, const AssetKey& Key, int Depth = 0)
     {
         if (Depth > 4)
         {
@@ -195,20 +215,20 @@ public:
             {
                 return {};
             }
-            QColor Tint(190, 190, 190);
+            DirectX::SimpleMath::Vector3 Tint(190.f / 255.f, 190.f / 255.f, 190.f / 255.f);
             const auto BaseColor = Material.Values.find("BaseColor");
             if (BaseColor != Material.Values.end())
             {
                 const auto& Numbers = BaseColor->second.Numbers;
-                Tint = QColor::fromRgbF(std::clamp(Numbers.x, 0.0f, 1.0f), std::clamp(Numbers.y, 0.0f, 1.0f), std::clamp(Numbers.z, 0.0f, 1.0f));
+                Tint = DirectX::SimpleMath::Vector3(std::clamp(Numbers.x, 0.0f, 1.0f), std::clamp(Numbers.y, 0.0f, 1.0f), std::clamp(Numbers.z, 0.0f, 1.0f));
             }
-            QImage TextureImage;
+            ImageBuffer TextureImage;
             const auto BaseTexture = Material.Values.find("BaseColorTexture");
             if (BaseTexture != Material.Values.end() && BaseTexture->second.Texture.IsValid())
             {
                 TextureImage = Generate(Registry, BaseTexture->second.Texture, Depth + 1);
             }
-            QImage Image = Background();
+            ImageBuffer Image = Background();
             for (int Row = 10; Row < 118; ++Row)
             {
                 for (int Column = 10; Column < 118; ++Column)
@@ -219,9 +239,9 @@ public:
                     if (RadiusSquared <= 1)
                     {
                         const float Forward = std::sqrt(1.0f - RadiusSquared);
-                        const QColor Color = Sample(TextureImage, 0.5f + std::atan2(Horizontal, Forward) / 6.2831853f,
+                        const DirectX::SimpleMath::Vector3 Color = Sample(TextureImage, 0.5f + std::atan2(Horizontal, Forward) / 6.2831853f,
                             0.5f - std::asin(Vertical) / 3.1415927f, Tint);
-                        Image.setPixelColor(Column, Row, Shade(Color, 0.25f + 0.75f * std::max(0.0f, -0.4f * Horizontal + 0.6f * Vertical + 0.69f * Forward)));
+                        SetPixel(Image, Column, Row, Shade(Color, 0.25f + 0.75f * std::max(0.0f, -0.4f * Horizontal + 0.6f * Vertical + 0.69f * Forward)));
                     }
                 }
             }
@@ -231,7 +251,7 @@ public:
     }
 };
 
-QImage GenerateAssetPreview(const AssetRegistry& Registry, const AssetKey& Key)
+ImageBuffer GenerateAssetPreview(const AssetRegistry& Registry, const AssetKey& Key)
 {
     return AssetPreviewGenerator::Generate(Registry, Key);
 }

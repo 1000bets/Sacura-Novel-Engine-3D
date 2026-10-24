@@ -230,14 +230,12 @@ if(SAKURA_PYTHON_AVAILABLE)
     FetchContent_MakeAvailable(pybind11)
 endif()
 
-include(${CMAKE_CURRENT_SOURCE_DIR}/Qt.cmake)
 
 # ---- Aggregate for Engine ----
 add_library(SakuraEngineThirdParty INTERFACE)
 add_library(Sakura::EngineThirdParty ALIAS SakuraEngineThirdParty)
 
 target_link_libraries(SakuraEngineThirdParty INTERFACE
-    Sakura::EngineQtThirdParty
     SDL3::SDL3
     Diligent-BuildSettings
     Sakura::PhysX
@@ -283,7 +281,7 @@ endif()
 if(TARGET Diligent-Imgui)
     target_link_libraries(SakuraEngineThirdParty INTERFACE Diligent-Imgui)
 endif()
-# Diligent-Imgui uses Tools' bundled ImGui only. Editor UI is Qt (Qt6::Core/Gui/Widgets).
+# Diligent-Imgui uses Tools' bundled ImGui only. Editor UI is React in Electron.
 
 target_include_directories(SakuraEngineThirdParty INTERFACE
     ${diligentcore_SOURCE_DIR}
@@ -293,13 +291,12 @@ target_include_directories(SakuraEngineThirdParty INTERFACE
 
 function(sakura_copy_engine_runtime_dlls TargetName)
     if(MSVC)
-        # Qt, JSON and the asset registry exchange UTF-8 paths. Keep narrow
+        # JSON and the asset registry exchange UTF-8 paths. Keep narrow
         # filesystem/CRT calls in the same encoding on Windows 10 1903+.
         # This is process-local; never change the user's system code page.
         target_sources(${TargetName} PRIVATE
             "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../resources/WindowsUtf8.manifest")
     endif()
-    sakura_deploy_qt_runtime(${TargetName})
     if(COMMAND copy_required_dlls)
         # Recent Windows SDKs ship the DXIL signer in Redist/D3D rather
         # than beside dxcompiler.dll. Diligent 2.5.6 assumes the older layout.

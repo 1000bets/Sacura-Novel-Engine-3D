@@ -40,6 +40,7 @@ bool ProjectSession::UpdateSettings(const ProjectDescriptor& Settings, std::stri
 
 bool ProjectSession::OpenProject(const std::filesystem::path& ProjectFile)
 {
+    SetPrintLogDirectory(std::filesystem::absolute(ProjectFile).parent_path() / "Saved" / "Logs");
     LastError.clear();
     IssueCount = 0;
     LastContentDiagnostic = AssetDiagnostic::Ok();

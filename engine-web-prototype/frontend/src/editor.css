@@ -3274,3 +3274,9 @@ select option,select optgroup { background:var(--graphite-700); color:var(--ivor
 .editor-menubar { min-width:0; overflow-x:auto; scrollbar-width:thin; }
 @media(max-width:1400px){.editor-menubar>.project-title{display:none}}
 @media(max-width:700px){.editor-app{min-width:0}.editor-menubar{flex-shrink:0}}
+
+.dock-toolbar > button[aria-pressed=true],
+.graph-toolbar > button[aria-pressed=true] {
+  color: var(--accent);
+  background: var(--line);
+}

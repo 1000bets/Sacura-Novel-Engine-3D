@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "guid": "111ecf73-e457-5d16-9b63-7cc48221fda4",
+  "assetType": "Model",
+  "sourceFingerprint": "43a6a5b19ea7e706",
+  "loadSettings": {},
+  "importInfo": {},
+  "subAssets": [
+    {
+      "id": "6651d05d-ba98-5620-b362-55136231fc8e",
+      "type": "StaticMesh",
+      "name": "TemplateBox",
+      "selector": {
+        "kind": "mesh",
+        "index": 0
+      }
+    }
+  ]
+}

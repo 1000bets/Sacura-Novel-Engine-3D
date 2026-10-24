@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "guid": "859c59bc-965d-5ae8-ac7a-441504ab0823",
+  "assetType": "Model",
+  "sourceFingerprint": "7f067e592c6d4a97",
+  "loadSettings": {},
+  "importInfo": {},
+  "subAssets": [
+    {
+      "id": "3af905ff-9a98-53d5-8aca-6f9610781104",
+      "type": "StaticMesh",
+      "name": "TemplateMouth",
+      "selector": {
+        "kind": "mesh",
+        "index": 0
+      }
+    }
+  ]
+}

@@ -1,3 +1,5 @@
+import {NativeStoryNodeFields,NativeStoryActionFields} from './NativeStoryInspector.jsx';
+import {NativeNarrativeNode} from './NativeNarrative.jsx';
 import {flowAriaLabels} from './flowLocalization.js';
 import {actionSummary} from './authoringPresentation.js';
 import {interactionTargets} from './interactionModel.js';
@@ -54,20 +56,24 @@ const Moment=memo(function Moment({data,selected}){
   {data.issue&&<div className="moment-issue"><Icon name="TriangleAlert" size={12}/>{tr(data.issue.title)}</div>}
   {data.entry&&!data.nativeMode&&<button className="moment-environment nodrag" title={tr("Изменить начальное окружение сабсцены")} onClick={()=>data.onScene(scene.id)}><Icon name="CloudSun" size={13}/>{tr("Начало · ")}{tr(scene.weather)} · {tr(scene.time)}<Icon name="Settings2" size={12}/></button>}
   {(!data.nativeMode||['Line','Choice'].includes(beat.nativeKind))&&events(phases[0])}
-  <div className="moment-dialogue nodrag" onClick={()=>data.onSelect(beat.id)}><strong>{data.nativeMode&&beat.nativeKind==='Action'?'Action':beat.speaker || (beat.kind==='choice'?tr("Выбор игрока"):tr("Рассказчик"))}</strong><p>{data.nativeMode&&beat.nativeKind==='Action'?`${beat.actions?.length||0} действий · редактирование в Inspector`:beat.text || tr("Пустая реплика")}</p></div>
+  {data.nativeMode && <fieldset className="native-node-fields nodrag nopan nowheel" disabled={data.running} onClick={Event=>Event.stopPropagation()} onDoubleClick={Event=>Event.stopPropagation()} onKeyDown={Event=>Event.stopPropagation()}>
+   <NativeStoryNodeFields Node={data.NativeNode} Objects={data.project.objects} Disabled={data.running} Edit={Patch=>data.NativeCommand('story.updateNode',{nodeId:beat.id,patch:Patch})}/>
+   {beat.nativeKind==='Action' && <NativeStoryActionFields Node={data.NativeNode} Objects={data.project.objects} Disabled={data.running} Edit={Patch=>data.NativeCommand('story.updateNode',{nodeId:beat.id,patch:Patch})}/>}
+  </fieldset>}
+  {!data.nativeMode && <div className="moment-dialogue nodrag" onClick={()=>data.onSelect(beat.id)}><strong>{data.nativeMode&&beat.nativeKind==='Action'?'Action':beat.speaker || (beat.kind==='choice'?tr("Выбор игрока"):tr("Рассказчик"))}</strong><p>{data.nativeMode&&beat.nativeKind==='Action'?`${beat.actions?.length||0} действий · редактирование в Inspector`:beat.text || tr("Пустая реплика")}</p></div>}
   {(!data.nativeMode||['Line','Choice'].includes(beat.nativeKind))&&events(phases[1])}
   <div className="moment-input nodrag" data-event-beat={beat.id} data-event-phase="AFTER" onDragOver={allowEvent} onDrop={e=>dropEvent(e,'AFTER')}><Icon name={beat.kind==='choice'?'GitFork':beat.kind==='gate'?'MousePointerClick':'MousePointer2'} size={12}/>{data.nativeMode&&beat.nativeKind==='Action'?'Действия C++ StoryRuntime':beat.kind==='gameplay'?tr('Управление игроком · правила и события'):beat.kind==='end'?tr("Завершение истории"):beat.kind==='choice'?tr("Игрок выбирает ответ"):beat.kind==='gate'?tr("Ожидание взаимодействия"):tr("Игрок нажимает «Дальше»")}</div>
   {beat.kind==='gate'&&<div className="moment-interaction-summary"><span>{interactionTargets(beat).map(id=>data.project.objects.find(o=>o.id===id)?.name||id).join(' + ')||tr('Выберите предметы в инспекторе')}</span>{interactionTargets(beat).length>1&&<small>{tr('Все предметы · в любом порядке')}</small>}{beat.controls?.mode&&beat.controls.mode!=='none'&&<small>{beat.controls.mode==='wasd'?'WASD':beat.controls.mode==='both'?'WASD + point & click':'Point & click'} · {data.project.objects.find(o=>o.id===beat.controls.characterId)?.name||tr('Выберите персонажа')}</small>}</div>}
   {(!data.nativeMode||['Line','Choice'].includes(beat.nativeKind))&&events(phases[2])}
-  {beat.kind==='choice'&&<div className="node-answers nodrag">{beat.choices.map((c,i)=><NodeAnswer nativeMode={data.nativeMode} key={c.id} choice={c} index={i} beatId={beat.id} data={data} available={data.project.chapters.some(ch=>ch.beats.some(b=>b.id===c.next))} onChange={patch=>data.onChoice(beat.id,c.id,patch)} onRemove={()=>data.onChoice(beat.id,c.id,null)} onDisconnect={()=>data.onConnect({source:beat.id,sourceHandle:'choice:'+c.id,target:null})}/>)}<Button icon="Plus" onClick={()=>data.onChoice(beat.id,null,{label:'Новый ответ'})}>{tr("Добавить ответ")}</Button></div>}
+  {beat.kind==='choice'&&<div className="node-answers nodrag">{beat.choices.map((c,i)=><NodeAnswer nativeMode={data.nativeMode} key={c.id} choice={c} index={i} beatId={beat.id} data={data} available={data.project.chapters.some(ch=>ch.beats.some(b=>b.id===c.next))} onChange={patch=>data.onChoice(beat.id,c.id,patch)} onRemove={()=>data.onChoice(beat.id,c.id,null)} onDisconnect={()=>data.onConnect({source:beat.id,sourceHandle:'choice:'+c.id,target:null})}/>)}<Button icon="Plus" disabled={data.running} onClick={()=>data.onChoice(beat.id,null,{label:'Новый ответ'})}>{tr("Добавить ответ")}</Button></div>}
   {!data.nativeMode&&beat.kind==='choice'&&choiceResultType(beat)&&<div className={'choice-result-output type-'+choiceResultType(beat)}><span>{tr("Результат выбора · ")}{{string:tr("Текст"),number:tr("Число"),boolean:tr("Да / нет"),any:tr("Разные типы")}[choiceResultType(beat)]}</span><Handle className="data-pin" type="source" position={Position.Right} id="value" title={tr("Результат этого выбора · выход значения")}/></div>}
   {(footerPorts.length>0||beat.kind==='end')&&<footer>{footerPorts.map(port=><div className={'moment-route story-route'+(!port.next?' disconnected':'')} key={port.id}><span className="story-route-label">{port.id.startsWith('choice:')||port.gameRule?port.label:tr(port.label)}</span><Handle type="source" position={Position.Right} id={port.id} isConnectable={!port.gameRule} title={(port.id.startsWith('choice:')||port.gameRule?port.label:tr(port.label))+tr(" · соединить с входом ноды")}/></div>)}{beat.kind==='end'&&<strong><Icon name="Flag" size={13}/>{beat.ending || tr("Конец")}</strong>}</footer>}
  </article>;
 });
 const Missing=({data})=><article className="story-moment missing"><Handle type="target" position={Position.Left} id="in"/><strong>{tr(data.title)}</strong><p>{tr("Целевая нода удалена")}</p><button className="nodrag" onClick={e=>{e.stopPropagation();data.onRemove();}}><Icon name="Unplug" size={14}/>{tr("Убрать переход")}</button></article>;
-const nodeTypes={moment:Moment,missing:Missing};
+const nodeTypes={moment:Moment,missing:Missing,narrative:NativeNarrativeNode};
 const NO_ISSUES=[];
-function Canvas({model:providedModel,nativeMode=false,running=false,onVariableEdit,onVariableAdd,onInspectVariable,selectedVariable,onVariableDrop,onLogicChange,onVariable,onChoice,onClipboard,contextNodeId,project,selectedId,selectionId,preview,issues=NO_ISSUES,onSelect,onOpen,onAdd,onBatch,onMoveBinding,onConnect,onDeleteNode,onScene,onContext,positions,onPositions,onReady}){
+function Canvas({NativeCommand,bAutoFocusSelection=false,model:providedModel,nativeMode=false,running=false,onVariableEdit,onVariableAdd,onInspectVariable,selectedVariable,onVariableDrop,onLogicChange,onVariable,onChoice,onClipboard,contextNodeId,project,selectedId,selectionId,preview,issues=NO_ISSUES,onSelect,onOpen,onAdd,onBatch,onMoveBinding,onConnect,onDeleteNode,onScene,onContext,positions,onPositions,onReady}){
  useLocale();
  const api=useReactFlow(),initialized=useNodesInitialized(),container=useRef(null),didFocus=useRef(false),lastSelected=useRef(selectedId),panGesture=useRef(null),placedNode=useRef(null),selectionKey=useRef(null);
  // React Flow registers a newly created node after the selection changes.
@@ -78,7 +84,7 @@ function Canvas({model:providedModel,nativeMode=false,running=false,onVariableEd
  const layout=useMemo(()=>arrangeStoryFlow(model.nodes,model.edges),[model]);
  const [nodes,setNodes]=useState([]),[minimap,setMinimap]=useState(false),[edgeId,setEdgeId]=useState(null),[missingId,setMissingId]=useState(null),[trace,setTrace]=useState(null);
  const didFitNative=useRef(false);
- useEffect(()=>{const selectionChanged=selectionKey.current!==selectedId;selectionKey.current=selectedId;setNodes(previous=>layout.map(n=>({...n,height:undefined,position:previous.find(p=>p.id===n.id)?.dragging?previous.find(p=>p.id===n.id).position:positions?.[n.id]||n.position,dragging:previous.find(p=>p.id===n.id)?.dragging,measured:previous.find(p=>p.id===n.id)?.measured,style:{width:n.width},dragHandle:'.moment-grab',selected:selectionChanged?n.id===selectedId:(previous.find(p=>p.id===n.id)?.selected??n.id===selectedId),data:{...n.data,onTrace:setTrace,onReveal:id=>{onSelect(id);api.fitView({nodes:[{id}],padding:.3,maxZoom:.8,duration:200});},onRemove:()=>onConnect({changes:model.edges.filter(e=>e.target===n.id).map(e=>({source:e.source,sourceHandle:e.sourceHandle,target:null}))}),issue:issues.find(i=>i.beatId===n.id),running,selectionId,preview,onSelect,onOpen,onAdd,onBatch,onMoveBinding,onScene,onLogicChange,onVariable,onChoice,onInspectVariable,onConnect,project,variables:project.variables}})));},[running,layout,positions,selectedId,selectionId,preview,issues,onSelect,onOpen,onAdd,onBatch,onMoveBinding,onScene,onLogicChange,onVariable,onChoice,onInspectVariable,onConnect,project]);
+ useEffect(()=>{const selectionChanged=selectionKey.current!==selectedId;selectionKey.current=selectedId;setNodes(previous=>layout.map(n=>({...n,height:undefined,position:previous.find(p=>p.id===n.id)?.dragging?previous.find(p=>p.id===n.id).position:positions?.[n.id]||n.position,dragging:previous.find(p=>p.id===n.id)?.dragging,measured:previous.find(p=>p.id===n.id)?.measured,style:{width:n.width},dragHandle:'.moment-grab',selected:selectionChanged?n.id===selectedId:(previous.find(p=>p.id===n.id)?.selected??n.id===selectedId),data:{...n.data,NativeCommand,onTrace:setTrace,onReveal:id=>{onSelect(id);api.fitView({nodes:[{id}],padding:.3,maxZoom:.8,duration:200});},onRemove:()=>onConnect({changes:model.edges.filter(e=>e.target===n.id).map(e=>({source:e.source,sourceHandle:e.sourceHandle,target:null}))}),issue:issues.find(i=>i.beatId===n.id),running,selectionId,preview,onSelect,onOpen,onAdd,onBatch,onMoveBinding,onScene,onLogicChange,onVariable,onChoice,onInspectVariable,onConnect,project,variables:project.variables}})));},[NativeCommand,running,layout,positions,selectedId,selectionId,preview,issues,onSelect,onOpen,onAdd,onBatch,onMoveBinding,onScene,onLogicChange,onVariable,onChoice,onInspectVariable,onConnect,project]);
  const focus=useCallback((id=selectedId)=>{
   const node=api.getNode(id);if(!node?.measured?.width || !node?.measured?.height)return false;
   const zoom=.8;
@@ -86,13 +92,19 @@ function Canvas({model:providedModel,nativeMode=false,running=false,onVariableEd
   return true;
  },[api,selectedId]);
  useEffect(()=>{
-  if(!initialized || !targetNode)return;
+  if (!bAutoFocusSelection) {
+   didFocus.current=false;
+   return;
+  }
+  if (!initialized || !targetNode) {
+   return;
+  }
   if(contextNodeId===selectedId&&placedNode.current!==contextNodeId){placedNode.current=contextNodeId;didFocus.current=true;lastSelected.current=selectedId;return;}
   if((!didFocus.current || lastSelected.current!==selectedId) && focus()){
    didFocus.current=true;
    lastSelected.current=selectedId;
   }
- },[initialized,selectedId,targetNode,focus,contextNodeId]);
+ },[bAutoFocusSelection,initialized,selectedId,targetNode,focus,contextNodeId]);
  const arrange=useCallback(()=>{
   const arranged=arrangeStoryFlow(api.getNodes(),model.edges);
   onPositions(Object.fromEntries(arranged.map(n=>[n.id,n.position])));

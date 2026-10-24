@@ -1,0 +1,392 @@
+{
+  "format": "sakura.scene",
+  "formatVersion": 1,
+  "name": "quest",
+  "objects": [
+    {
+      "id": "f0c1a434-7301-525c-b50e-256435734e9b",
+      "name": "camera",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          5,
+          6.8
+        ],
+        "rotation": [
+          -0.28213113322510897,
+          0.0,
+          0.0,
+          0.9593758510954483
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "b9b21037-e52b-55eb-a7b1-2cc02b83b310",
+          "type": "engine.CameraComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "primary": true,
+            "field_of_view": 58
+          }
+        },
+        {
+          "id": "1df54135-9ddb-5470-bf7d-2df8a0379ba7",
+          "type": "game.TemplateController",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "Scenario": "quest",
+            "ObjectIds": "{\"camera\": \"f0c1a434-7301-525c-b50e-256435734e9b\", \"sun\": \"062deee3-1ac7-595b-bf1d-f10e92dd0aeb\", \"sky\": \"3fef88e2-3e51-56f8-864c-7dc5109893d7\", \"quest-room-floor\": \"62d838d7-e7f7-5adc-b322-b0738903836b\", \"quest-room-wall\": \"b77bc857-dad3-521a-8464-fe838c470a8a\", \"key\": \"c0fe4a7b-c510-5c44-bbd5-e3b893a47934\", \"quest-key\": \"c0fe4a7b-c510-5c44-bbd5-e3b893a47934\", \"door\": \"9f461589-18e7-56c6-bc29-7fe85bd43bba\", \"quest-door\": \"9f461589-18e7-56c6-bc29-7fe85bd43bba\", \"warehouse\": \"82c76949-e14e-57e6-bd1b-39756f47abb2\", \"story-door\": \"82c76949-e14e-57e6-bd1b-39756f47abb2\", \"player\": \"c15de181-a9b0-59c1-bf5b-99a49d09ba9c\"}",
+            "MoveSpeed": 3.5,
+            "LookSensitivity": 0.003,
+            "RequireRecord": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "062deee3-1ac7-595b-bf1d-f10e92dd0aeb",
+      "name": "sun",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          -4,
+          9,
+          3
+        ],
+        "rotation": [
+          -0.4537387777352828,
+          -0.3852923350226961,
+          -0.22678567513597295,
+          0.7708691171043052
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "5b58ca6c-4cbb-593e-98e6-10d7d4455aff",
+          "type": "engine.LightComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "light_type": "Directional",
+            "intensity": 3.2,
+            "light_color": [
+              1,
+              0.965,
+              0.875,
+              1
+            ],
+            "cast_shadows": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "3fef88e2-3e51-56f8-864c-7dc5109893d7",
+      "name": "sky",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "id": "ffbba62d-bf91-5bda-a6b7-1ac997a9c16c",
+          "type": "engine.SkyLightComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "intensity": 1.7,
+            "light_color": [
+              0.773,
+              0.843,
+              0.918,
+              1
+            ]
+          }
+        },
+        {
+          "id": "1672c73b-6adb-51cc-874d-2dd2fa0839d5",
+          "type": "engine.SkySphereComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "zenith_color": [
+              0.1700791678610122,
+              0.36534830656017403,
+              0.6775136368066321,
+              1
+            ],
+            "horizon_color": [
+              0.1700791678610122,
+              0.36534830656017403,
+              0.6775136368066321,
+              1
+            ],
+            "ground_color": [
+              0.1700791678610122,
+              0.36534830656017403,
+              0.6775136368066321,
+              1
+            ],
+            "sun_intensity": 0,
+            "brightness": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "62d838d7-e7f7-5adc-b322-b0738903836b",
+      "name": "Пол локации",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          -0.08,
+          0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          16,
+          0.3,
+          12
+        ]
+      },
+      "components": [
+        {
+          "id": "df98b775-c2fe-5c32-86c9-aadaa7f4316e",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "111ecf73-e457-5d16-9b63-7cc48221fda4",
+            "mesh_sub_asset_id": "6651d05d-ba98-5620-b362-55136231fc8e",
+            "material_asset_id": "ac7845ed-26ba-5329-aa5e-f6591fd75744",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "b77bc857-dad3-521a-8464-fe838c470a8a",
+      "name": "Задняя стена",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          1.1,
+          -3
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          16,
+          4.4,
+          0.35
+        ]
+      },
+      "components": [
+        {
+          "id": "ead3b93e-a855-5cf8-98c8-7b205f01d3ef",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "111ecf73-e457-5d16-9b63-7cc48221fda4",
+            "mesh_sub_asset_id": "6651d05d-ba98-5620-b362-55136231fc8e",
+            "material_asset_id": "bb89a7f3-c69a-50db-a772-4cd3b1ca641a",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "c0fe4a7b-c510-5c44-bbd5-e3b893a47934",
+      "name": "Латунный ключ",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          0.4,
+          -0.5
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          0.75,
+          0.18,
+          0.42
+        ]
+      },
+      "components": [
+        {
+          "id": "a9dd7df8-ffa1-5e4e-8531-53bc3e62204e",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "111ecf73-e457-5d16-9b63-7cc48221fda4",
+            "mesh_sub_asset_id": "6651d05d-ba98-5620-b362-55136231fc8e",
+            "material_asset_id": "72c477b0-8302-5f32-94e3-d46ab2317cd3",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "9f461589-18e7-56c6-bc29-7fe85bd43bba",
+      "name": "Дверь с ключом",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          -2,
+          1,
+          -2.2
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.2,
+          2,
+          0.25
+        ]
+      },
+      "components": [
+        {
+          "id": "5e86b2b3-51d8-5941-b70c-cd9ffcd7ee23",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "111ecf73-e457-5d16-9b63-7cc48221fda4",
+            "mesh_sub_asset_id": "6651d05d-ba98-5620-b362-55136231fc8e",
+            "material_asset_id": "6dddb53e-d4b3-5976-bd36-7e8e6171f95b",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "82c76949-e14e-57e6-bd1b-39756f47abb2",
+      "name": "Дверь склада",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          2,
+          1,
+          -2.2
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.2,
+          2,
+          0.25
+        ]
+      },
+      "components": [
+        {
+          "id": "323af4c5-ac7c-5f62-98e5-8dcfd009ca34",
+          "type": "engine.MeshRendererComponent",
+          "typeVersion": 1,
+          "bEnabled": true,
+          "properties": {
+            "mesh_asset_id": "111ecf73-e457-5d16-9b63-7cc48221fda4",
+            "mesh_sub_asset_id": "6651d05d-ba98-5620-b362-55136231fc8e",
+            "material_asset_id": "3e4e2059-828a-5f11-b01d-c00a10a910b8",
+            "visible": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "c15de181-a9b0-59c1-bf5b-99a49d09ba9c",
+      "name": "player",
+      "parent": null,
+      "bActive": true,
+      "bVisual": true,
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": []
+    }
+  ]
+}

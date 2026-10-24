@@ -1,0 +1,386 @@
+{
+  "Version": 1,
+  "Context": {
+    "Name": "Gameplay",
+    "Bindings": [
+      {
+        "Identifier": "PointMousePosition",
+        "Action": "539d8a69-d959-5179-941c-20145142b4d6",
+        "Device": "Mouse",
+        "Control": "Position",
+        "Modifiers": {
+          "Scale": {
+            "Horizontal": 1,
+            "Vertical": 1,
+            "Depth": 1
+          },
+          "AxisOrder": [
+            0,
+            1,
+            2
+          ]
+        }
+      },
+      {
+        "Identifier": "LookEnableMouseSecondary",
+        "Action": "48c05ae4-d6c2-5c65-baad-e3cf82fb5d35",
+        "Device": "Mouse",
+        "Control": "Secondary",
+        "Modifiers": {
+          "Scale": {
+            "Horizontal": 1,
+            "Vertical": 1,
+            "Depth": 1
+          },
+          "AxisOrder": [
+            0,
+            1,
+            2
+          ]
+        }
+      },
+      {
+        "Identifier": "MoveKeyboardKeyW",
+        "Action": "e7a5c91a-5f5f-5c48-8956-9cbd099c3560",
+        "Device": "Keyboard",
+        "Control": "KeyW",
+        "Modifiers": {
+          "Scale": {
+            "Horizontal": 1,
+            "Vertical": 1,
+            "Depth": 1
+          },
+          "AxisOrder": [
+            1,
+            0,
+            2
+          ]
+        }
+      },
+      {
+        "Identifier": "MoveKeyboardArrowUp",
+        "Action": "e7a5c91a-5f5f-5c48-8956-9cbd099c3560",
+        "Device": "Keyboard",
+        "Control": "ArrowUp",
+        "Modifiers": {
+          "Scale": {
+            "Horizontal": 1,
+            "Vertical": 1,
+            "Depth": 1
+          },
+          "AxisOrder": [
+            1,
+            0,
+            2
+          ]
+        }
+      },
+      {
+        "Identifier": "MoveKeyboardKeyS",
+        "Action": "e7a5c91a-5f5f-5c48-8956-9cbd099c3560",
+        "Device": "Keyboard",
+        "Control": "KeyS",
+        "Modifiers": {
+          "Scale": {
+            "Horizontal": 1,
+            "Vertical": -1,
+            "Depth": 1
+          },
+          "AxisOrder": [
+            1,
+            0,
+            2
+          ]
+        }
+      },
+      {
+        "Identifier": "MoveKeyboardArrowDown",
+        "Action": "e7a5c91a-5f5f-5c48-8956-9cbd099c3560",
+        "Device": "Keyboard",
+        "Control": "ArrowDown",
+        "Modifiers": {
+          "Scale": {
+            "Horizontal": 1,
+            "Vertical": -1,
+            "Depth": 1
+          },
+          "AxisOrder": [
+            1,
+            0,
+            2
+          ]
+        }
+      },
+      {
+        "Identifier": "MoveKeyboardKeyA",
+        "Action": "e7a5c91a-5f5f-5c48-8956-9cbd099c3560",
+        "Device": "Keyboard",
+        "Control": "KeyA",
+        "Modifiers": {
+          "Scale": {
+            "Horizontal": -1,
+            "Vertical": 1,
+            "Depth": 1
+          },
+          "AxisOrder": [
+            0,
+            1,
+            2
+          ]
+        }
+      },
+      {
+        "Identifier": "MoveKeyboardArrowLeft",
+        "Action": "e7a5c91a-5f5f-5c48-8956-9cbd099c3560",
+        "Device": "Keyboard",
+        "Control": "ArrowLeft",
+        "Modifiers": {
+          "Scale": {
+            "Horizontal": -1,
+            "Vertical": 1,
+            "Depth": 1
+          },
+          "AxisOrder": [
+            0,
+            1,
+            2
+          ]
+        }
+      },
+      {
+        "Identifier": "MoveKeyboardKeyD",
+        "Action": "e7a5c91a-5f5f-5c48-8956-9cbd099c3560",
+        "Device": "Keyboard",
+        "Control": "KeyD",
+        "Modifiers": {
+          "Scale": {
+            "Horizontal": 1,
+            "Vertical": 1,
+            "Depth": 1
+          },
+          "AxisOrder": [
+            0,
+            1,
+            2
+          ]
+        }
+      },
+      {
+        "Identifier": "MoveKeyboardArrowRight",
+        "Action": "e7a5c91a-5f5f-5c48-8956-9cbd099c3560",
+        "Device": "Keyboard",
+        "Control": "ArrowRight",
+        "Modifiers": {
+          "Scale": {
+            "Horizontal": 1,
+            "Vertical": 1,
+            "Depth": 1
+          },
+          "AxisOrder": [
+            0,
+            1,
+            2
+          ]
+        }
+      },
+      {
+        "Identifier": "InteractKeyboardKeyE",
+        "Action": "d15e3672-f4da-5a34-af99-c371e2bfc948",
+        "Device": "Keyboard",
+        "Control": "KeyE",
+        "Modifiers": {
+          "Scale": {
+            "Horizontal": 1,
+            "Vertical": 1,
+            "Depth": 1
+          },
+          "AxisOrder": [
+            0,
+            1,
+            2
+          ]
+        }
+      },
+      {
+        "Identifier": "MoveGamepadLeftX",
+        "Action": "e7a5c91a-5f5f-5c48-8956-9cbd099c3560",
+        "Device": "Gamepad",
+        "Control": "LeftX",
+        "Modifiers": {
+          "Scale": {
+            "Horizontal": 1,
+            "Vertical": 1,
+            "Depth": 1
+          },
+          "AxisOrder": [
+            0,
+            1,
+            2
+          ]
+        }
+      },
+      {
+        "Identifier": "MoveGamepadLeftY",
+        "Action": "e7a5c91a-5f5f-5c48-8956-9cbd099c3560",
+        "Device": "Gamepad",
+        "Control": "LeftY",
+        "Modifiers": {
+          "Scale": {
+            "Horizontal": 1,
+            "Vertical": -1,
+            "Depth": 1
+          },
+          "AxisOrder": [
+            1,
+            0,
+            2
+          ]
+        }
+      },
+      {
+        "Identifier": "MoveGamepadDpadUp",
+        "Action": "e7a5c91a-5f5f-5c48-8956-9cbd099c3560",
+        "Device": "Gamepad",
+        "Control": "DpadUp",
+        "Modifiers": {
+          "Scale": {
+            "Horizontal": 1,
+            "Vertical": 1,
+            "Depth": 1
+          },
+          "AxisOrder": [
+            1,
+            0,
+            2
+          ]
+        }
+      },
+      {
+        "Identifier": "MoveGamepadDpadDown",
+        "Action": "e7a5c91a-5f5f-5c48-8956-9cbd099c3560",
+        "Device": "Gamepad",
+        "Control": "DpadDown",
+        "Modifiers": {
+          "Scale": {
+            "Horizontal": 1,
+            "Vertical": -1,
+            "Depth": 1
+          },
+          "AxisOrder": [
+            1,
+            0,
+            2
+          ]
+        }
+      },
+      {
+        "Identifier": "MoveGamepadDpadLeft",
+        "Action": "e7a5c91a-5f5f-5c48-8956-9cbd099c3560",
+        "Device": "Gamepad",
+        "Control": "DpadLeft",
+        "Modifiers": {
+          "Scale": {
+            "Horizontal": -1,
+            "Vertical": 1,
+            "Depth": 1
+          },
+          "AxisOrder": [
+            0,
+            1,
+            2
+          ]
+        }
+      },
+      {
+        "Identifier": "MoveGamepadDpadRight",
+        "Action": "e7a5c91a-5f5f-5c48-8956-9cbd099c3560",
+        "Device": "Gamepad",
+        "Control": "DpadRight",
+        "Modifiers": {
+          "Scale": {
+            "Horizontal": 1,
+            "Vertical": 1,
+            "Depth": 1
+          },
+          "AxisOrder": [
+            0,
+            1,
+            2
+          ]
+        }
+      },
+      {
+        "Identifier": "InteractGamepadSouth",
+        "Action": "d15e3672-f4da-5a34-af99-c371e2bfc948",
+        "Device": "Gamepad",
+        "Control": "South",
+        "Modifiers": {
+          "Scale": {
+            "Horizontal": 1,
+            "Vertical": 1,
+            "Depth": 1
+          },
+          "AxisOrder": [
+            0,
+            1,
+            2
+          ]
+        }
+      },
+      {
+        "Identifier": "FireMousePrimary",
+        "Action": "8c1b83b8-551f-5ff6-9521-bc66c9cbd526",
+        "Device": "Mouse",
+        "Control": "Primary",
+        "Modifiers": {
+          "Scale": {
+            "Horizontal": 1,
+            "Vertical": 1,
+            "Depth": 1
+          },
+          "AxisOrder": [
+            0,
+            1,
+            2
+          ]
+        }
+      },
+      {
+        "Identifier": "MoveTouchmove",
+        "Action": "e7a5c91a-5f5f-5c48-8956-9cbd099c3560",
+        "Device": "Touch",
+        "Control": "move",
+        "Modifiers": {
+          "Scale": {
+            "Horizontal": 1,
+            "Vertical": 1,
+            "Depth": 1
+          },
+          "AxisOrder": [
+            0,
+            1,
+            2
+          ]
+        }
+      },
+      {
+        "Identifier": "InteractTouchinteract",
+        "Action": "d15e3672-f4da-5a34-af99-c371e2bfc948",
+        "Device": "Touch",
+        "Control": "interact",
+        "Modifiers": {
+          "Scale": {
+            "Horizontal": 1,
+            "Vertical": 1,
+            "Depth": 1
+          },
+          "AxisOrder": [
+            0,
+            1,
+            2
+          ]
+        }
+      }
+    ]
+  }
+}

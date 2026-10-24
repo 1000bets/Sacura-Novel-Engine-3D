@@ -1,14 +1,23 @@
 const {spawn} = require('node:child_process');
 const fs = require('node:fs/promises');
 const path = require('node:path');
-const os = require('node:os');
 const {pathToFileURL} = require('node:url');
 const {createProject} = require('../project-store.cjs');
 
 (async () => {
   if (process.platform !== 'win32') throw new Error('Native child viewport currently requires Windows.');
   const root = path.resolve(__dirname, '..');
-  const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'sacura-native-'));
+  if (!process.argv.includes('--smoke')) {
+    const Child = spawn(process.env.SACURA_DESKTOP_EXECUTABLE || require('electron'),
+      process.env.SACURA_DESKTOP_EXECUTABLE ? [] : [root], {cwd: root, stdio: 'inherit', env: process.env});
+    const Code = await new Promise((Resolve, Reject) => { Child.once('exit', Resolve); Child.once('error', Reject); });
+    process.exitCode = Code;
+    return;
+  }
+  const TestRoot = path.resolve(root, '../build');
+  if (/^C:/i.test(TestRoot)) { throw new Error('Smoke project requires a workspace outside C:'); }
+  await fs.mkdir(TestRoot, {recursive: true});
+  const temporary = await fs.mkdtemp(path.join(TestRoot, 'sacura-native-'));
   try {
     const executable = process.env.SACURA_NATIVE_HOST || path.resolve(root, '../build/windows-msvc-debug/ElectronNative/Debug/SakuraElectronHost.exe');
     await fs.access(executable);

@@ -1,3 +1,9 @@
+#include "Project/GameExporter.h"
+#include "Core/EnginePaths.h"
+#include "Prefab/PrefabUtility.h"
+#include "Commands/PrefabCommands.h"
+#include "Core/Object/MemorySubsystem.h"
+#include "Story/Narrative.h"
 #include "Assets/AssetOperations.h"
 #include "Actions/EditorAction.h"
 #include "Assets/AssetPreview.h"
@@ -6,12 +12,15 @@
 #include "Core/Threading/JobSystem.h"
 #include "Commands/StaticMeshCommands.h"
 #include "World/Components/MeshRendererComponent.h"
+#include "World/Components/CharacterComponent.h"
 #include "World/Components/PhysicsBodyComponent.h"
 #include "World/Components/LightComponent.h"
 #include "World/Components/CameraComponent.h"
-#include <QBuffer>
-#include <QByteArray>
+#include "Core/IO/Base64.h"
+#include "Core/IO/ImageBuffer.h"
 #include "NativeBridge.h"
+#include "Scripting/ScriptingSubsystem.h"
+#include "World/Components/ScriptComponent.h"
 #include "Commands/EditorCommands.h"
 #include "Core/Threading/ThreadContext.h"
 #include "World/Scene.h"
@@ -63,8 +72,9 @@ Transform ParseTransform(const Json& J) {
 bool Readable(const PropertyDescriptor& P) {return !P.Attributes.bEditorHidden&&HasPropertyFlag(P.Attributes.Flags,PropertyFlags::EditorVisible);}
 bool Editable(const PropertyDescriptor& P) {return Readable(P)&&!P.bReadOnly&&!HasPropertyFlag(P.Attributes.Flags,PropertyFlags::EditorReadOnly)&&HasPropertyFlag(P.Attributes.Flags,PropertyFlags::EditorEditable);}
 }
-NativeBridge::NativeBridge(Engine& R,SceneWorkspace& W,ProjectSession& P,const std::filesystem::path& File,std::function<void()> Reset)
+NativeBridge::NativeBridge(Engine& R,SceneWorkspace& W,ProjectSession& P,const std::filesystem::path& File,std::function<void()> Reset, bool bInRuntimeOnly)
     :Runtime(R),Workspace(W),Project(P),Session(Guid::Generate().ToString()),ResetInput(std::move(Reset)) {
+    bRuntimeOnly = bInRuntimeOnly;
     AssertGameThread();std::ifstream Input(File);Input>>Contract;Require(Contract.at("version")==1,"PROTOCOL_ERROR","Unsupported contract");
     LastWorld=World()->GetObjectHandle();
     LastEditWorld=Runtime.GetEditScene()->GetObjectHandle();
@@ -112,12 +122,21 @@ Component* NativeBridge::FindComponent(const Json& P) {
 }
 void NativeBridge::ValidateParams(const std::string& M,const Json& P) {
     Require(Contract["methods"].contains(M),"UNKNOWN_METHOD","Unsupported method: "+M);
-    Require(P.is_object(),"INVALID_ARGUMENT","params must be an object");ValidateJson(P);
+    Require(P.is_object(),"INVALID_ARGUMENT","params must be an object");
     std::set<std::string> Allowed;
     for(auto It=Contract["methods"][M].begin();It!=Contract["methods"][M].end();++It) {
         std::string K=It.key();bool Optional=K.back()=='?';if(Optional)K.pop_back();Allowed.insert(K);
         if(!P.contains(K)){Require(Optional,"INVALID_ARGUMENT","Missing parameter: "+K);continue;}
         const auto& V=P[K];const std::string T=It.value();
+        if (T == "serializedJson")
+        {
+            Require(V.is_string() && V.get_ref<const std::string&>().size() <= 1024 * 1024, "INVALID_ARGUMENT", "Invalid " + K);
+            const auto Document = Json::parse(V.get_ref<const std::string&>(), nullptr, false);
+            Require(!Document.is_discarded(), "INVALID_ARGUMENT", "Invalid JSON document");
+            ValidateJson(Document);
+            continue;
+        }
+        ValidateJson(V, 1);
         if(T=="json")continue;
         if(T=="number"){Require(V.is_number()&&std::abs(V.get<double>())<=1e8,"INVALID_ARGUMENT","Invalid "+K);continue;}
         if(T=="transform"){ParseTransform(V);continue;}
@@ -167,6 +186,24 @@ Json NativeBridge::Properties(Component* C) {
         ReflectedValue V;auto D=PropertyAccess::GetProperty(C,*P,V,PropertyAccessContext::Inspector);Json Value;
         if(D.bOk)D=ReflectionJson::ReflectedValueToJson(P->ValueTypeId,V,Value);
         if(D.bOk)Item["value"]=ConvertValue(P->ValueTypeId,Value,false);else Item["error"]=D.Message;
+        if (P->Id.Value == "animation")
+        {
+            if (auto* Character = dynamic_cast<CharacterComponent*>(C))
+            {
+                Character->Resolve(Runtime.GetAssetManager());
+                Item["choices"] = Json::array();
+                if (const auto* Definition = Character->GetDefinition())
+                {
+                    for (const auto& Motion : Definition->Animations)
+                    {
+                        if (Motion.bEnabled)
+                        {
+                            Item["choices"].push_back({{"id", Motion.Identifier}, {"name", Motion.Name}});
+                        }
+                    }
+                }
+            }
+        }
         if (const auto* Enumeration = ReflectionSubsystem::Get().FindEnum(P->ValueTypeId))
         {
             Item["enumValues"] = Json::array();
@@ -203,6 +240,73 @@ bool NativeBridge::ProjectChanged() const {
     ContentHash Current; AssetDiagnostic D;
     return !ContentHash::TryHashFile(Project.GetProject()->ProjectFile.u8string(),Current,D) || Current!=ProjectFingerprint;
 }
+Json NativeBridge::GameViews()
+{
+    Json Views = Json::array();
+    if (!Runtime.IsGameRunning() && !Runtime.GetPlaySession().IsSimulating())
+    {
+        return Views;
+    }
+    for (auto* SceneObject : World()->GetAllObjects())
+    {
+        for (auto* Script : SceneObject->GetComponents<ScriptComponent>())
+        {
+            if (!Script->IsPlaying() || Script->IsScriptFailed())
+            {
+                continue;
+            }
+            for (const auto& Method : Script->GetClass()->Methods)
+            {
+                if (Method.Name != "GetGameView")
+                {
+                    continue;
+                }
+                ReflectedValue Result;
+                const auto Invoked = ScriptingSubsystem::Get().InvokeMethod(*Script, "GetGameView", {}, Result);
+                Require(Invoked.bOk, "GAME_VIEW_ERROR", Invoked.Message);
+                Require(Result.ValueKind == ReflectedValue::Kind::String && Result.StringValue.size() <= 65536,
+                    "GAME_VIEW_ERROR", "Game view must return a bounded JSON string");
+                auto View = Json::parse(Result.StringValue);
+                Require(View.is_object(), "GAME_VIEW_ERROR", "Game view must be an object");
+                View["objectId"] = SceneObject->GetPersistentId();
+                View["componentId"] = Script->GetPersistentId();
+                Views.push_back(std::move(View));
+            }
+        }
+    }
+    return Views;
+}
+
+void NativeBridge::ExecuteGameAction(const Json& Parameters)
+{
+    Require(Runtime.IsGameRunning() || Runtime.GetPlaySession().IsSimulating(),
+        "INVALID_STATE", "Game actions require a game session");
+    const bool bPaused = Runtime.IsGamePaused() || Runtime.GetPlaySession().GetState() == PlaySessionState::Paused;
+    auto* Script = dynamic_cast<ScriptComponent*>(FindComponent(Parameters));
+    Require(Script != nullptr && Script->IsPlaying(), "INVALID_ARGUMENT", "Game action requires a playing script component");
+    bool bAvailable = false;
+    for (const auto& View : GameViews())
+    {
+        if (View.at("componentId") != Parameters.at("componentId"))
+        {
+            continue;
+        }
+        for (const auto& Action : View.value("actions", Json::array()))
+        {
+            if (Action.at("id") == Parameters.at("action") && Action.value("enabled", true)
+                && (!bPaused || Action.value("allowWhilePaused", false)))
+            {
+                bAvailable = true;
+            }
+        }
+    }
+    Require(bAvailable, "INVALID_STATE", "Game action is not currently available");
+    ReflectedValue Result;
+    const auto Invoked = ScriptingSubsystem::Get().InvokeMethod(*Script, "ExecuteGameAction",
+        {{"Action", ReflectedValue::MakeString(Parameters.at("action").get<std::string>())}}, Result);
+    Require(Invoked.bOk, "GAME_ACTION_ERROR", Invoked.Message);
+}
+
 Json NativeBridge::Describe() {
     auto* Selected=Workspace.GetSelectedObject(World());auto& Play=Runtime.GetPlaySession();
     auto& Playback=Runtime.GetStoryRuntime();
@@ -213,16 +317,47 @@ Json NativeBridge::Describe() {
         {"speaker",Playback.GetDisplayedSpeaker()},{"text",Playback.GetDisplayedLine()},
         {"choices",Choices},{"canAdvance",Playback.CanAdvanceDialogue()},
         {"canChoose",Playback.CanSelectChoice()},{"error",Playback.GetLastError()}};
-    return {{"dirty",Workspace.GetDocument().IsDirty()},{"storyDirty",Story.IsDirty()},{"assetDocumentsDirty",HasDirtyAssetDocuments()},
+    return {{"gameRunning",Runtime.IsGameRunning()},{"gamePaused",Runtime.IsGamePaused()},{"dirty",Workspace.GetDocument().IsDirty()},{"storyDirty",Story.IsDirty()},{"assetDocumentsDirty",HasDirtyAssetDocuments()},
         {"externalChanges",Workspace.GetDocument().HasExternalChanges()},{"projectExternalChanges",ProjectChanged()},
         {"path",Workspace.GetDocument().GetDocumentPath().generic_string()},
         {"project",Project.GetProject()?Project.GetProject()->Name:""},
         {"play",Play.GetState()==PlaySessionState::Stopped?"stopped":Play.GetState()==PlaySessionState::Paused?"paused":"playing"},
-        {"dialogue",Dialogue},{"startupAudio",Project.GetProject()&&!Project.GetProject()->StartupAudio.empty()},
+        {"dialogue",Dialogue},{"gameViews",GameViews()},{"startupAudio",Project.GetProject()&&!Project.GetProject()->StartupAudio.empty()},
         {"selection",Selected?Json(Selected->GetPersistentId()):Json(nullptr)},
         {"canUndo",Workspace.GetCommands().CanUndo()},{"canRedo",Workspace.GetCommands().CanRedo()},{"assetError",AssetError}};
 }
 Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
+    if (bRuntimeOnly)
+    {
+        Require(M == "bridge.describe" || M == "game.state" || M == "game.advance" || M == "game.choose"
+            || M == "game.pause" || M == "game.action" || M == "audio.resolveStartup", "PLAYER_READ_ONLY", "Editor operations are unavailable in Player");
+    }
+    if (M == "game.action")
+    {
+        ExecuteGameAction(P);
+        return Describe();
+    }
+    if (M.rfind("game.", 0) == 0)
+    {
+        Require(bRuntimeOnly && Runtime.IsGameRunning(), "INVALID_STATE", "Standalone game is not running");
+        if (M == "game.advance")
+        {
+            Require(!Runtime.IsGamePaused() && Runtime.GetStoryRuntime().AdvanceDialogue(), "INVALID_STATE", "Dialogue cannot advance");
+        }
+        if (M == "game.choose")
+        {
+            const double Index = P.at("index");
+            Require(!Runtime.IsGamePaused() && Index >= 0 && std::floor(Index) == Index
+                && Index < Runtime.GetStoryRuntime().GetChoiceCount(), "INVALID_ARGUMENT", "Choice is unavailable");
+            Require(Runtime.GetStoryRuntime().SelectChoice(static_cast<size_t>(Index)), "INVALID_STATE", "Choice cannot be selected");
+        }
+        if (M == "game.pause")
+        {
+            Runtime.SetGamePaused(P.at("paused"));
+        }
+        return Describe();
+    }
+
     if (M == "scene.pickMesh")
     {
         Require(!Runtime.GetPlaySession().IsSimulating() && !GetPreviewScene(), "PLAY_READ_ONLY", "Material drops require the editable main scene");
@@ -232,6 +367,7 @@ Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
         Require(static_cast<bool>(PickViewportMesh), "UNAVAILABLE", "Viewport picking is unavailable");
         return PickViewportMesh(Horizontal, Vertical);
     }
+    if (M.rfind("prefab.", 0) == 0) { return PrefabTools(M, P); }
     if (M == "assetDocument.execute") { return AssetDocumentTools(P); }
     if(M.rfind("mesh.",0)==0 || M=="assets.place") { return MeshTools(M, P); }
     if(M.rfind("story.",0)==0||M.rfind("assets.",0)==0)return DispatchDocuments(M,P);
@@ -307,7 +443,17 @@ Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
                 Require(Settings.contains(Key) && Settings.at(Key).is_string(), "INVALID_ARGUMENT", "Project settings must be strings");
             }
             ProjectDescriptor Updated = *Project.GetProject();
-            Updated.Name = QString::fromStdString(Settings.at("name").get<std::string>()).trimmed().toStdString();
+            Updated.Name = Settings.at("name").get<std::string>();
+            const auto LastCharacter = Updated.Name.find_last_not_of(" \t\r\n\v\f");
+            if (LastCharacter == std::string::npos)
+            {
+                Updated.Name.clear();
+            }
+            else
+            {
+                Updated.Name.erase(LastCharacter + 1);
+                Updated.Name.erase(0, Updated.Name.find_first_not_of(" \t\r\n\v\f"));
+            }
             for (const auto* Key : {"startupScene", "startupStory"})
             {
                 const auto Relative = std::filesystem::u8path(Settings.at(Key).get<std::string>());
@@ -350,6 +496,16 @@ Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
         return {{"name", Descriptor.Name}, {"engineVersion", Descriptor.EngineVersion},
             {"startupScene", RelativePath(Descriptor.StartupScene)}, {"startupStory", RelativePath(Descriptor.StartupStory)}};
     }
+    if (M == "project.export")
+    {
+        Require(Project.GetProject() != nullptr && !ProjectChanged(), "EXTERNAL_CHANGES", "Reopen the changed project before exporting");
+        Require(!Document.IsDirty() && !Story.IsDirty() && !HasDirtyAssetDocuments(), "UNSAVED_CHANGES", "Save all documents before exporting");
+        std::string Error;
+        Require(GameExporter::Export(Project.GetProject()->ProjectFile,
+            std::filesystem::u8path(P.at("runtimeDirectory").get<std::string>()), EnginePaths::Root(),
+            std::filesystem::u8path(P.at("destination").get<std::string>()), P.at("executableName"), Error), "EXPORT_ERROR", Error);
+        return {{"destination", P.at("destination")}};
+    }
     if(M=="project.save") {
         Require(!ProjectChanged(),"EXTERNAL_CHANGES","Project descriptor changed on disk; reopen the project before saving startup settings");
         Require(!Document.HasExternalChanges()&&!Story.HasExternalChanges(),"EXTERNAL_CHANGES","A document changed on disk. Reload it or save a scene copy first");
@@ -358,8 +514,11 @@ Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
         if(Story.IsOpen()&&Story.IsDirty()) Require(Story.Save(Error),"STORY_ERROR",Error);
         for (auto& Entry : AssetDocuments)
         {
-            if (Entry.second.Script && Entry.second.Script->IsDirty()) { return true; }
-        if (Entry.second.Mesh && Entry.second.Mesh->IsDirty())
+            if (Entry.second.Script && Entry.second.Script->IsDirty())
+            {
+                Require(Entry.second.Script->Save(Error), "IO_ERROR", Error);
+            }
+            if (Entry.second.Mesh && Entry.second.Mesh->IsDirty())
             {
                 Require(Entry.second.Mesh->Save(Runtime.GetAssetManager(), Error), "IO_ERROR", Error);
             }
@@ -396,21 +555,30 @@ Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
     if(M=="character.create") {
         const std::string Name=P.at("name").get<std::string>();
         Require(!Name.empty(),"INVALID_ARGUMENT","Character name is required");
-        AssetRegistryEntry Model;
-        Require(Runtime.GetAssetRegistry().TryGetByPath("/Engine/Models/StarterCharacter.glb",Model)
-            &&Model.Metadata.SubAssets.size()==1&&Model.Metadata.SubAssets.front().Type==StaticMeshAssetType,
-            "NOT_FOUND","Starter character mesh is unavailable");
-        ObjectHandle Created,Mesh;
+        AssetRegistryEntry CharacterAsset;
+        Require(Runtime.GetAssetRegistry().TryGetByPath("/Engine/Characters/StarterHumanoid/StarterHumanoid.character",CharacterAsset),
+            "NOT_FOUND","Starter character asset is unavailable");
+        ObjectHandle Created,CharacterComponent;
         Commands.BeginGroup("Create Character");
         try {
             Commit(MakeCreateObjectCommand(World(),Name,{},&Created));
             if(P.contains("transform"))Commit(MakeSetTransformCommand(World(),Created,ParseTransform(P["transform"])));
-            Commit(MakeAddComponentCommand(World(),Created,TypeId{"engine.CharacterComponent"}));
-            Commit(MakeAddComponentCommand(World(),Created,TypeId{"engine.MeshRendererComponent"},&Mesh));
-            Commit(MakeSetPropertyCommand(World(),Mesh,PropertyId{"mesh_asset_id"},
-                ReflectedValue::MakeString(Model.Metadata.Guid.ToString())));
-            Commit(MakeSetPropertyCommand(World(),Mesh,PropertyId{"mesh_sub_asset_id"},
-                ReflectedValue::MakeString(Model.Metadata.SubAssets.front().Id.ToString())));
+            Commit(MakeAddComponentCommand(World(),Created,TypeId{"engine.CharacterComponent"},&CharacterComponent));
+            ReflectedValue CharacterValue;
+            CharacterValue.ValueKind=ReflectedValue::Kind::AssetReference;
+            CharacterValue.AssetValue={CharacterAsset.Metadata.Guid};
+            Commit(MakeSetPropertyCommand(World(),CharacterComponent,PropertyId{"character"},CharacterValue));
+            MaterialSlotOverrides Materials;
+            for(int32_t Slot=0;Slot<2;++Slot) {
+                AssetRegistryEntry Material;
+                Require(Runtime.GetAssetRegistry().TryGetByPath("/Engine/Characters/StarterHumanoid/HumanoidMaterial"+std::to_string(Slot)+".materialinstance",Material),
+                    "NOT_FOUND","Starter character material is unavailable");
+                Materials.Entries.push_back({Slot,{Material.Metadata.Guid}});
+            }
+            ReflectedValue MaterialValue;
+            Require(ReflectionValueCodec<MaterialSlotOverrides>::ToReflected(Materials,MaterialValue).bOk,
+                "INVALID_ARGUMENT","Starter character materials are invalid");
+            Commit(MakeSetPropertyCommand(World(),CharacterComponent,PropertyId{"material_slots"},MaterialValue));
             Commands.EndGroup();
         } catch(...) {Commands.CancelGroup();throw;}
         auto* Object=World()->FindByHandle(Created);
@@ -723,7 +891,28 @@ Json NativeBridge::StorySnapshot() {
     if(!Story.IsOpen())return {{"open",false},{"revision",StoryRevision},{"error",StoryError}};
     std::string Text;auto D=StoryDocumentIO::SaveToJson(Story.GetStory(),Text);Require(D.bOk,"STORY_ERROR",D.Error);
     Json Positions=Json::object();for(const auto& [Id,P]:Story.GetPositions())Positions[Id]={{"x",P.X},{"y",P.Y}};
-    return {{"open",true},{"revision",StoryRevision},{"document",Json::parse(Text)},{"positions",Positions},
+    Json Catalog = Json::array();
+    for (const auto& Definition : GetNarrativeDefinitions())
+    {
+        Json Entry{{"type", Definition.Type}, {"label", Definition.Label}, {"pure", Definition.bPure},
+            {"exits", Definition.Exits}, {"inputs", Json::array()}, {"outputs", Json::array()}};
+        const auto AddPins = [&](const char* Name, const std::vector<NarrativePin>& Pins)
+        {
+            for (const auto& Pin : Pins)
+            {
+                Json Value{{"name", Pin.Property.Id.Value}, {"type", Pin.Property.ValueTypeId.Value}};
+                if (Pin.bHasDefault)
+                {
+                    Value["default"] = Pin.Default;
+                }
+                Entry[Name].push_back(std::move(Value));
+            }
+        };
+        AddPins("inputs", Definition.Inputs);
+        AddPins("outputs", Definition.Outputs);
+        Catalog.push_back(std::move(Entry));
+    }
+    return {{"open",true},{"narrativeCatalog",Catalog},{"revision",StoryRevision},{"document",Json::parse(Text)},{"positions",Positions},
         {"path",Story.GetPath().generic_string()},{"dirty",Story.IsDirty()},{"readOnly",Story.IsReadOnly()},
         {"externalChanges",Story.HasExternalChanges()},{"canUndo",Story.CanUndo()},{"canRedo",Story.CanRedo()}};
 }
@@ -756,15 +945,11 @@ Json NativeBridge::DispatchDocuments(const std::string& M,const Json& P) {
                 std::string Encoded;
                 try
                 {
-                    QImage Image = GenerateAssetPreview(*Snapshot, Key);
-                    if (!Image.isNull())
+                    ImageBuffer Image = GenerateAssetPreview(*Snapshot, Key);
+                    if (!Image.Pixels.empty())
                     {
-                        Image = Image.scaled(128, 128, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-                        QByteArray Bytes;
-                        QBuffer Buffer(&Bytes);
-                        Buffer.open(QIODevice::WriteOnly);
-                        Image.save(&Buffer, "PNG");
-                        Encoded = Bytes.toBase64().toStdString();
+                        const auto Bytes = Image.ResizeToFit(128, 128).EncodePng();
+                        Encoded = Base64::Encode(Bytes.data(), Bytes.size());
                     }
                 }
                 catch (const std::exception& Error)
@@ -988,6 +1173,28 @@ Json NativeBridge::DispatchDocuments(const std::string& M,const Json& P) {
     if(M=="story.save"){Require(Story.Save(Error),"STORY_ERROR",Error);return StorySnapshot();}
     if(M=="story.undo"){Require(Story.Undo(),"COMMAND_FAILED","Story Undo is unavailable");return StorySnapshot();}
     if(M=="story.redo"){Require(Story.Redo(),"COMMAND_FAILED","Story Redo is unavailable");return StorySnapshot();}
+    if (M == "story.addNarrative")
+    {
+        StoryNodeId Created;
+        Require(Story.AddNarrativeNode(P.at("type"), {P.at("x"), P.at("y")}, Created, Error), "STORY_ERROR", Error);
+        return StorySnapshot();
+    }
+    if (M == "story.setNarrativeInput")
+    {
+        Require(Story.SetNarrativeInput(P.at("nodeId"), P.at("input"), P.at("value"), Error,
+            ReflectionJson::MakeSceneResolver(*Runtime.GetEditScene())), "STORY_ERROR", Error);
+        return StorySnapshot();
+    }
+    if (M == "story.connectData")
+    {
+        Require(Story.ConnectData(P.at("sourceId"), P.at("output"), P.at("targetId"), P.at("input"), Error), "STORY_ERROR", Error);
+        return StorySnapshot();
+    }
+    if (M == "story.validate")
+    {
+        Require(Story.ValidateForPlayback(Error), "STORY_ERROR", Error);
+        return StorySnapshot();
+    }
     if(M=="story.addNode") {
         const auto Kind=P.at("kind").get<std::string>();StoryNodeKind K;
         if(Kind=="Line")K=StoryNodeKind::Line;else if(Kind=="Choice")K=StoryNodeKind::Choice;else if(Kind=="Action")K=StoryNodeKind::Action;else if(Kind=="End")K=StoryNodeKind::End;else throw Failure("INVALID_ARGUMENT","Unsupported story node kind");
@@ -1139,6 +1346,7 @@ Json NativeBridge::MeshTools(const std::string& Method, const Json& Params)
 
 bool NativeBridge::HasDirtyAssetDocuments() const
 {
+    if (OpenPrefab.IsValid() && Workspace.GetDocument().IsDirty()) { return true; }
     for (const auto& Entry : AssetDocuments)
     {
         if (Entry.second.Script && Entry.second.Script->IsDirty()) { return true; }
@@ -1152,6 +1360,7 @@ Json NativeBridge::AssetDocumentTools(const Json& Params)
 {
     auto& Registry = Runtime.GetAssetRegistry();
     const auto Entry = Asset(Params.at("assetId"));
+    if (Entry.Metadata.Type == PrefabAssetType) { return PrefabDocumentTools(Params, Entry); }
     AssetKey Key{Entry.Metadata.Guid, std::nullopt};
     if (Params.contains("subAssetId") && !Params.at("subAssetId").is_null())
     {
@@ -1252,15 +1461,10 @@ Json NativeBridge::AssetDocumentTools(const Json& Params)
         AssetHandle<TextureResource> Texture;
         if (Runtime.GetAssetManager().TryGetLoaded(Key, Texture))
         {
-            QImage Image(Texture->Pixels.data(), Texture->Width, Texture->Height, Texture->RowStride, QImage::Format_RGBA8888);
-            if (Image.width() > 1024 || Image.height() > 1024)
-            {
-                Image = Image.scaled(1024, 1024, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-            }
-            QByteArray Bytes;
-            QBuffer Buffer(&Bytes);
-            Buffer.open(QIODevice::WriteOnly);
-            Require(Image.save(&Buffer, "PNG"), "DOCUMENT_ERROR", "Texture preview encoding failed");
+            const auto Image = ImageBuffer::FromRgba(Texture->Pixels.data(), Texture->Width, Texture->Height,
+                Texture->RowStride).ResizeToFit(1024, 1024);
+            const auto Bytes = Image.EncodePng();
+            Require(!Bytes.empty(), "DOCUMENT_ERROR", "Texture preview encoding failed");
             std::string ColorSpace = "Linear";
             if (Texture->ColorSpace == TextureColorSpace::Srgb)
             {
@@ -1268,8 +1472,8 @@ Json NativeBridge::AssetDocumentTools(const Json& Params)
             }
             Snapshot["document"] = {{"width", Texture->Width}, {"height", Texture->Height},
                 {"channelCount", Texture->ChannelCount}, {"decodedBytes", Texture->Pixels.size()},
-                {"colorSpace", ColorSpace}, {"format", "RGBA8"}, {"previewWidth", Image.width()}, {"previewHeight", Image.height()}};
-            Snapshot["previewPng"] = Bytes.toBase64().toStdString();
+                {"colorSpace", ColorSpace}, {"format", "RGBA8"}, {"previewWidth", Image.Width}, {"previewHeight", Image.Height}};
+            Snapshot["previewPng"] = Base64::Encode(Bytes.data(), Bytes.size());
             Snapshot["preparing"] = false;
             State.TextureSnapshot = Snapshot;
         }
@@ -1500,13 +1704,10 @@ void NativeBridge::TickPreview()
                         std::lock_guard<std::mutex> Lock(CompletedImage->Mutex);
                         if (State.Image->Generation == State.Material->GetPreviewRevision())
                         {
-                            QImage Image(State.Image->Pixels.data(), State.Image->Width, State.Image->Height,
-                                State.Image->Width * 4, QImage::Format_RGBA8888_Premultiplied);
-                            QByteArray Bytes;
-                            QBuffer Buffer(&Bytes);
-                            Buffer.open(QIODevice::WriteOnly);
-                            Image.save(&Buffer, "PNG");
-                            State.ImagePng = Bytes.toBase64().toStdString();
+                            const auto Image = ImageBuffer::FromRgba(State.Image->Pixels.data(), State.Image->Width,
+                                State.Image->Height, State.Image->Width * 4, true);
+                            const auto Bytes = Image.EncodePng();
+                            State.ImagePng = Base64::Encode(Bytes.data(), Bytes.size());
                         }
                         State.Image.reset();
                     }
@@ -1541,4 +1742,155 @@ void NativeBridge::TickPreview()
     if (PreviewMesh->GetMeshAssetKey() != MeshAsset) { PreviewMesh->SetMeshAssetKey(MeshAsset); }
     Runtime.GetSceneAssetResolver().ResolveScene(*PreviewScene);
     Runtime.SetRenderSurfaceScene(RenderSurfaceId{1}, PreviewScene);
+}
+
+Json NativeBridge::PrefabTools(const std::string& Method, const Json& Params)
+{
+    Require(!Runtime.GetPlaySession().IsSimulating() && !Runtime.IsGameRunning(), "PLAY_READ_ONLY", "Stop Play before editing prefabs");
+    std::string Error;
+    if (Method == "prefab.instantiate")
+    {
+        const auto Entry = Asset(Params.at("assetId"));
+        Require(Entry.Metadata.Type == PrefabAssetType, "INVALID_ARGUMENT", "Expected prefab asset");
+        ObjectHandle Parent;
+        if (Params.contains("parentId") && !Params.at("parentId").is_null())
+        {
+            Parent = Find(Params.at("parentId"))->GetObjectHandle();
+        }
+        ObjectHandle Created;
+        Commit(MakeInstantiatePrefabCommand(World(), Entry.Metadata.Guid, Parent, nullptr, &Created));
+        Workspace.Select(World(), Created);
+        return Describe();
+    }
+    auto* Object = Find(Params.at("objectId"));
+    if (Method == "prefab.create")
+    {
+        const auto Path = ContentPath(Params.at("path"));
+        Require(Path.extension() == ".prefab", "INVALID_PATH", "Expected a .prefab path");
+        AssetId Created;
+        const bool bVariant = Params.value("variant", false);
+        Commit(MakePrefabSubtreeEditCommand(World(), Object->GetObjectHandle(), "Create prefab",
+            [&](Scene& Scene, GameObject& Root, std::string& Failure)
+            {
+                return PrefabUtility::CreatePrefabAsset(Scene, Root, Path, bVariant, Created, Failure);
+            }, &Error));
+        Require(Error.empty(), "PREFAB_ERROR", Error);
+        return {{"assetId", Created.ToString()}};
+    }
+    auto* Root = PrefabUtility::GetOutermostInstanceRoot(Object);
+    if (Method == "prefab.inspect")
+    {
+        if (!Root) { return {{"instance", false}, {"overrides", Json::array()}}; }
+        std::vector<PrefabOverride> Overrides;
+        Require(PrefabUtility::GetOverrides(*World(), *Root, Overrides, Error), "PREFAB_ERROR", Error);
+        Json Result = Json::array();
+        for (size_t Index = 0; Index < Overrides.size(); ++Index)
+        {
+            const auto& Override = Overrides[Index];
+            Result.push_back({{"index", Index}, {"objectId", Override.HostObjectId}, {"componentId", Override.HostComponentId},
+                {"property", Override.Property}, {"label", Override.DisplayText}});
+        }
+        return {{"instance", true}, {"assetId", PrefabUtility::GetPrefabAsset(Root).ToString()},
+            {"rootId", Root->GetPersistentId()}, {"overrides", Result}};
+    }
+    Require(Root != nullptr, "INVALID_ARGUMENT", "Object is not a prefab instance");
+    const auto Operation = Params.at("operation").get<std::string>();
+    std::vector<PrefabOverride> Selection;
+    if (Params.contains("selection"))
+    {
+        Require(Params["selection"].is_array(), "INVALID_ARGUMENT", "Expected override indices");
+        std::vector<PrefabOverride> Overrides;
+        Require(PrefabUtility::GetOverrides(*World(), *Root, Overrides, Error), "PREFAB_ERROR", Error);
+        for (const auto& Index : Params["selection"])
+        {
+            Require(Index.is_number_unsigned() && Index.get<size_t>() < Overrides.size(), "INVALID_ARGUMENT", "Override index is invalid");
+            Selection.push_back(Overrides[Index.get<size_t>()]);
+        }
+    }
+    if (Operation == "apply")
+    {
+        Require(PrefabUtility::ApplyOverrides(*World(), *Root, Selection, Error), "PREFAB_ERROR", Error);
+        Workspace.GetCommands().Clear();
+        Workspace.GetDocument().MarkDirty();
+    }
+    else
+    {
+        Require(Operation == "revert" || Operation == "unpack" || Operation == "unpackAll", "INVALID_ARGUMENT", "Unknown prefab operation");
+        Commit(MakePrefabSubtreeEditCommand(World(), Root->GetObjectHandle(), "Modify prefab instance",
+            [Operation, Selection](Scene& Scene, GameObject& Root, std::string& Failure)
+            {
+                if (Operation == "revert")
+                {
+                    if (Selection.empty()) { return PrefabUtility::RevertAll(Scene, Root, Failure); }
+                    return PrefabUtility::RevertOverrides(Scene, Root, Selection, Failure);
+                }
+                auto Mode = PrefabUnpackMode::OutermostRoot;
+                if (Operation == "unpackAll") { Mode = PrefabUnpackMode::Completely; }
+                return PrefabUtility::Unpack(Scene, Root, Mode, Failure);
+            }, &Error));
+        Require(Error.empty(), "PREFAB_ERROR", Error);
+    }
+    return Describe();
+}
+
+Json NativeBridge::PrefabDocumentTools(const Json& Params, const AssetRegistryEntry& Entry)
+{
+    Require(std::getenv("SACURA_ASSET_WORKSPACE") != nullptr, "INVALID_STATE", "Open prefabs in an isolated asset workspace");
+    Require(!Runtime.GetPlaySession().IsSimulating() && !Runtime.IsGameRunning(), "PLAY_READ_ONLY", "Stop Play before editing prefabs");
+    const std::string Operation = Params.at("operation");
+    std::string Error;
+    auto& Document = Workspace.GetDocument();
+    if (!OpenPrefab.IsValid())
+    {
+        Require(Operation == "open", "INVALID_STATE", "Open the prefab document first");
+        auto Candidate = std::unique_ptr<Scene>(MemorySubsystem::Get()->NewObject<Scene>("PrefabWorkspace"));
+        GameObject* Root = nullptr;
+        Require(PrefabUtility::LoadPrefabIntoScene(Entry.Metadata.Guid, *Candidate, Root, Error), "PREFAB_ERROR", Error);
+        Require(Document.AdoptScene(Candidate.get(), std::filesystem::u8path(Entry.AbsolutePath), Error), "PREFAB_ERROR", Error);
+        Candidate.release();
+        OpenPrefab = Entry.Metadata.Guid;
+        Workspace.GetCommands().Clear();
+        ObserveWorld();
+        Workspace.Select(World(), Root->GetObjectHandle());
+    }
+    Require(OpenPrefab == Entry.Metadata.Guid, "INVALID_ARGUMENT", "This workspace owns a different prefab");
+    if (Operation != "get" && Operation != "open" && Operation != "preview")
+    {
+        const bool bSelecting = Operation == "command" && Params.at("value").value("method", std::string{}) == "selection.set";
+        Require(Entry.Mount == AssetMount::Game || bSelecting, "READ_ONLY", "Engine prefabs are read-only");
+        Require(Params.value("revision", uint64_t(-1)) == Document.GetRevision(), "STALE_DOCUMENT", "Prefab document revision changed");
+        if (Operation == "save")
+        {
+            Require(!Document.HasExternalChanges(), "EXTERNAL_CHANGES", "Prefab changed on disk; preserve the draft before reopening");
+            Require(PrefabUtility::SavePrefabFromScene(*World(), OpenPrefab, Error), "PREFAB_ERROR", Error);
+            Require(Document.AdoptScene(World(), std::filesystem::u8path(Entry.AbsolutePath), Error), "PREFAB_ERROR", Error);
+        }
+        else if (Operation == "undo") { Require(Workspace.GetCommands().Undo(), "COMMAND_FAILED", "Undo is unavailable"); }
+        else if (Operation == "redo") { Require(Workspace.GetCommands().Redo(), "COMMAND_FAILED", "Redo is unavailable"); }
+        else if (Operation == "command")
+        {
+            const auto& Command = Params.at("value");
+            const std::string Method = Command.at("method");
+            const std::set<std::string> Allowed{"selection.set", "object.create", "object.destroy", "object.rename", "object.setParent",
+                "object.addComponent", "object.removeComponent", "component.setProperty", "component.resetProperty", "transform.set",
+                "prefab.instantiate", "prefab.inspect", "prefab.modify"};
+            Require(Allowed.count(Method) != 0, "INVALID_ARGUMENT", "Unsupported prefab document command");
+            ValidateParams(Method, Command.at("params"));
+            Dispatch(Method, Command.at("params"));
+        }
+        else { Require(false, "INVALID_ARGUMENT", "Unsupported prefab document operation"); }
+    }
+    Json Objects = Hierarchy();
+    for (auto& Object : Objects)
+    {
+        for (auto& Component : Object["components"])
+        {
+            Json Identity{{"objectId", Object["id"]}, {"componentId", Component["id"]}};
+            Component["properties"] = Properties(FindComponent(Identity));
+        }
+    }
+    return {{"assetId", OpenPrefab.ToString()}, {"subAssetId", nullptr}, {"type", "Prefab"}, {"name", Entry.RelativePath},
+        {"revision", Document.GetRevision()}, {"dirty", Document.IsDirty()}, {"readOnly", Entry.Mount != AssetMount::Game},
+        {"canUndo", Workspace.GetCommands().CanUndo()}, {"canRedo", Workspace.GetCommands().CanRedo()},
+        {"document", Objects}, {"selection", Describe()["selection"]}};
 }

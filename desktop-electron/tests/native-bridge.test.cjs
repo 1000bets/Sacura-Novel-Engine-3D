@@ -10,9 +10,9 @@ const root=path.resolve(__dirname,'../..');
 const host=process.env.SACURA_NATIVE_HOST||path.join(root,'build/windows-msvc-debug/ElectronNative/Debug/SakuraElectronHost.exe');
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 async function until(predicate,timeout=30000){const end=Date.now()+timeout;while(!predicate()){if(Date.now()>end)throw Error('Timed out');await delay(20);}}
-async function launch(project){
+async function launch(project, Environment={}){
   const bridge=await BridgeTransport.listen();const events=[];bridge.on('event',e=>events.push(e));
-  const child=spawn(host,['--bridge-headless',project,bridge.path],{windowsHide:true,stdio:['pipe','pipe','pipe']});
+  const child=spawn(host,['--bridge-headless',project,bridge.path],{windowsHide:true,env:{...process.env,...Environment},stdio:['pipe','pipe','pipe']});
   let output='';child.stdout.on('data',b=>output+=b);child.stderr.on('data',b=>output+=b);
   let exited=false;const exit=new Promise(resolve=>child.once('exit',code=>{exited=true;resolve(code);}));
   try{await until(()=>bridge.connected||exited);assert.ok(bridge.connected,output);}catch(e){child.kill();bridge.close();throw e;}
@@ -33,7 +33,7 @@ test('contract rejects extra fields, unsafe values, methods and malformed transf
   for(const [m,p] of [['eval',{}],['object.destroy',{objectId:'x',pointer:42}],['object.rename',{objectId:'x',name:'\0'}],['component.setProperty',{objectId:'x',componentId:'c',property:'p',value:Infinity}],['transform.set',{objectId:'x',transform:{position:[1],rotation:[],scale:[]}}]])assert.throws(()=>validate(m,p));
   validate('object.create',{name:'日本語 объект'});
 });
-test('visual novel template plays dialogue, branches and resolves its WAV cue', {skip:process.platform!=='win32',timeout:120000},async()=>{
+test('visual novel template preserves source dialogue and branches without an invented audio cue', {skip:process.platform!=='win32',timeout:120000},async()=>{
   const parent=await fs.mkdtemp(path.join(os.tmpdir(),'sacura-novel-play-'));
   let app;
   try{
@@ -44,18 +44,20 @@ test('visual novel template plays dialogue, branches and resolves its WAV cue', 
     const project=path.join(parent,'NovelDemo','NovelDemo.project');
     app=await launch(project);
     const call=async(method,params={})=>{const result=await app.bridge.request(method,params);assert.equal(result.ok,true,method+': '+JSON.stringify(result));return result.value;};
-    const initial=await call('bridge.describe');assert.equal(initial.startupAudio,true);
-    const mira=(await call('scene.getHierarchy')).find(item=>item.name==='Мира');
-    assert.ok(mira?.components.some(component=>component.typeId==='engine.CharacterComponent'));
-    assert.ok(mira.components.some(component=>component.typeId==='engine.MeshRendererComponent'));
-    assert.ok((await call('assets.list')).some(asset=>asset.typeId==='Audio'&&asset.name==='RainTheme.wav'));
-    assert.equal((await call('story.get')).document.nodes.length,6);
-    const audio=(await call('audio.resolveStartup')).absolutePath;
-    const bytes=await fs.readFile(audio);assert.equal(bytes.toString('ascii',0,4),'RIFF');assert.equal(bytes.toString('ascii',8,12),'WAVE');
-    let state=await call('play.start');assert.equal(state.dialogue.phase,'line');assert.match(state.dialogue.text,/Дождь/);
-    state=await call('play.advanceDialogue');assert.equal(state.dialogue.speaker,'Мира');
-    state=await call('play.advanceDialogue');assert.equal(state.dialogue.phase,'choice');assert.equal(state.dialogue.choices.length,2);
-    state=await call('play.selectChoice',{index:0});assert.equal(state.dialogue.speaker,'Мира');
+    const initial=await call('bridge.describe');assert.equal(initial.startupAudio,false);
+    const Oracle=JSON.parse(await fs.readFile(path.join(root,'Root/Verification/WebTemplateOracle/novel.json'),'utf8'));
+    const Hierarchy=await call('scene.getHierarchy');
+    for(const Source of Oracle.objects){
+      assert.ok(Hierarchy.find(Entry=>Entry.name===Source.name)?.components.some(Component=>Component.typeId==='engine.MeshRendererComponent'));
+    }
+    assert.ok(!(await call('assets.list')).some(asset=>asset.typeId==='Audio'&&asset.name==='RainTheme.wav'));
+    assert.ok((await call('story.get')).document.nodes.some(Node=>Node.narrativeType==='game.TemplateAction'));
+    assert.equal((await app.bridge.request('audio.resolveStartup',{})).ok,false);
+    let state=await call('play.start');assert.equal(state.dialogue.phase,'choice');assert.equal(state.dialogue.choices.length,2);
+    await call('play.selectChoice',{index:0});await delay(150);
+    state=await call('bridge.describe');assert.deepEqual(state.gameViews[0].values.map(Value=>Value.value),[1,1]);
+    await call('play.advanceDialogue');await delay(150);
+    await call('play.selectChoice',{index:1});
     state=await call('play.advanceDialogue');assert.equal(state.dialogue.phase,'end');
     state=await call('play.stop');assert.equal(state.dialogue.phase,'idle');
   }finally{if(app)await app.close();await fs.rm(parent,{recursive:true,force:true,maxRetries:5});}
@@ -134,18 +136,29 @@ test('native character is visible, editable, undoable and saved in the scene', {
       const result=await app.bridge.request(method,params);
       assert.equal(result.ok,true,method+': '+JSON.stringify(result));return result.value;
     };
-    const starter=(await call('assets.list')).find(asset=>asset.path==='/Engine/Models/StarterCharacter.glb');
-    assert.ok(starter?.subassets?.some(item=>item.typeId==='StaticMesh'));
+    const starter=(await call('assets.list')).find(asset=>asset.path==='/Engine/Characters/StarterHumanoid/StarterHumanoid.character');
+    assert.equal(starter?.typeId,'Character');
     const created=await call('character.create',{name:'Алиса',transform:{position:[2,0,3],rotation:[0,0,0,1],scale:[1,1,1]}});
     let character=(await call('scene.getHierarchy')).find(item=>item.id===created.id);
     assert.deepEqual(character.transform.position,[2,0,3]);
     const marker=character.components.find(item=>item.typeId==='engine.CharacterComponent');
-    const renderer=character.components.find(item=>item.typeId==='engine.MeshRendererComponent');
-    assert.ok(marker&&renderer);
-    const mesh=(await call('component.getProperties',{objectId:created.id,componentId:renderer.id}))
-      .find(item=>item.id==='mesh_asset_id');
-    assert.equal(mesh.value,starter.id);
-    assert.equal(mesh.subAssetId,starter.subassets[0].id);
+    assert.ok(marker);
+    assert.equal(character.components.filter(item=>item.typeId==='engine.MeshRendererComponent').length,0);
+    const mesh=(await call('component.getProperties',{objectId:created.id,componentId:marker.id}))
+      .find(item=>item.id==='character');
+    assert.equal(mesh.assetId,starter.id);
+    let animation;
+    for(let Attempt=0;Attempt<50;++Attempt){
+      animation=(await call('component.getProperties',{objectId:created.id,componentId:marker.id})).find(item=>item.id==='animation');
+      if(animation?.choices?.length===3){break;}
+      await delay(40);
+    }
+    assert.deepEqual(animation.choices.map(item=>item.id),['idle','walk','dance']);
+    await call('component.setProperty',{objectId:created.id,componentId:marker.id,property:'animation',value:'dance'});
+    await call('editor.undo');
+    assert.equal((await call('component.getProperties',{objectId:created.id,componentId:marker.id})).find(item=>item.id==='animation').value,'');
+    await call('editor.redo');
+    assert.equal((await call('component.getProperties',{objectId:created.id,componentId:marker.id})).find(item=>item.id==='animation').value,'dance');
     await call('component.setProperty',{objectId:created.id,componentId:marker.id,property:'description',value:'Героиня истории'});
     await call('object.rename',{objectId:created.id,name:'Алиса Волкова'});
     await call('scene.save');
@@ -182,6 +195,7 @@ test('native bridge imports a rigged FBX as a static character mesh', {skip:proc
     const subasset=model.subassets.find(item=>item.typeId==='StaticMesh');
     assert.ok(subasset);
     const character=await call('character.create',{name:'Rigged fixture'});
+    await call('object.addComponent',{objectId:character.id,typeId:'engine.MeshRendererComponent'});
     const renderer=(await call('scene.getHierarchy')).find(item=>item.id===character.id).components
       .find(item=>item.typeId==='engine.MeshRendererComponent');
     await call('component.setAsset',{objectId:character.id,componentId:renderer.id,
@@ -227,6 +241,17 @@ test('real Engine / EditorCore bridge, errors, events and restart', {skip:proces
     for(let index=0;index<3;index++)await call('editor.undo');
     await call('editor.undo');assert.ok(!(await call('scene.getHierarchy')).some(o=>o.id===light.id));
     await call('editor.redo');assert.ok((await call('scene.getHierarchy')).some(o=>o.id===light.id));
+    const Clipboard = await call('object.copy',{objectId:light.id});
+    const Pasted = await call('object.paste',{subtree:Clipboard.subtree + ' '.repeat(70000)});
+    const PastedObject = (await call('scene.getHierarchy')).find(Object => Object.id === Pasted.id);
+    assert.notEqual(Pasted.id,light.id);
+    assert.deepEqual(PastedObject.transform,placed);
+    assert.ok(PastedObject.components.some(Component => Component.typeId === 'engine.LightComponent'));
+    await call('editor.undo');
+    assert.ok(!(await call('scene.getHierarchy')).some(Object => Object.id === Pasted.id));
+    await call('editor.redo');
+    assert.ok((await call('scene.getHierarchy')).some(Object => Object.id === Pasted.id));
+    await call('editor.undo');
     const copied=await call('object.duplicate',{objectId:light.id});
     assert.notEqual(copied.id,light.id);
     const copyInfo=(await call('scene.getHierarchy')).find(o=>o.id===copied.id);
@@ -403,7 +428,7 @@ test('native project creation, external conflicts, version errors and saved draf
  try{
   const created=await projectCli(host,['--project-create',dir,'Portable']);
   await projectCli(host,['--project-check',created.path]);
-  for(const folder of ['Content','Scripts','Config'])assert.ok((await fs.stat(path.join(dir,'Portable',folder))).isDirectory());
+  for(const folder of ['Content','Content/Scripts','Config'])assert.ok((await fs.stat(path.join(dir,'Portable',folder))).isDirectory());
   await assert.rejects(()=>projectCli(host,['--project-create',dir,'../Invalid']));
   app=await launch(created.path);const call=async(m,p={})=>{const r=await app.bridge.request(m,p);assert.equal(r.ok,true,JSON.stringify(r));return r.value;};
   const retained=await call('object.create',{name:'Unsaved retained'});await call('object.addComponent',{objectId:retained.id,typeId:'engine.LightComponent'});
@@ -493,7 +518,7 @@ test('React asset migration uses native previews, placement, documents and undo'
     assert.equal(InputData.Action.ValueType,2);
     assert.equal(InputData.Action.bExecuteWhenPaused,true);
     await Call('assets.create',{factoryId:'editor.CreateInputContextAssetFactory',path:'CreatedAssets/MenuContext.inputcontext'});
-    await Call('assets.create',{factoryId:'editor.CreateWidgetLibraryAssetFactory',path:'CreatedAssets/MenuWidgets.widgets'});
+    assert.ok(!CreationTypes.some(Type=>Type.id==='editor.CreateWidgetLibraryAssetFactory'));
     await Call('assets.create',{factoryId:'editor.CreatePrefabAssetFactory',path:'CreatedAssets/MenuPrefab.prefab'});
     assert.ok(!CreationTypes.some(Type=>Type.id==='editor.CreateShaderSourceAssetFactory'));
     assert.equal((await Application.bridge.request('assets.create',{factoryId:'editor.CreateShaderSourceAssetFactory',path:'CreatedAssets/MenuShader.hlsl'})).ok,false);
@@ -575,5 +600,190 @@ test('React asset migration uses native previews, placement, documents and undo'
   } finally {
     if(Application){await Application.close();}
     await fs.rm(Parent,{recursive:true,force:true});
+  }
+});
+
+test('Qt-free Narrative, prefab documents and standalone Player retain their workflows', {skip:process.platform!=='win32',timeout:120000}, async()=>{
+  const Directory=await fs.mkdtemp(path.join(root,'build','migration-test-'));
+  let Application;
+  let PrefabApplication;
+  try {
+    await fs.cp(path.join(root,'Samples/SampleProject'),Directory,{recursive:true});
+    const Project=path.join(Directory,'SampleProject.project');
+    Application=await launch(Project);
+    const Call=async(Method,Parameters={})=>{
+      const Result=await Application.bridge.request(Method,Parameters);
+      assert.equal(Result.ok,true,Method+': '+JSON.stringify(Result));
+      return Result.value;
+    };
+    let Story=await Call('story.get');
+    assert.ok(Story.narrativeCatalog.some(Definition=>Definition.type==='game.Multiply'));
+    Story=await Call('story.addNarrative',{type:'game.Multiply',x:100,y:100});
+    const Multiply=Story.document.nodes.at(-1).id;
+    Story=await Call('story.addNarrative',{type:'game.DelayedValue',x:500,y:100});
+    const Delay=Story.document.nodes.at(-1).id;
+    await Call('story.setNarrativeInput',{nodeId:Multiply,input:'Value',value:3.5});
+    assert.equal((await Application.bridge.request('story.setNarrativeInput',{nodeId:Multiply,input:'Value',value:'invalid'})).ok,false);
+    Story=await Call('story.connectData',{sourceId:Multiply,output:'Result',targetId:Delay,input:'Value'});
+    assert.deepEqual(Story.document.nodes.find(Node=>Node.id===Delay).sources.Value,[Multiply,'Result']);
+    await Call('story.undo');
+    Story=await Call('story.redo');
+    assert.deepEqual(Story.document.nodes.find(Node=>Node.id===Delay).sources.Value,[Multiply,'Result']);
+    await Call('story.save');
+    Story=await Call('story.addNarrative',{type:'game.Branch',x:800,y:100});
+    const Branch=Story.document.nodes.at(-1).id;
+    Story=await Call('story.addNode',{kind:'End',x:1100,y:100});
+    const End=Story.document.nodes.at(-1).id;
+    await Call('story.setNarrativeInput',{nodeId:Delay,input:'Seconds',value:0.01});
+    await Call('story.setNarrativeInput',{nodeId:Branch,input:'Condition',value:false});
+    await Call('story.connect',{sourceId:Delay,port:0,targetId:Branch});
+    await Call('story.connect',{sourceId:Branch,port:0,targetId:End});
+    await Call('story.connect',{sourceId:Branch,port:1,targetId:End});
+    await Call('story.setStart',{nodeId:Delay});
+    await Call('story.validate');
+    await Call('story.save');
+    let Playback=await Call('play.start');
+    for(let Attempt=0;Attempt<30 && Playback.dialogue.phase==='action';++Attempt){
+      await delay(100);Playback=await Call('bridge.describe');
+    }
+    assert.equal(Playback.dialogue.phase,'end',JSON.stringify(Playback.dialogue));
+    await Call('play.stop');
+    const Created=await Call('object.create',{name:'PrefabOriginal'});
+    const Prefab=await Call('prefab.create',{objectId:Created.id,path:'Migration.prefab'});
+    await Call('object.rename',{objectId:Created.id,name:'PrefabOverride'});
+    let Overrides=await Call('prefab.inspect',{objectId:Created.id});
+    assert.ok(Overrides.instance);
+    assert.ok(Overrides.overrides.length>0);
+    await Call('prefab.modify',{objectId:Created.id,operation:'revert'});
+    assert.equal((await Call('scene.getHierarchy')).find(Object=>Object.id===Created.id).name,'PrefabOriginal');
+    await Call('editor.undo');
+    assert.equal((await Call('scene.getHierarchy')).find(Object=>Object.id===Created.id).name,'PrefabOverride');
+    await Call('prefab.modify',{objectId:Created.id,operation:'apply'});
+    assert.equal((await Call('prefab.inspect',{objectId:Created.id})).overrides.length,0);
+    await Call('prefab.modify',{objectId:Created.id,operation:'unpack'});
+    assert.equal((await Call('prefab.inspect',{objectId:Created.id})).instance,false);
+    await Call('editor.undo');
+    assert.equal((await Call('prefab.inspect',{objectId:Created.id})).instance,true);
+    await Call('project.save');
+    PrefabApplication=await launch(Project,{SACURA_ASSET_WORKSPACE:'1'});
+    let Document;
+    const DocumentCall=async(Operation,Value)=>{
+      const Parameters={assetId:Prefab.assetId,operation:Operation};
+      if(Document){Parameters.revision=Document.revision;}
+      if(Value){Parameters.value=Value;}
+      const Result=await PrefabApplication.bridge.request('assetDocument.execute',Parameters);
+      assert.equal(Result.ok,true,Operation+': '+JSON.stringify(Result));
+      Document=Result.value;
+      return Document;
+    };
+    await DocumentCall('open');
+    assert.equal(Document.document.length,1);
+    await DocumentCall('command',{method:'object.rename',params:{objectId:Document.document[0].id,name:'IsolatedPrefab'}});
+    assert.ok(Document.dirty);
+    await DocumentCall('undo');
+    assert.equal(Document.document[0].name,'PrefabOverride');
+    await DocumentCall('redo');
+    await DocumentCall('save');
+    assert.equal(Document.dirty,false);
+    await DocumentCall('command',{method:'object.rename',params:{objectId:Document.document[0].id,name:'UnsavedPrefab'}});
+    await fs.appendFile(path.join(Directory,'Content/Migration.prefab'),'\n');
+    const Conflict=await PrefabApplication.bridge.request('assetDocument.execute',{assetId:Prefab.assetId,operation:'save',revision:Document.revision});
+    assert.equal(Conflict.error.code,'EXTERNAL_CHANGES');
+    await DocumentCall('get');
+    assert.equal(Document.document[0].name,'UnsavedPrefab');
+    assert.equal((await Call('scene.getHierarchy')).find(Object=>Object.id===Created.id).name,'PrefabOverride');
+    await PrefabApplication.close();PrefabApplication=null;
+    await Application.close();Application=null;
+    Application=await launch(Project,{SACURA_PLAYER:'1'});
+    let State=await Call('game.state');
+    assert.equal(State.gameRunning,true);
+    assert.equal((await Application.bridge.request('object.create',{name:'Forbidden'})).error.code,'PLAYER_READ_ONLY');
+    State=await Call('game.pause',{paused:true});
+    assert.equal(State.gamePaused,true);
+    assert.equal((await Application.bridge.request('game.advance')).ok,false);
+    await Call('game.pause',{paused:false});
+  } finally {
+    if(PrefabApplication){await PrefabApplication.close();}
+    if(Application){await Application.close();}
+    await fs.rm(Directory,{recursive:true,force:true,maxRetries:5});
+  }
+});
+
+test('Electron export stages a self-contained Player and preserves authored project data', {skip:process.platform!=='win32',timeout:180000},async()=>{
+  const {ExportGame}=require('../game-export.cjs');
+  const ExportTestRoot=path.resolve(process.env.SACURA_EXPORT_TEST_ROOT || path.join(root,'build'));
+  assert.ok(!/^C:/i.test(ExportTestRoot),'Export tests require a drive other than C:');
+  await fs.mkdir(ExportTestRoot,{recursive:true});
+  const Directory=await fs.mkdtemp(path.join(ExportTestRoot,'export-test-'));
+  let Application;
+  try {
+    const ProjectDirectory=path.join(Directory,'Project');
+    await fs.cp(path.join(root,'Samples/SampleProject'),ProjectDirectory,{recursive:true});
+    Application=await launch(path.join(ProjectDirectory,'SampleProject.project'));
+    const Destination=path.join(Directory,'Exported');
+    const Result=await ExportGame({Destination,Bridge:Application.bridge,RuntimeExecutable:require('electron'),NativeExecutable:host,ApplicationDirectory:path.join(root,'desktop-electron')});
+    assert.equal(Result.executable,path.join(Destination,'Game.exe'));
+    const NativeFiles=await fs.readdir(path.join(Destination,'resources','native'));
+    assert.ok(!NativeFiles.some(Name=>/^Qt\d/i.test(Name)));
+    const Descriptor=JSON.parse(await fs.readFile(path.join(Destination,'resources/Game/Game.project'),'utf8'));
+    assert.equal(Descriptor.startupScene,'Content/Scenes/Main.scene');
+    await fs.access(path.join(Destination,'resources/app/dist-ui/index.html'));
+    await fs.access(path.join(Destination,'resources/native/Python/Lib/os.py'));
+    await assert.rejects(ExportGame({Destination,Bridge:Application.bridge,RuntimeExecutable:require('electron'),NativeExecutable:host,ApplicationDirectory:path.join(root,'desktop-electron')}),/new export directory/);
+    if(process.env.SACURA_KEEP_EXPORT){
+      await fs.writeFile(path.join(root,'build/last-player-export.txt'),Destination);
+    }
+  } finally {
+    if(Application){await Application.close();}
+    if(!process.env.SACURA_KEEP_EXPORT){await fs.rm(Directory,{recursive:true,force:true,maxRetries:5});}
+  }
+});
+
+test('Python script creation preserves module paths, metadata and editable source', {skip:process.platform!=='win32',timeout:60000},async()=>{
+  const Directory=await fs.mkdtemp(path.join(os.tmpdir(),'sacura-python-create-'));
+  let Application;
+  try {
+    await fs.cp(path.join(root,'Samples/SampleProject'),Directory,{recursive:true});
+    const Project=path.join(Directory,'SampleProject.project');
+    Application=await launch(Project);
+    const Call=async(Method,Parameters={})=>{
+      const Result=await Application.bridge.request(Method,Parameters);
+      assert.equal(Result.ok,true,Method+': '+JSON.stringify(Result));
+      return Result.value;
+    };
+    const Factory=(await Call('assets.creationTypes')).find(Type=>Type.typeId==='PythonScript');
+    assert.ok(Factory);
+    await Call('assets.createFolder',{folder:'Game/Scripts',name:'Gameplay'});
+    for(const Relative of ['Scripts/CreatedBehaviour.py','Scripts/Gameplay/NestedBehaviour.py']){
+      const Created=await Call('assets.create',{factoryId:Factory.id,path:Relative,settings:{}});
+      assert.equal(Created.path,'/Game/'+Relative);
+      const Filename=path.join(Directory,'Content',Relative);
+      const Original=await fs.readFile(Filename,'utf8');
+      assert.match(Original,/from engine import ScriptComponent, register_class/);
+      assert.ok(Original.includes('game.'+Relative.slice('Scripts/'.length,-3).replaceAll('/','.')));
+      const Metadata=await fs.readFile(Filename+'.meta','utf8');
+      assert.equal(JSON.parse(Metadata).guid,Created.id);
+      assert.equal((await Application.bridge.request('assets.create',{factoryId:Factory.id,path:Relative})).ok,false);
+      assert.equal(await fs.readFile(Filename,'utf8'),Original);
+      let Document=await Call('assetDocument.execute',{assetId:Created.id,operation:'open'});
+      Document=await Call('assetDocument.execute',{assetId:Created.id,operation:'source',revision:Document.revision,value:Original+'\nEditedValue = 42\n'});
+      assert.equal(Document.dirty,true);
+      Document=await Call('assetDocument.execute',{assetId:Created.id,operation:'save',revision:Document.revision});
+      assert.equal(Document.dirty,false);
+      assert.match(await fs.readFile(Filename,'utf8'),/EditedValue = 42/);
+      assert.equal(JSON.parse(await fs.readFile(Filename+'.meta','utf8')).guid,Created.id);
+    }
+    for(const Relative of ['WrongLocation.py','Scripts/1Invalid.py','Scripts/class.py','Scripts/Invalid Name.py','Scripts/выфыа.py']){
+      assert.equal((await Application.bridge.request('assets.create',{factoryId:Factory.id,path:Relative})).ok,false,Relative);
+      await assert.rejects(fs.access(path.join(Directory,'Content',Relative)));
+    }
+    await Application.close();Application=null;
+    Application=await launch(Project);
+    const Types=await Call('reflection.getComponentTypes');
+    assert.ok(Types.some(Type=>Type.typeId==='game.CreatedBehaviour'));
+    assert.ok(Types.some(Type=>Type.typeId==='game.Gameplay.NestedBehaviour'));
+  } finally {
+    if(Application){await Application.close();}
+    await fs.rm(Directory,{recursive:true,force:true,maxRetries:5});
   }
 });

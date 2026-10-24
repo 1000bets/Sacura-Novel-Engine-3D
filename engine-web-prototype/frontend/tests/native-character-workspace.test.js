@@ -11,8 +11,26 @@ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const {render,screen,fireEvent,cleanup,waitFor}=await import('@testing-library/react');
 const server=await createServer({root:fileURLToPath(new URL('..',import.meta.url)),server:{middlewareMode:true,watch:null,hmr:false,ws:false}});
 const {default:NativeCharacterWorkspace,nativeCharacters,nativeCharacterModels}=await server.ssrLoadModule('/src/NativeCharacterWorkspace.jsx');
+const {setLanguage:SetLanguage}=await server.ssrLoadModule('/src/i18n.js');
+const {NativeAssetsContext}=await server.ssrLoadModule('/src/NativeAssets.jsx');
+SetLanguage('ru');
 afterEach(cleanup);
 after(async()=>{await server.close();dom.window.close();});
+
+test('animated character selection uses shared scene property commands',async()=>{
+  const Calls=[];
+  const Character={id:'animated',name:'Humanoid',active:true,components:[{id:'controller',typeId:'engine.CharacterComponent'}]};
+  const Components=[{id:'controller',typeId:'engine.CharacterComponent',properties:[
+    {id:'character',assetId:'humanoid',value:{assetId:'humanoid'}},
+    {id:'animation',value:'',choices:[{id:'idle',name:'Idle'},{id:'walk',name:'Walk'},{id:'dance',name:'HipHopDance'}]},
+    {id:'automatic_walk',value:true}
+  ]}];
+  render(React.createElement(NativeCharacterWorkspace,{objects:[Character],components:Components,assets:[{id:'humanoid',name:'Humanoid',typeId:'Character'}],selected:'animated',command:async(Method,Parameters)=>Calls.push([Method,Parameters]),select(){},onFocus(){}}));
+  fireEvent.change(screen.getByRole('combobox',{name:/Animation|Анимация/}),{target:{value:'dance'}});
+  assert.deepEqual(Calls.at(-1),['component.setProperty',{objectId:'animated',componentId:'controller',property:'animation',value:'dance'}]);
+  fireEvent.click(screen.getByRole('checkbox',{name:/Walk animation|Анимация ходьбы/}));
+  assert.deepEqual(Calls.at(-1),['component.setProperty',{objectId:'animated',componentId:'controller',property:'automatic_walk',value:false}]);
+});
 
 test('native character panel recognizes persisted character components and static model assets',()=>{
   const objects=[{id:'one',components:[{typeId:'engine.CharacterComponent'}]},{id:'two',components:[{typeId:'engine.MeshRendererComponent'}]}];
@@ -26,12 +44,14 @@ test('native character panel edits scene identity and assigns a registered mesh'
   const character={id:'alice',name:'Алиса',active:true,components:[{id:'marker',typeId:'engine.CharacterComponent'},{id:'renderer',typeId:'engine.MeshRendererComponent'}]};
   const components=[{id:'marker',typeId:'engine.CharacterComponent',properties:[{id:'description',value:'Героиня'}]},
     {id:'renderer',typeId:'engine.MeshRendererComponent',properties:[{id:'mesh_asset_id',value:'starter',subAssetId:'body'}]}];
-  const assets=[{id:'starter',name:'StarterCharacter.glb',typeId:'Model',builtin:true,subassets:[{id:'body',name:'Body',typeId:'StaticMesh'}]},
-    {id:'custom',name:'Hero.glb',typeId:'Model',builtin:false,subassets:[{id:'mesh',name:'Body',typeId:'StaticMesh'}]}];
-  render(React.createElement(NativeCharacterWorkspace,{objects:[character],components,assets,selected:'alice',dirty:true,
-    command:async(method,params)=>{calls.push([method,params]);return {id:'created'};},select:id=>selected.push(id),onFocus(){},onImport:async()=>{}}));
+  const assets=[{id:'starter',name:'StarterCharacter.glb',path:'/Engine/StarterCharacter.glb',typeId:'Model',builtin:true,subassets:[{id:'body',name:'Body',typeId:'StaticMesh'}]},
+    {id:'custom',name:'Hero.glb',path:'/Game/Hero.glb',typeId:'Model',builtin:false,subassets:[{id:'mesh',name:'Body',typeId:'StaticMesh'}]}];
+  render(React.createElement(NativeAssetsContext.Provider,{value:{assets}},React.createElement(NativeCharacterWorkspace,{objects:[character],components,assets,selected:'alice',dirty:true,
+    command:async(method,params)=>{calls.push([method,params]);return {id:'created'};},select:id=>selected.push(id),onFocus(){},onImport:async()=>{}})));
   assert.equal(screen.getAllByText('Алиса').length,2);
-  fireEvent.change(screen.getByLabelText('Меш персонажа'),{target:{value:'custom|mesh'}});
+  fireEvent.click(screen.getByLabelText('Меш персонажа'));
+  screen.getByLabelText('Меш персонажа').closest('details').open=true;
+  fireEvent.click(screen.getByText('/Game/Hero.glb / Body'));
   assert.deepEqual(calls.at(-1),['component.setAsset',{objectId:'alice',componentId:'renderer',property:'mesh_asset_id',assetId:'custom',subAssetId:'mesh'}]);
   fireEvent.change(screen.getByLabelText('Описание персонажа'),{target:{value:'Главная героиня'}});
   fireEvent.blur(screen.getByLabelText('Описание персонажа'));

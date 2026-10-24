@@ -1,0 +1,8 @@
+.native-game-hud { position: absolute; z-index: 15; left: 16px; top: 16px; max-width: min(440px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow: auto; padding: 12px; border: 1px solid var(--border-subtle, #555); border-radius: 6px; background: var(--bg-panel-elevated, #20212a); color: var(--text-primary, #eee); pointer-events: auto; }
+.native-game-values, .native-game-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.native-game-hud p { white-space: pre-wrap; margin: 8px 0; }
+.native-game-hud small { display: block; margin-top: 8px; color: var(--text-secondary, #ccc); }
+.native-game-actions button { color: inherit; background: var(--bg-hover, #30313d); border: 1px solid var(--border-subtle, #555); border-radius: 4px; padding: 6px 10px; cursor: pointer; }
+.native-game-actions button:disabled { opacity: .45; cursor: default; }
+.native-game-reticle { position: absolute; z-index: 14; left: 50%; top: 50%; transform: translate(-50%, -50%); color: white; font-size: 24px; text-shadow: 0 1px 3px black; pointer-events: none; }
+.native-game-player .standalone-bar { z-index: 40; isolation: isolate; transform: translateZ(0); }

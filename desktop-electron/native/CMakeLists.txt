@@ -8,11 +8,6 @@ if(BUILD_TESTING)
     sakura_copy_engine_runtime_dlls(SakuraAssetCreationFactoryTest)
     add_test(NAME Editor.AssetCreationFactories COMMAND SakuraAssetCreationFactoryTest "${CMAKE_BINARY_DIR}/asset-factory-test")
 
-    add_executable(SakuraEditorCompatibilityTest QtCompatibilityTest.cpp)
-    target_link_libraries(SakuraEditorCompatibilityTest PRIVATE Editor)
-    sakura_link_whole_archive_engine(SakuraEditorCompatibilityTest)
-    sakura_copy_engine_runtime_dlls(SakuraEditorCompatibilityTest)
-    sakura_stage_engine_runtime(SakuraEditorCompatibilityTest)
 endif()
 add_executable(SakuraElectronHost Host.cpp ProjectCli.cpp ViewportController.cpp NativeBridge.cpp)
 set_property(TARGET SakuraElectronHost APPEND PROPERTY LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../bridge/contract.json")
@@ -52,3 +47,9 @@ if(SAKURA_PYTHON_AVAILABLE)
         VERBATIM)
 endif()
 
+
+add_custom_command(TARGET SakuraElectronHost POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/Root/EditorCore/resources/Localization/Editor.json"
+        "$<TARGET_FILE_DIR:SakuraElectronHost>/Engine/Config/EditorLocalization.json"
+    VERBATIM)

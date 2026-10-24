@@ -44,6 +44,8 @@ struct InputAction
     float Threshold = 0.5f;
     std::string ChordAction;
     bool bExecuteWhenPaused = false;
+    bool bClampMagnitude = true;
+    bool bRequireNeutral = true;
 };
 
 struct InputBinding
