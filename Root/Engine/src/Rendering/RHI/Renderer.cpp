@@ -1320,7 +1320,7 @@ void Renderer::RenderView(const RenderViewFrame& View, uint64_t FrameIndex, ITex
             if (!Entry.Source)
             {
                 Entry.Source = Object.PosedMesh;
-                Entry.Mesh = Resources.CreateMeshFromCpuData(*Object.PosedMesh);
+                Entry.Mesh = Resources.CreateMeshFromCpuData(*Object.PosedMesh, true);
             }
             Entry.LastFrame = FrameIndex;
             Mesh = Resources.GetMesh(Entry.Mesh);
@@ -1845,6 +1845,14 @@ void Renderer::SetSharedFrameStream(std::shared_ptr<SharedGpuFrameStream> Stream
 {
     AssertRenderThread();
     FrameExporter = Stream ? std::make_shared<SharedFrameExporter>(std::move(Stream)) : nullptr;
+}
+
+void Renderer::PollSharedFrames()
+{
+    if (FrameExporter)
+    {
+        FrameExporter->Poll();
+    }
 }
 
 void Renderer::RenderMaterialPreview(const MaterialImageRequest& Request, ITextureView* Output)

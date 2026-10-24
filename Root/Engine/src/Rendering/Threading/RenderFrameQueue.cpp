@@ -1,3 +1,4 @@
+#include "Core/Threading/CpuProfileScope.h"
 #include "Rendering/Threading/RenderFrameQueue.h"
 
 RenderFrameQueue::RenderFrameQueue(std::size_t InMaximumQueuedFrames)
@@ -7,6 +8,7 @@ RenderFrameQueue::RenderFrameQueue(std::size_t InMaximumQueuedFrames)
 
 bool RenderFrameQueue::Submit(std::unique_ptr<RenderFrameData> Frame, bool bReplacePending)
 {
+    CpuProfileScope CpuMeasurement("Render.QueueSubmit");
     std::unique_lock<std::mutex> Lock(Mutex);
     ProducerCondition.wait(Lock, [this, bReplacePending]()
     {

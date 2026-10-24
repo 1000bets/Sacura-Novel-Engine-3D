@@ -1,3 +1,4 @@
+#include "Core/Threading/CpuProfileScope.h"
 #include "Scripting/ScriptingSubsystem.h"
 #include "Engine.h"
 #include "Input/InputTypes.h"
@@ -191,6 +192,7 @@ void ScriptingSubsystem::UnbindScriptComponent(ScriptComponent& Component)
 
 void ScriptingSubsystem::TickScriptComponent(ScriptComponent& Component, float DeltaTime)
 {
+    CpuProfileScope CpuMeasurement("Python.Tick");
     AssertGameThread();
 #if !defined(SAKURA_ENABLE_PYTHON)
     return;

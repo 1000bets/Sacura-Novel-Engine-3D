@@ -196,7 +196,15 @@ void CharacterComponent::UpdatePose(float DeltaTime)
                 bInPlace = Motion->bInPlace;
             }
         }
-        PosedMesh = BuildSkinnedCharacterPose(*Model, *Skeleton, Clip.Get(), Ratio, bInPlace, Diagnostic);
+        if (GetGameObject() && GetGameObject()->GetScene())
+        {
+            PosedMesh = GetGameObject()->GetScene()->GetCharacterPoseCache().BuildPose(
+                Model.GetSharedResource(), Skeleton.GetSharedResource(), Clip.GetSharedResource(), Ratio, bInPlace, Diagnostic);
+        }
+        else
+        {
+            PosedMesh = BuildSkinnedCharacterPose(*Model, *Skeleton, Clip.Get(), Ratio, bInPlace, Diagnostic);
+        }
         bPoseDirty = Motion && Motion->Clip.IsValid() && !Clip.Get();
     }
     bMissingAsset = !PosedMesh;

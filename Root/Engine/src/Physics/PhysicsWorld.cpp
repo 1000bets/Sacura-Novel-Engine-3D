@@ -1,3 +1,4 @@
+#include "Core/Threading/CpuProfileScope.h"
 #include "Physics/PhysicsWorld.h"
 #include "World/Scene.h"
 #include "World/GameObject.h"
@@ -108,6 +109,7 @@ void PhysicsWorld::Shutdown()
 
 bool PhysicsWorld::Synchronize()
 {
+    CpuProfileScope CpuMeasurement("Physics.Synchronize");
     AssertGameThread();
     if (!Backend)
     {
@@ -274,6 +276,7 @@ void PhysicsWorld::Step(float DeltaTime)
 
 void PhysicsWorld::Tick(float DeltaTime)
 {
+    CpuProfileScope CpuMeasurement("Physics.Tick");
     AssertGameThread();
     Contacts.clear();
     if (!Backend || !std::isfinite(DeltaTime) || DeltaTime <= 0.f)

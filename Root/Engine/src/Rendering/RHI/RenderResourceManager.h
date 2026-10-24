@@ -29,7 +29,7 @@ public:
     void GetStatistics(RenderStatistics& Statistics) const;
 
     MeshHandle CreateDefaultQuadMesh();
-    MeshHandle CreateMeshFromCpuData(const StaticMeshResource& Mesh);
+    MeshHandle CreateMeshFromCpuData(const StaticMeshResource& Mesh, bool bPreparedSurface = false);
     TextureHandle CreateTextureFromCpuData(const TextureResource& Texture);
     TextureHandle CreateTextureFromCpuData(const TextureResource& Texture, bool bSrgb);
 

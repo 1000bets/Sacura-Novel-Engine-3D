@@ -13,6 +13,7 @@ class PhysicsWorld;
 class AssetManager;
 class NavigationWorld;
 class JobSystem;
+class CharacterPoseCache;
 namespace Authoring
 {
 class OperationRegistry;
@@ -39,6 +40,7 @@ public:
     const PhysicsWorld* GetPhysicsIfCreated() const { return Physics.get(); }
     void SetAssetManager(AssetManager* Assets);
     AssetManager* GetAssetManager() const { return Assets; }
+    CharacterPoseCache& GetCharacterPoseCache();
     NavigationWorld& GetNavigation();
     const NavigationWorld* GetNavigationIfCreated() const { return Navigation.get(); }
     void SetJobSystem(JobSystem* System);
@@ -74,6 +76,7 @@ private:
 
     std::vector<GameObject*> m_Objects;
     std::unique_ptr<PhysicsWorld> Physics;
+    std::unique_ptr<CharacterPoseCache> CharacterPoses;
     std::unique_ptr<NavigationWorld> Navigation;
     std::shared_ptr<const Authoring::OperationRegistry> AuthoringOperations;
     std::unique_ptr<Authoring::Runtime> AuthoringRuntime;

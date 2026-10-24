@@ -246,6 +246,16 @@ set(ENGINE_HDR
 
 add_library(Engine STATIC ${ENGINE_SRC} ${ENGINE_HDR})
 
+if(MSVC)
+    set_property(SOURCE src/Characters/CharacterPose.cpp src/Rendering/RHI/RenderResourceManager.cpp
+        APPEND PROPERTY COMPILE_OPTIONS "$<$<CONFIG:Debug>:/O2;/Ob2;/RTC->")
+    set_property(SOURCE src/Characters/CharacterPose.cpp src/Rendering/RHI/RenderResourceManager.cpp
+        APPEND PROPERTY VS_SETTINGS "BasicRuntimeChecks=Default")
+else()
+    set_property(SOURCE src/Characters/CharacterPose.cpp src/Rendering/RHI/RenderResourceManager.cpp
+        APPEND PROPERTY COMPILE_OPTIONS "$<$<CONFIG:Debug>:-O2>")
+endif()
+
 target_include_directories(Engine PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 target_include_directories(Engine PUBLIC

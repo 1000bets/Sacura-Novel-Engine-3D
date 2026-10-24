@@ -83,7 +83,7 @@ if (process.argv.includes('--native-viewport')) sharedTexture.setSharedTextureRe
       Metrics.frameIndex = Number(packet.getBigUint64(32, true));
       Metrics.readyToDrawMs = performance.timeOrigin + performance.now() - Number(packet.getBigUint64(40, true)) / 1000;
       const now = performance.now();
-      if (Timing.lastDraw && now-Timing.lastDraw<250) {Timing.intervals.push(now-Timing.lastDraw); if(Timing.intervals.length>600) Timing.intervals.shift();}
+      if (Timing.lastDraw) {Timing.intervals.push(now-Timing.lastDraw); if(Timing.intervals.length>600) Timing.intervals.shift();}
       Timing.lastDraw=now; Timing.periodFrames++;
       if (!Timing.periodStart) Timing.periodStart=now;
       if (now-Timing.periodStart>=1000) {Metrics.fps=Timing.periodFrames*1000/(now-Timing.periodStart); Timing.periodStart=now;Timing.periodFrames=0;}

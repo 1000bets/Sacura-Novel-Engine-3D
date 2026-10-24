@@ -1,3 +1,4 @@
+#include "Core/Threading/CpuProfileScope.h"
 #include "Navigation/NavigationWorld.h"
 #include "World/Scene.h"
 #include "World/GameObject.h"
@@ -530,6 +531,7 @@ void NavigationWorld::Schedule(ProfileState& Profile)
 
 void NavigationWorld::Update()
 {
+    CpuProfileScope CpuMeasurement("Navigation.Update");
     AssertGameThread();
     bWaitingForAssets = false;
     bInputRejected = false;
@@ -674,6 +676,7 @@ bool NavigationWorld::PrepareForSimulation()
 
 void NavigationWorld::UpdateCrowds(float DeltaTime)
 {
+    CpuProfileScope CpuMeasurement("Navigation.Crowds");
     AssertGameThread();
     if (!World.IsPlaying() || !std::isfinite(DeltaTime) || DeltaTime <= 0.f)
     {

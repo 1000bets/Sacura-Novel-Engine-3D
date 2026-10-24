@@ -185,6 +185,10 @@ void RenderThread::ThreadMain()
     while (!bStopRequested.load(std::memory_order_acquire))
     {
         ProcessPendingCommands();
+        if (OwnedRenderer)
+        {
+            OwnedRenderer->PollSharedFrames();
+        }
 
         std::unique_ptr<RenderFrameData> Frame = FrameQueue.WaitForFrameFor(std::chrono::milliseconds(4));
         if (Frame)

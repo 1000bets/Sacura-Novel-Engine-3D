@@ -1,3 +1,4 @@
+#include "Core/Threading/CpuProfileScope.h"
 #include "World/Components/MeshRendererComponent.h"
 #include "World/Components/CameraComponent.h"
 #include "World/GameObject.h"
@@ -563,6 +564,7 @@ void Engine::SetRenderSurfaceImGuiOverlay(RenderSurfaceId Surface, ImGuiOverlayS
 
 void Engine::Tick(float DeltaTime)
 {
+    CpuProfileScope CpuMeasurement("Engine.Tick");
     AssertGameThread();
     BeginFrame();
     if (PlayerInput)
@@ -622,6 +624,7 @@ void Engine::BeginFrame()
 
 void Engine::EndFrame(bool bReplacePending)
 {
+    CpuProfileScope CpuMeasurement("Engine.EndFrame");
     if (bHeadless)
     {
         ++NextFrameIndex;

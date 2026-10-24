@@ -1,12 +1,15 @@
+#include "Core/Threading/CpuProfileScope.h"
 #include "Rendering/RHI/SharedFrameExporter.h"
 #include "Rendering/RHI/RenderDevice.h"
 #include "Core/Threading/ThreadContext.h"
 #include "Texture.h"
 #include "DeviceContext.h"
+#include "Fence.h"
 #include "RefCntAutoPtr.hpp"
 #include <chrono>
 #include <algorithm>
 #include <stdexcept>
+#include <deque>
 #if defined(_WIN32) && D3D12_SUPPORTED
 #include <d3d12.h>
 #include "RenderDeviceD3D12.h"
@@ -18,6 +21,8 @@ struct SharedFrameExporter::State
     uint64_t NextToken = 1;
 #if defined(_WIN32) && D3D12_SUPPORTED
     HANDLE Consumer = nullptr;
+    Diligent::RefCntAutoPtr<Diligent::IFence> Completion;
+    std::deque<SharedGpuFrame> PendingFrames;
     struct Slot {
         Diligent::RefCntAutoPtr<Diligent::ITexture> Texture;
         HANDLE Remote = nullptr;
@@ -35,14 +40,44 @@ struct SharedFrameExporter::State
 };
 SharedFrameExporter::SharedFrameExporter(std::shared_ptr<SharedGpuFrameStream> Stream) : Data(std::make_unique<State>()) { Data->Stream = std::move(Stream); }
 SharedFrameExporter::~SharedFrameExporter() = default;
+void SharedFrameExporter::Poll()
+{
+    AssertRenderThread();
+#if defined(_WIN32) && D3D12_SUPPORTED
+    if (!Data->Completion)
+    {
+        return;
+    }
+    const uint64_t Completed = Data->Completion->GetCompletedValue();
+    while (!Data->PendingFrames.empty() && Data->PendingFrames.front().Token <= Completed)
+    {
+        auto Frame = std::move(Data->PendingFrames.front());
+        Data->PendingFrames.pop_front();
+        Frame.ReadyMicroseconds = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        Data->Stream->Publish(std::move(Frame));
+    }
+#endif
+}
 void SharedFrameExporter::Export(RenderDevice& Device, Diligent::ITexture* Source, uint64_t FrameIndex)
 {
+    CpuProfileScope CpuMeasurement("Render.SharedExport");
     AssertRenderThread();
     if (!Data->Stream->Enabled || !Source) return;
 #if defined(_WIN32) && D3D12_SUPPORTED
     using namespace Diligent;
     try {
+        Poll();
         if (Device.GetActiveBackend() != GraphicsBackend::D3D12) throw std::runtime_error("Shared GPU export currently requires D3D12; fallback backend cannot export.");
+        if (!Data->Completion)
+        {
+            FenceDesc Description;
+            Description.Name = "Shared frame producer completion";
+            Device.GetDevice()->CreateFence(Description, &Data->Completion);
+            if (!Data->Completion)
+            {
+                throw std::runtime_error("Shared frame producer fence allocation failed.");
+            }
+        }
         if (!Data->Consumer) Data->Consumer = OpenProcess(PROCESS_DUP_HANDLE, FALSE, Data->Stream->ConsumerProcess);
         if (!Data->Consumer) throw std::runtime_error("Cannot open GPU frame consumer process.");
         const auto Desc = Source->GetDesc();
@@ -94,16 +129,16 @@ void SharedFrameExporter::Export(RenderDevice& Device, Diligent::ITexture* Sourc
         Context->CopyTexture(Copy);
         StateTransitionDesc Transition(Available->Texture, RESOURCE_STATE_UNKNOWN, RESOURCE_STATE_COMMON, STATE_TRANSITION_FLAG_UPDATE_STATE);
         Context->TransitionResourceStates(1, &Transition);
-        // Conservative producer fence: no pixel readback, but a CPU wait on Render
-        // thread. Consumer ownership ends on its completed GPU blit ACK, never on send.
-        Device.WaitForIdle();
         Available->Released = std::make_shared<std::atomic<bool>>(false);
         SharedGpuFrame Frame;
         Frame.Token = Data->NextToken++; Frame.WindowsNtHandle = reinterpret_cast<uintptr_t>(Available->Remote);
         Frame.FrameIndex = FrameIndex; Frame.Width = Desc.Width; Frame.Height = Desc.Height;
         Frame.ReadyMicroseconds = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
         Frame.Released = Available->Released;
-        Data->Stream->Publish(std::move(Frame));
+        Context->EnqueueSignal(Data->Completion, Frame.Token);
+        Data->PendingFrames.push_back(std::move(Frame));
+        Context->Flush();
+        Poll();
     } catch (const std::exception& Error) { Data->Stream->Fail(Error.what()); }
 #else
     Data->Stream->Fail("Shared GPU export is implemented only for Windows D3D12.");

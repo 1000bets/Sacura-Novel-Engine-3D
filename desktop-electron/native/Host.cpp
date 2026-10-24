@@ -7,6 +7,8 @@
 #include "World/GameObject.h"
 #include "World/Components/MeshRendererComponent.h"
 #include <chrono>
+#include <array>
+#include <string_view>
 #include "Core/IO/ImageBuffer.h"
 #include "Core/IO/AtomicFileWriter.h"
 #include <nlohmann/json.hpp>
@@ -176,10 +178,11 @@ int main(int Argc, char** Argv)
     int Width = 64, Height = 64, Ticks = 0;
     float Time = 0.f;
     bool Animate = false, Visible = false;
+    std::array<double, 4> TotalTickMilliseconds{};
+    std::array<double, 4> MaximumTickMilliseconds{};
     auto Tick = [&] {
+        const auto TickStart = std::chrono::steady_clock::now();
         DWORD Available = 0;
-        if (Frames && !Frames->Pump()) { bRunning = false; return; }
-        if (Frames && !Frames->Stream->GetError().empty()) { Emit({{"error", Frames->Stream->GetError()}}); Result = 9; bRunning = false; return; }
         if ((!Headless && !IsWindow(Parent)) || !PeekNamedPipe(Input, nullptr, 0, nullptr, &Available, nullptr)) { bRunning = false; return; }
         if (Available) {
             char Buffer[4096]; DWORD Read = 0;
@@ -194,7 +197,18 @@ int main(int Argc, char** Argv)
                 for(const auto& Request:Requests) {
                     Animate=false;
                     auto Reply=Bridge->Execute(Request);
-                    auto Event=Bridge->Poll();Reply["context"]=Bridge->Context();
+                    static constexpr std::array<std::string_view, 16> ReadMethods{
+                        "bridge.describe", "scene.getHierarchy", "object.getComponents", "component.getProperties",
+                        "transform.get", "reflection.getComponentTypes", "assets.list", "assets.getScenes",
+                        "editor.actions", "mesh.inspect", "story.get", "assets.folders", "assets.creationTypes",
+                        "assets.resolve", "assets.thumbnail", "audio.resolveStartup"};
+                    const std::string Method = Request.value("method", std::string{});
+                    Json Event;
+                    if (std::find(ReadMethods.begin(), ReadMethods.end(), Method) == ReadMethods.end() && Method != "game.state")
+                    {
+                        Event = Bridge->Poll();
+                    }
+                    Reply["context"]=Bridge->Context();
                     if(!Control->Send(Reply)){bRunning = false;return;}
                     if(!Event.is_null())Control->Send(Event);
                 }
@@ -277,15 +291,29 @@ int main(int Argc, char** Argv)
         PreviousTick = CurrentTick;
         if (Animate) Time += Dt;
         if (Animate) if (auto* Object = Runtime.GetEditScene()->FindByHandle(Animated)) { auto T = Object->GetTransform(); T.Rotation = Quaternion::CreateFromYawPitchRoll(Time * 0.6f, 0.2f, 0.f); Object->SetTransform(T); }
+        const auto ControllerStart = std::chrono::steady_clock::now();
         Controller->SetAssetPreview(Bridge.get());
         if (!bRuntimeOnly)
         {
             Controller->Tick(Dt);
         }
+        const auto RuntimeStart = std::chrono::steady_clock::now();
         Runtime.Tick(Dt);
+        const auto BridgeStart = std::chrono::steady_clock::now();
         if(Bridge && Ticks % 15 == 0) {
             try {if(Ticks%120==0)Bridge->ScanAssets();auto Event=Bridge->Poll();if(!Event.is_null()&&!Control->Send(Event)){bRunning = false;return;}}
             catch(const std::exception& E){Emit({{"error",E.what()}});Result = 10; bRunning = false;return;}
+        }
+        const auto TickEnd = std::chrono::steady_clock::now();
+        const std::array<double, 4> TickMilliseconds{
+            std::chrono::duration<double,std::milli>(ControllerStart-TickStart).count(),
+            std::chrono::duration<double,std::milli>(RuntimeStart-ControllerStart).count(),
+            std::chrono::duration<double,std::milli>(BridgeStart-RuntimeStart).count(),
+            std::chrono::duration<double,std::milli>(TickEnd-BridgeStart).count()};
+        for (size_t StageIndex = 0; StageIndex < TickMilliseconds.size(); ++StageIndex)
+        {
+            TotalTickMilliseconds[StageIndex] += TickMilliseconds[StageIndex];
+            MaximumTickMilliseconds[StageIndex] = std::max(MaximumTickMilliseconds[StageIndex], TickMilliseconds[StageIndex]);
         }
         if (++Ticks % 30 == 0) {
             const auto S = Runtime.GetRenderStatistics(RenderSurfaceId{1});
@@ -297,6 +325,10 @@ int main(int Argc, char** Argv)
                 {"drawCalls", S.DrawCalls}, {"triangles", S.Triangles}, {"visibleObjects", S.VisibleObjects},
                 {"residentMeshes", S.ResidentMeshes}, {"resolvedMeshes", ResolvedMeshes}, {"visible", Visible}, {"animate", Animate}});
             Emit({{"type","timing"},{"cpuMs",S.CpuMilliseconds},{"gpuAvailable",S.bGpuTimingsAvailable},
+                {"controlMs",TotalTickMilliseconds[0]/30.0},{"controllerMs",TotalTickMilliseconds[1]/30.0},
+                {"gameTickMs",TotalTickMilliseconds[2]/30.0},{"bridgeMs",TotalTickMilliseconds[3]/30.0},
+                {"controlMaxMs",MaximumTickMilliseconds[0]},{"gameTickMaxMs",MaximumTickMilliseconds[2]},
+                {"bridgeMaxMs",MaximumTickMilliseconds[3]},
                 {"gpuMs",S.ShadowMilliseconds+S.OpaqueMilliseconds+S.TransparencyMilliseconds+S.PostprocessMilliseconds},
                 {"shadowMs",S.ShadowMilliseconds},{"opaqueMs",S.OpaqueMilliseconds},
                 {"transparencyMs",S.TransparencyMilliseconds},{"postprocessMs",S.PostprocessMilliseconds},
@@ -304,6 +336,8 @@ int main(int Argc, char** Argv)
                 {"sharedTextures",Frames ? Frames->Stream->TextureCount.load() : 0},
                 {"sharedTextureBytes",Frames ? Frames->Stream->TextureBytes.load() : 0}});
             Emit({{"type", "viewport"}, {"data", Controller->Status()}});
+            TotalTickMilliseconds.fill(0.0);
+            MaximumTickMilliseconds.fill(0.0);
         }
     };
     HANDLE FrameTimer = CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
@@ -311,6 +345,16 @@ int main(int Argc, char** Argv)
     auto NextTick = std::chrono::steady_clock::now();
     while (bRunning)
     {
+        if (Frames && !Frames->Pump())
+        {
+            break;
+        }
+        if (Frames && !Frames->Stream->GetError().empty())
+        {
+            Emit({{"error", Frames->Stream->GetError()}});
+            Result = 9;
+            break;
+        }
         MSG Message{};
         while (PeekMessageW(&Message, nullptr, 0, 0, PM_REMOVE))
         {
@@ -339,7 +383,11 @@ int main(int Argc, char** Argv)
         }
         if (bRunning)
         {
-            const auto Remaining = NextTick - std::chrono::steady_clock::now();
+            auto Remaining = NextTick - std::chrono::steady_clock::now();
+            if (Frames)
+            {
+                Remaining = std::min(Remaining, std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::milliseconds(2)));
+            }
             LARGE_INTEGER DueTime;
             DueTime.QuadPart = -std::max<int64_t>(1, std::chrono::duration_cast<std::chrono::nanoseconds>(Remaining).count() / 100);
             if (FrameTimer && SetWaitableTimer(FrameTimer, &DueTime, 0, nullptr, nullptr, FALSE))

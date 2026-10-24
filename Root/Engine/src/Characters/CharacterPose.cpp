@@ -1,10 +1,39 @@
+#include "Core/Threading/CpuProfileScope.h"
 #include "Characters/CharacterPose.h"
+#include "Core/Threading/ThreadContext.h"
 #include "ozz/animation/runtime/sampling_job.h"
 #include "ozz/animation/runtime/local_to_model_job.h"
 #include "ozz/base/maths/soa_transform.h"
 #include "ozz/base/maths/simd_math.h"
 #include <algorithm>
 #include <cmath>
+
+std::shared_ptr<const StaticMeshResource> CharacterPoseCache::BuildPose(std::shared_ptr<const SkeletalMeshResource> Model,
+    std::shared_ptr<const SkeletonResource> Skeleton, std::shared_ptr<const AnimationClipResource> Animation,
+    float Ratio, bool bInPlace, std::string& Error)
+{
+    AssertGameThread();
+    const uint64_t CurrentFrame = GetGameFrameIndex();
+    if (FrameIndex != CurrentFrame)
+    {
+        Entries.clear();
+        FrameIndex = CurrentFrame;
+    }
+    for (const auto& Cached : Entries)
+    {
+        if (Cached.Model == Model && Cached.Skeleton == Skeleton && Cached.Animation == Animation
+            && Cached.Ratio == Ratio && Cached.bInPlace == bInPlace)
+        {
+            return Cached.Pose;
+        }
+    }
+    auto Pose = BuildSkinnedCharacterPose(*Model, *Skeleton, Animation.get(), Ratio, bInPlace, Error);
+    if (Pose)
+    {
+        Entries.push_back({std::move(Model), std::move(Skeleton), std::move(Animation), Ratio, bInPlace, Pose});
+    }
+    return Pose;
+}
 
 static void AppendCharacterBox(StaticMeshResource& Mesh, const Vector3& Center, const Vector3& Extents, const Matrix& Pose)
 {
@@ -115,6 +144,7 @@ std::shared_ptr<const StaticMeshResource> BuildStandardCharacterPose(const std::
 std::shared_ptr<const StaticMeshResource> BuildSkinnedCharacterPose(const SkeletalMeshResource& Mesh,
     const SkeletonResource& Skeleton, const AnimationClipResource* Animation, float Ratio, bool bInPlace, std::string& Error)
 {
+    CpuProfileScope CpuMeasurement("Character.Skin");
     if (!Mesh.Binding || !Skeleton.Skeleton)
     {
         Error = "Character requires a skeleton and skin binding";
@@ -206,11 +236,21 @@ std::shared_ptr<const StaticMeshResource> BuildSkinnedCharacterPose(const Skelet
     auto Result = std::make_shared<StaticMeshResource>(Mesh.Mesh);
     Result->Bounds.Minimum = Vector3(FLT_MAX, FLT_MAX, FLT_MAX);
     Result->Bounds.Maximum = Vector3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+    const auto AccumulateDirection = [](Vector3& Destination, const Vector3& Source, const Matrix& Transform, float Weight)
+    {
+        Destination.x += (Source.x * Transform._11 + Source.y * Transform._21 + Source.z * Transform._31) * Weight;
+        Destination.y += (Source.x * Transform._12 + Source.y * Transform._22 + Source.z * Transform._32) * Weight;
+        Destination.z += (Source.x * Transform._13 + Source.y * Transform._23 + Source.z * Transform._33) * Weight;
+    };
     for (size_t VertexIndex = 0; VertexIndex < Result->Vertices.size(); ++VertexIndex)
     {
         auto& Vertex = Result->Vertices[VertexIndex];
         Vector3 Position = Vector3::Zero;
         Vector3 Normal = Vector3::Zero;
+        Vector3 Tangent = Vector3::Zero;
+        Vector3 Bitangent = Vector3::Zero;
+        const Vector3 SourceTangent(Vertex.Tangent.x, Vertex.Tangent.y, Vertex.Tangent.z);
+        const Vector3 SourceBitangent = Vertex.Normal.Cross(SourceTangent) * Vertex.Tangent.w;
         float TotalWeight = 0.f;
         for (size_t Influence = 0; Influence < 4; ++Influence)
         {
@@ -224,8 +264,17 @@ std::shared_ptr<const StaticMeshResource> BuildSkinnedCharacterPose(const Skelet
             }
             if (Weight > 0.f)
             {
-                Position += Vector3::Transform(Vertex.Position, Matrices[Joint]) * Weight;
-                Normal += Vector3::TransformNormal(Vertex.Normal, NormalMatrices[Joint]) * Weight;
+                const auto& JointTransform = Matrices[Joint];
+                AccumulateDirection(Position, Vertex.Position, JointTransform, Weight);
+                Position.x += JointTransform._41 * Weight;
+                Position.y += JointTransform._42 * Weight;
+                Position.z += JointTransform._43 * Weight;
+                AccumulateDirection(Normal, Vertex.Normal, NormalMatrices[Joint], Weight);
+                if (Vertex.bHasTangent)
+                {
+                    AccumulateDirection(Tangent, SourceTangent, JointTransform, Weight);
+                    AccumulateDirection(Bitangent, SourceBitangent, JointTransform, Weight);
+                }
                 TotalWeight += Weight;
             }
         }
@@ -234,11 +283,28 @@ std::shared_ptr<const StaticMeshResource> BuildSkinnedCharacterPose(const Skelet
             Vertex.Position = Position / TotalWeight;
             Normal.Normalize();
             Vertex.Normal = Normal;
-            Vertex.bHasTangent = false;
+            if (Vertex.bHasTangent)
+            {
+                Tangent -= Normal * Normal.Dot(Tangent);
+                if (Tangent.LengthSquared() > 0.00000001f)
+                {
+                    Tangent.Normalize();
+                    float Handedness = 1.f;
+                    if (Normal.Cross(Tangent).Dot(Bitangent) < 0.f)
+                    {
+                        Handedness = -1.f;
+                    }
+                    Vertex.Tangent = Vector4(Tangent.x, Tangent.y, Tangent.z, Handedness);
+                }
+                else
+                {
+                    Vertex.Tangent = Vector4::Zero;
+                    Vertex.bHasTangent = false;
+                }
+            }
         }
         Result->Bounds.Minimum = Vector3::Min(Result->Bounds.Minimum, Vertex.Position);
         Result->Bounds.Maximum = Vector3::Max(Result->Bounds.Maximum, Vertex.Position);
     }
-    PrepareSurfaceVertices(*Result);
     return Result;
 }

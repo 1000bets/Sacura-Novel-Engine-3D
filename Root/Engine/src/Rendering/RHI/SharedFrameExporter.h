@@ -9,6 +9,7 @@ public:
     explicit SharedFrameExporter(std::shared_ptr<SharedGpuFrameStream> Stream);
     ~SharedFrameExporter();
     void Export(RenderDevice& Device, Diligent::ITexture* Source, uint64_t FrameIndex);
+    void Poll();
 private:
     struct State;
     std::unique_ptr<State> Data;

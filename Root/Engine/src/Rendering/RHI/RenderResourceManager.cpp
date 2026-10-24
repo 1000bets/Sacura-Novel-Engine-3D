@@ -1,3 +1,4 @@
+#include "Core/Threading/CpuProfileScope.h"
 #include "Rendering/RHI/RenderResourceManager.h"
 #include "Assets/Resources/StaticMeshResource.h"
 #include "Assets/Resources/TextureResource.h"
@@ -88,8 +89,9 @@ MeshHandle RenderResourceManager::CreateDefaultQuadMesh()
     return Handle;
 }
 
-MeshHandle RenderResourceManager::CreateMeshFromCpuData(const StaticMeshResource& SourceMesh)
+MeshHandle RenderResourceManager::CreateMeshFromCpuData(const StaticMeshResource& SourceMesh, bool bPreparedSurface)
 {
+    CpuProfileScope CpuMeasurement("Render.MeshUpload");
     AssertRenderThread();
     assert(Device != nullptr);
 
@@ -113,34 +115,42 @@ MeshHandle RenderResourceManager::CreateMeshFromCpuData(const StaticMeshResource
         UploadVertices[Index].VertexColor = DirectX::SimpleMath::Color(1.f, 1.f, 1.f, 1.f);
     }
 
-    for (size_t Index = 0; Index + 2 < SourceMesh.Indices.size(); Index += 3)
+    if (!bPreparedSurface)
     {
-        const uint32_t First = SourceMesh.Indices[Index];
-        const uint32_t Second = SourceMesh.Indices[Index + 1];
-        const uint32_t Third = SourceMesh.Indices[Index + 2];
-        if (First >= UploadVertices.size() || Second >= UploadVertices.size() || Third >= UploadVertices.size())
+        for (size_t Index = 0; Index + 2 < SourceMesh.Indices.size(); Index += 3)
         {
-            return MeshHandle{};
-        }
-        const Vector3 Normal = (UploadVertices[Second].Position - UploadVertices[First].Position).Cross(
-            UploadVertices[Third].Position - UploadVertices[First].Position);
-        for (uint32_t VertexIndex : {First, Second, Third})
-        {
-            if (!SourceMesh.Vertices[VertexIndex].bHasNormal)
+            const uint32_t First = SourceMesh.Indices[Index];
+            const uint32_t Second = SourceMesh.Indices[Index + 1];
+            const uint32_t Third = SourceMesh.Indices[Index + 2];
+            if (First >= UploadVertices.size() || Second >= UploadVertices.size() || Third >= UploadVertices.size())
             {
-                UploadVertices[VertexIndex].Normal += Normal;
+                return MeshHandle{};
+            }
+            if (SourceMesh.Vertices[First].bHasNormal && SourceMesh.Vertices[Second].bHasNormal
+                && SourceMesh.Vertices[Third].bHasNormal)
+            {
+                continue;
+            }
+            const Vector3 Normal = (UploadVertices[Second].Position - UploadVertices[First].Position).Cross(
+                UploadVertices[Third].Position - UploadVertices[First].Position);
+            for (uint32_t VertexIndex : {First, Second, Third})
+            {
+                if (!SourceMesh.Vertices[VertexIndex].bHasNormal)
+                {
+                    UploadVertices[VertexIndex].Normal += Normal;
+                }
             }
         }
-    }
-    for (auto& Vertex : UploadVertices)
-    {
-        if (Vertex.Normal.LengthSquared() > 0.0000001f)
+        for (auto& Vertex : UploadVertices)
         {
-            Vertex.Normal.Normalize();
-        }
-        else
-        {
-            Vertex.Normal = Vector3::Up;
+            if (Vertex.Normal.LengthSquared() > 0.0000001f)
+            {
+                Vertex.Normal.Normalize();
+            }
+            else
+            {
+                Vertex.Normal = Vector3::Up;
+            }
         }
     }
     MeshHandle Handle;

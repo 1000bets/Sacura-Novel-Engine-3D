@@ -1,4 +1,6 @@
+#include "Core/Threading/CpuProfileScope.h"
 #include "World/Scene.h"
+#include "Characters/CharacterPose.h"
 #include "World/Components/CameraComponent.h"
 #include "World/Components/Component.h"
 #include "World/GameObject.h"
@@ -11,6 +13,16 @@
 #include <algorithm>
 
 Scene::Scene() = default;
+
+CharacterPoseCache& Scene::GetCharacterPoseCache()
+{
+    AssertGameThread();
+    if (!CharacterPoses)
+    {
+        CharacterPoses = std::make_unique<CharacterPoseCache>();
+    }
+    return *CharacterPoses;
+}
 
 void Scene::SetAuthoringOperations(std::shared_ptr<const Authoring::OperationRegistry> Operations)
 {
@@ -402,6 +414,7 @@ void Scene::EndPlay()
 
 void Scene::Tick(float DeltaTime, bool bSinglePhysicsStep)
 {
+    CpuProfileScope CpuMeasurement("Scene.Tick");
     if (bUpdatingComponents)
     {
         return;

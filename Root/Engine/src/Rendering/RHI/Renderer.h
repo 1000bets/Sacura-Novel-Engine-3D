@@ -49,6 +49,7 @@ public:
     void PollMaterialImages();
     void ClearMaterialResources();
     void SetSharedFrameStream(std::shared_ptr<SharedGpuFrameStream> Stream);
+    void PollSharedFrames();
 
     MeshHandle GetDefaultMesh() const { return DefaultMesh; }
     bool IsInitialized() const { return bInitialized; }

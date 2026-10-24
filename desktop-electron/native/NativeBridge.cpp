@@ -1,3 +1,4 @@
+#include "Core/Threading/CpuProfileScope.h"
 #include "Project/GameExporter.h"
 #include "Core/EnginePaths.h"
 #include "Prefab/PrefabUtility.h"
@@ -177,6 +178,7 @@ Json NativeBridge::Components(GameObject* O) {
     Json A=Json::array();for(auto* C:O->GetAllComponents())A.push_back({{"id",C->GetPersistentId()},{"typeId",C->GetTypeId().Value},{"displayName",C->GetClass()->GetDisplayName()},{"enabled",C->IsEnabled()}});return A;
 }
 Json NativeBridge::Properties(Component* C) {
+    CpuProfileScope CpuMeasurement("Bridge.Properties");
     Json A=Json::array();if(!C->GetClass())return A;
     for(const auto* P:C->GetClass()->GetAllProperties())if(Readable(*P)) {
         Json Item{{"id",P->Id.Value},{"typeId",P->ValueTypeId.Value},{"editable",Editable(*P)},
@@ -902,10 +904,42 @@ Json NativeBridge::Execute(const Json& Request) {
     Result["context"]=Context();return Result;
 }
 Json NativeBridge::Poll(bool Force) {
+    CpuProfileScope CpuMeasurement("Bridge.Poll");
     AssertGameThread();ObserveWorld();
     Json State=Describe();State.erase("context");State["hierarchy"]=Hierarchy();
     // Observe native gizmo/gameplay/property edits too; no JS mirror is authoritative.
-    Json Values=Json::array();for(auto* O:World()->GetAllObjects())for(auto* C:O->GetAllComponents())Values.push_back(Properties(C));State["properties"]=std::move(Values);
+    Json Values = Json::array();
+    for (auto* Object : World()->GetAllObjects())
+    {
+        for (auto* ComponentInstance : Object->GetAllComponents())
+        {
+            Json ComponentValues = Json::array();
+            if (ComponentInstance->GetClass())
+            {
+                for (const auto* Property : ComponentInstance->GetClass()->GetAllProperties())
+                {
+                    if (!Readable(*Property))
+                    {
+                        continue;
+                    }
+                    ReflectedValue Value;
+                    auto Diagnostic = PropertyAccess::GetProperty(ComponentInstance, *Property, Value, PropertyAccessContext::Inspector);
+                    Json SerializedValue;
+                    if (Diagnostic.bOk)
+                    {
+                        Diagnostic = ReflectionJson::ReflectedValueToJson(Property->ValueTypeId, Value, SerializedValue);
+                    }
+                    if (!Diagnostic.bOk)
+                    {
+                        SerializedValue = {{"error", Diagnostic.Message}};
+                    }
+                    ComponentValues.push_back(std::move(SerializedValue));
+                }
+            }
+            Values.push_back(std::move(ComponentValues));
+        }
+    }
+    State["properties"] = std::move(Values);
     auto StoryState=StorySnapshot();StoryState.erase("revision");const auto StoryText=StoryState.dump(),AssetText=Assets().dump();
     const bool StoryChanged=StoryText!=PreviousStory,AssetsChanged=AssetText!=PreviousAssets;
     if(StoryChanged){PreviousStory=StoryText;++StoryRevision;}PreviousAssets=AssetText;
@@ -920,6 +954,7 @@ AssetRegistryEntry NativeBridge::Asset(const std::string& Id) {
 }
 void NativeBridge::ScanAssets()
 {
+    CpuProfileScope CpuMeasurement("Bridge.ScanAssets");
     AssertGameThread();
     auto& Registry = Runtime.GetAssetRegistry();
     std::map<std::string, Json> Previous;
@@ -944,6 +979,7 @@ void NativeBridge::ScanAssets()
     }
 }
 Json NativeBridge::Assets() {
+    CpuProfileScope CpuMeasurement("Bridge.Assets");
     Json Result=Json::array();auto& Registry=Runtime.GetAssetRegistry();
     for(const auto& Type:Registry.GetAssetTypeRegistrations())
         for(const auto& E:Registry.FindByType(Type.Type)) {
@@ -961,6 +997,7 @@ Json NativeBridge::Assets() {
     std::sort(Result.begin(),Result.end(),[](const Json& A,const Json& B){return A.at("path")<B.at("path");});return Result;
 }
 Json NativeBridge::StorySnapshot() {
+    CpuProfileScope CpuMeasurement("Bridge.Story");
     if(!Story.IsOpen())return {{"open",false},{"revision",StoryRevision},{"error",StoryError}};
     std::string Text;auto D=StoryDocumentIO::SaveToJson(Story.GetStory(),Text);Require(D.bOk,"STORY_ERROR",D.Error);
     Json Positions=Json::object();for(const auto& [Id,P]:Story.GetPositions())Positions[Id]={{"x",P.X},{"y",P.Y}};

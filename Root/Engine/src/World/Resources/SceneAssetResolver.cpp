@@ -1,3 +1,4 @@
+#include "Core/Threading/CpuProfileScope.h"
 #include "World/Resources/SceneAssetResolver.h"
 
 #include "Assets/Resources/MaterialResource.h"
@@ -23,6 +24,7 @@ void SceneAssetResolver::Bind(
 
 void SceneAssetResolver::ResolveScene(Scene& TargetScene)
 {
+    CpuProfileScope CpuMeasurement("Assets.ResolveScene");
     AssertGameThread();
     if (BoundManager == nullptr || BoundUploader == nullptr)
     {

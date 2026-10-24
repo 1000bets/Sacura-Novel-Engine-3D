@@ -33,18 +33,20 @@ exports.Run = async ({Application, Window, GetViewport, CreateNativeProject, Rep
     }
     const Measurement = {Name, Seconds:(Date.now()-Start)/1000, Frames:(await Status()).presentation.frames-First, Samples};
     Measurement.FramesPerSecond = Measurement.Frames / Measurement.Seconds;
-    Assert.ok(Measurement.FramesPerSecond > 10, 'Presentation stalled');
     Report.Measurements.push(Measurement);
+    await FileSystem.writeFile(Path.join(Output, 'report.json'), JSON.stringify(Report, null, 2));
+    Assert.ok(Measurement.FramesPerSecond > Number(process.env.SACURA_PERFORMANCE_MINIMUM_FPS || 10), 'Presentation stalled');
     console.log('Render performance: ' + Name + ' ' + Measurement.FramesPerSecond.toFixed(2) + ' FPS');
     await FileSystem.writeFile(Path.join(Output, Name + '.png'), (await Window.webContents.capturePage()).toPNG());
   }
   try {
     Assert.ok(!/^C:/i.test(Output), 'Performance artifacts must stay outside C:');
     await FileSystem.mkdir(Output, {recursive:true});
+    Window.setPosition(-20000, 0);
     setTimeout(() => Application.exit(1), 180000).unref();
     await Wait(async () => !Window.webContents.isLoading() && await Window.webContents.executeJavaScript('!!window.sacuraDesktop?.bridge'));
     if (!process.env.SACURA_NATIVE_PROJECT) {
-      await CreateNativeProject('RenderPerformance', Output, 'builtin-quest');
+      await CreateNativeProject('RenderPerformance', Output, process.env.SACURA_PERFORMANCE_TEMPLATE || 'builtin-quest');
     }
     await Wait(() => GetViewport().state.presentation?.frames > 60 && GetViewport().state.stats?.visibleObjects > 0);
     Window.setSize(1440, 900);
@@ -52,6 +54,12 @@ exports.Run = async ({Application, Window, GetViewport, CreateNativeProject, Rep
     const Play = await GetViewport().bridge.request('play.start', {});
     Assert.equal(Play.ok, true, JSON.stringify(Play));
     await Measure('Play');
+    if (process.env.SACURA_PERFORMANCE_GAMEPLAY === '1') {
+      const Advanced = await GetViewport().bridge.request('play.advanceDialogue', {});
+      Assert.equal(Advanced.ok, true, JSON.stringify(Advanced));
+      await Measure('Battle');
+      Report.Checks.push('Shooter battle runs after the opening dialogue');
+    }
     await GetViewport().bridge.request('play.stop', {});
     if (process.env.SACURA_PERFORMANCE_REGRESSIONS === '1') {
       async function CaptureMode(Mode) {
