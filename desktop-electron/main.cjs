@@ -24,6 +24,7 @@ const smoke = process.argv.includes('--desktop-smoke');
 const nativePrototype = true;
 const assetTransferTest=process.argv.includes('--asset-transfer-check');
 const AssetReferenceCheck = process.argv.includes('--asset-reference-check');
+const ReflectedAssetsCheck = process.argv.includes('--reflected-assets-check');
 const ComponentNamesCheck = process.argv.includes('--component-names-check');
 const WorkspaceTabsRestore = process.argv.includes('--workspace-tabs-restore-check');
 const WorkspaceTabsCheck = WorkspaceTabsRestore || process.argv.includes('--workspace-tabs-check');
@@ -36,7 +37,7 @@ const MigrationCheck = process.argv.includes('--qt-removal-check');
 const nativeSmoke = process.argv.includes('--native-smoke')||assetTransferTest||MigrationCheck;
 // CLI rendering checks must keep Chromium producing frames when another app
 // covers the test window. Production keeps normal background/visibility policy.
-if(LocalizationCheck || AssetReferenceCheck || WorkspaceTabsCheck || nativeSmoke || MaterialCapture || ComponentNamesCheck || CameraSpeedCheck || SceneShortcutsCheck || MaterialDropCheck){
+if(ReflectedAssetsCheck || LocalizationCheck || AssetReferenceCheck || WorkspaceTabsCheck || nativeSmoke || MaterialCapture || ComponentNamesCheck || CameraSpeedCheck || SceneShortcutsCheck || MaterialDropCheck){
   app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
   app.commandLine.appendSwitch('disable-features','CalculateNativeWinOcclusion');
 }
@@ -314,6 +315,7 @@ app.whenReady().then(async () => {
       }).catch(error=>{closing=false;dialog.showErrorBox('Проект остаётся открытым',error.message);});
     });
     if (AssetReferenceCheck) require('./scripts/asset-reference-check.cjs').run({app,window,editors:AssetWindows,windows:WorkspaceWindows,getViewport:()=>nativeViewport,createNativeProject});
+    if (ReflectedAssetsCheck) require('./scripts/reflected-assets-check.cjs').run({app,window,editors:AssetWindows,windows:WorkspaceWindows,getViewport:()=>nativeViewport,createNativeProject});
     if (ComponentNamesCheck) require('./scripts/component-names-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
     if (WorkspaceTabsCheck) {
       require('./scripts/workspace-tabs-check.cjs').run({app,window,editors:AssetWindows,windows:WorkspaceWindows,getViewport:()=>nativeViewport,createNativeProject,restore:WorkspaceTabsRestore});
@@ -324,7 +326,7 @@ app.whenReady().then(async () => {
     if (MaterialDropCheck) require('./scripts/material-drop-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
     if (MigrationCheck) require('./scripts/qt-removal-check.cjs').Run({Application:app,Window:window,Editors:AssetWindows,GetViewport:()=>nativeViewport});
     else if (assetTransferTest) require('./scripts/asset-transfer-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
-    else if (nativeSmoke && !assetTransferTest && !process.argv.some(Argument => Argument.startsWith('--screenshot-texture='))) require('./scripts/native-smoke-main.cjs').run({app, window, getViewport:()=>nativeViewport, replaceProject});
+    else if (nativeSmoke && !assetTransferTest && !process.argv.some(Argument => (Argument.startsWith('--screenshot-texture=') || Argument.startsWith('--widget-editor-check=')))) require('./scripts/native-smoke-main.cjs').run({app, window, getViewport:()=>nativeViewport, replaceProject});
   }
   if (smoke) {
     const deadline = setTimeout(() => {console.error('Desktop smoke: React did not become ready'); app.exit(1);}, 15000);
@@ -411,6 +413,10 @@ app.whenReady().then(async () => {
   if (devUrl) await window.loadURL(devUrl); else await window.loadURL('sacura://app/index.html');
   if (MaterialCapture) {
     require('./scripts/capture-material-editor.cjs').run({app, window, editors: AssetWindows, windows:WorkspaceWindows, getViewport: () => nativeViewport, output: MaterialCapture.slice('--screenshot-material='.length)});
+  }
+  const WidgetCheck = process.argv.find(Argument => Argument.startsWith('--widget-editor-check='));
+  if (WidgetCheck) {
+    require('./scripts/widget-editor-check.cjs').run({app,window,editors:AssetWindows,windows:WorkspaceWindows,getViewport:()=>nativeViewport,output:WidgetCheck.slice('--widget-editor-check='.length)});
   }
   const TextureCapture = process.argv.find(Argument => Argument.startsWith('--screenshot-texture='));
   if (TextureCapture) {

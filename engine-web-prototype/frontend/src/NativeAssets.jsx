@@ -70,9 +70,7 @@ export function AssetReferenceField({assetId: AssetId, subAssetId: SubAssetId, a
     }
   }
   const Identity = {assetId: AssetId, subAssetId: SubAssetId};
-  const CanOpen = Available && typeof Context.open === 'function' &&
-    (['Scene', 'Story', 'StaticMesh', 'Material', 'MaterialInstance', 'Texture', 'PythonScript', 'Prefab'].includes(Type) ||
-      Type === 'Model' && Asset.subassets?.some(Entry => Entry.typeId === 'StaticMesh'));
+  const CanOpen = Available && typeof Context.open === 'function';
   const Open = () => {
     if (CanOpen) {
       Context.open(Identity);

@@ -1,4 +1,8 @@
 #pragma once
+#include <array>
+#include <algorithm>
+#include <limits>
+#include "Reflection/ReflectionSubsystem.h"
 
 #include "Reflection/ReflectedValue.h"
 #include "Reflection/TypeId.h"
@@ -134,6 +138,10 @@ struct ReflectionValueCodec<int>
         if (InValue.ValueKind != ReflectedValue::Kind::Int64)
         {
             return ReflectionDiagnostic::Fail("Expected int64");
+        }
+        if (InValue.Int64Value < std::numeric_limits<int>::min() || InValue.Int64Value > std::numeric_limits<int>::max())
+        {
+            return ReflectionDiagnostic::Fail("Integer value is outside native int range");
         }
         Destination = static_cast<int>(InValue.Int64Value);
         return ReflectionDiagnostic::Ok();
@@ -431,6 +439,46 @@ struct ReflectionValueCodec<std::vector<ElementType>>
         }
         Destination = std::move(Candidate);
         return ReflectionDiagnostic::Ok();
+    }
+};
+
+template <typename ElementType, size_t ElementCount>
+struct ReflectionValueCodec<std::array<ElementType, ElementCount>>
+{
+    static TypeId GetTypeId()
+    {
+        const TypeId Element = ReflectionValueCodec<ElementType>::GetTypeId();
+        TypeDescriptor Descriptor;
+        Descriptor.Id = TypeId{"engine.FixedArray<" + Element.Value + "," + std::to_string(ElementCount) + ">"};
+        Descriptor.Kind = TypeKind::Array;
+        Descriptor.ElementTypeId = Element;
+        Descriptor.FixedElementCount = ElementCount;
+        Descriptor.MakeDefault = [](ReflectedValue& Value)
+        {
+            return ToReflected({}, Value);
+        };
+        const TypeId Result = Descriptor.Id;
+        ReflectionSubsystem::Get().RegisterTypeDescriptor(std::move(Descriptor));
+        return Result;
+    }
+    static ReflectionDiagnostic ToReflected(const std::array<ElementType, ElementCount>& Source, ReflectedValue& OutValue)
+    {
+        return ReflectionValueCodec<std::vector<ElementType>>::ToReflected(
+            std::vector<ElementType>(Source.begin(), Source.end()), OutValue);
+    }
+    static ReflectionDiagnostic FromReflected(std::array<ElementType, ElementCount>& Destination, const ReflectedValue& Value)
+    {
+        if (Value.Values.size() != ElementCount)
+        {
+            return ReflectionDiagnostic::Fail("Invalid fixed array length");
+        }
+        std::vector<ElementType> Candidate;
+        const auto Result = ReflectionValueCodec<std::vector<ElementType>>::FromReflected(Candidate, Value);
+        if (Result.bOk)
+        {
+            std::copy(Candidate.begin(), Candidate.end(), Destination.begin());
+        }
+        return Result;
     }
 };
 

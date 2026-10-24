@@ -1,0 +1,22 @@
+.native-reflected-asset-editor { display:flex; flex-direction:column; min-width:0; height:100%; min-height:0; color:var(--text-primary); background:var(--bg-panel); }
+.native-reflected-asset-editor>.native-document-toolbar { flex-shrink:0; border-bottom:1px solid var(--border-subtle); padding:6px; display:flex; align-items:center; gap:8px; }
+.native-reflected-asset-editor>.native-document-toolbar>strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; flex:1; }
+.native-reflected-asset-fields { overflow:auto; min-height:0; padding:12px; }
+.reflected-property-group { border:1px solid var(--border-subtle); border-radius:4px; padding:8px; margin-bottom:8px; min-width:0; }
+.reflected-property-group>summary { cursor:pointer; padding:4px 0; color:var(--text-primary); }
+.reflected-collection-element { border-top:1px solid var(--border-subtle); padding:8px 0; }
+.reflected-collection-element>header,.reflected-collection-actions { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+.reflected-collection-element>header>span { flex:1; }
+.native-reflected-asset-editor button { background:var(--bg-panel-elevated); color:var(--text-secondary); border:1px solid var(--border-subtle); border-radius:4px; padding:5px; }
+.native-reflected-asset-editor button:hover:not(:disabled) { background:var(--bg-hover); }
+.native-reflected-asset-editor button:disabled { color:var(--text-disabled); }
+.native-reflected-asset-editor input,.native-reflected-asset-editor select { min-width:0; max-width:100%; }
+.native-reflected-asset-fields .component-property-field { min-width:0; }
+.native-reflected-asset-fields dd { overflow-wrap:anywhere; margin:4px 0 12px; }
+.reflected-document-error { color:var(--error); padding:8px; margin:0; }
+.native-reflected-asset-fields .component-parameter-fields { border:0; padding:0; margin:0 0 10px; min-width:0; }
+.native-reflected-asset-fields .game-field { display:flex; flex-direction:column; gap:5px; margin:0; }
+.native-reflected-asset-fields .game-field:has(input[type="checkbox"]) { flex-direction:row; align-items:center; justify-content:space-between; padding:5px 0; }
+.native-reflected-asset-fields .game-field input[type="checkbox"] { flex:none; width:14px; height:14px; margin:0; }
+.native-reflected-asset-fields .game-field>span,.native-reflected-asset-fields .component-property-field>span { color:var(--text-secondary); }
+.native-reflected-asset-fields .component-property-field { margin-bottom:10px; }

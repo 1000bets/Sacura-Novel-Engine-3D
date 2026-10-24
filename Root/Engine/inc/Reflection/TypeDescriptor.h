@@ -12,6 +12,7 @@ struct TypeDescriptor
     uint32_t SchemaVersion = 1;
     size_t ByteSize = 0;
     TypeId ElementTypeId{};
+    size_t FixedElementCount = 0;
     TypeId ReferencedTypeId{};
 
     using ConstructFunction = void (*)(void* Destination);

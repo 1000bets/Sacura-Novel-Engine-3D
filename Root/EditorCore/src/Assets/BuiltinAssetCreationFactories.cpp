@@ -1,5 +1,7 @@
 #include "Assets/BuiltinAssetCreationFactories.h"
 #include <set>
+#include "Documents/WidgetLibraryDocument.h"
+#include "Core/EnginePaths.h"
 #include "Assets/MaterialAssetCreation.h"
 #include "Assets/StoryAssetCreation.h"
 #include "Core/IO/AtomicFileWriter.h"
@@ -9,6 +11,16 @@
 #include "World/Serialization/SceneSerializer.h"
 #include "Prefab/PrefabLibrary.h"
 #include "Input/InputDocument.h"
+
+bool CreateWidgetLibraryAssetFactory::Create(AssetRegistry& Registry, const std::filesystem::path& Destination, std::string& Error) const
+{
+    nlohmann::json Document;
+    if (!WidgetLibraryDocument::Read(EnginePaths::Config() / "UI" / "Default.widgets", Document, Error))
+    {
+        return false;
+    }
+    return AtomicFileWriter::WriteText(Destination, Document.dump(2) + "\n", Error);
+}
 
 bool CreateSceneAssetFactory::Create(AssetRegistry& Registry, const std::filesystem::path& Destination, std::string& Error) const
 {
@@ -140,6 +152,7 @@ bool CreatePythonScriptAssetFactory::Create(AssetRegistry& Registry, const std::
 
 void ForceTouchBuiltinAssetCreationFactories()
 {
+    (void)&CreateWidgetLibraryAssetFactory::s_ReflectionClassRegistrar;
     (void)&CreatePythonScriptAssetFactory::s_ReflectionClassRegistrar;
     (void)&AssetCreationFactory::s_ReflectionClassRegistrar;
     (void)&CreateSceneAssetFactory::s_ReflectionClassRegistrar;

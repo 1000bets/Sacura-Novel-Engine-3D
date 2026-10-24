@@ -5,13 +5,16 @@ import {AssetReferenceField} from './NativeAssets.jsx';
 import {SchemaValue} from './SchemaFields.jsx';
 import ColorField from './ColorField.jsx';
 
-export default function NativeAssetCreateDialog({type: Type, folder: Folder, selectedAsset: SelectedAsset, create: Create, close: Close}) {
-  const [OwnerDocument] = useState(ActiveWorkspaceDocument);
+export default function NativeAssetCreateDialog({type: Type, folder: Folder, selectedAsset: SelectedAsset, create: Create, close: Close, ownerDocument:InvokingDocument}) {
+  const [OwnerDocument] = useState(() => InvokingDocument || ActiveWorkspaceDocument());
   const [Name, SetName] = useState('');
   const IsPythonScript = Type.typeId === 'PythonScript';
   let DestinationFolder = Folder || 'Game';
   if (IsPythonScript && DestinationFolder !== 'Game/Scripts' && !DestinationFolder.startsWith('Game/Scripts/')) {
     DestinationFolder = 'Game/Scripts';
+  }
+  if (Type.typeId === 'WidgetLibrary' && DestinationFolder === 'Game') {
+    DestinationFolder = 'Game/UI';
   }
   const [Settings, SetSettings] = useState(() => {
     const Defaults = Object.fromEntries(Type.settings.map(Field => [Field.id, Field.value]));

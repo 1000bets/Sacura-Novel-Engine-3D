@@ -138,7 +138,7 @@ export default function TransformInspector({object, scene, onChange, onInteracti
         <NumericInput label={Label + ' ' + AxisName} value={Draft[Key][Axis]} disabled={disabled} step={Step} onBegin={Begin} onPreview={Next => Preview(Key, Axis, Next)} onCancel={Cancel} onCommit={(Next, IsDrag) => Commit(Key, Axis, Next, IsDrag)}/>
       </label>)}</div>
     </div>)}
-    <div className="transform-actions"><Button icon="Focus" onClick={onFocus}>{tr('В кадр')}</Button><Button icon="RotateCcw" onClick={onReset}>{tr('Сбросить')}</Button><Button icon="Copy" disabled={!onDuplicate} onClick={onDuplicate}>{tr('Дубликат')}</Button><Button icon="Trash2" onClick={onDelete}>{tr('Удалить')}</Button></div>
+    <div className="transform-actions"><Button icon="Focus" onClick={onFocus} title={tr('В кадр')}/><Button icon="RotateCcw" onClick={onReset} title={tr('Сбросить')}/><Button icon="Copy" disabled={!onDuplicate} onClick={onDuplicate} title={tr('Дубликат')}/><Button icon="Trash2" onClick={onDelete} title={tr('Удалить')}/></div>
     {!compact && <p>{tr("Тяните число мышью или нажмите для ввода выражения. Shift — точнее, Ctrl — быстрее. Enter — применить, Escape — отменить.")}</p>}
   </fieldset>;
 }

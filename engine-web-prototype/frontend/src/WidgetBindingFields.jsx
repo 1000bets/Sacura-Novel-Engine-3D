@@ -1,9 +1,23 @@
 import React from 'react';
-import {useLocale} from './i18n.jsx';
+import {useLocale,t as Translate} from './i18n.jsx';
 import {GameSelect,GameField,GameNumber} from './GameplayCommandFields.jsx';
 import CapabilityBindingFields from './CapabilityBindingFields.jsx';
-export default function WidgetBindingFields({element:e,project,onChange}){
+export default function WidgetBindingFields({element:e,project,onChange,native:Native=false}){
  useLocale();const binding=(key,value)=>onChange({binding:{...e.binding,[key]:value}});
+ if (Native) {
+  return <>
+   <label>{Translate('Editor.Widgets.Binding')}<input value={e.binding?.path||''} onChange={Event=>onChange({binding:{source:'variable',path:Event.target.value,format:e.binding?.format||''}})}/></label>
+   <label>{Translate('Editor.Widgets.TextFormat')}<input placeholder="{value}" value={e.binding?.format||''} onChange={Event=>binding('format',Event.target.value)}/></label>
+   <label>{Translate('Editor.Widgets.Visibility')}<input value={e.showIf?.path||''} onChange={Event=>{
+     let Condition=null;
+     if (Event.target.value) {
+      Condition={source:'variable',path:Event.target.value};
+     }
+     onChange({showIf:Condition});
+    }}/></label>
+   {e.type==='progress'&&<><GameNumber label="Минимум" value={e.min||0} onChange={Value=>onChange({min:Value})}/><GameNumber label="Максимум" value={e.max??100} onChange={Value=>onChange({max:Value})}/><label>{Translate('Editor.Widgets.MaximumVariable')}<input value={e.maxVariable||''} onChange={Event=>onChange({maxVariable:Event.target.value})}/></label></>}
+  </>;
+ }
  return <><GameSelect label="Источник значения" value={e.binding?.source||''} options={[["","Статический текст"],["variable","Переменная проекта"],["capability","Состояние компонента / возможности"],...(e.binding?.source==='component'?[["component","Состояние компонента"]]:[]),...(e.binding?.source==='game'?[["game","Старая привязка состояния"]]:[])]} onChange={source=>onChange({binding:source==='capability'?{source}:source==='variable'?{source,path:Object.keys(project.variables)[0]||''}:null})}/>
  {['capability','component'].includes(e.binding?.source)&&<CapabilityBindingFields project={project} valueTypes={e.type==='inventory'?['collection']:e.type==='progress'?['number','integer']:undefined} value={e.binding} onChange={value=>onChange({binding:value?{...value,format:e.binding.format||''}:null})}/>}
  {e.binding?.source==='variable'&&<GameSelect label="Переменная проекта" value={e.binding.path} options={Object.keys(project.variables).map(id=>[id,id])} onChange={path=>binding('path',path)}/>}

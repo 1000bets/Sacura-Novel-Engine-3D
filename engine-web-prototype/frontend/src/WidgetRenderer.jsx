@@ -4,7 +4,7 @@ import {boundText,widgetValue,widgetVisible} from './widgetBindings.js';
 import {scopeWidgetCss,widgetRects,isUnmodifiedDefaultWidget} from './widgetModel.js';
 import './widgets.css';
 
-export default function WidgetRenderer({widget,context={},onAction,onChoice,choiceEnabled=()=>true,editing=false,width,height}){
+export default function WidgetRenderer({widget,context={},onAction,onChoice,choiceEnabled=()=>true,editing=false,width,height,imageSource}){
  useLocale();
  const ref=useRef(null),[size,setSize]=useState({width:width||1280,height:height||720}),token=useId().replace(/[^a-zA-Z0-9]/g,''),scope='widget-scope-'+token;
  useEffect(()=>{if(width&&height){setSize({width,height});return;}const node=ref.current;if(!node)return;const observer=new ResizeObserver(([entry])=>setSize({width:entry.contentRect.width,height:entry.contentRect.height}));observer.observe(node);return()=>observer.disconnect();},[width,height]);
@@ -23,7 +23,13 @@ export default function WidgetRenderer({widget,context={},onAction,onChoice,choi
    if(e.type==='progress'){const min=e.min||0,max=Number(widgetValue(context,e.maxBinding)??context.variables?.[e.maxVariable]??e.max??100),value=Number(widgetValue(context,e.binding)??e.value??0);return <div {...props}><progress aria-label={e.name} max={Math.max(.001,max-min)} value={Math.min(Math.max(0,value-min),Math.max(.001,max-min))}/></div>;}
    if(e.type==='inventory'){const owner=e.binding?.source==='capability'?e.binding.owner.id:undefined,equipment=owner?Object.values(context.game?.inventories?.[e.binding.owner.type+':'+owner]?.equipment||{}):Object.values(context.game?.equipment||{}),action=(command,itemId)=>onAction?.('gameplay',owner?{command:'sacura.inventory.'+command,value:{owner:e.binding.owner,item:{kind:'reference',type:'item',mode:'direct',id:itemId}}}:{command:command==='use'?'useItem':'equip',value:{itemId}});return <div {...props}>{(widgetValue(context,e.binding)||context.game?.inventory||[]).map((slot,i)=>{const item=context.project?.gameplay?.items.find(x=>x.id===slot.itemId);return <div key={i}><span>{item?.name||slot.itemId} × {slot.count}{equipment.includes(slot.itemId)?' ✓':''}</span>{item?.slot&&<button onClick={()=>action('equip',slot.itemId)}>{tr('Экипировать')}</button>}{(item?.heal||item?.useEventId)&&<button onClick={()=>action('use',slot.itemId)}>{tr('Использовать')}</button>}</div>;})}{context.project?.gameplay?.recipes.map(r=><button key={r.id} onClick={()=>onAction?.('gameplay',owner?{command:'sacura.inventory.combine',value:{owner:e.binding.owner,recipe:{kind:'reference',type:'recipe',mode:'direct',id:r.id}}}:{command:'combine',value:{recipeId:r.id}})}>{r.name}</button>)}</div>;}
    if(e.type==='choices')return <div {...props}>{(context.choices||[{id:'preview',label:tr('Пример ответа')}]).map(choice=><button key={choice.id} className={context.selectedChoiceId===choice.id?'input-selected':undefined} aria-pressed={context.selectedChoiceId===choice.id} disabled={!editing&&(!context.ready||!choiceEnabled(choice))} onClick={()=>!editing&&onChoice?.(choice.id)}>{choice.label}</button>)}</div>;
-   if(e.type==='image')return <div {...props}>{e.src?<img src={e.src} alt={e.text||e.name} draggable={false}/>:editing?tr("Изображение"):null}</div>;
+   if (e.type === 'image') {
+    let Source = e.src;
+    if (imageSource && e.imageAssetId) {
+     Source = imageSource(e.imageAssetId);
+    }
+    return <div {...props}>{Source && <img src={Source} alt={e.text || e.name} draggable={false}/>} {!Source && editing && tr('Изображение')}</div>;
+   }
    const advance=e.role==='dialogueText'&&context.canAdvance&&!editing;
    return <div {...props} role={advance?'button':undefined} tabIndex={advance?0:undefined} aria-label={advance?tr("Продолжить диалог"):undefined} onClick={()=>advance&&onAction?.('advance')} onKeyDown={event=>{if(advance&&['Enter',' '].includes(event.key)){event.preventDefault();event.stopPropagation();onAction?.('advance');}}}>{e.type==='text'?textFor(e):null}</div>;
   })}

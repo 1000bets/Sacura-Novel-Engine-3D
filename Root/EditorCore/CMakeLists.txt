@@ -5,6 +5,7 @@ set(EDITOR_CORE_SRC
     src/Assets/AssetCreationFactory.cpp
     src/Assets/BuiltinAssetCreationFactories.cpp
     src/Commands/StaticMeshCommands.cpp
+    src/Documents/WidgetLibraryDocument.cpp
     src/Documents/PythonScriptDocument.cpp
     src/Documents/StaticMeshDocument.cpp
     src/Project/GameExporter.cpp
@@ -12,6 +13,7 @@ set(EDITOR_CORE_SRC
     src/Assets/CharacterAnimationImport.cpp
     src/Documents/MaterialEditingSession.cpp
     src/Commands/PrefabCommands.cpp
+    src/Documents/ReflectedAssetDocument.cpp
     src/Documents/InputAssetDocument.cpp
     src/Documents/InputPackage.cpp
     src/Assets/StoryAssetCreation.cpp

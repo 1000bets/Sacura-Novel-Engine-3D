@@ -1,0 +1,767 @@
+{
+  "format": "sakura.widgets",
+  "version": 1,
+  "widgets": [
+    {
+      "id": "widget-default-dialogue",
+      "name": "Диалог",
+      "kind": "dialogue",
+      "builtinDefault": true,
+      "referenceSize": [
+        1280,
+        720
+      ],
+      "elements": [
+        {
+          "id": "widget-default-dialogue-panel",
+          "name": "Диалоговое окно",
+          "type": "panel",
+          "parentId": null,
+          "role": "none",
+          "text": "",
+          "action": "none",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0,
+              1
+            ],
+            "anchorMax": [
+              1,
+              1
+            ],
+            "pivot": [
+              0.5,
+              1
+            ],
+            "x": 0,
+            "y": -34,
+            "width": -100,
+            "height": 205
+          },
+          "style": {
+            "background": "#211c29",
+            "color": "#fff4f8",
+            "opacity": 0.96,
+            "borderRadius": 16,
+            "borderWidth": 1,
+            "borderColor": "#ad849d",
+            "padding": 0
+          }
+        },
+        {
+          "id": "widget-default-dialogue-speaker",
+          "name": "Имя персонажа",
+          "type": "text",
+          "parentId": "widget-default-dialogue-panel",
+          "role": "speaker",
+          "text": "Новый текст",
+          "action": "none",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0,
+              0
+            ],
+            "anchorMax": [
+              1,
+              0
+            ],
+            "pivot": [
+              0,
+              0
+            ],
+            "x": 28,
+            "y": 18,
+            "width": -56,
+            "height": 32
+          },
+          "style": {
+            "background": "transparent",
+            "color": "#e2b8d1",
+            "fontSize": 23,
+            "fontWeight": 600,
+            "padding": 0
+          }
+        },
+        {
+          "id": "widget-default-dialogue-text",
+          "name": "Текст реплики",
+          "type": "text",
+          "parentId": "widget-default-dialogue-panel",
+          "role": "dialogueText",
+          "text": "Новый текст",
+          "action": "none",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0,
+              0
+            ],
+            "anchorMax": [
+              1,
+              1
+            ],
+            "pivot": [
+              0,
+              0
+            ],
+            "x": 28,
+            "y": 60,
+            "width": -88,
+            "height": -105
+          },
+          "style": {
+            "background": "transparent",
+            "color": "#fff4f8",
+            "fontSize": 24,
+            "padding": 0
+          }
+        },
+        {
+          "id": "widget-default-dialogue-status",
+          "name": "Подсказка",
+          "type": "text",
+          "parentId": "widget-default-dialogue-panel",
+          "role": "status",
+          "text": "Новый текст",
+          "action": "none",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0,
+              1
+            ],
+            "anchorMax": [
+              1,
+              1
+            ],
+            "pivot": [
+              0,
+              1
+            ],
+            "x": 28,
+            "y": -16,
+            "width": -90,
+            "height": 25
+          },
+          "style": {
+            "background": "transparent",
+            "color": "#d1bfd0",
+            "fontSize": 15,
+            "padding": 0
+          }
+        },
+        {
+          "id": "widget-default-dialogue-next",
+          "name": "Продолжить",
+          "type": "button",
+          "parentId": "widget-default-dialogue-panel",
+          "role": "none",
+          "text": "›",
+          "action": "advance",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              1,
+              1
+            ],
+            "anchorMax": [
+              1,
+              1
+            ],
+            "pivot": [
+              1,
+              1
+            ],
+            "x": -20,
+            "y": -14,
+            "width": 44,
+            "height": 44
+          },
+          "style": {
+            "background": "#704e7c",
+            "color": "#fff4f8",
+            "fontSize": 28,
+            "borderRadius": 10,
+            "textAlign": "center",
+            "padding": 0
+          }
+        },
+        {
+          "id": "widget-default-dialogue-choices",
+          "name": "Ответы игрока",
+          "type": "choices",
+          "parentId": null,
+          "role": "choices",
+          "text": "",
+          "action": "none",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0.5,
+              1
+            ],
+            "anchorMax": [
+              0.5,
+              1
+            ],
+            "pivot": [
+              0.5,
+              1
+            ],
+            "x": 0,
+            "y": -255,
+            "width": 620,
+            "height": 190
+          },
+          "style": {
+            "background": "transparent",
+            "color": "#fff4f8",
+            "fontSize": 22,
+            "borderRadius": 10,
+            "padding": 4,
+            "gap": 8
+          }
+        }
+      ],
+      "css": ""
+    },
+    {
+      "id": "widget-default-hud",
+      "name": "Игровой HUD",
+      "kind": "hud",
+      "builtinDefault": true,
+      "referenceSize": [
+        1280,
+        720
+      ],
+      "elements": [
+        {
+          "id": "widget-default-hud-hp",
+          "name": "Здоровье",
+          "type": "text",
+          "parentId": null,
+          "role": "none",
+          "text": "HP",
+          "action": "none",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0,
+              0
+            ],
+            "anchorMax": [
+              0,
+              0
+            ],
+            "pivot": [
+              0,
+              0
+            ],
+            "x": 24,
+            "y": 22,
+            "width": 200,
+            "height": 42
+          },
+          "style": {
+            "fontSize": 24,
+            "padding": 0
+          },
+          "binding": {
+            "source": "variable",
+            "path": "hp",
+            "format": "HP: {value}"
+          }
+        },
+        {
+          "id": "widget-default-hud-health",
+          "name": "Шкала здоровья",
+          "type": "progress",
+          "parentId": null,
+          "role": "none",
+          "text": "",
+          "action": "none",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0,
+              0
+            ],
+            "anchorMax": [
+              0,
+              0
+            ],
+            "pivot": [
+              0,
+              0
+            ],
+            "x": 24,
+            "y": 68,
+            "width": 220,
+            "height": 16
+          },
+          "style": {
+            "background": "transparent",
+            "color": "#fff4f8",
+            "fontSize": 24,
+            "fontFamily": "system-ui",
+            "fontWeight": 400,
+            "borderColor": "#ad849d",
+            "borderWidth": 0,
+            "borderRadius": 12,
+            "padding": 12,
+            "opacity": 1,
+            "textAlign": "left",
+            "gap": 8
+          },
+          "binding": {
+            "source": "variable",
+            "path": "hp"
+          },
+          "maxVariable": "maxHp",
+          "min": 0,
+          "max": 100
+        },
+        {
+          "id": "widget-default-hud-ammo",
+          "name": "Патроны",
+          "type": "text",
+          "parentId": null,
+          "role": "none",
+          "text": "Новый текст",
+          "action": "none",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0,
+              0
+            ],
+            "anchorMax": [
+              0,
+              0
+            ],
+            "pivot": [
+              0,
+              0
+            ],
+            "x": 24,
+            "y": 98,
+            "width": 220,
+            "height": 40
+          },
+          "style": {
+            "fontSize": 24,
+            "padding": 0
+          },
+          "binding": {
+            "source": "variable",
+            "path": "ammo",
+            "format": "Ammo: {value}"
+          }
+        },
+        {
+          "id": "widget-default-hud-inventory",
+          "name": "Инвентарь",
+          "type": "inventory",
+          "parentId": null,
+          "role": "none",
+          "text": "",
+          "action": "none",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              1,
+              1
+            ],
+            "anchorMax": [
+              1,
+              1
+            ],
+            "pivot": [
+              1,
+              1
+            ],
+            "x": -24,
+            "y": -24,
+            "width": 440,
+            "height": 130
+          },
+          "style": {
+            "background": "transparent",
+            "color": "#fff4f8",
+            "fontSize": 24,
+            "fontFamily": "system-ui",
+            "fontWeight": 400,
+            "borderColor": "#ad849d",
+            "borderWidth": 0,
+            "borderRadius": 12,
+            "padding": 12,
+            "opacity": 1,
+            "textAlign": "left",
+            "gap": 8
+          }
+        }
+      ],
+      "css": ""
+    },
+    {
+      "id": "widget-default-mainMenu",
+      "name": "Главное меню",
+      "kind": "mainMenu",
+      "builtinDefault": true,
+      "referenceSize": [
+        1280,
+        720
+      ],
+      "elements": [
+        {
+          "id": "widget-default-mainMenu-panel",
+          "name": "Панель меню",
+          "type": "panel",
+          "parentId": null,
+          "role": "none",
+          "text": "",
+          "action": "none",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "x": 0,
+            "y": 0,
+            "width": 510,
+            "height": 440
+          },
+          "style": {
+            "background": "#211c29",
+            "color": "#fff4f8",
+            "opacity": 0.98,
+            "borderRadius": 20,
+            "borderWidth": 1,
+            "borderColor": "#ad849d",
+            "padding": 0
+          }
+        },
+        {
+          "id": "widget-default-mainMenu-title",
+          "name": "Заголовок",
+          "type": "text",
+          "parentId": "widget-default-mainMenu-panel",
+          "role": "title",
+          "text": "Пауза",
+          "action": "none",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0,
+              0
+            ],
+            "anchorMax": [
+              1,
+              0
+            ],
+            "pivot": [
+              0,
+              0
+            ],
+            "x": 30,
+            "y": 35,
+            "width": -60,
+            "height": 90
+          },
+          "style": {
+            "background": "transparent",
+            "color": "#fff4f8",
+            "fontSize": 36,
+            "fontWeight": 600,
+            "textAlign": "center",
+            "padding": 0
+          }
+        },
+        {
+          "id": "widget-default-mainMenu-start",
+          "name": "Начать игру",
+          "type": "button",
+          "parentId": "widget-default-mainMenu-panel",
+          "role": "none",
+          "text": "Начать игру",
+          "action": "start",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0.5,
+              0
+            ],
+            "anchorMax": [
+              0.5,
+              0
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "x": 0,
+            "y": 160,
+            "width": 380,
+            "height": 60
+          },
+          "style": {
+            "background": "#704e7c",
+            "color": "#fff4f8",
+            "fontSize": 24,
+            "textAlign": "center",
+            "borderRadius": 10,
+            "padding": 8
+          }
+        },
+        {
+          "id": "widget-default-mainMenu-restart",
+          "name": "Начать заново",
+          "type": "button",
+          "parentId": "widget-default-mainMenu-panel",
+          "role": "none",
+          "text": "Начать заново",
+          "action": "restart",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0.5,
+              0
+            ],
+            "anchorMax": [
+              0.5,
+              0
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "x": 0,
+            "y": 240,
+            "width": 380,
+            "height": 60
+          },
+          "style": {
+            "background": "#704e7c",
+            "color": "#fff4f8",
+            "fontSize": 24,
+            "textAlign": "center",
+            "borderRadius": 10,
+            "padding": 8
+          }
+        }
+      ],
+      "css": ""
+    },
+    {
+      "id": "widget-default-pauseMenu",
+      "name": "Меню паузы",
+      "kind": "pauseMenu",
+      "builtinDefault": true,
+      "referenceSize": [
+        1280,
+        720
+      ],
+      "elements": [
+        {
+          "id": "widget-default-pauseMenu-panel",
+          "name": "Панель меню",
+          "type": "panel",
+          "parentId": null,
+          "role": "none",
+          "text": "",
+          "action": "none",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "x": 0,
+            "y": 0,
+            "width": 510,
+            "height": 440
+          },
+          "style": {
+            "background": "#211c29",
+            "color": "#fff4f8",
+            "opacity": 0.98,
+            "borderRadius": 20,
+            "borderWidth": 1,
+            "borderColor": "#ad849d",
+            "padding": 0
+          }
+        },
+        {
+          "id": "widget-default-pauseMenu-title",
+          "name": "Заголовок",
+          "type": "text",
+          "parentId": "widget-default-pauseMenu-panel",
+          "role": "none",
+          "text": "Пауза",
+          "action": "none",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0,
+              0
+            ],
+            "anchorMax": [
+              1,
+              0
+            ],
+            "pivot": [
+              0,
+              0
+            ],
+            "x": 30,
+            "y": 35,
+            "width": -60,
+            "height": 90
+          },
+          "style": {
+            "background": "transparent",
+            "color": "#fff4f8",
+            "fontSize": 36,
+            "fontWeight": 600,
+            "textAlign": "center",
+            "padding": 0
+          }
+        },
+        {
+          "id": "widget-default-pauseMenu-resume",
+          "name": "Продолжить",
+          "type": "button",
+          "parentId": "widget-default-pauseMenu-panel",
+          "role": "none",
+          "text": "Продолжить",
+          "action": "resume",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0.5,
+              0
+            ],
+            "anchorMax": [
+              0.5,
+              0
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "x": 0,
+            "y": 160,
+            "width": 380,
+            "height": 60
+          },
+          "style": {
+            "background": "#704e7c",
+            "color": "#fff4f8",
+            "fontSize": 24,
+            "textAlign": "center",
+            "borderRadius": 10,
+            "padding": 8
+          }
+        },
+        {
+          "id": "widget-default-pauseMenu-restart",
+          "name": "Начать заново",
+          "type": "button",
+          "parentId": "widget-default-pauseMenu-panel",
+          "role": "none",
+          "text": "Начать заново",
+          "action": "restart",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0.5,
+              0
+            ],
+            "anchorMax": [
+              0.5,
+              0
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "x": 0,
+            "y": 240,
+            "width": 380,
+            "height": 60
+          },
+          "style": {
+            "background": "#704e7c",
+            "color": "#fff4f8",
+            "fontSize": 24,
+            "textAlign": "center",
+            "borderRadius": 10,
+            "padding": 8
+          }
+        },
+        {
+          "id": "widget-default-pauseMenu-mainMenu",
+          "name": "Главное меню",
+          "type": "button",
+          "parentId": "widget-default-pauseMenu-panel",
+          "role": "none",
+          "text": "Главное меню",
+          "action": "mainMenu",
+          "visible": true,
+          "layout": {
+            "anchorMin": [
+              0.5,
+              0
+            ],
+            "anchorMax": [
+              0.5,
+              0
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "x": 0,
+            "y": 320,
+            "width": 380,
+            "height": 60
+          },
+          "style": {
+            "background": "#704e7c",
+            "color": "#fff4f8",
+            "fontSize": 24,
+            "textAlign": "center",
+            "borderRadius": 10,
+            "padding": 8
+          }
+        }
+      ],
+      "css": ""
+    }
+  ],
+  "ui": {
+    "dialogue": "widget-default-dialogue",
+    "hud": "widget-default-hud",
+    "mainMenu": "widget-default-mainMenu",
+    "pauseMenu": "widget-default-pauseMenu"
+  }
+}

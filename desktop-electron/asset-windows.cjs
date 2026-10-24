@@ -16,10 +16,6 @@ exports.createAssetWindows = function({dialog, NativeViewport, waitForNative, ge
     if (Asset.typeId === 'Model' && !Identity.subAssetId) {
       Identity = {...Identity, subAssetId:Asset.subassets.find(Entry => Entry.typeId === 'StaticMesh')?.id};
     }
-    if (!['Material','MaterialInstance','Texture','PythonScript','Prefab'].includes(Asset.typeId) && !Asset.subassets.some(Entry => Entry.id === Identity.subAssetId && Entry.typeId === 'StaticMesh')) {
-      getMainWindow().webContents.send('native-reveal-asset', {...Identity,open:true});
-      return null;
-    }
     const Identifier = 'asset:' + Identity.assetId + ':' + (Identity.subAssetId || '');
     if (Pending.has(Identifier)) {
       return Pending.get(Identifier);
@@ -150,7 +146,19 @@ exports.createAssetWindows = function({dialog, NativeViewport, waitForNative, ge
       if (Value.method === 'assetDocument.execute' && (Value.params?.assetId !== Editor.identity.assetId || (Value.params?.subAssetId || null) !== (Editor.identity.subAssetId || null))) {
         throw Error('Document belongs to another tab');
       }
+      if (Value.method === 'assetDocument.execute' && !['open','get','preview'].includes(Value.params?.operation)) {
+        const MainState = await getViewport().bridge.request('bridge.describe', {});
+        if (!MainState.ok || MainState.value.play !== 'stopped') {
+          return {version:1,type:'bridge.result',id:null,ok:false,context:Value.context,error:{code:'PLAY_READ_ONLY',message:'Stop Play before editing asset documents'}};
+        }
+      }
       const Result = await Owner.bridge.request(Value.method, Value.params, Value.context);
+      if (Result.ok && Value.method === 'assetDocument.execute') {
+        const MainState = await getViewport().bridge.request('bridge.describe', {});
+        if (MainState.ok && MainState.value.play !== 'stopped') {
+          Result.value.readOnly = true;
+        }
+      }
       if (Result.ok && Value.params?.operation === 'save') {
         await getViewport().bridge.request('assets.refresh', {});
       }

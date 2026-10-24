@@ -118,7 +118,7 @@
 .transform-vector label b { font-size:10px; font-weight:500; }
 .transform-vector input { width:100%; padding:5px 3px; font-size:11px; }
 .axis-X { color:var(--axis-x); }.axis-Y { color:var(--axis-y); }.axis-Z { color:var(--axis-z); }
-.transform-actions { display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-top:13px; }
+.transform-actions { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px; margin-top:13px; }
 .transform-actions button { border:1px solid var(--line); font-size:11px; }
 .transform-inspector>p { color:var(--muted); font-size:10px; line-height:1.7; margin-bottom:0; }
 * {

@@ -19,7 +19,7 @@ export default function NativeGameHud({State, Execute}) {
     {View.reticle && <span className="native-game-reticle" aria-hidden="true">+</span>}
     {View.message&&<div className="gameplay-task" role="status">{View.message}</div>}
     {View.widget ? <div className="gameplay-hud">
-      <WidgetRenderer widget={View.widget} context={{paused:Disabled}} onAction={(Action,Element)=>{
+      <WidgetRenderer widget={View.widget} context={{paused:Disabled,variables:View.variables||{},game:View.game||{}}} onAction={(Action,Element)=>{
         if (!Disabled && Element.nativeAction) {
           Execute({objectId:View.objectId,componentId:View.componentId,action:Element.nativeAction});
         }

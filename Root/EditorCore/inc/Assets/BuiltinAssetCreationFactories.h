@@ -14,6 +14,17 @@ public:
 };
 ENGINE_CLASS_END(CreatePythonScriptAssetFactory)
 
+class CreateWidgetLibraryAssetFactory : public AssetCreationFactory
+{
+    ENGINE_CLASS(CreateWidgetLibraryAssetFactory, AssetCreationFactory, "editor.CreateWidgetLibraryAssetFactory")
+public:
+    AssetType GetAssetType() const override { return WidgetLibraryAssetType; }
+    const char* GetDisplayName() const override { return "Библиотека виджетов UI"; }
+    const char* GetExtension() const override { return ".widgets"; }
+    bool Create(AssetRegistry& Registry, const std::filesystem::path& Destination, std::string& Error) const override;
+};
+ENGINE_CLASS_END(CreateWidgetLibraryAssetFactory)
+
 class CreateSceneAssetFactory : public AssetCreationFactory
 {
     ENGINE_CLASS(CreateSceneAssetFactory, AssetCreationFactory, "editor.CreateSceneAssetFactory")

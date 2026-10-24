@@ -240,6 +240,40 @@ bool NativeBridge::ProjectChanged() const {
     ContentHash Current; AssetDiagnostic D;
     return !ContentHash::TryHashFile(Project.GetProject()->ProjectFile.u8string(),Current,D) || Current!=ProjectFingerprint;
 }
+void NativeBridge::ResolveWidgetImages(Json& Widget)
+{
+    for (auto& Element : Widget.at("elements"))
+    {
+        if (!Element.contains("imageAssetId") || Element.at("imageAssetId").is_null())
+        {
+            continue;
+        }
+        const auto Image = Asset(Element.at("imageAssetId"));
+        Require(Image.Metadata.Type == TextureAssetType, "GAME_VIEW_ERROR", "Widget image must reference a texture");
+        const auto Identifier = Image.Metadata.Guid.ToString() + Image.Metadata.SourceFingerprint.ToHex();
+        const auto Cached = RuntimeWidgetImages.find(Identifier);
+        if (Cached != RuntimeWidgetImages.end())
+        {
+            Element["src"] = Cached->second;
+            continue;
+        }
+        const AssetKey Key{Image.Metadata.Guid, std::nullopt};
+        auto& Manager = Runtime.GetAssetManager();
+        if (Manager.GetLoadState(Key) == AssetLoadState::Unloaded)
+        {
+            Manager.LoadAsync<TextureResource>(Key);
+        }
+        AssetHandle<TextureResource> Texture;
+        if (Manager.TryGetLoaded(Key, Texture))
+        {
+            const auto Pixels = ImageBuffer::FromRgba(Texture->Pixels.data(), Texture->Width, Texture->Height, Texture->RowStride).ResizeToFit(512, 512);
+            const auto Bytes = Pixels.EncodePng();
+            Element["src"] = "data:image/png;base64," + Base64::Encode(Bytes.data(), Bytes.size());
+            RuntimeWidgetImages[Identifier] = Element.at("src").get<std::string>();
+        }
+    }
+}
+
 Json NativeBridge::GameViews()
 {
     Json Views = Json::array();
@@ -268,12 +302,43 @@ Json NativeBridge::GameViews()
                     "GAME_VIEW_ERROR", "Game view must return a bounded JSON string");
                 auto View = Json::parse(Result.StringValue);
                 Require(View.is_object(), "GAME_VIEW_ERROR", "Game view must be an object");
+                if (View.contains("widgetLibrary"))
+                {
+                    const auto Library = Asset(View.at("widgetLibrary"));
+                    Require(Library.Metadata.Type == WidgetLibraryAssetType, "GAME_VIEW_ERROR", "widgetLibrary must reference a WidgetLibrary asset");
+                    auto& Cached = RuntimeWidgetLibraries[Library.Metadata.Guid.ToString()];
+                    if (Cached.second.is_null() || Cached.first != Library.Metadata.SourceFingerprint)
+                    {
+                        Json Document;
+                        std::string Error;
+                        Require(WidgetLibraryDocument::Read(std::filesystem::u8path(Library.AbsolutePath), Document, Error), "GAME_VIEW_ERROR", Error);
+                        Cached = {Library.Metadata.SourceFingerprint, std::move(Document)};
+                    }
+                    View["widgets"] = Json::object();
+                    for (auto Widget : Cached.second.at("widgets"))
+                    {
+                        const auto Kind = Widget.at("kind").get<std::string>();
+                        if (Cached.second.at("ui").at(Kind) == Widget.at("id"))
+                        {
+                            ResolveWidgetImages(Widget);
+                            if (Kind == "hud")
+                            {
+                                View["widget"] = Widget;
+                            }
+                            else
+                            {
+                                View["widgets"][Kind] = Widget;
+                            }
+                        }
+                    }
+                }
                 View["objectId"] = SceneObject->GetPersistentId();
                 View["componentId"] = Script->GetPersistentId();
                 Views.push_back(std::move(View));
             }
         }
     }
+    Require(Views.dump().size() <= 6291456, "GAME_VIEW_ERROR", "Resolved game UI exceeds the 6 MiB transport budget");
     return Views;
 }
 
@@ -514,6 +579,14 @@ Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
         if(Story.IsOpen()&&Story.IsDirty()) Require(Story.Save(Error),"STORY_ERROR",Error);
         for (auto& Entry : AssetDocuments)
         {
+            if (Entry.second.Reflected && Entry.second.Reflected->IsDirty())
+            {
+                Require(Entry.second.Reflected->Save(Error), "IO_ERROR", Error);
+            }
+            if (Entry.second.Widgets && Entry.second.Widgets->IsDirty())
+            {
+                Require(Entry.second.Widgets->Save(Error), "IO_ERROR", Error);
+            }
             if (Entry.second.Script && Entry.second.Script->IsDirty())
             {
                 Require(Entry.second.Script->Save(Error), "IO_ERROR", Error);
@@ -1349,6 +1422,11 @@ bool NativeBridge::HasDirtyAssetDocuments() const
     if (OpenPrefab.IsValid() && Workspace.GetDocument().IsDirty()) { return true; }
     for (const auto& Entry : AssetDocuments)
     {
+        if (Entry.second.Reflected && Entry.second.Reflected->IsDirty()) { return true; }
+        if (Entry.second.Widgets && Entry.second.Widgets->IsDirty())
+        {
+            return true;
+        }
         if (Entry.second.Script && Entry.second.Script->IsDirty()) { return true; }
         if (Entry.second.Mesh && Entry.second.Mesh->IsDirty()) { return true; }
         if (Entry.second.Material && Entry.second.Material->GetDocument().IsDirty()) { return true; }
@@ -1373,8 +1451,7 @@ Json NativeBridge::AssetDocumentTools(const Json& Params)
     Require(Registry.TryResolveKey(Key, Resolved, &Subasset), "NOT_FOUND", "Document asset unavailable");
     AssetType Type = Entry.Metadata.Type;
     if (Subasset) { Type = Subasset->Type; }
-    Require(Type == StaticMeshAssetType || Type == MaterialAssetType || Type == MaterialInstanceAssetType || Type == TextureAssetType || Type == PythonScriptAssetType,
-        "INVALID_ARGUMENT", "This asset type has no document editor");
+
     const std::string Identifier = Key.Asset.ToString() + Params.value("subAssetId", Json(nullptr)).dump();
     const std::string Operation = Params.at("operation");
     auto Found = AssetDocuments.find(Identifier);
@@ -1383,7 +1460,12 @@ Json NativeBridge::AssetDocumentTools(const Json& Params)
         Require(Operation == "open", "NOT_FOUND", "Open the asset document first");
         AssetDocumentState State;
         std::string Error;
-        if (Type == PythonScriptAssetType)
+        if (Type == WidgetLibraryAssetType)
+        {
+            State.Widgets = std::make_unique<WidgetLibraryDocument>(Registry);
+            Require(State.Widgets->Open(Key, Error), "DOCUMENT_ERROR", Error);
+        }
+        else if (Type == PythonScriptAssetType)
         {
             State.Script = std::make_unique<PythonScriptDocument>(Registry);
             Require(State.Script->Open(Key, Error), "DOCUMENT_ERROR", Error);
@@ -1393,15 +1475,114 @@ Json NativeBridge::AssetDocumentTools(const Json& Params)
             State.Mesh = std::make_unique<StaticMeshDocument>(Registry);
             Require(State.Mesh->Open(Key, Error), "DOCUMENT_ERROR", Error);
         }
-        else if (Type != TextureAssetType)
+        else if (Type == MaterialAssetType || Type == MaterialInstanceAssetType)
         {
             State.Material = std::make_unique<MaterialEditingSession>(Registry);
             const auto Result = State.Material->Open(Key);
             Require(!Result.HasError(), "DOCUMENT_ERROR", Result.Message);
         }
+        else if (Type != TextureAssetType)
+        {
+            State.Reflected = ReflectedAssetDocument::Create(Type);
+            if (State.Reflected)
+            {
+                Require(State.Reflected->Open(Registry, Resolved, Error), "DOCUMENT_ERROR", Error);
+            }
+        }
         Found = AssetDocuments.emplace(Identifier, std::move(State)).first;
     }
     auto& State = Found->second;
+    if (State.Widgets)
+    {
+        if (Operation != "open" && Operation != "get" && Operation != "preview")
+        {
+            Require(!Runtime.GetPlaySession().IsSimulating(), "PLAY_READ_ONLY", "Stop Play before editing widgets");
+            Require(Params.contains("revision") && Params.at("revision") == State.Revision,
+                "STALE_DOCUMENT", "Refresh the widget document before editing");
+            Require(Entry.Mount == AssetMount::Game, "READ_ONLY", "Engine widgets are read-only");
+            std::string Error;
+            if (Operation == "edit")
+            {
+                Require(State.Widgets->Edit(Params.at("value"), Error), "DOCUMENT_ERROR", Error);
+            }
+            else if (Operation == "save")
+            {
+                Require(State.Widgets->Save(Error), "DOCUMENT_ERROR", Error);
+            }
+            else if (Operation == "undo")
+            {
+                State.Widgets->Undo();
+            }
+            else if (Operation == "redo")
+            {
+                State.Widgets->Redo();
+            }
+            else if (Operation == "reload")
+            {
+                Require(!State.Widgets->IsDirty(), "UNSAVED_CHANGES", "Save or undo widget changes before reloading");
+                Require(State.Widgets->Open(Key, Error), "DOCUMENT_ERROR", Error);
+            }
+            else
+            {
+                throw Failure("INVALID_ARGUMENT", "Unknown widget document operation");
+            }
+            ++State.Revision;
+        }
+        return {{"assetId", Key.Asset.ToString()}, {"type", "WidgetLibrary"}, {"revision", State.Revision},
+            {"document", State.Widgets->GetDocument()}, {"dirty", State.Widgets->IsDirty()},
+            {"canUndo", State.Widgets->CanUndo()}, {"canRedo", State.Widgets->CanRedo()},
+            {"readOnly", Entry.Mount == AssetMount::Engine || Runtime.GetPlaySession().IsSimulating()}};
+    }
+    if (State.Reflected)
+    {
+        if (Operation != "open" && Operation != "get" && Operation != "preview")
+        {
+            Require(!Runtime.GetPlaySession().IsSimulating(), "PLAY_READ_ONLY", "Stop Play before editing assets");
+            Require(Params.contains("revision") && Params.at("revision") == State.Revision,
+                "STALE_DOCUMENT", "Refresh the asset document before editing");
+            Require(!State.Reflected->IsReadOnly(), "READ_ONLY", "Asset is read-only");
+            std::string Error;
+            if (Operation == "property")
+            {
+                Require(State.Reflected->Edit(Params.at("value"), Error), "DOCUMENT_ERROR", Error);
+            }
+            else if (Operation == "save")
+            {
+                Require(State.Reflected->Save(Error), "DOCUMENT_ERROR", Error);
+            }
+            else if (Operation == "undo")
+            {
+                State.Reflected->Undo();
+            }
+            else if (Operation == "redo")
+            {
+                State.Reflected->Redo();
+            }
+            else if (Operation == "reload")
+            {
+                Require(!State.Reflected->IsDirty(), "UNSAVED_CHANGES", "Save or undo changes before reloading");
+                Require(State.Reflected->Open(Registry, Resolved, Error), "DOCUMENT_ERROR", Error);
+            }
+            else
+            {
+                throw Failure("INVALID_ARGUMENT", "Unknown reflected document operation");
+            }
+            ++State.Revision;
+        }
+        return {{"assetId", Key.Asset.ToString()}, {"type", Type.GetIdentifier()}, {"editor", "properties"},
+            {"revision", State.Revision}, {"dirty", State.Reflected->IsDirty()},
+            {"readOnly", State.Reflected->IsReadOnly() || Runtime.GetPlaySession().IsSimulating()},
+            {"canUndo", State.Reflected->CanUndo()}, {"canRedo", State.Reflected->CanRedo()},
+            {"schema", State.Reflected->GetSchema()}, {"document", State.Reflected->GetValues()}};
+    }
+    if (!State.Script && !State.Mesh && !State.Material && Type != TextureAssetType)
+    {
+        Require(Operation == "open" || Operation == "get" || Operation == "preview", "READ_ONLY", "No editable document is registered for this asset type");
+        return {{"assetId", Key.Asset.ToString()}, {"type", Type.GetIdentifier()}, {"editor", "properties"},
+            {"revision", State.Revision}, {"dirty", false}, {"readOnly", true},
+            {"document", Json::object()}, {"schema", nullptr},
+            {"diagnostic", "No reflected document is registered for this asset type."}};
+    }
     if (State.Script)
     {
         if (Operation != "open" && Operation != "get" && Operation != "preview")

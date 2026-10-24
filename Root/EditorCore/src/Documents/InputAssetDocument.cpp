@@ -60,7 +60,7 @@ bool InputAssetDocument::Apply(nlohmann::json Candidate, std::string& Error)
                     Existing = Action;
                 }
             }
-            Candidate["Action"] = Action;
+            Candidate["Action"]["Identifier"] = Action.Identifier;
         }
         else
         {
@@ -73,7 +73,7 @@ bool InputAssetDocument::Apply(nlohmann::json Candidate, std::string& Error)
                     Existing = Context;
                 }
             }
-            Candidate["Context"] = Context;
+            Candidate["Context"]["Identifier"] = Context.Identifier;
         }
         if (!InputSession::Validate(Configuration, Error))
         {
@@ -176,4 +176,88 @@ bool InputAssetDocument::Create(AssetRegistry& Registry, const std::string& Name
         return false;
     }
     return true;
+}
+
+TypeId InputAssetDocument::GetRootType() const
+{
+    if (Entry.Metadata.Type == InputActionAssetType)
+    {
+        return TypeId{InputAction::StaticReflectionTypeId()};
+    }
+    return TypeId{InputMappingContext::StaticReflectionTypeId()};
+}
+
+ReflectionDiagnostic InputAssetDocument::ReadValue(ReflectedValue& Value) const
+{
+    if (Entry.Metadata.Type == InputActionAssetType)
+    {
+        return ReflectionValueCodec<InputAction>::ToReflected(Data.at("Action").get<InputAction>(), Value);
+    }
+    return ReflectionValueCodec<InputMappingContext>::ToReflected(Data.at("Context").get<InputMappingContext>(), Value);
+}
+
+static void MergeInputFields(nlohmann::json& Destination, const nlohmann::json& Source)
+{
+    for (auto Field = Source.begin(); Field != Source.end(); ++Field)
+    {
+        if (Field.value().is_object() && Destination.contains(Field.key()) && Destination.at(Field.key()).is_object())
+        {
+            MergeInputFields(Destination[Field.key()], Field.value());
+        }
+        else
+        {
+            Destination[Field.key()] = Field.value();
+        }
+    }
+}
+
+bool InputAssetDocument::ApplyValue(const ReflectedValue& Value, std::string& Error)
+{
+    auto Candidate = Data;
+    ReflectionDiagnostic Result;
+    if (Entry.Metadata.Type == InputActionAssetType)
+    {
+        auto Action = Data.at("Action").get<InputAction>();
+        Result = ReflectionValueCodec<InputAction>::FromReflected(Action, Value);
+        if (Result.bOk)
+        {
+            MergeInputFields(Candidate["Action"], nlohmann::json(Action));
+        }
+    }
+    else
+    {
+        auto Context = Data.at("Context").get<InputMappingContext>();
+        Result = ReflectionValueCodec<InputMappingContext>::FromReflected(Context, Value);
+        if (Result.bOk)
+        {
+            auto Bindings = nlohmann::json::array();
+            for (auto& Binding : Context.Bindings)
+            {
+                nlohmann::json Record = nlohmann::json::object();
+                for (const auto& Existing : Data.at("Context").value("Bindings", nlohmann::json::array()))
+                {
+                    if (!Binding.Identifier.empty() && Existing.value("Identifier", "") == Binding.Identifier)
+                    {
+                        Record = Existing;
+                        break;
+                    }
+                }
+                if (Binding.Identifier.empty())
+                {
+                    Binding.Identifier = Guid::Generate().ToString();
+                }
+                MergeInputFields(Record, nlohmann::json(Binding));
+                Bindings.push_back(std::move(Record));
+            }
+            auto Record = nlohmann::json(Context);
+            Record["Bindings"] = std::move(Bindings);
+            MergeInputFields(Candidate["Context"], Record);
+        }
+    }
+    if (!Result.bOk)
+    {
+        Error = Result.Message;
+        return false;
+    }
+    return Apply(std::move(Candidate), Error);
 }

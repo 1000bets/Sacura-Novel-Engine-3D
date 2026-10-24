@@ -33,6 +33,10 @@
 
 ## Editor settings, console and MCP
 
+- Do not add viewport or graph help popovers listing navigation controls or keyboard shortcuts.
+
+- Scripting lists individual PythonScript assets and searches their paths and source contents. Results open the original file through the ordinary Python asset workspace, preserving its editing, history and explicit saves. It uses existing assetDocument.execute/open reads and never concatenates modules into a synthetic file.
+
 - Native Story Flow cards reuse Inspector fields for node type, speaker, dialogue/prompt and actions, and Narrative literal controls for typed inputs. Inline edits use the existing story.updateNode/story.setNarrativeInput commands, retain Undo/Redo, and are disabled during Play/read-only. Text commits on blur or Enter (Ctrl+Enter for multiline); Escape cancels the draft.
 
 - Story Flow selection preserves the graph viewport by default. Automatic focus is an opt-in toolbar icon toggle; explicit focus and fit actions remain independent. This is UI-only navigation state, excluded from native mutation commands and authored story documents.
@@ -56,6 +60,8 @@
 - The Electron Inspector presents components in a single list of collapsible sections, without component overview filters or their search field. Each component header and all of its fields share one bordered card so property ownership remains visible. Property refresh must retain the Inspector scroll position; never scroll to a component as a side effect of editing a field.
 
 - The main mesh Inspector presents the mesh asset, actual material slots and object physics as separate sections. Material assignment is direct per slot, with explicit inherited-material reset and a single assign-all action; do not expose raw slot collection editing as the primary workflow. Collision participation and dynamic simulation are separate controls. Disabling a physics body preserves its authored settings. Material and physics changes use shared EditorCore commands and the typed `mesh_material_assign` / `mesh_physics_set` tools. Undo/Redo resolves restored scene components by persistent ID, never by a stale runtime identity.
+
+- Inspector components exposing the reflected `material_slots: engine.MaterialSlots` property reuse NativeMeshInspector, including CharacterComponent. Hide raw material slot/global assignment fields for these components. Use the existing mesh.inspect/mesh.material command path and shared asset thumbnails; do not introduce a separate Character material mutation path.
 
 - Every editor window, asset editor, detached workspace and settings dialog must use the shared Engine/Editor design system: palette tokens, backgrounds, typography, controls, spacing and interaction states. New windows must explicitly participate in the shared CSS tokens and reusable style roles. Do not leave native light surfaces or default unstyled controls inside the themed editor. Verify the actual native window, including scroll contents and detached presentation, using the project screenshot helpers or automated native tests before completing UI work.
 
@@ -701,3 +707,21 @@ Python @register_class / field()
 - Regression coverage: frontend `localization.test.js` and `editor-localization.test.js`; native desktop `--localization-check`. Keep generated projects, profiles and captures under M:/Sacura-Novel-Engine-3D/build. Details: `docs/EDITOR-LOCALIZATION.md`.
 
 - Reopening an asset must select its existing document tab, reveal its dock region, and raise its owning native window. Restore minimized windows and recover offscreen title bars onto a display work area. Reuse the document session and Undo history; presentation focus uses the restricted workspace-focus-window IPC, not a document mutation command.
+
+
+## Default reflected asset documents
+
+- Asset activation opens an ordinary document tab. Registered specialized presentations in `assetEditorRegistry.js` take priority; otherwise `NativeReflectedAssetEditor` renders the native reflected schema. Unsupported formats open read-only asset information with an explicit diagnostic, never an unrestricted JSON file editor.
+- EditorCore `ReflectedAssetDocument` registers document factories by open AssetType identifiers. Each adapter owns format IO, domain validation and history; shared reflection generates nested property/collection metadata and validates property-path edits. React must not duplicate Input field catalogs or write files directly. Native typed `assetDocument.execute` operation `property` accepts `{path, operation, value?, index?, destination?}`; collection operations are insert/remove/move. Save/undo/redo/reload retain revision checks, Play restrictions, Engine read-only behavior and existing document-window close guards.
+- InputAction/InputMappingContext and their nested values use ordinary ENGINE_STRUCT metadata. The Input adapter preserves original JSON format and unknown fields, generates IDs for new bindings, validates through InputSession and keeps explicit saves. Specialized UI registration is presentation only; it must reuse the document command path.
+- Fixed `std::array<T, N>` reflected values expose element type and fixed length; the property editor allows element edits but no resizing. Native `int` decoding rejects overflow; int64 transport uses decimal strings. This extends the supported container inventory beyond std::vector without enabling arbitrary containers.
+
+### React widget libraries
+
+- Game UI authoring uses the prototype WidgetWorkspace in normal Electron asset tabs. The UI toolbar and Windows/Widgets panel list WidgetLibrary assets; Content Browser creation and double-click use the shared factory and asset-document registry. Do not restore the removed Qt widget editor.
+- A .widgets asset under Content (default destination Content/UI) is a sakura.widgets version 1 JSON library: widgets contains layouts with stable local IDs, ui maps dialogue/hud/mainMenu/pauseMenu to compatible widget IDs. The .meta GUID identifies the library across moves. Each library owns its defaults; never select the first discovered library implicitly. Unknown document fields are preserved. Texture elements use imageAssetId GUIDs, not machine-specific paths or embedded image files.
+- WidgetLibraryDocument owns validation, independent Undo/Redo, explicit atomic saves and external-change detection. assetDocument.execute open/get/edit/undo/redo/save/reload is the shared UI/MCP contract; edits require the current revision and reject Engine Content and Play. Dragging previews locally and commits one document edit at release. Dirty document tabs use the existing close guards. Canvas fit, preview resolution, selection and layout preview are presentation state, excluded from MCP mutations and saved assets.
+- Python GetGameView may publish widgetLibrary as the library asset GUID and variables as its UI binding values. The native host resolves only saved library defaults into the existing widget/widgets payload for Editor Play and Player; actions remain restricted by the published actions catalog and game.action validation. The React layout preview does not execute project gameplay. Prototype-only event/component authoring is not exposed as if it were supported by native gameplay. Existing template-owned widget payloads remain supported when widgetLibrary is absent.
+- Widget files are limited to 512 KiB, 128 widgets and 512 elements per widget, with checked parent graphs and typed default assignments. Runtime image presentation uses the existing CPU texture loader and bounded PNG transport (512 pixels per side); resolved game UI is limited to 6 MiB. Saved assets retain full-resolution texture references and export with Content. Tests: desktop-electron/tests/widget-library.test.cjs and the --widget-editor-check project-owned Electron helper.
+
+- Reflected property controls must not display implementation hints such as int64 decimal-string transport notes. Keep transport details in developer documentation, not the property UI.

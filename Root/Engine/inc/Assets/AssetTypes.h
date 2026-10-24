@@ -41,6 +41,7 @@ inline const AssetType InputActionAssetType{"InputAction"};
 inline const AssetType InputMappingContextAssetType{"InputMappingContext"};
 inline const AssetType AudioAssetType{"Audio"};
 inline const AssetType ModelAssetType{"Model"};
+inline const AssetType WidgetLibraryAssetType{"WidgetLibrary"};
 inline const AssetType PythonScriptAssetType{"PythonScript"};
 inline const AssetType TextureAssetType{"Texture"};
 inline const AssetType MaterialAssetType{"Material"};

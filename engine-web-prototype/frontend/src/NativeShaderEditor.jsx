@@ -113,6 +113,7 @@ export default function NativeShaderEditor({
       doc: Source,
       extensions: [basicSetup, keymap.of([indentWithTab]), indentUnit.of('    '), Syntax, syntaxHighlighting(ShaderHighlight), Editable.current.of([EditorState.readOnly.of(Disabled), EditorView.editable.of(!Disabled)]), EditorView.contentAttributes.of({
         'aria-label': Label,
+        tabindex: '0',
         spellcheck: 'false'
       }), EditorView.theme({
         '&': {

@@ -1,3 +1,6 @@
+import NativeReflectedAssetEditor from './NativeReflectedAssetEditor.jsx';
+import {ResolveAssetEditor} from './assetEditorRegistry.js';
+import NativeWidgetEditor from './NativeWidgetEditor.jsx';
 import {NativePrefabWorkspace} from './NativePrefab.jsx';
 import {t as tr, useLocale} from './i18n.jsx';
 import React, { useEffect, useRef, useState } from 'react';
@@ -115,6 +118,9 @@ export default function NativeAssetEditorRoot({desktop:Desktop = window.sacuraDe
           shader: Latest.current.document.shader
         };
       }
+      if (typeof Value === 'function') {
+        Value = Value(Latest.current.document);
+      }
       const Params = {
         ...Identity,
         operation: Operation,
@@ -225,8 +231,19 @@ export default function NativeAssetEditorRoot({desktop:Desktop = window.sacuraDe
   if (!Snapshot) {
     return <p role="status">{ErrorMessage || 'Открытие документа…'}</p>;
   }
-  if (Snapshot.type === 'Prefab') { return <NativePrefabWorkspace Snapshot={Snapshot} Execute={Execute} Desktop={Desktop} Assets={Assets} Error={ErrorMessage}/>; }
-  if (Snapshot.type === 'PythonScript') {
+  const Presentation = ResolveAssetEditor(Snapshot.type);
+  if (typeof Presentation === 'function') {
+    const SpecializedEditor = Presentation;
+    return <NativeAssetsContext.Provider value={{assets:Assets, session:Session, open:Identity => Desktop.nativeOpenAssetEditor(Identity).catch(Failure => SetErrorMessage(Failure.message)), reveal:Identity => Desktop.nativeRevealAsset(Identity)}}><SpecializedEditor Snapshot={Snapshot} Execute={Execute} Desktop={Desktop} Assets={Assets} Error={ErrorMessage}/></NativeAssetsContext.Provider>;
+  }
+  if (Presentation === 'widgets') {
+    return <NativeAssetsContext.Provider value={{assets:Assets,session:Session,open:Identity=>Desktop.nativeOpenAssetEditor(Identity),reveal:Identity=>Desktop.nativeRevealAsset(Identity)}}><NativeWidgetEditor Snapshot={Snapshot} Execute={Execute} Asset={Assets.find(Entry => Entry.id === Snapshot.assetId)} ErrorMessage={ErrorMessage} DocumentId={Desktop.documentId}/></NativeAssetsContext.Provider>;
+  }
+  if (Presentation === 'properties') {
+    return <NativeAssetsContext.Provider value={{assets:Assets, session:Session, open:Identity => Desktop.nativeOpenAssetEditor(Identity).catch(Failure => SetErrorMessage(Failure.message)), reveal:Identity => Desktop.nativeRevealAsset(Identity)}}><NativeReflectedAssetEditor Snapshot={Snapshot} Asset={Assets.find(Entry => Entry.id === Snapshot.assetId)} Execute={Execute} Error={ErrorMessage} DocumentId={Desktop.documentId}/></NativeAssetsContext.Provider>;
+  }
+  if (Presentation === 'prefab') { return <NativePrefabWorkspace Snapshot={Snapshot} Execute={Execute} Desktop={Desktop} Assets={Assets} Error={ErrorMessage}/>; }
+  if (Presentation === 'source') {
     return <main className="native-python-editor" data-document-tab={Desktop.documentId} onKeyDown={Event => {
       if ((Event.ctrlKey || Event.metaKey) && Event.code === 'KeyS') {
         Event.preventDefault();
@@ -250,10 +267,10 @@ export default function NativeAssetEditorRoot({desktop:Desktop = window.sacuraDe
         <span>{Position.Line}:{Position.Column}</span><span>UTF-8</span></footer>
     </main>;
   }
-  if (Snapshot?.type === 'Texture') {
+  if (Presentation === 'texture') {
     return <NativeTextureEditor snapshot={Snapshot} asset={Assets.find(Entry => Entry.id === Snapshot.assetId)} focusRequest={Focus} error={ErrorMessage} />;
   }
-  const IsMaterial = Snapshot && Snapshot.type !== 'StaticMesh';
+  const IsMaterial = Presentation === 'material';
   const IsMaterialInstance = Snapshot.type === 'MaterialInstance';
   const ReadOnly = !Snapshot || Snapshot.readOnly;
   const Asset = Assets.find(Entry => Entry.id === Snapshot?.assetId);

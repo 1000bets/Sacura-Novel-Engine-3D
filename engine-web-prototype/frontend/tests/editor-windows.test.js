@@ -69,3 +69,14 @@ Test('legacy layouts migrate and corrupt container graphs cannot recurse', () =>
   Assert.equal(windowArea(Cyclic,'story'),'workspace');
   Assert.deepEqual(Cyclic.containers,{});
 });
+
+Test('removed server projects, events and gameplay panels cannot open or return from saved layouts', () => {
+  const State = defaultWindows();
+  for (const Identifier of ['server-projects', 'event', 'gameplay']) {
+    Assert.equal(EDITOR_WINDOWS.some(([Name]) => Name === Identifier), false);
+    Assert.equal(openWindow(State, Identifier), State);
+  }
+  const Restored = restoreWindows({...State, tabs:[...State.tabs, 'server-projects', 'event', 'gameplay'], floating:{'server-projects':{}, event:{}, gameplay:{}}});
+  Assert.deepEqual(Restored.tabs, State.tabs);
+  Assert.equal(activeDockWindow(Restored), 'story');
+});

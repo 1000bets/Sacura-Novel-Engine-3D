@@ -159,6 +159,29 @@ test('native character is visible, editable, undoable and saved in the scene', {
     assert.equal((await call('component.getProperties',{objectId:created.id,componentId:marker.id})).find(item=>item.id==='animation').value,'');
     await call('editor.redo');
     assert.equal((await call('component.getProperties',{objectId:created.id,componentId:marker.id})).find(item=>item.id==='animation').value,'dance');
+    const MaterialTarget={objectId:created.id,componentId:marker.id};
+    const OriginalSlots=(await call('mesh.inspect',MaterialTarget)).slots;
+    assert.equal(OriginalSlots.length,2);
+    const FirstMaterial=OriginalSlots[0].assetId;
+    const SecondMaterial=OriginalSlots[1].assetId;
+    let MaterialState=await call('mesh.material',{...MaterialTarget,slot:0,assetId:SecondMaterial});
+    assert.deepEqual(MaterialState.slots.map(Slot=>Slot.assetId),[SecondMaterial,SecondMaterial]);
+    await call('editor.undo');
+    assert.deepEqual((await call('mesh.inspect',MaterialTarget)).slots,OriginalSlots);
+    await call('editor.redo');
+    assert.equal((await call('mesh.inspect',MaterialTarget)).slots[0].assetId,SecondMaterial);
+    MaterialState=await call('mesh.material',{...MaterialTarget,slot:-1,assetId:FirstMaterial});
+    assert.deepEqual(MaterialState.slots.map(Slot=>Slot.assetId),[FirstMaterial,FirstMaterial]);
+    await call('mesh.material',{...MaterialTarget,slot:1,assetId:null});
+    for(let Attempt=0;Attempt<100;++Attempt){
+      MaterialState=await call('mesh.inspect',MaterialTarget);
+      if(MaterialState.slots.some(Slot=>Slot.slot===1)){break;}
+      await delay(40);
+    }
+    assert.equal(MaterialState.slots.find(Slot=>Slot.slot===1)?.inherited,true);
+    assert.equal(MaterialState.slots[0].assetId,FirstMaterial);
+    await call('editor.undo');
+    assert.deepEqual((await call('mesh.inspect',MaterialTarget)).slots.map(Slot=>Slot.assetId),[FirstMaterial,FirstMaterial]);
     await call('component.setProperty',{objectId:created.id,componentId:marker.id,property:'description',value:'Героиня истории'});
     await call('object.rename',{objectId:created.id,name:'Алиса Волкова'});
     await call('scene.save');
@@ -169,6 +192,7 @@ test('native character is visible, editable, undoable and saved in the scene', {
     character=(await call('scene.getHierarchy')).find(item=>item.id===created.id);
     assert.equal(character.name,'Алиса Волкова');
     assert.ok(character.components.some(item=>item.typeId==='engine.CharacterComponent'));
+    assert.deepEqual((await call('mesh.inspect',MaterialTarget)).slots.map(Slot=>Slot.assetId),[FirstMaterial,FirstMaterial]);
     const duplicate=await call('object.duplicate',{objectId:created.id});
     assert.ok((await call('scene.getHierarchy')).some(item=>item.id===duplicate.id&&item.components.some(component=>component.typeId==='engine.CharacterComponent')));
     await call('editor.undo');

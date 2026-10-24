@@ -41,7 +41,10 @@ export default function NativeGamePlayer() {
     const View = CurrentState.current?.gameViews?.[0];
     if (View) { return await Request('game.action',{objectId:View.objectId,componentId:View.componentId,action:Identifier}); }
   };
-  const MenuAction = async Identifier => {
+  const MenuAction = async (Identifier, Element) => {
+    if (Identifier === 'gameplay' && Element?.nativeAction) {
+      Identifier = Element.nativeAction;
+    }
     try {
       if (Identifier==='mainMenu') { await Request('game.pause',{paused:true});SetMenu(true); }
       else if (Identifier==='start'||Identifier==='restart') { await GameAction('restart');await Request('game.pause',{paused:false});SetMenu(false); }
@@ -201,9 +204,9 @@ export default function NativeGamePlayer() {
     <canvas ref={Canvas} data-native-surface data-native-owner="" style={{width: '100%', height: '100%', display: 'block'}}/>
     {!Menu&&<NativeGameHud State={State} Execute={Parameters => Action('game.action', Parameters)}/>}
     <div className="standalone-bar"><button aria-label="Пауза / продолжить" disabled={!State} onClick={() => {if(Menu){MenuAction('start');}else{Action('game.pause', {paused: !State.gamePaused});}}}>⏯</button><button onClick={()=>MenuAction('save')}>Сохранить</button><button onClick={()=>MenuAction('load')}>Загрузить</button></div>
-    {Menu&&State?.gameViews?.[0]?.widgets?.mainMenu&&<WidgetMenu widget={State.gameViews[0].widgets.mainMenu} label="Главное меню" context={{title:State.gameViews[0].projectTitle,paused:true}} onAction={MenuAction}/>}
-    {!Menu&&State?.gamePaused&&State.gameViews?.[0]?.widgets?.pauseMenu&&<WidgetMenu widget={State.gameViews[0].widgets.pauseMenu} label="Пауза" context={{paused:true}} onAction={MenuAction}/>}
-    {!Menu&&!State?.gamePaused&&<NativeDialogue state={State} onAdvance={()=>Action('game.advance')} onChoice={Index=>Action('game.choose',{index:Index})}/>}
+    {Menu&&State?.gameViews?.[0]?.widgets?.mainMenu&&<WidgetMenu widget={State.gameViews[0].widgets.mainMenu} label="Главное меню" context={{variables:State.gameViews[0].variables||{},title:State.gameViews[0].projectTitle,paused:true}} onAction={MenuAction}/>}
+    {!Menu&&State?.gamePaused&&State.gameViews?.[0]?.widgets?.pauseMenu&&<WidgetMenu widget={State.gameViews[0].widgets.pauseMenu} label="Пауза" context={{variables:State.gameViews[0].variables||{},paused:true}} onAction={MenuAction}/>}
+    {!Menu&&!State?.gamePaused&&<NativeDialogue state={State} onGameAction={Parameters=>Action('game.action',Parameters)} onAdvance={()=>Action('game.advance')} onChoice={Index=>Action('game.choose',{index:Index})}/>}
     {State?.gameViews?.[0]?.input&&<TouchInput settings={State.gameViews[0].input} contexts={['system','dialogue','gameplay','game-mechanics']} active={!Menu} paused={State.gamePaused} playerMode={State.gameViews[0].controllerMode} onInput={Event=>{
       let Value=[Event.value,0,0];
       if(Array.isArray(Event.value)){Value=[...Event.value,0];}

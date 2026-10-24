@@ -1,3 +1,4 @@
+import NativeScriptsWorkspace from './NativeScriptsWorkspace.jsx';
 import NativeGameHud from './NativeGameHud.jsx';
 import {NativePrefabControls} from './NativePrefab.jsx';
 import {GetNativeMeshPlacement} from './nativeScenePlacement.js';
@@ -29,6 +30,7 @@ import {inputContextsFor,inputHelp} from './inputModel.js';
 import EditorPreferences from './EditorPreferences.jsx';
 import ProjectSettings from './ProjectSettings.jsx';
 import {LocalizeEditorText} from './i18n.js';
+import {NativeWidgetLibraries} from './NativeWidgetEditor.jsx';
 import WidgetWorkspace from './WidgetWorkspace.jsx';
 import WidgetRenderer,{WidgetMenu} from './WidgetRenderer.jsx';
 import WidgetAssignment from './WidgetAssignment.jsx';
@@ -43,7 +45,7 @@ import {createObjectGroup,addObjectsToGroup,removeObjectsFromGroups,sceneObjectG
 import {validateImportSize} from './fileLimits.js';
 import {projectAudioAssets,validateImportedAudio} from './audioAssets.js';
 import {accountStorage} from './accountStorage.js';
-import {serverStorageEnabled,saveServerProject,listServerProjects,openServerProject,portableProject} from './serverStorage.js';
+import {serverStorageEnabled,saveServerProject,portableProject} from './serverStorage.js';
 import AssetExplorer from './AssetExplorer.jsx';
 import {storeAssetFile,retainObjectModel} from './assetFiles.js';
 import {beatPreview} from './storyLabels.js';
@@ -587,7 +589,6 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       }
     }
     if (id === 'history') { setHistoryOpen(false); }
-    if (id === 'server-projects') { setServerProjects(null); }
     changeWindows(current=>closeWindow(current,id));
     if(workspaceTabCount===1&&dockTabs(windows)[0]===id)setMaximized(null);
   };
@@ -1082,14 +1083,6 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
     }
     setProjectDialog(null);
   });
-  const [serverProjects,setServerProjects]=useState(null);
-  useEffect(() => {
-    if (serverProjects) {
-      changeWindows(Current => openWindow(Current, 'server-projects'));
-    }
-  }, [serverProjects]);
-  const showServerProjects=()=>runFileOperation(async()=>{setMenu(null);setServerProjects(await listServerProjects());});
-  const selectServerProject=id=>runFileOperation(async()=>{replaceProject(readProject(await openServerProject(id)));setServerProjects(null);setNotice('Проект открыт с сервера.');});
   const openProjectFile = () => {
     if(isNative){setMenu(null);return runFileOperation(()=>window.sacuraDesktop.nativeOpenProject());}
     setMenu(null);
@@ -2422,12 +2415,22 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
     }
     let SubassetId = Identity.subAssetId;
     if (Asset.typeId==='Model' && !SubassetId) { SubassetId = Asset.subassets.find(Entry=>Entry.typeId==='StaticMesh')?.id; }
-    if (['Material','MaterialInstance','Texture','PythonScript','Prefab'].includes(Asset.typeId) || SubassetId && Asset.subassets.some(Entry=>Entry.id===SubassetId&&Entry.typeId==='StaticMesh')) {
-      try { await window.sacuraDesktop.nativeOpenAssetEditor({assetId:Asset.id, subAssetId:SubassetId || null}); }
-      catch (ErrorValue) { setNotice(ErrorValue.message); }
-      return;
+    try {
+      await window.sacuraDesktop.nativeOpenAssetEditor({assetId:Asset.id, subAssetId:SubassetId || null});
+    } catch (ErrorValue) {
+      setNotice(ErrorValue.message);
     }
-    RevealNativeAsset(Identity);
+  }
+  async function CreateNativeAsset(Parameters) {
+    if (Parameters.factoryId === 'editor.CreateWidgetLibraryAssetFactory' && Parameters.path.startsWith('UI/')) {
+      const Folders = await native.adapter.command('assets.folders', {}, native.context);
+      if (!Folders.includes('Game/UI')) {
+        await native.adapter.command('assets.createFolder', {folder:'Game', name:'UI'}, native.context);
+      }
+    }
+    const Created = await native.adapter.command('assets.create', Parameters, native.context);
+    await RefreshNativeAssets();
+    return Created;
   }
   const renderNativeWorkspace=(dock,visible)=>{
     const openAsset=Asset=>OpenNativeAsset({assetId:Asset.id});
@@ -2435,7 +2438,7 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
       manage:async (Method,Params)=>{const Result=await native.adapter.command(Method,Params,native.context);await RefreshNativeAssets();return Result;},
       refresh:RefreshNativeAssets,
       creationTypes:()=>native.adapter.command('assets.creationTypes',{},native.context),
-      create:async Params=>{const Created=await native.adapter.command('assets.create',Params,native.context);await native.adapter.loadDomain('assets.list','assets');RevealNativeAsset({assetId:Created.id});return Created;},
+      create:async Params=>{const Created=await CreateNativeAsset(Params);RevealNativeAsset({assetId:Created.id});return Created;},
       import:async folder=>{if(folder.startsWith('Engine'))throw Error('Engine Content доступен только для чтения');const results=await window.sacuraDesktop.nativeImportAssets(folder.replace(/^Game\/?/,''));await native.adapter.loadDomain('assets.list','assets');const failure=results.find(r=>!r.ok);if(failure)throw Error(failure.error.message);}}}/>;
     if(dock==='characters')return <NativeCharacterWorkspace objects={native.objects} components={native.components} assets={native.assets}
       selected={native.state?.selection} disabled={nativeEditing} playing={nativePlaying} dirty={native.state?.dirty}
@@ -2448,6 +2451,14 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
         const mesh=imported?.subassets?.find(item=>item.typeId==='StaticMesh');
         if(results.length&&!mesh)throw Error('В импортированном файле нет статического меша.');
         return mesh?{assetId:imported.id,subAssetId:mesh.id,name:imported.name?.replace(/\.glb$/i,'')}:null;}}/>;
+    if (dock==='widgets') {
+      return <NativeWidgetLibraries Assets={native.assets} OpenAsset={OpenNativeAsset} Disabled={nativeEditing}
+        CreationTypes={()=>native.adapter.command('assets.creationTypes',{},native.context)}
+        Create={CreateNativeAsset}/>;
+    }
+    if (dock==='scripting') {
+      return <NativeScriptsWorkspace Assets={native.assets} Adapter={native.adapter} Session={native.context?.session} OpenAsset={OpenNativeAsset}/>;
+    }
     if(dock!=='story'&&dock!=='event')return <p role="status">{tr("Эта панель ещё не подключена к C++ Engine. Доступны Hierarchy, Inspector, Сцена, Файлы и История.")}</p>;
     const doc=native.story?.document;
     const select=value=>{setNativeFocus('story');setNativeStorySelection(!value?null:typeof value==='string'?{nodeId:value}:{nodeId:value.flowBeatId,eventId:value.event?.id,bindingId:value.binding?.id});};
@@ -2501,14 +2512,12 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
       return <WorkspaceDocument descriptor={LiveDocuments[dock]}/>;
     }
     if (dock === 'history') { return renderHistory(); }
-    if (dock === 'server-projects') { return <div>{(serverProjects || []).map(Item => <button key={Item.id} onClick={() => selectServerProject(Item.id)}>{Item.title}</button>)}</div>; }
     return isNative?renderNativeWorkspace(dock,visible):<>
             {["story", "timeline", "staging", "event"].includes(dock) && !detailEditor && (
               <div className="graph-toolbar">
                 {dock==='event'?<><Button icon="ArrowLeft" title={tr("Вернуться в поток истории")} onClick={()=>setDock('story')}/><span className="graph-breadcrumb">{event?.name}</span></>:<><Icon name="Route" size={15}/><span className="flow-toolbar-context">{project.subscenes.length} {tr("сабсцены · ")}{nodes.length} {tr("реплик · единый поток")}</span><Button icon="Focus" onClick={()=>graphApis.current[dock]?.focus(beat.id)}>{tr("К реплике")}</Button><Button icon="Scan" onClick={()=>graphApis.current[dock]?.fit()}>{tr("Вся история")}</Button></>}
         {dock==='story' && <Button icon="LocateFixed" title={tr("Фокусироваться при выборе ноды")} aria-pressed={bAutoFocusStorySelection} onClick={()=>SetAutoFocusStorySelection(Previous=>!Previous)}/>}
         <div className="flex-space" />
-                <details className="viewport-help graph-help"><summary title={tr("Навигация по графу")} aria-label={tr("Навигация по графу")}><Icon name="CircleHelp" size={15}/></summary><div>{tr("ПКМ — панорама")}<br/>{tr("Колесо — масштаб")}<br/>{tr("Пин → пин — соединить")}<br/>{tr("Alt + щелчок по пину — разорвать связи")}<br/>{tr("Ctrl + перетаскивание пина — перенести связи")}<br/>{tr("Выбрать провод + Delete — разорвать")}<br/>{tr("ЛКМ — выбор и перемещение узла")}<br/>{tr("Двойной щелчок — открыть узел")}</div></details>
                 {dock !== "event" && beat.kind === "choice" && (
                   <Button
                     icon="GitFork"
@@ -2845,7 +2854,14 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
                 {tr("Игра")}</button>
 
               <div className="flex-space" />
-              <Button disabled={isNative} icon="PanelsTopLeft" title={isNative?"Редактор игрового UI пока не подключён":tr("Редактор интерфейса игры")} onClick={()=>openWidgets(resolveWidget(project,'dialogue',beat).id)}/>
+              <Button icon="PanelsTopLeft" title={tr("Редактор интерфейса игры")} onClick={()=>{
+                if (isNative) {
+                  setDock("widgets");
+                  setCompactPanel("workspace");
+                } else {
+                  openWidgets(resolveWidget(project,'dialogue',beat).id);
+                }
+              }}/>
               {!isNative&&mode==='game'&&<Button icon="Menu" title={tr("Главное меню игры")} onClick={()=>{rt?.stop();setGameMenu('mainMenu');setPreviewWidgetId(null);}}>{tr("Меню")}</Button>}
               {mode==='game'&&running&&!preview.audition&&<><Button icon="Save" title={tr("Сохранить прохождение")} onClick={()=>widgetAction('save')}>{tr("Сохранить прохождение")}</Button><Button icon="FolderOpen" title={tr("Загрузить прохождение")} onClick={()=>widgetAction('load')}>{tr("Загрузить прохождение")}</Button></>}
               <button
@@ -2898,7 +2914,6 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
               </div>}
               {cameraPilotId&&mode==='scene'&&<div className="camera-pilot-bar"><Icon name="Video"/><span>{tr("Настройка: ")}{displayScene.cameras?.find(c=>c.id===cameraPilotId)?.name}<small>{tr("Обзор мышью · правая кнопка — сдвиг · колесо — приближение")}</small></span><Button icon="Check" onClick={()=>captureCamera(cameraPilotId)}>{tr("Сохранить ракурс")}</Button><Button icon="X" title={tr("Вернуться без сохранения")} onClick={()=>setCameraPilotId(null)}/></div>}
               {!isNative&&(mode==='game'||(cameraPreviewId&&!cameraPilotId))&&<div className="camera-view-badge"><Icon name={resolveCamera(displayScene,world,objects,cameraPreviewId).mode==='follow'?'UserRoundCheck':'Video'} size={14}/><span className="camera-view-name">{resolveCamera(displayScene,world,objects,cameraPreviewId).name}</span>{cameraPreviewId&&<button onClick={()=>setCameraPreviewId(null)}>{mode==='game'?tr("По сценарию"):tr("Вернуться к сцене")} <Icon name="X" size={12}/></button>}</div>}
-              <details className="viewport-help"><summary title={tr("Управление сценой")} aria-label={tr("Управление сценой")}><Icon name="CircleHelp" size={15}/></summary><div>{mode==='game'?<>{tr("Кадр показан из активной камеры.")}<br/>{tr("Выберите камеру в иерархии, чтобы посмотреть её ракурс.")}<br/>{tr("«По сценарию» возвращает камеру, выбранную историей.")}<br/>{inputHelp(playProject.input,inputContextsFor(playProject,playBeat),['move','interact','point','advance','pause'])}<br/>{tr("Для настройки ракурса вернитесь в «Локацию».")}</>:<>{tr("W — перемещение · E — вращение")}<br/>{tr("R — масштаб · Q — выбор")}<br/>{tr("Работают и в русской раскладке")}<br/>{tr("Shift + щелчок — мультивыбор")}<br/>{tr("Alt + ЛКМ — орбита · СКМ — панорама")}<br/>{tr("ПКМ + WASD / QE — полёт")}<br/>{tr("F — выделение в кадр")}<br/>{tr("Delete — удалить выделенные объекты")}<br/>{tr("Ctrl+Z — вернуть удалённые объекты")}</>}</div></details>
             </div>
             <div
               className="scene-viewport"
@@ -2947,7 +2962,7 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
                 onInteract={interact}
               />
               {isNative&&nativePlaying&&<NativeGameHud State={native.state} Execute={Parameters=>nativeCommand('game.action',Parameters)}/>}
-              {isNative&&nativePlaying&&<NativeDialogue state={native.state} session={native.context?.session} onAdvance={()=>nativeCommand('play.advanceDialogue')} onChoice={index=>nativeCommand('play.selectChoice',{index})}/>}
+              {isNative&&nativePlaying&&<NativeDialogue onGameAction={Parameters=>nativeCommand('game.action',Parameters)} state={native.state} session={native.context?.session} onAdvance={()=>nativeCommand('play.advanceDialogue')} onChoice={index=>nativeCommand('play.selectChoice',{index})}/>}
               {!isNative&&<>{mode==='game'&&<TouchInput settings={playProject.input} contexts={world.inputContexts||[]} active={world.inputActive} playerMode={world.playerControl?.mode} paused={world.paused||!world.inputReady}/>}
               {positionPick&&<div className="viewport-caption"><strong>{tr("Выберите точку на сцене")}</strong><Button icon="X" onClick={()=>setPositionPick(null)}>{tr("Отмена")}</Button></div>}
               <GameDialogue project={running?rt?.project:project}
@@ -3108,7 +3123,6 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
           {isNative&&menu === "Файл" ? (<><button onClick={()=>openProjectDialog('new')}>{tr("Новый C++ проект…")}</button><button onClick={openProjectFile}>{tr("Открыть C++ проект…")}</button><button disabled={!native.connected || nativeEditing || projectFileBusy} onClick={() => {setMenu(null);runFileOperation(async () => {const Result = await window.sacuraDesktop.nativeExportGame();if (Result) {setNotice('Game exported: ' + Result.path);}});}}>Export game…</button><button disabled={!native.connected} onClick={saveProject}>{tr("Сохранить сцену и историю")}<kbd>Ctrl S</kbd></button><button disabled={!native.connected} onClick={()=>nativeCommand('project.save',{useCurrentAsStartup:true})}>{tr("Использовать текущие сцену и историю при запуске")}</button><button disabled={!native.connected} onClick={()=>openProjectDialog('sceneNew')}>{tr("Новая сцена…")}</button><button disabled={!native.connected} onClick={()=>openProjectDialog('sceneCopy')}>{tr("Сохранить сцену как…")}</button></>) : menu === "Файл" ? (
             <>
               <button disabled={projectFileBusy} onClick={()=>openProjectDialog('new')}><Icon name="FilePlus2"/>{tr("Новый пустой проект…")}</button>
-              {serverStorageEnabled&&window.sacuraDesktop?.isDesktop!==true&&<button disabled={projectFileBusy} onClick={showServerProjects}><Icon name="Database"/>{tr("Открыть с сервера…")}</button>}
               <button disabled={projectFileBusy} onClick={openProjectFile}>
                 <Icon name="FolderOpen" />
                 {tr("Открыть проект…")}</button>

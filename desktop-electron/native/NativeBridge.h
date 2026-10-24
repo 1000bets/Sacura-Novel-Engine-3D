@@ -9,7 +9,9 @@
 #include <mutex>
 #include "Documents/StaticMeshDocument.h"
 #include "Documents/PythonScriptDocument.h"
+#include "Documents/WidgetLibraryDocument.h"
 #include "Documents/MaterialEditingSession.h"
+#include "Documents/ReflectedAssetDocument.h"
 
 // Single owner on Game thread. The wire contains persistent IDs, never pointers.
 class MeshRendererComponent;
@@ -41,6 +43,8 @@ private:
     Json PrefabDocumentTools(const Json& Params, const AssetRegistryEntry& Entry);
     struct AssetDocumentState
     {
+        std::unique_ptr<ReflectedAssetDocument> Reflected;
+        std::unique_ptr<WidgetLibraryDocument> Widgets;
         std::unique_ptr<PythonScriptDocument> Script;
         std::unique_ptr<StaticMeshDocument> Mesh;
         std::unique_ptr<MaterialEditingSession> Material;
@@ -54,6 +58,9 @@ private:
         float ImageTime = -1.f;
     };
     std::map<std::string, AssetDocumentState> AssetDocuments;
+    std::map<std::string, std::pair<ContentHash, Json>> RuntimeWidgetLibraries;
+    std::map<std::string, std::string> RuntimeWidgetImages;
+    void ResolveWidgetImages(Json& Widget);
     std::string PreviewDocument;
     Scene* PreviewScene = nullptr;
     MeshRendererComponent* PreviewMesh = nullptr;

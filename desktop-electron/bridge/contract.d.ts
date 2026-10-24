@@ -9,8 +9,23 @@ export interface ObjectInfo {id:Id;name:string;parentId:Id|null;active:boolean;t
 export interface PropertyInfo {enumValues?:string[];id:string;typeId:string;editable:boolean;assetTypes?:string[];assetId?:Id|null;subAssetId?:Id|null;label:string;localizationKey?:string;category:string;value:JsonValue;error?:string;range?:[number,number]}
 /** engine.int64 is represented by a decimal string, including inside reflected arrays/structs. */
 export interface DialogueState {phase:'idle'|'line'|'choice'|'action'|'end'|'failed';speaker:string;text:string;choices:string[];canAdvance:boolean;canChoose:boolean;error:string}
-export interface GameView {objectId:Id;componentId:Id;title?:string;values?:{label:string;value:string|number}[];actions?:{id:string;label:string;enabled?:boolean}[];text?:string;objective?:string;controls?:string;reticle?:boolean;pointerLock?:boolean}
+export interface GameView {widgetLibrary?:Id;variables?:{[key:string]:JsonValue};widget?:JsonValue;widgets?:{[key:string]:JsonValue};objectId:Id;componentId:Id;title?:string;values?:{label:string;value:string|number}[];actions?:{id:string;label:string;enabled?:boolean}[];text?:string;objective?:string;controls?:string;reticle?:boolean;pointerLock?:boolean}
 export interface State {gameViews:GameView[];gameRunning:boolean;gamePaused:boolean;dirty:boolean;storyDirty:boolean;assetDocumentsDirty?:boolean;externalChanges:boolean;projectExternalChanges:boolean;path:string;project:string;play:'stopped'|'playing'|'paused';dialogue:DialogueState;startupAudio:boolean;selection:Id|null;canUndo:boolean;canRedo:boolean;assetError?:string}
+export type ReflectedPropertyChange =
+  | {path:(string|number)[];operation:'set';value:JsonValue}
+  | {path:(string|number)[];operation:'insert';value:JsonValue}
+  | {path:(string|number)[];operation:'remove';index:number}
+  | {path:(string|number)[];operation:'move';index:number;destination:number};
+export interface ReflectedPropertySchema {
+  typeId:string;kind:'value'|'struct'|'array';id?:string;label?:string;localizationKey?:string;
+  category?:string;description?:string;editable?:boolean;fields?:ReflectedPropertySchema[];
+  element?:ReflectedPropertySchema;elementDefault?:JsonValue;fixedSize?:number;
+  enumValues?:string[];assetTypes?:string[];range?:[number,number];error?:string;
+}
+export type AssetDocumentRequest = {assetId:Id;subAssetId?:Id|null} & (
+  {operation:'property';value:ReflectedPropertyChange;revision:number} |
+  {operation:'open'|'get'|'preview'|'edit'|'source'|'save'|'undo'|'redo'|'reload'|'compile'|'command';value?:JsonValue;revision?:number}
+);
 export interface AssetInfo {id:Id;name:string;path:string;relativePath:string;typeId:string;builtin:boolean;browserVisible?:boolean;bytes:number;version:string;subassets:JsonValue[]}
 export interface StorySnapshot {narrativeCatalog?:JsonValue[];open:boolean;revision:number;error?:string;dirty?:boolean;readOnly?:boolean;externalChanges?:boolean;canUndo?:boolean;canRedo?:boolean;path?:string;document?:JsonValue;positions?:Record<string,{x:number;y:number}>}
 export interface AssetCreationType {id:string;label:string;typeId:string;category:string;extension:string;settings:(PropertyInfo & {required:boolean;enumValues?:string[]})[]}
@@ -120,4 +135,19 @@ export interface Bridge {
   connect():Promise<{connected:boolean;context:Context|null;state?:State}>;
   request<K extends keyof Commands>(request:Request<K>):Promise<Result<Commands[K]['result']>>;
   subscribe(callback:(event:Event)=>void):()=>void;
+}
+
+export interface WidgetLibraryDocument {
+  format:'sakura.widgets';
+  version:1;
+  widgets:WidgetLayout[];
+  ui:Record<'dialogue'|'hud'|'mainMenu'|'pauseMenu',Id>;
+}
+export interface WidgetLayout {
+  id:Id;
+  name:string;
+  kind:'dialogue'|'hud'|'mainMenu'|'pauseMenu';
+  referenceSize:[number,number];
+  elements:JsonValue[];
+  css:string;
 }

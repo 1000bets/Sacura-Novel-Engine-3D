@@ -1,0 +1,18 @@
+.native-widget-editor{display:flex;flex-direction:column;width:100%;height:100%;min-height:0;min-width:0;background:var(--surface-1);color:var(--text-primary)}
+.native-widget-editor>.native-document-toolbar{flex-wrap:wrap;padding:8px;gap:8px;border-bottom:1px solid var(--divider)}
+.native-widget-editor>.native-document-toolbar>span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:45%}
+.native-widget-editor .widget-workspace{flex:1;min-height:0;background:var(--surface-1);color:var(--text-primary)}
+.native-widget-editor .widget-workspace>header,.native-widget-editor .widget-library,.native-widget-editor .widget-properties{background:var(--surface-1);color:var(--text-primary);border-color:var(--divider)}
+.native-widget-editor .widget-canvas-area,.native-widget-editor .widget-canvas-viewport{background:var(--app-background)}
+.native-widget-editor input,.native-widget-editor select,.native-widget-editor textarea{background:var(--surface-input);color:var(--text-primary);border:1px solid var(--divider);border-radius:var(--radius-control);max-width:100%}
+.native-widget-editor .widget-library>button,.native-widget-editor .widget-presets button{background:var(--surface-2);color:var(--text-primary);border-color:var(--divider)}
+.native-widget-editor .widget-library>button.active,.native-widget-editor .widget-presets button.active{background:var(--surface-active);border-color:var(--accent)}
+.native-widget-editor .widget-save-note,.native-widget-editor small{color:var(--text-secondary)}
+.native-widget-editor>p{padding:8px;margin:0}
+.native-widget-libraries{padding:16px;overflow:auto;height:100%;background:var(--surface-1);color:var(--text-primary)}
+.native-widget-library{display:flex;flex-direction:column;align-items:flex-start;width:100%;padding:12px;margin-top:8px;gap:4px}
+.native-widget-library span{color:var(--text-secondary)}
+.native-widget-preview{display:flex;flex-direction:column;flex:1;min-height:0}
+.native-widget-preview>header{display:flex;gap:12px;padding:8px;flex-wrap:wrap}
+.native-widget-preview-canvas{position:relative;flex:1;min-height:160px;background:var(--app-background)}
+@media(max-width:700px){.native-widget-editor .widget-body{overflow:auto;align-content:flex-start}.native-widget-editor .widget-library,.native-widget-editor .widget-canvas-area{box-sizing:border-box}.native-widget-editor .widget-properties{box-sizing:border-box;width:100%}}

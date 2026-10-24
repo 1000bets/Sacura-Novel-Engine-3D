@@ -3,7 +3,7 @@ import './nativeDialogue.css';
 import WidgetRenderer from './WidgetRenderer.jsx';
 import {t as Translate, useLocale} from './i18n.jsx';
 
-export default function NativeDialogue({state,session,onAdvance,onChoice}){
+export default function NativeDialogue({state,session,onAdvance,onChoice,onGameAction}){
   useLocale();
   const audio=useRef(null);
   useEffect(()=>{
@@ -29,8 +29,14 @@ export default function NativeDialogue({state,session,onAdvance,onChoice}){
     if (dialogue.phase === 'choice') {
       Status = Translate('Выберите ответ');
     }
-    return <WidgetRenderer widget={View.widgets.dialogue} context={{speaker:dialogue.speaker,text:dialogue.text,status:Status,choices:Choices,ready:enabled,canAdvance:enabled&&dialogue.canAdvance}}
-      onAction={Action=>{if(Action==='advance'){onAdvance();}}} onChoice={Identifier=>onChoice(Number(Identifier))} choiceEnabled={Choice=>Choice.enabled!==false}/>;
+    return <WidgetRenderer widget={View.widgets.dialogue} context={{variables:View.variables||{},speaker:dialogue.speaker,text:dialogue.text,status:Status,choices:Choices,ready:enabled,canAdvance:enabled&&dialogue.canAdvance}}
+      onAction={(Action, Element)=>{
+        if (Action === 'advance') {
+          onAdvance();
+        } else if (enabled && Element?.nativeAction) {
+          onGameAction?.({objectId:View.objectId,componentId:View.componentId,action:Element.nativeAction});
+        }
+      }} onChoice={Identifier=>onChoice(Number(Identifier))} choiceEnabled={Choice=>Choice.enabled!==false}/>;
   }
   return <div className="native-dialogue" role="region" aria-label="Диалог истории">
     {dialogue.speaker&&<strong className="native-dialogue-speaker">{dialogue.speaker}</strong>}
