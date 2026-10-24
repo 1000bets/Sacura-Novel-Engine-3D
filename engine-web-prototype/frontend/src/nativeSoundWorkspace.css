@@ -1,0 +1,18 @@
+.native-sound-workspace { container-type: inline-size; min-width: 0; }
+.native-sound-workspace .sound-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); }
+.native-sound-workspace .sound-card { min-width: 0; background: var(--surface-1); border-color: var(--divider); }
+.native-sound-workspace .sound-card h2, .native-sound-workspace .sound-card p { overflow-wrap: anywhere; }
+.native-sound-workspace .sound-card p, .native-sound-workspace .audio-options, .native-sound-workspace .sound-footer > span { color: var(--text-secondary); }
+.native-sound-workspace .audio-routing { background: var(--surface-2); border-color: var(--divider); }
+.native-sound-workspace .audio-routing > div { color: var(--text-primary); }
+.native-sound-workspace .sound-footer, .native-sound-workspace .sound-card .wave { border-color: var(--divider); }
+.native-sound-workspace .sound-footer button { background: var(--surface-2); border-color: var(--divider); }
+.native-sound-workspace .sound-import { flex-wrap: wrap; }
+.native-sound-workspace .sound-import > div { min-width: 0; flex: 1 1 240px; }
+@container (max-width: 560px) {
+  .native-sound-workspace .page-heading { flex-direction: column; gap: 12px; }
+  .native-sound-workspace .sound-controls { flex-wrap: wrap; }
+  .native-sound-workspace .sound-controls .field { flex-basis: 100%; margin-left: 0; }
+  .native-sound-workspace .sound-footer { flex-wrap: wrap; }
+  .native-sound-workspace .sidechain-fields { grid-template-columns: 1fr; }
+}

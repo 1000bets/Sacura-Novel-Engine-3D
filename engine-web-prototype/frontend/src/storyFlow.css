@@ -82,8 +82,9 @@
 
 .moment-event.draggable{cursor:grab;touch-action:none}.moment-event.draggable:active{cursor:grabbing}.moment-phase{min-height:40px}
 
-.native-node-fields { border:0; margin:0; padding:10px 12px; min-width:0; display:flex; flex-direction:column; gap:8px; }
-.native-node-fields input:not([type=checkbox]), .native-node-fields textarea, .native-node-fields select { width:100%; min-width:0; box-sizing:border-box; }
-.native-node-fields textarea { resize:vertical; min-height:70px; }
-.native-node-fields .native-action-fields { min-width:0; }
+.native-node-dialogue {border:0;margin:0;min-width:0;}
+.story-flow .native-node-dialogue textarea.dialogue-text-field {display:block;field-sizing:content;width:100%;min-width:0;min-height:1.6em;max-height:none;box-sizing:border-box;resize:none;margin:8px 0 0;padding:0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit;font-size:14px;line-height:1.6;box-shadow:none;}
+.native-node-dialogue textarea:focus-visible {outline:1px solid var(--accent);outline-offset:4px;}
+.native-node-dialogue textarea:disabled {opacity:1;cursor:default;}
+.native-node-dialogue textarea::placeholder {color:var(--muted);}
 fieldset.node-answer { min-width:0; margin:0; }

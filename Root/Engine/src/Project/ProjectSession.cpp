@@ -141,6 +141,7 @@ bool ProjectSession::RelocateContentPath(
     };
     Relocate(Updated.StartupScene);
     Relocate(Updated.StartupStory);
+    Relocate(Updated.StartupAudio);
     if (bChanged)
     {
         if (!Updated.TrySaveToFile(OutError))
@@ -167,6 +168,45 @@ bool ProjectSession::SetStartupDocuments(const std::filesystem::path& Scene, con
     if(!Updated.TrySaveToFile(OutError)) return false;
     OpenedProject=std::move(Updated);
     if(BoundEngine) BoundEngine->SetStartupStory(OpenedProject->StartupStory);
+    return true;
+}
+
+bool ProjectSession::SetStartupAudio(const std::filesystem::path& Audio, std::string& OutError)
+{
+    if (!OpenedProject)
+    {
+        OutError = "No project is open";
+        return false;
+    }
+    if (!Audio.empty())
+    {
+        std::error_code Error;
+        const auto ContentDirectory = std::filesystem::weakly_canonical(OpenedProject->ProjectRoot / "Content", Error);
+        if (Error)
+        {
+            OutError = Error.message();
+            return false;
+        }
+        const auto AudioFile = std::filesystem::weakly_canonical(Audio, Error);
+        if (Error || AudioFile.extension() != ".wav" || !std::filesystem::is_regular_file(AudioFile))
+        {
+            OutError = "Startup audio must be an existing WAV inside project Content";
+            return false;
+        }
+        const auto RelativePath = AudioFile.lexically_relative(ContentDirectory);
+        if (RelativePath.empty() || *RelativePath.begin() == "..")
+        {
+            OutError = "Startup audio must stay inside project Content";
+            return false;
+        }
+    }
+    auto Updated = *OpenedProject;
+    Updated.StartupAudio = Audio;
+    if (!Updated.TrySaveToFile(OutError))
+    {
+        return false;
+    }
+    OpenedProject = std::move(Updated);
     return true;
 }
 

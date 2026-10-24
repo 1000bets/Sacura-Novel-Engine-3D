@@ -120,6 +120,7 @@ import {exportLocation,importLocation} from "./locationFiles.js";
 import FailureLab from "./FailureLab.jsx";
 import SubsceneWorkspace from './SubsceneWorkspace.jsx';
 import CharacterWorkspace from './CharacterWorkspace.jsx';
+import NativeSoundWorkspace from './NativeSoundWorkspace.jsx';
 import NativeCharacterWorkspace from './NativeCharacterWorkspace.jsx';
 import {createCharacter,setCharacterInScene} from './characterModel.js';
 import {createSubscene,cloneSubscene,setSceneEntry,connectSubscene,changeSceneLocation,newSceneDraft,LOCATION_PRIMITIVES} from './subsceneModel.js';
@@ -2433,6 +2434,25 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
     return Created;
   }
   const renderNativeWorkspace=(dock,visible)=>{
+    if (dock === 'sound') {
+      return <NativeSoundWorkspace assets={native.assets} session={native.context?.session || ''}
+        startupAudioPath={native.state?.startupAudioPath} disabled={nativeEditing}
+        onImport={async () => {
+          const Results = await window.sacuraDesktop.nativeImportAssets('Audio');
+          await native.adapter.loadDomain('assets.list', 'assets');
+          const Failure = Results.find(Result => !Result.ok);
+          if (Failure) {
+            throw Error(Failure.error.message);
+          }
+        }}
+        onSetStartup={AssetId => {
+          const Parameters = {};
+          if (AssetId) {
+            Parameters.assetId = AssetId;
+          }
+          return native.adapter.command('audio.setStartup', Parameters, native.context);
+        }}/>;
+    }
     const openAsset=Asset=>OpenNativeAsset({assetId:Asset.id});
     if(dock==='files')return <AssetExplorer project={project} audioAssets={[]} revealRequest={NativeReveal} onPlaceModel={Asset=>PlaceNativeMesh(GetNativeMeshPlacement(Asset)).catch(Failure=>setNotice(Failure.message))} disabled={nativeEditing} onSelectFile={id=>{setNativeAssetId(id);setNativeFocus('asset');}} adapter={{files:nativeFiles,folders:NativeFolders,open:openAsset,
       manage:async (Method,Params)=>{const Result=await native.adapter.command(Method,Params,native.context);await RefreshNativeAssets();return Result;},

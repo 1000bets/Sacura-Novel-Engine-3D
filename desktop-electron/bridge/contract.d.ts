@@ -10,7 +10,7 @@ export interface PropertyInfo {enumValues?:string[];id:string;typeId:string;edit
 /** engine.int64 is represented by a decimal string, including inside reflected arrays/structs. */
 export interface DialogueState {phase:'idle'|'line'|'choice'|'action'|'end'|'failed';speaker:string;text:string;choices:string[];canAdvance:boolean;canChoose:boolean;error:string}
 export interface GameView {widgetLibrary?:Id;variables?:{[key:string]:JsonValue};widget?:JsonValue;widgets?:{[key:string]:JsonValue};objectId:Id;componentId:Id;title?:string;values?:{label:string;value:string|number}[];actions?:{id:string;label:string;enabled?:boolean}[];text?:string;objective?:string;controls?:string;reticle?:boolean;pointerLock?:boolean}
-export interface State {gameViews:GameView[];gameRunning:boolean;gamePaused:boolean;dirty:boolean;storyDirty:boolean;assetDocumentsDirty?:boolean;externalChanges:boolean;projectExternalChanges:boolean;path:string;project:string;play:'stopped'|'playing'|'paused';dialogue:DialogueState;startupAudio:boolean;selection:Id|null;canUndo:boolean;canRedo:boolean;assetError?:string}
+export interface State {gameViews:GameView[];gameRunning:boolean;gamePaused:boolean;dirty:boolean;storyDirty:boolean;assetDocumentsDirty?:boolean;externalChanges:boolean;projectExternalChanges:boolean;path:string;project:string;play:'stopped'|'playing'|'paused';dialogue:DialogueState;startupAudio:boolean;startupAudioPath:string|null;selection:Id|null;canUndo:boolean;canRedo:boolean;assetError?:string}
 export type ReflectedPropertyChange =
   | {path:(string|number)[];operation:'set';value:JsonValue}
   | {path:(string|number)[];operation:'insert';value:JsonValue}
@@ -71,6 +71,7 @@ export interface Commands {
   'play.step': {params:Record<string,never>;result:State};
   'play.advanceDialogue': {params:Record<string,never>;result:State};
   'play.selectChoice': {params:{index:number};result:State};
+  'audio.setStartup': {params:{assetId?:Id};result:State};
   'audio.resolveStartup': {params:Record<string,never>;result:{absolutePath:string}};
   'assets.list': {params:Record<string,never>;result:AssetInfo[]};
   'assets.refresh': {params:Record<string,never>;result:JsonValue};

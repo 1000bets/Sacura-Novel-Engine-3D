@@ -119,7 +119,12 @@ app.whenReady().then(async () => {
         const result=await bridge.request('assets.resolve',{assetId:id});
         if(!result.ok)return new Response(result.error.message,{status:404});
         const file=result.value.absolutePath;
-        if(result.value.typeId!=='Texture'||!['.png','.jpg','.jpeg','.bmp','.webp'].includes(path.extname(file).toLowerCase()))return new Response('No browser preview for this native asset type',{status:415});
+        const Extension = path.extname(file).toLowerCase();
+        const IsTexture = result.value.typeId === 'Texture' && ['.png','.jpg','.jpeg','.bmp','.webp'].includes(Extension);
+        const IsAudio = result.value.typeId === 'Audio' && Extension === '.wav';
+        if (!IsTexture && !IsAudio) {
+          return new Response('No browser preview for this native asset type', {status:415});
+        }
         return net.fetch(pathToFileURL(file).toString());
       }
       if (url.host === 'native-thumbnail') {
@@ -269,11 +274,17 @@ app.whenReady().then(async () => {
     handle('native-import-assets',async destination=>{
       if(typeof destination!=='string'||destination.length>900)throw Error('Invalid import destination');
       const owner=nativeViewport,context=owner.bridge.context;
-      const picked=await dialog.showOpenDialog(window,{title:'Импорт в C++ AssetRegistry',properties:['openFile','multiSelections'],filters:[{name:'Native Engine assets',extensions:['glb','fbx','png','jpg','jpeg','bmp','tga','hdr']}]});
+      let ImportTitle = 'Импорт в C++ AssetRegistry';
+      let ImportFilters = [{name:'Native Engine assets',extensions:['glb','fbx','png','jpg','jpeg','bmp','tga','hdr','wav']}];
+      if (destination === 'Audio') {
+        ImportTitle = 'Импорт WAV';
+        ImportFilters = [{name:'WAV audio',extensions:['wav']}];
+      }
+      const picked=await dialog.showOpenDialog(window,{title:ImportTitle,properties:['openFile','multiSelections'],filters:ImportFilters});
       if(picked.canceled)return [];
       if(owner!==nativeViewport||context?.session!==owner.bridge.context?.session)throw Error('Project changed during import');
       const results=[];
-      for(const sourcePath of picked.filePaths){const name=path.basename(sourcePath).replace(/\.fbx$/i,'.glb');results.push(await owner.bridge.request('assets.import',{sourcePath,destination:path.posix.join(destination||'Imports',name)},context));}
+      for(const sourcePath of picked.filePaths){const name=path.basename(sourcePath).replace(/\.fbx$/i,'.glb').replace(/\.wav$/i,'.wav');results.push(await owner.bridge.request('assets.import',{sourcePath,destination:path.posix.join(destination||'Imports',name)},context));}
       return results;
     });
     handle('native-input', value => nativeViewport.input(value));
@@ -328,7 +339,7 @@ app.whenReady().then(async () => {
     if (MaterialDropCheck) require('./scripts/material-drop-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
     if (MigrationCheck) require('./scripts/qt-removal-check.cjs').Run({Application:app,Window:window,Editors:AssetWindows,GetViewport:()=>nativeViewport});
     else if (assetTransferTest) require('./scripts/asset-transfer-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
-    else if (nativeSmoke && !assetTransferTest && !process.argv.some(Argument => (Argument.startsWith('--screenshot-texture=') || Argument.startsWith('--widget-editor-check=')))) require('./scripts/native-smoke-main.cjs').run({app, window, getViewport:()=>nativeViewport, replaceProject});
+    else if (nativeSmoke && !assetTransferTest && !process.argv.some(Argument => (Argument.startsWith('--screenshot-texture=') || Argument.startsWith('--widget-editor-check=') || Argument.startsWith('--sound-editor-check=')))) require('./scripts/native-smoke-main.cjs').run({app, window, getViewport:()=>nativeViewport, replaceProject});
   }
   if (smoke) {
     const deadline = setTimeout(() => {console.error('Desktop smoke: React did not become ready'); app.exit(1);}, 15000);
@@ -415,6 +426,10 @@ app.whenReady().then(async () => {
   if (devUrl) await window.loadURL(devUrl); else await window.loadURL('sacura://app/index.html');
   if (MaterialCapture) {
     require('./scripts/capture-material-editor.cjs').run({app, window, editors: AssetWindows, windows:WorkspaceWindows, getViewport: () => nativeViewport, output: MaterialCapture.slice('--screenshot-material='.length)});
+  }
+  const SoundCheck = process.argv.find(Argument => Argument.startsWith('--sound-editor-check='));
+  if (SoundCheck) {
+    require('./scripts/sound-editor-check.cjs').run({app,window,windows:WorkspaceWindows,getViewport:()=>nativeViewport,output:SoundCheck.slice('--sound-editor-check='.length)});
   }
   const WidgetCheck = process.argv.find(Argument => Argument.startsWith('--widget-editor-check='));
   if (WidgetCheck) {

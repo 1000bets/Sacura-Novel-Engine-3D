@@ -1,4 +1,4 @@
-import {NativeStoryNodeFields,NativeStoryActionFields} from './NativeStoryInspector.jsx';
+import {NativeStoryNodeFields} from './NativeStoryInspector.jsx';
 import {NativeNarrativeNode} from './NativeNarrative.jsx';
 import {flowAriaLabels} from './flowLocalization.js';
 import {actionSummary} from './authoringPresentation.js';
@@ -56,9 +56,8 @@ const Moment=memo(function Moment({data,selected}){
   {data.issue&&<div className="moment-issue"><Icon name="TriangleAlert" size={12}/>{tr(data.issue.title)}</div>}
   {data.entry&&!data.nativeMode&&<button className="moment-environment nodrag" title={tr("Изменить начальное окружение сабсцены")} onClick={()=>data.onScene(scene.id)}><Icon name="CloudSun" size={13}/>{tr("Начало · ")}{tr(scene.weather)} · {tr(scene.time)}<Icon name="Settings2" size={12}/></button>}
   {(!data.nativeMode||['Line','Choice'].includes(beat.nativeKind))&&events(phases[0])}
-  {data.nativeMode && <fieldset className="native-node-fields nodrag nopan nowheel" disabled={data.running} onClick={Event=>Event.stopPropagation()} onDoubleClick={Event=>Event.stopPropagation()} onKeyDown={Event=>Event.stopPropagation()}>
-   <NativeStoryNodeFields Node={data.NativeNode} Objects={data.project.objects} Disabled={data.running} Edit={Patch=>data.NativeCommand('story.updateNode',{nodeId:beat.id,patch:Patch})}/>
-   {beat.nativeKind==='Action' && <NativeStoryActionFields Node={data.NativeNode} Objects={data.project.objects} Disabled={data.running} Edit={Patch=>data.NativeCommand('story.updateNode',{nodeId:beat.id,patch:Patch})}/>}
+  {data.nativeMode && <fieldset className="moment-dialogue native-node-dialogue nodrag nopan nowheel" disabled={data.running} onClick={Event=>Event.stopPropagation()} onDoubleClick={Event=>Event.stopPropagation()} onKeyDown={Event=>Event.stopPropagation()}>
+   <NativeStoryNodeFields bCompact Node={data.NativeNode} Objects={data.project.objects} Disabled={data.running} Edit={Patch=>data.NativeCommand('story.updateNode',{nodeId:beat.id,patch:Patch})}/>
   </fieldset>}
   {!data.nativeMode && <div className="moment-dialogue nodrag" onClick={()=>data.onSelect(beat.id)}><strong>{data.nativeMode&&beat.nativeKind==='Action'?'Action':beat.speaker || (beat.kind==='choice'?tr("Выбор игрока"):tr("Рассказчик"))}</strong><p>{data.nativeMode&&beat.nativeKind==='Action'?`${beat.actions?.length||0} действий · редактирование в Inspector`:beat.text || tr("Пустая реплика")}</p></div>}
   {(!data.nativeMode||['Line','Choice'].includes(beat.nativeKind))&&events(phases[1])}

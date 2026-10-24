@@ -25,6 +25,7 @@ public:
     bool OpenProject(const std::filesystem::path& ProjectFile);
     void CloseProject();
     bool SetStartupDocuments(const std::filesystem::path& Scene, const std::filesystem::path& Story, std::string& OutError);
+    bool SetStartupAudio(const std::filesystem::path& Audio, std::string& OutError);
     bool RelocateContentPath(const std::filesystem::path& Source, const std::filesystem::path& Destination, std::string& OutError);
 
     bool IsOpen() const;

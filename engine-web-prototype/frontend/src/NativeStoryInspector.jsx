@@ -20,8 +20,8 @@ export function NativeInspectorEmpty({children}){
  return <div className="native-inspector-empty" role="status"><Icon name="MousePointer2" size={24}/><strong>{tr('Ничего не выбрано')}</strong><p>{children||tr('Выберите элемент на холсте или в списке слева.')}</p></div>;
 }
 
-function CommitText({label,value='',onCommit,disabled,multiline=false}){
- const Properties={defaultValue:value,disabled,'aria-label':label,onBlur:Event=>{
+function CommitText({label,value='',onCommit,disabled,multiline=false,placeholder}){
+ const Properties={defaultValue:value,disabled,placeholder,'aria-label':label,onBlur:Event=>{
   if (!disabled && Event.target.value!==value) {
    onCommit(Event.target.value);
   }
@@ -101,8 +101,24 @@ export default function NativeStoryInspector({story,selection,objects=[],disable
  </div>;
 }
 
-export function NativeStoryNodeFields({Node:node,Objects:objects=[],Disabled:disabled,Edit:edit}) {
+export function NativeStoryNodeFields({Node:node,Objects:objects=[],Disabled:disabled,Edit:edit,bCompact=false}) {
  useLocale();
+ if (bCompact) {
+  let Speaker=node.speaker||tr('Рассказчик');
+  if (node.speaker==='Narrator') {
+   Speaker=tr('Рассказчик');
+  }
+  if (node.kind==='Choice') {
+   return <><strong>{tr('Выбор игрока')}</strong><CommitText label="Текст выбора" value={node.prompt} placeholder={tr('Пустая реплика')} onCommit={prompt=>edit({prompt})} disabled={disabled} multiline/></>;
+  }
+  if (node.kind==='Line') {
+   return <><strong>{Speaker}</strong><CommitText label="Текст выбранной реплики" value={node.text} placeholder={tr('Пустая реплика')} onCommit={text=>edit({text})} disabled={disabled} multiline/></>;
+  }
+  if (node.kind==='Action') {
+   return <><strong>{tr('Действие')}</strong><p>{tr('Действий: ')}{node.actions?.length||0}</p></>;
+  }
+  return <><strong>{tr('Рассказчик')}</strong><p>{node.text||tr('Пустая реплика')}</p></>;
+ }
  return <>    <Field label="Тип блока"><Select disabled={node.kind === 'Narrative'} aria-label="Тип блока" value={node.kind} options={node.kind === 'Narrative' ? [['Narrative','Python Narrative']] : kinds} onChange={kind=>edit({kind})}/></Field>
     {node.kind==='Line'&&<><Field label="Говорит"><AssetReferenceField label="Персонаж-говорящий" assetId={SpeakerAssetIdentifier(node.speaker)} allowedTypes={['Character']} disabled={disabled} onChange={Identity=>{let Speaker='Narrator';if(Identity.assetId){Speaker='character:'+Identity.assetId;}edit({speaker:Speaker});}}/><Select aria-label="Говорит" value={node.speaker||'Narrator'} options={[['Narrator','Рассказчик'],...objects.map(o=>[o.name,o.name]),...(node.speaker&&!objects.some(o=>o.name===node.speaker)&&node.speaker!=='Narrator'?[[node.speaker,node.speaker]]:[])]} onChange={speaker=>edit({speaker})}/></Field><CommitText label="Текст выбранной реплики" value={node.text} onCommit={text=>edit({text})} disabled={disabled} multiline/></>}
     {node.kind==='Choice'&&<CommitText label="Текст выбора" value={node.prompt} onCommit={prompt=>edit({prompt})} disabled={disabled} multiline/>}</>;

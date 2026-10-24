@@ -8,16 +8,16 @@ export default function NativeDialogue({state,session,onAdvance,onChoice,onGameA
   const audio=useRef(null);
   useEffect(()=>{
     if(!state?.startupAudio||!session)return;
-    const cue=new Audio(`sacura://startup-audio/${encodeURIComponent(session)}/cue.wav`);
+    const cue=new Audio(`sacura://startup-audio/${encodeURIComponent(session)}/cue.wav?path=${encodeURIComponent(state.startupAudioPath||'')}`);
     cue.volume=.55;
     audio.current=cue;
     return()=>{cue.pause();cue.src='';if(audio.current===cue)audio.current=null;};
-  },[session,state?.startupAudio]);
+  },[session,state?.startupAudio,state?.startupAudioPath]);
   useEffect(()=>{
     if(!audio.current)return;
     if(state?.play==='playing')audio.current.play().catch(()=>{});
     else audio.current.pause();
-  },[state?.play,session,state?.startupAudio]);
+  },[state?.play,session,state?.startupAudio,state?.startupAudioPath]);
   const dialogue=state?.dialogue;
   if(!dialogue||!['line','choice','failed'].includes(dialogue.phase))return null;
   const enabled=state.play==='playing'||state.gameRunning&&!state.gamePaused;

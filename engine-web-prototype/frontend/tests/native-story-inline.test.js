@@ -13,12 +13,15 @@ const {render:Render,screen:Screen,fireEvent:FireEvent,cleanup:Cleanup,waitFor:W
 const Server=await createServer({root:fileURLToPath(new URL('..',import.meta.url)),server:{middlewareMode:true,watch:null,hmr:false,ws:false}});
 const {NativeStoryNodeFields,NativeStoryActionFields}=await Server.ssrLoadModule('/src/NativeStoryInspector.jsx');
 const {NativeNarrativeInspector}=await Server.ssrLoadModule('/src/NativeNarrative.jsx');
+const {setLanguage:SetLanguage}=await Server.ssrLoadModule('/src/i18n.js');
+SetLanguage('ru');
 afterEach(Cleanup);
 after(async()=>{await Server.close();DocumentEnvironment.window.close();});
-Test('inline dialogue commits once on blur, cancels Escape and refreshes after undo',()=>{
+for (const bCompact of [false,true]) {
+Test('inline dialogue commits once on blur, cancels Escape and refreshes after undo; compact='+bCompact,()=>{
  const Changes=[];
  const Node={id:'line',kind:'Line',speaker:'Narrator',text:'Original'};
- const Properties={Node,Objects:[],Edit:Patch=>Changes.push(Patch)};
+ const Properties={Node,Objects:[],bCompact,Edit:Patch=>Changes.push(Patch)};
  const View=Render(React.createElement(NativeStoryNodeFields,Properties));
  let Field=Screen.getByLabelText('Текст выбранной реплики');
  FireEvent.change(Field,{target:{value:'Draft'}});
@@ -33,19 +36,25 @@ Test('inline dialogue commits once on blur, cancels Escape and refreshes after u
  View.rerender(React.createElement(NativeStoryNodeFields,{...Properties,Node:{...Node,text:'Edited'}}));
  View.rerender(React.createElement(NativeStoryNodeFields,Properties));
  Assert.equal(Screen.getByLabelText('Текст выбранной реплики').value,'Original');
+ if (bCompact) {
+  Assert.equal(Screen.queryByLabelText('Тип блока'),null);
+  Assert.equal(Screen.queryByLabelText('Говорит'),null);
+  Assert.ok(Screen.getByText('Рассказчик'));
+ }
 });
 Test('choice prompt uses prompt field and disabled dialogue cannot commit',()=>{
  const Changes=[];
- const View=Render(React.createElement(NativeStoryNodeFields,{Node:{kind:'Choice',prompt:'Question'},Edit:Patch=>Changes.push(Patch)}));
+ const View=Render(React.createElement(NativeStoryNodeFields,{bCompact,Node:{kind:'Choice',prompt:'Question'},Edit:Patch=>Changes.push(Patch)}));
  FireEvent.change(Screen.getByLabelText('Текст выбора'),{target:{value:'New question'}});
  FireEvent.blur(Screen.getByLabelText('Текст выбора'));
  Assert.deepEqual(Changes,[{prompt:'New question'}]);
- View.rerender(React.createElement(NativeStoryNodeFields,{Node:{kind:'Line',speaker:'Narrator',text:'Locked'},Disabled:true,Edit:Patch=>Changes.push(Patch)}));
+ View.rerender(React.createElement(NativeStoryNodeFields,{bCompact,Node:{kind:'Line',speaker:'Narrator',text:'Locked'},Disabled:true,Edit:Patch=>Changes.push(Patch)}));
  const Field=Screen.getByLabelText('Текст выбранной реплики');
  Assert.equal(Field.disabled,true);
  FireEvent.change(Field,{target:{value:'Rejected'}});FireEvent.blur(Field);
  Assert.equal(Changes.length,1);
 });
+}
 Test('inline action edits preserve the other authored actions',()=>{
  const Actions=[{id:'first',kind:'Wait',durationSeconds:1},{id:'second',kind:'Wait',durationSeconds:2}];
  const Changes=[];

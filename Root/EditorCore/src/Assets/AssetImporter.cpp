@@ -8,6 +8,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <fstream>
+#include <string_view>
 #include <unordered_set>
 
 namespace
@@ -215,6 +217,23 @@ ImportResult AssetImporter::ImportImage(const ImportRequest& Request)
     return PublishPair(Request, StagedPath, TextureAssetType, ImportInfo);
 }
 
+ImportResult AssetImporter::ImportAudio(const ImportRequest& Request)
+{
+    ImportResult Result{};
+    std::ifstream Input(Request.SourcePath, std::ios::binary);
+    char Header[12]{};
+    if (!Input.read(Header, sizeof(Header)) ||
+        std::string_view(Header, 4) != "RIFF" ||
+        std::string_view(Header + 8, 4) != "WAVE")
+    {
+        Result.Diagnostic = AssetDiagnostic::Fail(
+            AssetErrorCode::InvalidData, "AssetImporter", "Invalid WAV header");
+        return Result;
+    }
+    return PublishPair(Request, Request.SourcePath, AudioAssetType,
+        {{"source", Request.SourcePath.u8string()}, {"importer", "WavImporter"}});
+}
+
 ImportResult AssetImporter::ImportFbx(const ImportRequest& Request)
 {
     const std::filesystem::path StagingRoot = Request.StagingDirectory.empty()
@@ -298,6 +317,10 @@ ImportResult AssetImporter::Import(const ImportRequest& Request)
     if (Extension == ".fbx")
     {
         return ImportFbx(Request);
+    }
+    if (Extension == ".wav")
+    {
+        return ImportAudio(Request);
     }
 
     Result.Diagnostic = AssetDiagnostic::Fail(

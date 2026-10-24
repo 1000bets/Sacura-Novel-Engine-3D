@@ -14,6 +14,7 @@ public:
 private:
     ImportResult ImportGlb(const ImportRequest& Request);
     ImportResult ImportImage(const ImportRequest& Request);
+    ImportResult ImportAudio(const ImportRequest& Request);
     ImportResult ImportFbx(const ImportRequest& Request);
     std::vector<SubAssetRecord> BuildUniqueSubAssets(
         const std::string& DestinationRelativePath,

@@ -384,7 +384,12 @@ Json NativeBridge::Describe() {
         {"speaker",Playback.GetDisplayedSpeaker()},{"text",Playback.GetDisplayedLine()},
         {"choices",Choices},{"canAdvance",Playback.CanAdvanceDialogue()},
         {"canChoose",Playback.CanSelectChoice()},{"error",Playback.GetLastError()}};
-    return {{"gameRunning",Runtime.IsGameRunning()},{"gamePaused",Runtime.IsGamePaused()},{"dirty",Workspace.GetDocument().IsDirty()},{"storyDirty",Story.IsDirty()},{"assetDocumentsDirty",HasDirtyAssetDocuments()},
+    Json StartupAudioPath = nullptr;
+    if (Project.GetProject() && !Project.GetProject()->StartupAudio.empty())
+    {
+        StartupAudioPath = Project.GetProject()->StartupAudio.lexically_relative(ProjectPaths::Content()).generic_string();
+    }
+    return {{"startupAudioPath",StartupAudioPath},{"gameRunning",Runtime.IsGameRunning()},{"gamePaused",Runtime.IsGamePaused()},{"dirty",Workspace.GetDocument().IsDirty()},{"storyDirty",Story.IsDirty()},{"assetDocumentsDirty",HasDirtyAssetDocuments()},
         {"externalChanges",Workspace.GetDocument().HasExternalChanges()},{"projectExternalChanges",ProjectChanged()},
         {"path",Workspace.GetDocument().GetDocumentPath().generic_string()},
         {"project",Project.GetProject()?Project.GetProject()->Name:""},
@@ -854,6 +859,23 @@ Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
     if(M=="selection.set"){if(P["objectId"].is_null())Workspace.ClearSelection();else Workspace.Select(World(),Find(P["objectId"])->GetObjectHandle());return Describe();}
     if(M=="editor.undo"){Require(Commands.Undo(),"COMMAND_FAILED","Nothing to undo or stale command");return Describe();}
     if(M=="editor.redo"){Require(Commands.Redo(),"COMMAND_FAILED","Nothing to redo or stale command");return Describe();}
+    if (M == "audio.setStartup")
+    {
+        Require(!ProjectChanged(), "EXTERNAL_CHANGES", "Project descriptor changed externally");
+        std::filesystem::path Audio;
+        if (P.contains("assetId"))
+        {
+            const auto Entry = Asset(P.at("assetId"));
+            Require(Entry.Metadata.Type == AudioAssetType && Entry.Mount == AssetMount::Game,
+                "INVALID_ARGUMENT", "Expected project WAV asset");
+            Audio = Entry.AbsolutePath;
+        }
+        std::string Error;
+        Require(Project.SetStartupAudio(Audio, Error), "IO_ERROR", Error);
+        AssetDiagnostic Diagnostic;
+        ContentHash::TryHashFile(Project.GetProject()->ProjectFile.u8string(), ProjectFingerprint, Diagnostic);
+        return Describe();
+    }
     if(M=="audio.resolveStartup") {
         Require(Project.GetProject()&&!Project.GetProject()->StartupAudio.empty(),"NOT_FOUND","No startup audio");
         const auto Relative=Project.GetProject()->StartupAudio.lexically_relative(ProjectPaths::Content());

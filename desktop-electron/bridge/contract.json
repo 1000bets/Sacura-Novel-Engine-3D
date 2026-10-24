@@ -95,6 +95,7 @@
     "assets.getScenes": {},
     "play.step": {},
     "audio.resolveStartup": {},
+    "audio.setStartup": {"assetId?": "id"},
     "assets.list": {},
     "assets.refresh": {},
     "assets.resolve": {

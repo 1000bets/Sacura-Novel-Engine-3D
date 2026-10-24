@@ -37,7 +37,7 @@
 
 - Scripting lists individual PythonScript assets and searches their paths and source contents. Results open the original file through the ordinary Python asset workspace, preserving its editing, history and explicit saves. It uses existing assetDocument.execute/open reads and never concatenates modules into a synthetic file.
 
-- Native Story Flow cards reuse Inspector fields for node type, speaker, dialogue/prompt and actions, and Narrative literal controls for typed inputs. Inline edits use the existing story.updateNode/story.setNarrativeInput commands, retain Undo/Redo, and are disabled during Play/read-only. Text commits on blur or Enter (Ctrl+Enter for multiline); Escape cancels the draft.
+- Native Story Flow cards retain the compact visual layout from `origin/feature/electoron_ui`: speaker and dialogue/prompt on a tinted block, event phases, answers and connection pins. Do not embed the full Inspector form (type, speaker asset picker or action forms) into these cards. Full settings remain in Inspector; inline dialogue/prompt reuses its commit control with borderless, content-sized styling. Python Narrative retains typed literal controls. Inline edits use the existing story.updateNode/story.setNarrativeInput commands, retain Undo/Redo, and are disabled during Play/read-only. Text commits on blur or Enter (Ctrl+Enter for multiline); Escape cancels the draft.
 
 - Story Flow selection preserves the graph viewport by default. Automatic focus is an opt-in toolbar icon toggle; explicit focus and fit actions remain independent. This is UI-only navigation state, excluded from native mutation commands and authored story documents.
 
