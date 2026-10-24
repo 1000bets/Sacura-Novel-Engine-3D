@@ -1,3 +1,4 @@
+#include "UI/Presentation/LocalizedEditorUi.h"
 #include "UI/Views/WidgetWorkspaceView.h"
 #include "UI/Views/WidgetCanvasView.h"
 #include "UI/Views/StudioControls.h"
@@ -166,7 +167,7 @@ WidgetWorkspaceView::WidgetWorkspaceView(QWidget *Parent) : QWidget(Parent)
     auto *Header = new QWidget(this);
     Header->setObjectName("WidgetHeader");
     auto *Top = new WidgetHeaderLayout(Header);
-    auto *Title = new QLabel(tr("Редактор виджетов"), Header);
+    auto *Title = BindEditorCaption(new QLabel(tr("Редактор виджетов"), Header), QString::fromUtf8("Редактор виджетов"));
     Title->setProperty("uiRole", "widgetHeading");
     Top->addWidget(Title);
     Picker = new StudioSelect(Header);
@@ -242,8 +243,8 @@ WidgetWorkspaceView::WidgetWorkspaceView(QWidget *Parent) : QWidget(Parent)
     for (auto T : WidgetLayout::Types())
         Add->addItem(WidgetLayout::TypeLabel(T), T);
     Left->addWidget(Add);
-    auto *Help = new QLabel(
-        tr("Новый элемент добавляется внутрь выбранной панели. Стрелки перемещают элемент; Shift — шаг 10."));
+    auto *Help = BindEditorCaption(new QLabel(
+        tr("Новый элемент добавляется внутрь выбранной панели. Стрелки перемещают элемент; Shift — шаг 10.")), QString::fromUtf8("Новый элемент добавляется внутрь выбранной панели. Стрелки перемещают элемент; Shift — шаг 10."));
     Help->setWordWrap(true);
     Help->setProperty("uiRole", "widgetHint");
     Left->addWidget(Help);
@@ -664,14 +665,14 @@ void WidgetWorkspaceView::Export()
 {
     FlushEdits();
     QDialog Dialog(this);
-    Dialog.setWindowTitle(tr("Экспорт виджета"));
+    BindEditorProperty(&Dialog, "windowTitle", QString::fromUtf8("Экспорт виджета"));
     auto *Form = new QFormLayout(&Dialog);
     auto *Author = new QLineEdit(&Dialog);
     auto *License = new QLineEdit(&Dialog);
     auto *Description = new QLineEdit(&Dialog);
-    Form->addRow(tr("Автор"), Author);
-    Form->addRow(tr("Лицензия"), License);
-    Form->addRow(tr("Описание"), Description);
+    Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Автор")), Author);
+    Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Лицензия")), License);
+    Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Описание")), Description);
     auto *Buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &Dialog);
     Form->addRow(Buttons);
     connect(Buttons, &QDialogButtonBox::accepted, &Dialog, &QDialog::accept);
@@ -975,7 +976,7 @@ void WidgetWorkspaceView::Inspector()
                E["role"].toString(), [this](QString V) { EditElement([&](QJsonObject &Item) { Item["role"] = V; }); });
         if (E["type"] != "panel")
         {
-            L->addWidget(new QLabel(tr("Текст / подпись")));
+            L->addWidget(BindEditorCaption(new QLabel(tr("Текст / подпись")), QString::fromUtf8("Текст / подпись")));
             auto *Text = new TextEdit(Form);
             Text->setObjectName("WidgetElementText");
             Text->setPlainText(E["text"].toString());
@@ -1135,7 +1136,7 @@ void WidgetWorkspaceView::Inspector()
     }
     else
     {
-        auto *Empty = new QLabel(tr("Выберите элемент на холсте или в списке слева."));
+        auto *Empty = BindEditorCaption(new QLabel(tr("Выберите элемент на холсте или в списке слева.")), QString::fromUtf8("Выберите элемент на холсте или в списке слева."));
         Empty->setWordWrap(true);
         Empty->setObjectName("WidgetEmptySelection");
         L->addWidget(Empty);
@@ -1143,8 +1144,8 @@ void WidgetWorkspaceView::Inspector()
     auto *Css = Button(tr("CSS виджета"), "ChevronRight", Form, L, []() {});
     Css->setCheckable(true);
     Css->setProperty("uiRole", "widgetDisclosure");
-    auto *CssNote = new QLabel(
-        tr("CSS доступен в веб-прототипе. В нативном редакторе используйте параметры оформления элементов."), Form);
+    auto *CssNote = BindEditorCaption(new QLabel(
+        tr("CSS доступен в веб-прототипе. В нативном редакторе используйте параметры оформления элементов."), Form), QString::fromUtf8("CSS доступен в веб-прототипе. В нативном редакторе используйте параметры оформления элементов."));
     CssNote->setWordWrap(true);
     L->addWidget(CssNote);
     CssNote->hide();

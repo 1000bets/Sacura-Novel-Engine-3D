@@ -1,3 +1,4 @@
+#include "UI/Presentation/LocalizedEditorUi.h"
 #include "UI/Adapters/WorkspaceDockController.h"
 #include "UI/Styles/EditorStyle.h"
 #include <QAction>
@@ -257,7 +258,7 @@ void WorkspaceDockController::Float(QWidget& Page, QRect Geometry)
     Layout->setContentsMargins(4, 4, 4, 4);
     auto* Attach = new QToolButton(Window);
     Attach->setText(tr("Закрепить…"));
-    Attach->setToolTip(tr("Вернуть окно в одну из областей редактора"));
+    BindEditorProperty(Attach, "toolTip", QString::fromUtf8("Вернуть окно в одну из областей редактора"));
     connect(Attach, &QToolButton::clicked, this, [this, Id, Attach]()
     { ShowMenu(Id, Attach->mapToGlobal(QPoint(0, Attach->height()))); });
     Layout->addWidget(Attach, 0, Qt::AlignRight);
@@ -274,21 +275,21 @@ void WorkspaceDockController::ShowMenu(const QString& Id, QPoint Position)
     auto* Menu = new QMenu(&Owner);
     Menu->setAttribute(Qt::WA_DeleteOnClose);
     QPointer<QWidget> Page = Pages[Id].Page;
-    auto* Restore = Menu->addAction(tr("Вернуть на исходное место"), this, [this, Page]()
+    auto* Restore = BindEditorCaption(Menu->addAction(tr("Вернуть на исходное место"), this, [this, Page]()
     {
         if (Page) { RestoreDefault(*Page); }
-    });
+    }), QString::fromUtf8("Вернуть на исходное место"));
     Restore->setObjectName("RestoreWorkspacePage");
     Menu->addSeparator();
     if (!Pages[Id].Floating)
-    { Menu->addAction(tr("Отдельное окно"), this, [this, Page]() { if (Page) { Float(*Page); } }); }
+    { BindEditorCaption(Menu->addAction(tr("Отдельное окно"), this, [this, Page]() { if (Page) { Float(*Page); } }), QString::fromUtf8("Отдельное окно")); }
     for (auto It = Areas.cbegin(); It != Areas.cend(); ++It)
     {
-        Menu->addAction(tr("Закрепить: %1").arg(It->Title), this,
-            [this, Page, Area = It.key()]() { if (Page) { Dock(*Page, Area); } });
+        BindEditorCaption(Menu->addAction(tr("Закрепить: %1").arg(It->Title), this,
+            [this, Page, Area = It.key()]() { if (Page) { Dock(*Page, Area); } }), QString::fromUtf8("Закрепить: %1"));
     }
     Menu->addSeparator();
-    Menu->addAction(tr("Закрыть"), this, [this, Page]() { if (Page) { SetOpen(*Page, false); } });
+    BindEditorCaption(Menu->addAction(tr("Закрыть"), this, [this, Page]() { if (Page) { SetOpen(*Page, false); } }), QString::fromUtf8("Закрыть"));
     Menu->popup(Position);
 }
 

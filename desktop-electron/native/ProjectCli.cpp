@@ -1,4 +1,7 @@
 #include "ProjectCli.h"
+#include "Localization/EditorLocalization.h"
+#include <QFile>
+#include <QJsonDocument>
 #include "Engine.h"
 #include "Core/EnginePaths.h"
 #include "Core/Threading/ThreadContext.h"
@@ -9,6 +12,33 @@
 
 int RunProjectCli(const QStringList& A)
 {
+    if (A.size() == 2 && A[1] == "--editor-localization")
+    {
+        QFile Input;
+        Input.open(stdin, QIODevice::ReadOnly);
+        const QByteArray Bytes = Input.read(4 * 1024 * 1024 + 1);
+        QString Error;
+        bool Success = Bytes.size() <= 4 * 1024 * 1024;
+        if (!Bytes.trimmed().isEmpty() && Success)
+        {
+            QJsonParseError ParseError;
+            const auto Document = QJsonDocument::fromJson(Bytes, &ParseError);
+            Success = ParseError.error == QJsonParseError::NoError && Document.isObject();
+            if (Success)
+            {
+                Success = EditorLocalization::Get().ApplyPreferences(Document.object(), Error);
+            }
+        }
+        auto Result = EditorLocalization::Get().Preferences();
+        Result.insert("ok", Success);
+        Result.insert("error", Error);
+        std::cout << "\n@project " << QJsonDocument(Result).toJson(QJsonDocument::Compact).toStdString() << std::endl;
+        if (Success)
+        {
+            return 0;
+        }
+        return 1;
+    }
     if (A.size()<2 || (A[1]!="--project-create" && A[1]!="--project-check")) return -1;
     nlohmann::json Result;
     try {

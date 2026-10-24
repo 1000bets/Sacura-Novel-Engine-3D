@@ -1,3 +1,4 @@
+#include "UI/Presentation/LocalizedEditorUi.h"
 #include "UI/Views/StudioActionMenu.h"
 #include "UI/Styles/ControlStyle.h"
 #include "UI/Styles/ActionMenuStyle.h"
@@ -105,7 +106,7 @@ StudioActionMenu::StudioActionMenu(const QString& Title, QVector<StudioMenuItem>
     SearchLayout->addWidget(Icon);
     Search = new QLineEdit(SearchBox);
     Search->setObjectName("StudioMenuSearch");
-    Search->setPlaceholderText(tr("Поиск…"));
+    BindEditorProperty(Search, "placeholderText", QString::fromUtf8("Поиск…"));
     Search->setAccessibleName(tr("Поиск в контекстном меню"));
     Search->installEventFilter(this);
     SearchLayout->addWidget(Search, 1);

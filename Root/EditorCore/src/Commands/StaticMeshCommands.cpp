@@ -37,7 +37,7 @@ std::unique_ptr<EditorCommand> MakeCreateStaticMeshObjectCommand(Scene* World, c
         Body->CollisionMeshAssetId = Asset.Asset.ToString();
         Body->CollisionMeshSubAssetId = Asset.SubAsset->ToString();
         const auto& Element = Defaults.CollisionElements.front();
-        Body->ShapeType = Element.ShapeType;
+        Body->ShapeType = static_cast<PhysicsShapeType>(Element.ShapeType);
         Body->Center = Element.Center;
         Body->HalfExtents = Element.HalfExtents;
         Body->Radius = Element.Radius;
@@ -293,7 +293,7 @@ std::unique_ptr<EditorCommand> MakeSetMeshPhysicsCommand(Scene* World, const Ass
     }
     else
     {
-        bTriangle = Body->ShapeType == 3;
+        bTriangle = Body->ShapeType == PhysicsShapeType::TriangleMesh;
     }
     if (bEnabled && bSimulate && bTriangle)
     {
@@ -304,29 +304,31 @@ std::unique_ptr<EditorCommand> MakeSetMeshPhysicsCommand(Scene* World, const Ass
     Command->WorldIdentity = World->GetObjectHandle();
     Command->OwnerId = Owner->GetPersistentId();
     Command->bNewEnabled = bEnabled;
-    int64_t MotionType = 0;
+    PhysicsMotionType MotionType = PhysicsMotionType::Static;
     if (Body)
     {
         MotionType = Body->MotionType;
     }
     if (bEnabled && bSimulate)
     {
-        MotionType = 1;
+        MotionType = PhysicsMotionType::Dynamic;
     }
-    else if (bEnabled && MotionType == 1)
+    else if (bEnabled && MotionType == PhysicsMotionType::Dynamic)
     {
-        MotionType = 0;
+        MotionType = PhysicsMotionType::Static;
     }
     if (Body)
     {
-        if (Body->MotionType == 3)
+        if (Body->MotionType == PhysicsMotionType::Character)
         {
             Error = "Configure character motion in its own component";
             return nullptr;
         }
         Command->BodyId = Body->GetPersistentId();
         Command->bOldEnabled = Body->IsEnabled();
-        Command->Motion = MakeSetPropertyCommand(World, Body->GetObjectHandle(), PropertyId{"motion_type"}, ReflectedValue::MakeInt64(MotionType));
+        ReflectedValue EncodedMotion;
+        ReflectionValueCodec<PhysicsMotionType>::ToReflected(MotionType, EncodedMotion);
+        Command->Motion = MakeSetPropertyCommand(World, Body->GetObjectHandle(), PropertyId{"motion_type"}, EncodedMotion);
         return Command;
     }
     if (!bEnabled)

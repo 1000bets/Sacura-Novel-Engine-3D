@@ -31,7 +31,7 @@ exports.run = async ({app: Application, window: Window, getViewport: GetViewport
     const Catalogue = await GetViewport().bridge.request('reflection.getComponentTypes', {});
     await Report('Catalogue received');
     Assert.equal(Catalogue.ok, true);
-    Assert.equal(Catalogue.value.find(Type => Type.typeId === 'engine.MeshRendererComponent').displayName, 'Статический меш');
+    Assert.equal(Catalogue.value.find(Type => Type.typeId === 'engine.MeshRendererComponent').displayName, 'Static Mesh');
     await Report('Opening placement menu');
     await Wait(() => Evaluate("Array.from(document.querySelectorAll('.editor-menubar button')).some(Button=>Button.textContent.includes('Разместить')&&!Button.disabled)"));
     await Evaluate("Array.from(document.querySelectorAll('.editor-menubar button')).find(Button=>Button.textContent.includes('Разместить')).click()");

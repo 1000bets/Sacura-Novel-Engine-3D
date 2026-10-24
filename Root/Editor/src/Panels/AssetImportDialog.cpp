@@ -1,3 +1,4 @@
+#include "UI/Presentation/LocalizedEditorUi.h"
 #include "UI/Views/StudioControls.h"
 #include "Panels/AssetImportDialog.h"
 
@@ -23,21 +24,21 @@ AssetImportDialog::AssetImportDialog(
     , Sources(SourceFiles)
     , SourceFolders(RelativeFolders)
 {
-    setWindowTitle(tr("Импорт ресурсов"));
+    BindEditorProperty(this, "windowTitle", QString::fromUtf8("Импорт ресурсов"));
     setModal(true);
     resize(680, 420);
 
     auto* Layout = new QVBoxLayout(this);
-    auto* Description = new QLabel(
+    auto* Description = BindEditorCaption(new QLabel(
         tr("Проверьте имена и папки перед импортом в Assets. Существующие файлы не перезаписываются."),
-        this);
+        this), QString::fromUtf8("Проверьте имена и папки перед импортом в Assets. Существующие файлы не перезаписываются."));
     Description->setWordWrap(true);
     Layout->addWidget(Description);
 
     auto* DestinationLayout = new QFormLayout();
     DestinationFolderEdit = new QLineEdit(InitialDestinationFolder, this);
-    DestinationFolderEdit->setPlaceholderText(tr("Models"));
-    DestinationLayout->addRow(tr("Папка назначения"), DestinationFolderEdit);
+    BindEditorProperty(DestinationFolderEdit, "placeholderText", QString::fromUtf8("Models"));
+    DestinationLayout->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Папка назначения")), DestinationFolderEdit);
     Layout->addLayout(DestinationLayout);
 
     FilesTable = new QTableWidget(SourceFiles.size(), 3, this);
@@ -74,9 +75,9 @@ AssetImportDialog::AssetImportDialog(
     GenerateMissingNormalsCheck->setVisible(bHasFbxSource);
     Layout->addWidget(GenerateMissingNormalsCheck);
 
-    auto* FormatInformation = new QLabel(
+    auto* FormatInformation = BindEditorCaption(new QLabel(
         tr("GLB без внешних файлов, FBX (риг импортируется в статической позе), PNG и JPEG · до 100 МБ на файл. FBX преобразуется в GLB. Пропущено неподдерживаемых файлов: %1.").arg(SkippedFiles),
-        this);
+        this), QString::fromUtf8("GLB без внешних файлов, FBX (риг импортируется в статической позе), PNG и JPEG · до 100 МБ на файл. FBX преобразуется в GLB. Пропущено неподдерживаемых файлов: %1."));
     FormatInformation->setWordWrap(true);
     Layout->addWidget(FormatInformation);
 

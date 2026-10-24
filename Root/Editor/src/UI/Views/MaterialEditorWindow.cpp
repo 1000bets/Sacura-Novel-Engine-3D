@@ -1,3 +1,4 @@
+#include "UI/Presentation/LocalizedEditorUi.h"
 #include "UI/Styles/StudioIcons.h"
 #include "UI/Views/AssetReferenceField.h"
 #include "UI/Adapters/AssetThumbnails.h"
@@ -80,9 +81,9 @@ MaterialEditorWindow::MaterialEditorWindow(Engine& InRuntime, std::shared_ptr<Ma
     Content->setObjectName("MaterialEditorContent");
     setCentralWidget(Content);
     auto* Layout = new QVBoxLayout(Content);
-    auto* FileMenu = menuBar()->addMenu(tr("Файл"));
-    auto* EditMenu = menuBar()->addMenu(tr("Правка"));
-    auto* ViewMenu = menuBar()->addMenu(tr("Вид"));
+    auto* FileMenu = BindEditorCaption(menuBar()->addMenu(tr("Файл")), QString::fromUtf8("Файл"));
+    auto* EditMenu = BindEditorCaption(menuBar()->addMenu(tr("Правка")), QString::fromUtf8("Правка"));
+    auto* ViewMenu = BindEditorCaption(menuBar()->addMenu(tr("Вид")), QString::fromUtf8("Вид"));
     auto* Toolbar = new QToolBar(tr("Документ"), this);
     Toolbar->setObjectName("MaterialDocumentToolbar");
     Toolbar->setMovable(false);
@@ -91,10 +92,10 @@ MaterialEditorWindow::MaterialEditorWindow(Engine& InRuntime, std::shared_ptr<Ma
     addToolBar(Toolbar);
     auto* SaveAction = FileMenu->addAction(EditorUi::MakeFrontendIcon("Save"), tr("Сохранить"));
     SaveAction->setShortcut(QKeySequence::Save);
-    SaveAction->setToolTip(tr("Сохранить (Ctrl+S)"));
+    BindEditorProperty(SaveAction, "toolTip", QString::fromUtf8("Сохранить (Ctrl+S)"));
     Toolbar->addAction(SaveAction);
     connect(SaveAction, &QAction::triggered, this, [this]() { Save(); });
-    auto* ReloadAction = FileMenu->addAction(tr("Перечитать"));
+    auto* ReloadAction = BindEditorCaption(FileMenu->addAction(tr("Перечитать")), QString::fromUtf8("Перечитать"));
     connect(ReloadAction, &QAction::triggered, this, [this]()
     {
         if ((Session->GetDocument().IsDirty() || bSourcePending)
@@ -105,16 +106,16 @@ MaterialEditorWindow::MaterialEditorWindow(Engine& InRuntime, std::shared_ptr<Ma
         bSourcePending = false;
         Run(MaterialEditOperation::Reload);
     });
-    auto* CloseAction = FileMenu->addAction(tr("Закрыть"));
+    auto* CloseAction = BindEditorCaption(FileMenu->addAction(tr("Закрыть")), QString::fromUtf8("Закрыть"));
     CloseAction->setShortcut(QKeySequence::Close);
     connect(CloseAction, &QAction::triggered, this, [this]() { close(); });
-    auto* UndoAction = EditMenu->addAction(tr("Отменить"));
+    auto* UndoAction = BindEditorCaption(EditMenu->addAction(tr("Отменить")), QString::fromUtf8("Отменить"));
     UndoAction->setShortcut(QKeySequence::Undo);
     connect(UndoAction, &QAction::triggered, this, [this]() { Run(MaterialEditOperation::Undo); });
-    auto* RedoAction = EditMenu->addAction(tr("Повторить"));
+    auto* RedoAction = BindEditorCaption(EditMenu->addAction(tr("Повторить")), QString::fromUtf8("Повторить"));
     RedoAction->setShortcut(QKeySequence::Redo);
     connect(RedoAction, &QAction::triggered, this, [this]() { Run(MaterialEditOperation::Redo); });
-    auto* CompileAction = ViewMenu->addAction(tr("Обновить предпросмотр"));
+    auto* CompileAction = BindEditorCaption(ViewMenu->addAction(tr("Обновить предпросмотр")), QString::fromUtf8("Обновить предпросмотр"));
     connect(CompileAction, &QAction::triggered, this, [this]() { Run(MaterialEditOperation::Compile); });
     ViewMenu->addAction(Toolbar->toggleViewAction());
     StateLabel = new QLabel(this);
@@ -150,6 +151,10 @@ MaterialEditorWindow::MaterialEditorWindow(Engine& InRuntime, std::shared_ptr<Ma
     SourceEditor->setLineWrapMode(QPlainTextEdit::NoWrap);
     new MaterialSourceHighlighter(SourceEditor->document());
     Tabs->addTab(SourceEditor, tr("Исходный HLSL"));
+    if (Session->IsInstance())
+    {
+        Tabs->setTabVisible(Tabs->indexOf(SourceEditor), false);
+    }
     Splitter->setSizes({420, 650});
     Layout->addWidget(Splitter, 1);
     Diagnostics = new QPlainTextEdit(this);
@@ -329,7 +334,7 @@ void MaterialEditorWindow::EditParameterDefinition(const std::string& Identifier
     QDialog Dialog(this);
     Dialog.setObjectName("MaterialParameterDialog");
     EditorUi::EditorStyle::Apply(Dialog);
-    Dialog.setWindowTitle(tr("Определение параметра"));
+    BindEditorProperty(&Dialog, "windowTitle", QString::fromUtf8("Определение параметра"));
     auto* Form = new QFormLayout(&Dialog);
     auto Draft = Session->GetDocument().GetDocument();
     nlohmann::json Definition = nlohmann::json::object();
@@ -354,14 +359,14 @@ void MaterialEditorWindow::EditParameterDefinition(const std::string& Identifier
     Clamp->setChecked(Definition.value("address", "Wrap") == "Clamp");
     auto* Point = new QCheckBox(&Dialog);
     Point->setChecked(Definition.value("filter", "Linear") == "Point");
-    Form->addRow(tr("Имя в HLSL"), Name);
-    Form->addRow(tr("Название"), DisplayName);
-    Form->addRow(tr("Группа"), Group);
-    Form->addRow(tr("Тип"), Type);
-    Form->addRow(tr("Текстура sRGB"), Srgb);
-    Form->addRow(tr("Текстура: ограничить края"), Clamp);
-    Form->addRow(tr("Текстура: точечная фильтрация"), Point);
-    auto* Explanation = new QLabel(tr("Имя используется в HLSL. После добавления измените исходный код, чтобы использовать параметр."), &Dialog);
+    Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Имя в HLSL")), Name);
+    Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Название")), DisplayName);
+    Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Группа")), Group);
+    Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Тип")), Type);
+    Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Текстура sRGB")), Srgb);
+    Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Текстура: ограничить края")), Clamp);
+    Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Текстура: точечная фильтрация")), Point);
+    auto* Explanation = BindEditorCaption(new QLabel(tr("Имя используется в HLSL. После добавления измените исходный код, чтобы использовать параметр."), &Dialog), QString::fromUtf8("Имя используется в HLSL. После добавления измените исходный код, чтобы использовать параметр."));
     Explanation->setWordWrap(true);
     Form->addRow(Explanation);
     auto* Buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &Dialog);
@@ -549,7 +554,7 @@ QWidget* MaterialEditorWindow::MakeParameterField(const MaterialParameterDefinit
         }
         if (Type == MaterialParameterType::Color)
         {
-            auto* SelectColor = new QPushButton(tr("Цвет…"), Container);
+            auto* SelectColor = BindEditorCaption(new QPushButton(tr("Цвет…"), Container), QString::fromUtf8("Цвет…"));
             Layout->addWidget(SelectColor);
             connect(SelectColor, &QPushButton::clicked, this, [this, Components, Definition]()
             {
@@ -637,7 +642,7 @@ void MaterialEditorWindow::RebuildFields()
     {
         Domain = "UserInterface";
     }
-    Fields->addRow(tr("Область применения"), new QLabel(Domain, this));
+    Fields->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Область применения")), new QLabel(Domain, this));
     auto AddChoice = [this, Draft, &Document](const QString& Label, const std::string& Name, const QStringList& Choices, const QString& Default)
     {
         auto* Choice = new QComboBox(this);
@@ -727,7 +732,7 @@ void MaterialEditorWindow::RebuildFields()
         }
         Parent->setCurrentIndex(Parent->findData(QString::fromStdString(Resolved.Parent.Asset.ToString())));
         Parent->setEnabled(!Document.IsReadOnly());
-        Fields->addRow(tr("Родитель"), new AssetReferenceField(*Parent, Runtime.GetAssetRegistry()));
+        Fields->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Родитель")), new AssetReferenceField(*Parent, Runtime.GetAssetRegistry()));
         connect(Parent, &QComboBox::activated, this, [this, Parent](int)
         {
             AssetKey Key;
@@ -751,7 +756,7 @@ void MaterialEditorWindow::RebuildFields()
         Layout->addWidget(MakeParameterField(Definition, Resolved.Values.at(Definition.Identifier)), 1);
         if (Session->IsInstance())
         {
-            auto* Reset = new QPushButton(tr("Наследовать"), Row);
+            auto* Reset = BindEditorCaption(new QPushButton(tr("Наследовать"), Row), QString::fromUtf8("Наследовать"));
             Reset->setEnabled(!Document.IsReadOnly() && Draft.value("overrides", nlohmann::json::object()).contains(Definition.Identifier));
             Layout->addWidget(Reset);
             connect(Reset, &QPushButton::clicked, this, [this, Identifier = Definition.Identifier]()
@@ -763,8 +768,8 @@ void MaterialEditorWindow::RebuildFields()
         }
         else
         {
-            auto* Edit = new QPushButton(tr("Настроить"), Row);
-            auto* Remove = new QPushButton(tr("Удалить"), Row);
+            auto* Edit = BindEditorCaption(new QPushButton(tr("Настроить"), Row), QString::fromUtf8("Настроить"));
+            auto* Remove = BindEditorCaption(new QPushButton(tr("Удалить"), Row), QString::fromUtf8("Удалить"));
             Edit->setEnabled(!Document.IsReadOnly());
             Remove->setEnabled(!Document.IsReadOnly());
             Layout->addWidget(Edit);
@@ -802,7 +807,7 @@ void MaterialEditorWindow::RebuildFields()
     }
     if (!Session->IsInstance())
     {
-        auto* Add = new QPushButton(tr("Добавить параметр"), this);
+        auto* Add = BindEditorCaption(new QPushButton(tr("Добавить параметр"), this), QString::fromUtf8("Добавить параметр"));
         Add->setEnabled(!Document.IsReadOnly());
         Fields->addRow(Add);
         connect(Add, &QPushButton::clicked, this, [this]() { EditParameterDefinition(); });

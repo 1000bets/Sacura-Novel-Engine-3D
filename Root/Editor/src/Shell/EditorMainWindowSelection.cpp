@@ -629,8 +629,8 @@ void EditorMainWindow::OnHierarchyContextMenu(const QPoint& Position)
         !BoundEngine.GetPlaySession().IsSimulating()
         && QApplication::clipboard()->mimeData()->hasFormat(SakuraSceneSubtreeMimeType));
     Menu.addSeparator();
-    QMenu* CreateObjectsMenu = Menu.addMenu(QString::fromUtf8("\xD0\x9E\xD0\xB1\xD1\x8A\xD0\xB5\xD0\xBA\xD1\x82\xD1\x8B"));
-    QMenu* CreateComponentsMenu = Menu.addMenu(QString::fromUtf8("\xD0\x9A\xD0\xBE\xD0\xBC\xD0\xBF\xD0\xBE\xD0\xBD\xD0\xB5\xD0\xBD\xD1\x82\xD1\x8B"));
+    QMenu* CreateObjectsMenu = Menu.addMenu(tr("Объекты"));
+    QMenu* CreateComponentsMenu = Menu.addMenu(tr("Компоненты"));
     PopulateCreateMenus(CreateObjectsMenu, CreateComponentsMenu);
     Menu.addSeparator();
     Menu.addAction(tr("Создать префаб из выбранного объекта"), this, &EditorMainWindow::CreatePrefabFromSelection);

@@ -1,3 +1,4 @@
+#include "UI/Presentation/LocalizedEditorUi.h"
 #include "UI/Views/HierarchyPanelView.h"
 #include "UI/Styles/StudioIcons.h"
 #include "UI/Styles/HierarchyStyle.h"
@@ -28,7 +29,7 @@ HierarchyPanelView::HierarchyPanelView(QTreeWidget& InTree, QWidget* Parent) : Q
     SearchLayout->setSpacing(6);
     Add = new QPushButton(MakeStudioIcon(StudioIcon::Plus), {}, SearchRow);
     Add->setObjectName("HierarchyAdd");
-    Add->setToolTip(tr("Создать объект"));
+    BindEditorProperty(Add, "toolTip", QString::fromUtf8("Создать объект"));
     SearchLayout->addWidget(Add);
     auto* SearchBox = new QWidget(SearchRow);
     SearchBox->setObjectName("HierarchySearchBox");
@@ -41,7 +42,7 @@ HierarchyPanelView::HierarchyPanelView(QTreeWidget& InTree, QWidget* Parent) : Q
     SearchBoxLayout->addWidget(SearchIcon);
     Search = new QLineEdit(SearchBox);
     Search->setObjectName("HierarchySearch");
-    Search->setPlaceholderText(tr("Найти объект…"));
+    BindEditorProperty(Search, "placeholderText", QString::fromUtf8("Найти объект…"));
     Search->setAccessibleName(tr("Найти объект"));
     Search->setFrame(false);
     Search->setClearButtonEnabled(true);
@@ -64,7 +65,7 @@ HierarchyPanelView::HierarchyPanelView(QTreeWidget& InTree, QWidget* Parent) : Q
     Heading->setObjectName("SceneObjectsHeading");
     auto* HeadingLayout = new QHBoxLayout(Heading);
     HeadingLayout->setContentsMargins(8, 0, 8, 0);
-    HeadingLayout->addWidget(new QLabel(tr("Объекты сцены"), Heading));
+    HeadingLayout->addWidget(BindEditorCaption(new QLabel(tr("Объекты сцены"), Heading), QString::fromUtf8("Объекты сцены")));
     HeadingLayout->addStretch();
     Count = new QLabel(Heading);
     Count->setObjectName("SceneObjectCount");

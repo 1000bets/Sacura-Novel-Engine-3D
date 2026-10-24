@@ -1,3 +1,6 @@
+#include "UI/Presentation/LocalizedEditorUi.h"
+#include "Localization/EditorLocalization.h"
+#include <QComboBox>
 #include "Shell/EditorMainWindow.h"
 #include "Automation/EditorToolset.h"
 #include "Automation/EditorMcpServer.h"
@@ -101,7 +104,7 @@ QJsonObject EditorMainWindow::ApplyProjectSettings(const QJsonObject& Settings)
 QJsonObject EditorMainWindow::ReadEditorSettings() const
 {
     QSettings Settings;
-    return {{"cameraSpeed", Settings.value("Editor/CameraSpeed", 8.0).toDouble()},
+    return {{"language", EditorLocalization::Get().GetLanguage()}, {"cameraSpeed", Settings.value("Editor/CameraSpeed", 8.0).toDouble()},
             {"consoleLines", Settings.value("Editor/ConsoleLines", 2000).toInt()},
             {"mcpAutoStart", Settings.value("Editor/McpAutoStart", false).toBool()}};
 }
@@ -118,6 +121,10 @@ QJsonObject EditorMainWindow::ApplyEditorSettings(const QJsonObject& Values)
     if (Speed < 0.25 || Speed > 250.0 || Lines < 100 || Lines > 10000 || Lines != static_cast<int>(Lines))
     {
         return EditorToolset::Failure("Camera speed must be 0.25..250; console lines must be an integer in 100..10000");
+    }
+    if (!EditorLocalization::Get().SetLanguage(Updated.value("language").toString()))
+    {
+        return EditorToolset::Failure("Language must be en or ru and preferences must be writable");
     }
     QSettings Settings;
     Settings.setValue("Editor/CameraSpeed", Speed);
@@ -140,7 +147,7 @@ void EditorMainWindow::ShowSettings(int Page)
 {
     QDialog Dialog(this);
     Dialog.setObjectName("EditorSettingsDialog");
-    Dialog.setWindowTitle(tr("Настройки"));
+    BindEditorProperty(&Dialog, "windowTitle", QString::fromUtf8("Настройки"));
     Dialog.resize(760, 580);
     auto* Layout = new QVBoxLayout(&Dialog);
     auto* Tabs = new QTabWidget(&Dialog);
@@ -157,14 +164,14 @@ void EditorMainWindow::ShowSettings(int Page)
     Name->setObjectName("ProjectSettingsName");
     auto* ScenePath = new QLineEdit(Project.value("startupScene").toString(), ProjectPage);
     auto* StoryPath = new QLineEdit(Project.value("startupStory").toString(), ProjectPage);
-    ProjectForm->addRow(tr("Название"), Name);
-    ProjectForm->addRow(tr("Версия движка"), new QLabel(Project.value("engineVersion").toString(), ProjectPage));
-    ProjectForm->addRow(tr("Стартовая сцена"), ScenePath);
-    ProjectForm->addRow(tr("Стартовая история"), StoryPath);
-    auto* Hint = new QLabel(tr("Пути относительно каталога проекта. Пустая история отключает её автозапуск. Стартовые документы применяются при следующем открытии проекта."), ProjectPage);
+    ProjectForm->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Название")), Name);
+    ProjectForm->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Версия движка")), new QLabel(Project.value("engineVersion").toString(), ProjectPage));
+    ProjectForm->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Стартовая сцена")), ScenePath);
+    ProjectForm->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Стартовая история")), StoryPath);
+    auto* Hint = BindEditorCaption(new QLabel(tr("Пути относительно каталога проекта. Пустая история отключает её автозапуск. Стартовые документы применяются при следующем открытии проекта."), ProjectPage), QString::fromUtf8("Пути относительно каталога проекта. Пустая история отключает её автозапуск. Стартовые документы применяются при следующем открытии проекта."));
     Hint->setWordWrap(true);
     ProjectForm->addRow(Hint);
-    auto* SaveProject = new QPushButton(tr("Сохранить настройки проекта"), ProjectPage);
+    auto* SaveProject = BindEditorCaption(new QPushButton(tr("Сохранить настройки проекта"), ProjectPage), QString::fromUtf8("Сохранить настройки проекта"));
     SaveProject->setObjectName("SaveProjectSettings");
     ProjectForm->addRow(SaveProject);
     connect(SaveProject, &QPushButton::clicked, &Dialog, [this, Status, Name, ScenePath, StoryPath]()
@@ -182,22 +189,28 @@ void EditorMainWindow::ShowSettings(int Page)
     auto* EditorPage = new QWidget(Tabs);
     auto* EditorForm = new QFormLayout(EditorPage);
     const QJsonObject Preferences = ReadEditorSettings();
+    auto* Language = new QComboBox(EditorPage);
+    Language->setObjectName("EditorLanguage");
+    Language->addItem("English", "en");
+    Language->addItem(QString::fromUtf8("Русский"), "ru");
+    Language->setCurrentIndex(Language->findData(Preferences.value("language").toString()));
+    EditorForm->addRow(BindEditorCaption(new QLabel(), "Interface language"), Language);
     auto* Speed = new QDoubleSpinBox(EditorPage);
     Speed->setRange(0.25, 250.0);
     Speed->setValue(Preferences.value("cameraSpeed").toDouble());
     auto* Lines = new QSpinBox(EditorPage);
     Lines->setRange(100, 10000);
     Lines->setValue(Preferences.value("consoleLines").toInt());
-    auto* AutoStart = new QCheckBox(tr("Включать MCP при открытии редактора"), EditorPage);
+    auto* AutoStart = BindEditorCaption(new QCheckBox(tr("Включать MCP при открытии редактора"), EditorPage), QString::fromUtf8("Включать MCP при открытии редактора"));
     AutoStart->setChecked(Preferences.value("mcpAutoStart").toBool());
-    EditorForm->addRow(tr("Скорость камеры"), Speed);
-    EditorForm->addRow(tr("Строк в консоли"), Lines);
+    EditorForm->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Скорость камеры")), Speed);
+    EditorForm->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Строк в консоли")), Lines);
     EditorForm->addRow(AutoStart);
-    auto* SaveEditor = new QPushButton(tr("Сохранить настройки редактора"), EditorPage);
+    auto* SaveEditor = BindEditorCaption(new QPushButton(tr("Сохранить настройки редактора"), EditorPage), QString::fromUtf8("Сохранить настройки редактора"));
     EditorForm->addRow(SaveEditor);
-    connect(SaveEditor, &QPushButton::clicked, &Dialog, [this, Speed, Lines, AutoStart, Status]()
+    connect(SaveEditor, &QPushButton::clicked, &Dialog, [this, Speed, Lines, AutoStart, Status, Language]()
     {
-        const QJsonObject Result = Toolset->Call("editor_settings_set", {{"cameraSpeed", Speed->value()}, {"consoleLines", Lines->value()}, {"mcpAutoStart", AutoStart->isChecked()}});
+        const QJsonObject Result = Toolset->Call("editor_settings_set", {{"language", Language->currentData().toString()}, {"cameraSpeed", Speed->value()}, {"consoleLines", Lines->value()}, {"mcpAutoStart", AutoStart->isChecked()}});
         if (Result.value("isError").toBool())
         {
             Status->setText(Result.value("content").toArray().first().toObject().value("text").toString());
@@ -206,6 +219,11 @@ void EditorMainWindow::ShowSettings(int Page)
         Status->setText(tr("Настройки редактора сохранены."));
     });
     Tabs->addTab(EditorPage, tr("Редактор"));
+    EditorLocalization::Get().Bind(Tabs, [Tabs]()
+    {
+        Tabs->setTabText(0, EditorLocalization::Get().Caption("Project"));
+        Tabs->setTabText(1, EditorLocalization::Get().Caption("Editor"));
+    });
 
     auto* McpPage = new QWidget(Tabs);
     auto* McpLayout = new QVBoxLayout(McpPage);
@@ -244,7 +262,7 @@ void EditorMainWindow::ShowSettings(int Page)
         }
         UpdateConnection();
     });
-    auto* Copy = new QPushButton(tr("Сгенерировать и скопировать конфигурацию"), McpPage);
+    auto* Copy = BindEditorCaption(new QPushButton(tr("Сгенерировать и скопировать конфигурацию"), McpPage), QString::fromUtf8("Сгенерировать и скопировать конфигурацию"));
     Copy->setObjectName("CopyMcpConfiguration");
     McpLayout->addWidget(Copy);
     connect(Copy, &QPushButton::clicked, &Dialog, [this, Status, UpdateConnection, Configuration]()
@@ -258,7 +276,7 @@ void EditorMainWindow::ShowSettings(int Page)
         Status->setText(tr("Конфигурация скопирована. Добавьте запись sakura-editor в настройки MCP-клиента. После перезапуска редактора сгенерируйте конфигурацию заново."));
         UpdateConnection();
     });
-    auto* Export = new QPushButton(tr("Сохранить конфигурацию JSON…"), McpPage);
+    auto* Export = BindEditorCaption(new QPushButton(tr("Сохранить конфигурацию JSON…"), McpPage), QString::fromUtf8("Сохранить конфигурацию JSON…"));
     McpLayout->addWidget(Export);
     connect(Export, &QPushButton::clicked, &Dialog, [this, Status, Configuration, UpdateConnection]()
     {

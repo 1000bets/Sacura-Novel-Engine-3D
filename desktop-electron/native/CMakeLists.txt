@@ -40,15 +40,15 @@ add_custom_command(TARGET SakuraElectronHost POST_BUILD
         "$<TARGET_FILE:SDL3::SDL3>" "$<TARGET_FILE_DIR:SakuraElectronHost>"
     VERBATIM)
 if(SAKURA_PYTHON_AVAILABLE)
-    find_package(Python3 COMPONENTS Interpreter Development.Embed REQUIRED)
-    get_filename_component(SakuraPythonHome "${Python3_EXECUTABLE}" DIRECTORY)
+    get_property(SakuraPythonHome GLOBAL PROPERTY SAKURA_DISTRIBUTION_PYTHON_ROOT)
+    get_property(SakuraPythonVersion GLOBAL PROPERTY SAKURA_DISTRIBUTION_PYTHON_VERSION)
     add_custom_command(TARGET SakuraElectronHost POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "$<TARGET_FILE:Python3::Python>" "$<TARGET_FILE_DIR:SakuraElectronHost>"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${SakuraPythonHome}/Lib" "$<TARGET_FILE_DIR:SakuraElectronHost>/Python/Lib"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${SakuraPythonHome}/DLLs" "$<TARGET_FILE_DIR:SakuraElectronHost>/Python/DLLs"
-        COMMENT "Deploy embedded Python standard library for the Electron host"
+        COMMAND ${CMAKE_COMMAND}
+            "-DPYTHON_ROOT=${SakuraPythonHome}"
+            "-DPYTHON_VERSION=${SakuraPythonVersion}"
+            "-DDEST_DIR=$<TARGET_FILE_DIR:SakuraElectronHost>"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/../../Root/cmake/DeployPythonRuntime.cmake"
+        COMMENT "Deploy bundled Python for the Electron host"
         VERBATIM)
 endif()
+

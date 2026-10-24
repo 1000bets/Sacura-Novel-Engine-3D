@@ -4,6 +4,8 @@ import { keymap } from '@codemirror/view';
 import { indentWithTab } from '@codemirror/commands';
 import { EditorState, Compartment } from '@codemirror/state';
 import { StreamLanguage, HighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import {PythonLanguage} from './PythonLanguage.js';
+import {indentUnit} from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 const ShaderLanguage = StreamLanguage.define({
   startState() {
@@ -80,6 +82,7 @@ const ShaderHighlight = HighlightStyle.define([{
   color: 'var(--accent)'
 }]);
 export default function NativeShaderEditor({
+  language: Language = 'hlsl',
   source: Source,
   disabled: Disabled,
   pending: Pending,
@@ -99,11 +102,17 @@ export default function NativeShaderEditor({
   const Synchronizing = useRef(false);
   const Editable = useRef(new Compartment());
   useEffect(() => {
+    let Syntax = ShaderLanguage;
+    let Label = 'Исходник шейдера';
+    if (Language === 'python') {
+      Syntax = PythonLanguage;
+      Label = 'Python source';
+    }
     const Editor = new EditorView({
       parent: Host.current,
       doc: Source,
-      extensions: [basicSetup, keymap.of([indentWithTab]), ShaderLanguage, syntaxHighlighting(ShaderHighlight), Editable.current.of([EditorState.readOnly.of(Disabled), EditorView.editable.of(!Disabled)]), EditorView.contentAttributes.of({
-        'aria-label': 'Исходник шейдера',
+      extensions: [basicSetup, keymap.of([indentWithTab]), indentUnit.of('    '), Syntax, syntaxHighlighting(ShaderHighlight), Editable.current.of([EditorState.readOnly.of(Disabled), EditorView.editable.of(!Disabled)]), EditorView.contentAttributes.of({
+        'aria-label': Label,
         spellcheck: 'false'
       }), EditorView.theme({
         '&': {

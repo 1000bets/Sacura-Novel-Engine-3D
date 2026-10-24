@@ -6,7 +6,7 @@ export interface Transform {position:Vec3;rotation:[number,number,number,number]
 export interface Context {session:string;epoch:number;revision:number}
 export interface ComponentInfo {id:Id;typeId:string;displayName:string;enabled:boolean}
 export interface ObjectInfo {id:Id;name:string;parentId:Id|null;active:boolean;transform:Transform;components:ComponentInfo[]}
-export interface PropertyInfo {id:string;typeId:string;editable:boolean;assetTypes?:string[];assetId?:Id|null;subAssetId?:Id|null;label:string;category:string;value:JsonValue;error?:string;range?:[number,number]}
+export interface PropertyInfo {enumValues?:string[];id:string;typeId:string;editable:boolean;assetTypes?:string[];assetId?:Id|null;subAssetId?:Id|null;label:string;localizationKey?:string;category:string;value:JsonValue;error?:string;range?:[number,number]}
 /** engine.int64 is represented by a decimal string, including inside reflected arrays/structs. */
 export interface DialogueState {phase:'idle'|'line'|'choice'|'action'|'end'|'failed';speaker:string;text:string;choices:string[];canAdvance:boolean;canChoose:boolean;error:string}
 export interface State {dirty:boolean;storyDirty:boolean;assetDocumentsDirty?:boolean;externalChanges:boolean;projectExternalChanges:boolean;path:string;project:string;play:'stopped'|'playing'|'paused';dialogue:DialogueState;startupAudio:boolean;selection:Id|null;canUndo:boolean;canRedo:boolean;assetError?:string}
@@ -14,6 +14,8 @@ export interface AssetInfo {id:Id;name:string;path:string;relativePath:string;ty
 export interface StorySnapshot {open:boolean;revision:number;error?:string;dirty?:boolean;readOnly?:boolean;externalChanges?:boolean;canUndo?:boolean;canRedo?:boolean;path?:string;document?:JsonValue;positions?:Record<string,{x:number;y:number}>}
 export interface AssetCreationType {id:string;label:string;typeId:string;category:string;extension:string;settings:(PropertyInfo & {required:boolean;enumValues?:string[]})[]}
 export interface Commands {
+  'project.settings.get': {params:Record<string,never>;result:{name:string;engineVersion:string;startupScene:string;startupStory:string}};
+  'project.settings.set': {params:{settings:{name:string;startupScene:string;startupStory:string}};result:Commands['project.settings.get']['result']};
   'assets.folders': {params:Record<string,never>;result:string[]};
   'assets.rename': {params:{assetId:string;name:string};result:JsonValue};
   'assets.move': {params:{assetId:string;folder:string};result:JsonValue};

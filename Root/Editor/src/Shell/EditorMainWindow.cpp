@@ -1,6 +1,7 @@
 #include "Prefab/PrefabLibrary.h"
 #include "Prefab/PrefabEditorWindow.h"
 #include "UI/Views/MaterialEditorWindow.h"
+#include "UI/Views/PythonScriptEditorWindow.h"
 #include "UI/Views/StaticMeshEditorWindow.h"
 #include "UI/Views/CharacterWorkspaceView.h"
 #include "Shell/EditorMainWindow.h"
@@ -144,7 +145,11 @@ EditorMainWindow::~EditorMainWindow()
     delete CharacterWorkspace.data();
     for (QMainWindow* AssetWindow : findChildren<QMainWindow*>())
     {
-        if (auto* MaterialWindow = dynamic_cast<MaterialEditorWindow*>(AssetWindow))
+        if (auto* PythonWindow = dynamic_cast<PythonScriptEditorWindow*>(AssetWindow))
+        {
+            delete PythonWindow;
+        }
+        else if (auto* MaterialWindow = dynamic_cast<MaterialEditorWindow*>(AssetWindow))
         {
             delete MaterialWindow;
         }

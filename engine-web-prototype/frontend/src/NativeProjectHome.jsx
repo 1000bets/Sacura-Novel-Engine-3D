@@ -1,3 +1,4 @@
+import {useLocale} from './i18n.jsx';
 import React,{useEffect,useMemo,useRef,useState} from 'react';
 import Editor from './Editor.jsx';
 import ProjectHome from './ProjectHome.jsx';
@@ -6,6 +7,7 @@ import {createEmptyProject} from './projectLifecycle.js';
 
 // Only shell defaults are local. Documents come from the Bridge.
 export default function NativeProjectHome(){
+  useLocale();
   const api=window.sacuraDesktop;
   const [session,setSession]=useState(null);
   const seed=useRef(null);if(!seed.current)seed.current=createEmptyProject('Sacura');

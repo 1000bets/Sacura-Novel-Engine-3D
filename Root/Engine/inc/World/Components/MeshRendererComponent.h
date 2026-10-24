@@ -19,7 +19,7 @@ using namespace DirectX::SimpleMath;
 
 class MeshRendererComponent : public Component
 {
-    ENGINE_CLASS(MeshRendererComponent, Component, "engine.MeshRendererComponent", "Статический меш")
+    ENGINE_CLASS(MeshRendererComponent, Component, "engine.MeshRendererComponent", "Static Mesh")
 
 public:
     std::string MaterialDiagnostic;

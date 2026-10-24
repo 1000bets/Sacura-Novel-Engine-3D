@@ -1,3 +1,4 @@
+#include "UI/Presentation/LocalizedEditorUi.h"
 #include "UI/Views/AssetReferenceField.h"
 #include "UI/Adapters/AssetThumbnails.h"
 #include "UI/Views/StudioControls.h"
@@ -129,10 +130,10 @@ StoryInspectorView::StoryInspectorView(QWidget* Parent) : QWidget(Parent)
     Speaker = new EditorUi::StudioSelect(Body);
     Speaker->setObjectName("StorySpeaker");
     Speaker->setInsertPolicy(QComboBox::NoInsert);
-    Form->addRow(tr("Тип блока"), Kind);
+    Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Тип блока")), Kind);
     KindCaption = Form->labelForField(Kind);
     SpeakerAsset = new AssetReferenceField(*Speaker, Registry);
-    Form->addRow(tr("Говорит"), SpeakerAsset);
+    Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Говорит")), SpeakerAsset);
     SpeakerCaption = Form->labelForField(SpeakerAsset);
     PrimaryLayout->addLayout(Form);
     Text = new QTextEdit(Primary);
@@ -454,7 +455,7 @@ void StoryInspectorView::RebuildDetails()
         Fields->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
         if (Current.NarrativeDefinition.Type.empty())
         {
-            auto* Message = new QLabel(tr("Тип ноды не зарегистрирован. Проверьте Python-файл в Scripts проекта."), Section);
+            auto* Message = BindEditorCaption(new QLabel(tr("Тип ноды не зарегистрирован. Проверьте Python-файл в Scripts проекта."), Section), QString::fromUtf8("Тип ноды не зарегистрирован. Проверьте Python-файл в Scripts проекта."));
             Message->setWordWrap(true);
             Fields->addRow(Message);
             return;
@@ -616,7 +617,7 @@ void StoryInspectorView::RebuildDetails()
                 connect(Select, &QPushButton::clicked, this, [this, Id = Binding.Identity]() { Commit(); if (EventSelected) { EventSelected(Current.Identity, Id); } });
             } } }
         }
-        auto* Import = new QPushButton(tr("Импорт события…"), Staging);
+        auto* Import = BindEditorCaption(new QPushButton(tr("Импорт события…"), Staging), QString::fromUtf8("Импорт события…"));
         StagingLayout->addWidget(Import);
         connect(Import, &QPushButton::clicked, this, [this]() { Commit(); if (ImportEventRequested) { ImportEventRequested(); } });
     }
@@ -647,7 +648,7 @@ void StoryInspectorView::RebuildDetails()
         ChoicesLayout->setSpacing(StoryInspectorStyle::FieldGap);
         for (int Index = 0; Index < Current.Choices.size(); ++Index)
         {
-            auto* Group = new QGroupBox(tr("Ответ %1").arg(Index + 1), Section);
+            auto* Group = BindEditorCaption(new QGroupBox(tr("Ответ %1").arg(Index + 1), Section), QString::fromUtf8("Ответ %1"));
             auto* Layout = new QVBoxLayout(Group);
             Layout->setContentsMargins(10, 20, 10, 10);
             Layout->setSpacing(10);
@@ -658,7 +659,7 @@ void StoryInspectorView::RebuildDetails()
             auto* Target = MakeTargetPicker(Group, Current.Choices[Index].Target);
             Target->setObjectName(QStringLiteral("StoryChoiceTarget%1").arg(Index));
             Layout->addWidget(Target);
-            auto* Remove = new QPushButton(tr("Удалить вариант"), Group);
+            auto* Remove = BindEditorCaption(new QPushButton(tr("Удалить вариант"), Group), QString::fromUtf8("Удалить вариант"));
             Layout->addWidget(Remove);
             connect(Label, &QLineEdit::editingFinished, this,
                     [this, Label, Index]()
@@ -694,7 +695,7 @@ void StoryInspectorView::RebuildDetails()
                     });
             ChoicesLayout->addWidget(Group);
         }
-        auto* Add = new QPushButton(tr("+ Вариант ответа"), Details);
+        auto* Add = BindEditorCaption(new QPushButton(tr("+ Вариант ответа"), Details), QString::fromUtf8("+ Вариант ответа"));
         Add->setObjectName("StoryAddChoice");
         ChoicesLayout->addWidget(Add);
         connect(Add, &QPushButton::clicked, this,
@@ -720,7 +721,7 @@ void StoryInspectorView::RebuildDetails()
     for (int Index = 0; Index < Current.Actions.size(); ++Index)
     {
         const auto Value = Current.Actions[Index];
-        auto* Group = new QGroupBox(tr("Действие %1").arg(Index + 1), ActionsSection);
+        auto* Group = BindEditorCaption(new QGroupBox(tr("Действие %1").arg(Index + 1), ActionsSection), QString::fromUtf8("Действие %1"));
         auto* Layout = new QVBoxLayout(Group);
         Layout->setContentsMargins(10, 20, 10, 10);
         Layout->setSpacing(10);
@@ -802,7 +803,7 @@ void StoryInspectorView::RebuildDetails()
                 }
                 Target->setCurrentIndex(TargetIndex);
                 Target->setObjectName(QStringLiteral("StoryActionTarget%1").arg(Index));
-                Form->addRow(tr("Объект"), Target);
+                Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Объект")), Target);
                 connect(Target, &QComboBox::currentIndexChanged, this,
                         [this, Target, Index]()
                         {
@@ -829,7 +830,7 @@ void StoryInspectorView::RebuildDetails()
                     Animation->addItem(tr("Недоступная анимация: ") + Value.AnimationId, Value.AnimationId);
                 }
                 Animation->setCurrentIndex(std::max(0, Animation->findData(Value.AnimationId)));
-                Form->addRow(tr("Анимация"), Animation);
+                Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Анимация")), Animation);
                 connect(Animation, &QComboBox::currentIndexChanged, this, [this, Animation, Index]()
                 {
                     if (bUpdating || bStructurePending)
@@ -901,7 +902,7 @@ void StoryInspectorView::RebuildDetails()
             }
         }
         Layout->addLayout(Form);
-        auto* Remove = new QPushButton(tr("Удалить действие"), Group);
+        auto* Remove = BindEditorCaption(new QPushButton(tr("Удалить действие"), Group), QString::fromUtf8("Удалить действие"));
         Layout->addWidget(Remove);
         connect(Type, &QComboBox::currentIndexChanged, this,
                 [this, Index](int KindValue)
@@ -927,7 +928,7 @@ void StoryInspectorView::RebuildDetails()
                 });
         ActionsLayout->addWidget(Group);
     }
-    auto* Add = new QPushButton(tr("+ Действие"), Details);
+    auto* Add = BindEditorCaption(new QPushButton(tr("+ Действие"), Details), QString::fromUtf8("+ Действие"));
     Add->setObjectName("StoryAddAction");
     ActionsLayout->addWidget(Add);
     connect(Add, &QPushButton::clicked, this,

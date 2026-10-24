@@ -24,7 +24,9 @@ import {exportPlayableGame} from './gameExport.js';
 import {instantiateAuthoringTemplate} from './authoringTemplates.js';
 import {builtinTemplates,loadBuiltinTemplate,createBuiltinProject,nativeTemplateIds} from './builtinTemplates.js';
 import {inputContextsFor,inputHelp} from './inputModel.js';
-import LanguagePicker from './LanguagePicker.jsx';
+import EditorPreferences from './EditorPreferences.jsx';
+import ProjectSettings from './ProjectSettings.jsx';
+import {LocalizeEditorText} from './i18n.js';
 import WidgetWorkspace from './WidgetWorkspace.jsx';
 import WidgetRenderer,{WidgetMenu} from './WidgetRenderer.jsx';
 import WidgetAssignment from './WidgetAssignment.jsx';
@@ -452,8 +454,8 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
         await run('transform.set',{objectId:child.id,transform:{position:[2,3,4],rotation:eulerToQuaternion([20,30,40]),scale:[1,2,3]}});
         await run('editor.undo');await run('editor.redo');
         const component=await run('object.addComponent',{objectId:child.id,typeId:'engine.LightComponent'});
-        await run('component.setProperty',{objectId:child.id,componentId:component.id,property:'light_type',value:'1'});
-        await wait(()=>nativeRendered.current.components.some(c=>c.id===component.id&&c.properties.some(p=>p.id==='light_type'&&p.value==='1')));
+        await run('component.setProperty',{objectId:child.id,componentId:component.id,property:'light_type',value:'Point'});
+        await wait(()=>nativeRendered.current.components.some(c=>c.id===component.id&&c.properties.some(p=>p.id==='light_type'&&p.value==='Point')));
         checks.push('Inspector/Transform: reflected native edits, Undo/Redo');
         setDock('files');await adapter.loadDomain('assets.list','assets');await wait(()=>nativeRendered.current.assets.some(a=>a.typeId==='Story'));
         checks.push('Content Browser: actual AssetRegistry in existing panel');
@@ -495,6 +497,16 @@ export default function Editor({initialProject=null,user=null,onLogout,onHome}) 
       if (Disposed || !Descriptor) {
         return;
       }
+      let Area = windowArea(windowPreferences.current, Descriptor.id);
+      while (windowPreferences.current.containers?.[Area]?.kind === 'group') {
+        Area = windowPreferences.current.containers[Area].parent;
+      }
+      revealDockArea(Area);
+      let WindowName = '';
+      if (windowPreferences.current.containers?.[Area]?.kind === 'window') {
+        WindowName = 'sacura-' + Area;
+      }
+      window.sacuraDesktop.focusWorkspaceWindow(WindowName).catch(Failure => setNotice(Failure.message));
       RegisterEditorTab(Descriptor.id, Descriptor);
       SetLiveDocuments(Current => ({...Current,[Descriptor.id]:Descriptor}));
       changeWindows(Current => openWindow({...Current,documents:{...Current.documents,[Descriptor.id]:Descriptor}}, Descriptor.id));
@@ -1521,18 +1533,18 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
   const moveBinding=(sourceId,id,targetId,phase,batchId,beforeId)=>{if(rt?.running)return;mutate(p=>moveEventBinding(p,sourceId,id,targetId,phase,batchId,beforeId));if(eventContext?.bindingId===id){setEventContext(c=>({...c,beatId:targetId}));setSelectedBeat(targetId);}};
   const renderInspector = () => {
     if(isNative){
-      if(nativeFocus==='sceneSettings')return <div className="story-inspector native-scene-inspector"><div className="story-inspector-heading"><Icon name="Clapperboard" size={16}/><strong>Сцена</strong><small>{native.state?.project}</small></div><div className="inspector-primary-fields"><Field label="Файл"><output>{native.state?.path||'Не открыт'}</output></Field><Field label="Объектов"><output>{native.objects.length}</output></Field><Button icon="Save" disabled={nativeEditing||!native.state?.dirty} onClick={()=>nativeCommand('scene.save')}>Сохранить сцену</Button></div></div>;
+      if(nativeFocus==='sceneSettings')return <div className="story-inspector native-scene-inspector"><div className="story-inspector-heading"><Icon name="Clapperboard" size={16}/><strong>{tr("Сцена")}</strong><small>{native.state?.project}</small></div><div className="inspector-primary-fields"><Field label={tr("Файл")}><output>{native.state?.path||'Не открыт'}</output></Field><Field label={tr("Объектов")}><output>{native.objects.length}</output></Field><Button icon="Save" disabled={nativeEditing||!native.state?.dirty} onClick={()=>nativeCommand('scene.save')}>{tr("Сохранить сцену")}</Button></div></div>;
       if(nativeFocus==='asset'){
-        const asset=nativeFiles.find(a=>a.id===nativeAssetId);return asset?<><h3>{asset.name}</h3><p>{asset.typeId} · {asset.path}</p><p>{asset.id}</p>{asset.kind==='image'&&<img style={{maxWidth:'100%'}} src={asset.src} alt={asset.name}/>}<pre style={{whiteSpace:'pre-wrap'}}>{JSON.stringify(asset.subassets,null,2)}</pre>{asset.kind==='model'&&<button onClick={()=>OpenNativeAsset({assetId:asset.id})}>Открыть редактор меша</button>}</>:<p>Ресурс удалён или больше не зарегистрирован.</p>;
+        const asset=nativeFiles.find(a=>a.id===nativeAssetId);return asset?<><h3>{asset.name}</h3><p>{asset.typeId} · {asset.path}</p><p>{asset.id}</p>{asset.kind==='image'&&<img style={{maxWidth:'100%'}} src={asset.src} alt={asset.name}/>}<pre style={{whiteSpace:'pre-wrap'}}>{JSON.stringify(asset.subassets,null,2)}</pre>{asset.kind==='model'&&<button onClick={()=>OpenNativeAsset({assetId:asset.id})}>{tr("Открыть редактор меша")}</button>}</>:<p>{tr("Ресурс удалён или больше не зарегистрирован.")}</p>;
       }
       if(nativeFocus==='story'){
         return <NativeStoryInspector story={native.story} selection={nativeStorySelection} objects={native.objects} disabled={nativeEditing||native.story?.readOnly} command={nativeCommand} onSelect={setNativeStorySelection} onEvents={openNativeEvents} onFocus={()=>graphApi.current?.focus(nativeStorySelection?.nodeId)}/>;
       }
-      if(!nativeObject)return <NativeInspectorEmpty>Выберите объект в иерархии или сцене.</NativeInspectorEmpty>;
+      if(!nativeObject)return <NativeInspectorEmpty>{tr("Выберите объект в иерархии или сцене.")}</NativeInspectorEmpty>;
       const id=nativeObject.id;
       return <div className="object-inspector native-object-inspector">
-        <div className="inspector-identity"><span className="identity-icon"><Icon name="Box" size={28}/></span><div><input aria-label="Имя объекта" key={id+nativeObject.name} defaultValue={nativeObject.name} disabled={nativeEditing} onBlur={e=>{if(e.target.value!==nativeObject.name)nativeCommand('object.rename',{objectId:id,name:e.target.value});}}/><small>Объект сцены</small></div><input type="checkbox" aria-label="Объект активен" title="Объект активен" checked={nativeObject.active} disabled={nativeEditing} onChange={e=>nativeCommand('object.setActive',{objectId:id,active:e.target.checked})}/></div>
-        <Fold title="Иерархия" open={false}><Field label="Родитель"><select value={nativeObject.parentId||''} disabled={nativeEditing} onChange={e=>nativeCommand('object.setParent',{objectId:id,parentId:e.target.value||null})}><option value="">Корень</option>{native.objects.filter(o=>o.id!==id).map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select></Field></Fold>
+        <div className="inspector-identity"><span className="identity-icon"><Icon name="Box" size={28}/></span><div><input aria-label={tr("Имя объекта")} key={id+nativeObject.name} defaultValue={nativeObject.name} disabled={nativeEditing} onBlur={e=>{if(e.target.value!==nativeObject.name)nativeCommand('object.rename',{objectId:id,name:e.target.value});}}/><small>{tr("Объект сцены")}</small></div><input type="checkbox" aria-label={tr("Объект активен")} title={tr("Объект активен")} checked={nativeObject.active} disabled={nativeEditing} onChange={e=>nativeCommand('object.setActive',{objectId:id,active:e.target.checked})}/></div>
+        <Fold title={tr("Иерархия")} open={false}><Field label={tr("Родитель")}><select value={nativeObject.parentId||''} disabled={nativeEditing} onChange={e=>nativeCommand('object.setParent',{objectId:id,parentId:e.target.value||null})}><option value="">{tr("Корень")}</option>{native.objects.filter(o=>o.id!==id).map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select></Field></Fold>
         <TransformInspector key={id} compact object={presentationObject(nativeObject)} scene={nativeScene} disabled={nativeEditing}
           onInteraction={(Operation, Transaction, TransformValue) => {
             const Params = {objectId:id,transaction:Transaction,operation:Operation};
@@ -2406,7 +2418,7 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
     }
     let SubassetId = Identity.subAssetId;
     if (Asset.typeId==='Model' && !SubassetId) { SubassetId = Asset.subassets.find(Entry=>Entry.typeId==='StaticMesh')?.id; }
-    if (['Material','MaterialInstance','Texture'].includes(Asset.typeId) || SubassetId && Asset.subassets.some(Entry=>Entry.id===SubassetId&&Entry.typeId==='StaticMesh')) {
+    if (['Material','MaterialInstance','Texture','PythonScript'].includes(Asset.typeId) || SubassetId && Asset.subassets.some(Entry=>Entry.id===SubassetId&&Entry.typeId==='StaticMesh')) {
       try { await window.sacuraDesktop.nativeOpenAssetEditor({assetId:Asset.id, subAssetId:SubassetId || null}); }
       catch (ErrorValue) { setNotice(ErrorValue.message); }
       return;
@@ -2432,15 +2444,15 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
         const mesh=imported?.subassets?.find(item=>item.typeId==='StaticMesh');
         if(results.length&&!mesh)throw Error('В импортированном файле нет статического меша.');
         return mesh?{assetId:imported.id,subAssetId:mesh.id,name:imported.name?.replace(/\.glb$/i,'')}:null;}}/>;
-    if(dock!=='story'&&dock!=='event')return <p role="status">Эта панель ещё не подключена к C++ Engine. Доступны Hierarchy, Inspector, Сцена, Файлы и История.</p>;
+    if(dock!=='story'&&dock!=='event')return <p role="status">{tr("Эта панель ещё не подключена к C++ Engine. Доступны Hierarchy, Inspector, Сцена, Файлы и История.")}</p>;
     const doc=native.story?.document;
     const select=value=>{setNativeFocus('story');setNativeStorySelection(!value?null:typeof value==='string'?{nodeId:value}:{nodeId:value.flowBeatId,eventId:value.event?.id,bindingId:value.binding?.id});};
     const connect=async value=>{const changes=value.changes||[value];for(const c of changes){const node=doc.nodes.find(n=>n.id===c.source);if(!node)continue;const port=c.sourceHandle==='next'?-1:(node.choices||[]).findIndex(p=>'choice:'+p.id===c.sourceHandle);await nativeCommand('story.connect',{sourceId:c.source,port,targetId:c.target||null});}};
     return <div style={{height:'100%',display:'flex',flexDirection:'column'}} onPointerDown={()=>setNativeFocus('story')}>
-      <div className="dock-toolbar"><select aria-label="Story asset" value={native.assets.find(a=>a.typeId==='Story'&&native.story?.path?.replaceAll('\\','/').endsWith('/'+a.relativePath))?.id||''} onChange={e=>nativeCommand('story.open',{assetId:e.target.value})}><option value="">Открыть историю…</option>{native.assets.filter(a=>a.typeId==='Story').map(a=><option key={a.id} value={a.id}>{a.path}</option>)}</select>
-        <input aria-label="Новый story asset" disabled={nativeStoryCreating} value={nativeStoryPath} onChange={e=>setNativeStoryPath(e.target.value)}/><Button disabled={nativeEditing||nativeStoryCreating} onClick={createNativeStory}>{nativeStoryCreating?'Создание…':'Создать историю'}</Button>
-        <Button disabled={!doc||nativeEditing} onClick={()=>nativeCommand('story.save')}>Сохранить</Button><Button disabled={!native.story?.canUndo||nativeEditing} onClick={()=>nativeCommand('story.undo')}>Undo</Button><Button disabled={!native.story?.canRedo||nativeEditing} onClick={()=>nativeCommand('story.redo')}>Redo</Button>
-        <span className="muted" title="Кнопка + у фазы открывает меню событий">ПКМ — добавить ноду</span>
+      <div className="dock-toolbar"><select aria-label="Story asset" value={native.assets.find(a=>a.typeId==='Story'&&native.story?.path?.replaceAll('\\','/').endsWith('/'+a.relativePath))?.id||''} onChange={e=>nativeCommand('story.open',{assetId:e.target.value})}><option value="">{tr("Открыть историю…")}</option>{native.assets.filter(a=>a.typeId==='Story').map(a=><option key={a.id} value={a.id}>{a.path}</option>)}</select>
+        <input aria-label={tr("Новый story asset")} disabled={nativeStoryCreating} value={nativeStoryPath} onChange={e=>setNativeStoryPath(e.target.value)}/><Button disabled={nativeEditing||nativeStoryCreating} onClick={createNativeStory}>{tr(nativeStoryCreating?'Создание…':'Создать историю')}</Button>
+        <Button disabled={!doc||nativeEditing} onClick={()=>nativeCommand('story.save')}>{tr("Сохранить")}</Button><Button disabled={!native.story?.canUndo||nativeEditing} onClick={()=>nativeCommand('story.undo')}>Undo</Button><Button disabled={!native.story?.canRedo||nativeEditing} onClick={()=>nativeCommand('story.redo')}>Redo</Button>
+        <span className="muted" title={tr("Кнопка + у фазы открывает меню событий")}>{tr("ПКМ — добавить ноду")}</span>
         <span>{native.story?.dirty?'Изменено':''}{native.story?.externalChanges?' · Файл изменён извне':''}</span>
       </div>
       {doc?<div style={{flex:1,minHeight:220}}><StoryFlow key={native.story.path} nativeMode model={nativeFlow.model} project={nativeFlow.project} running={nativeEditing||native.story.readOnly} selectedId={nativeStorySelection?.nodeId} selectionId={nativeStorySelection?.bindingId} positions={native.story.positions} onPositions={positions=>nativeCommand('story.moveNodes',{positions})} onSelect={select} onOpen={select} onConnect={connect}
@@ -2457,12 +2469,17 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
           select(nodeId);setNotice('Порядок группы изменяется списком «По очереди / Одновременно»; свойства Event — щелчком по событию.');
         }}
         onMoveBinding={(from,bindingId,to,phase,batchId,beforeId)=>{if(from!==to){setNotice('Перенос Event между нодами пока не подключён.');return;}nativeCommand('story.placeEvent',{nodeId:from,bindingId,phase,join:doc.nodes.find(n=>n.id===from)?.bindings?.find(b=>b.id===bindingId)?.join||'EVENT_END',...(batchId?{batchId}:{}),...(beforeId?{beforeId}:{})});}}
-      /></div>:<p>Откройте настоящий .story из AssetRegistry или создайте новый.</p>}
+      /></div>:<p>{tr("Откройте настоящий .story из AssetRegistry или создайте новый.")}</p>}
     </div>;
   };
   const renderWorkspace=(dock,visible)=>{
+    if (dock === 'editor-settings') { return <EditorPreferences/>; }
+    if (dock === 'project-settings') {
+      if (!isNative) { return <p>{tr('Откройте проект в настольном редакторе.')}</p>; }
+      return <ProjectSettings Adapter={native.adapter} Disabled={nativeEditing} Connected={native.connected} Session={native.context?.session}/>;
+    }
     if (dock.startsWith('asset:')) {
-      if (!LiveDocuments[dock]) { return <p>Открытие документа…</p>; }
+      if (!LiveDocuments[dock]) { return <p>{tr("Открытие документа…")}</p>; }
       return <WorkspaceDocument descriptor={LiveDocuments[dock]}/>;
     }
     if (dock === 'history') { return renderHistory(); }
@@ -2725,15 +2742,15 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
         {running&&<div className="toolbar-layout">
           <span className="play-label">{preview.paused ? tr("На паузе") : tr("Предпросмотр")}</span>
         </div>}
-        {onHome&&<Button icon="FolderOpen" disabled={projectFileBusy} onClick={()=>runFileOperation(async()=>{rt?.stop();await onHome(project);})}>{isNative?"К проектам":tr("Главное меню")}</Button>}
+        {onHome&&<Button icon="FolderOpen" disabled={projectFileBusy} onClick={()=>runFileOperation(async()=>{rt?.stop();await onHome(project);})}>{isNative?tr("К проектам"):tr("Главное меню")}</Button>}
         {user&&<button onClick={()=>onLogout(project)} title={tr("Выйти из аккаунта {0}", [user.login])}>{user.login} {tr("· Выйти")}</button>}
-        <LanguagePicker onOpen={() => setMenu(null)} />
+        <Button data-editor-preferences="true" icon="Settings" aria-label={LocalizeEditorText('Editor.Settings.Title')} title={LocalizeEditorText('Editor.Settings.Title')} onClick={() => {setMenu(null); selectWorkspace('editor-settings');}}/>
         <ThemePicker onOpen={() => setMenu(null)} />
         {logicReturn&&<Button icon="ArrowLeft" onClick={returnToLogicCaller}>{tr('К месту вызова')}</Button>}
       </header>
       {isNative&&(native.state?.assetError||native.story?.error)&&<div role="alert" className="error-box" style={{flex:'0 0 auto',maxHeight:120,overflow:'auto'}}>{native.state?.assetError||native.story?.error}</div>}
-      {isNative&&native.error&&<div role="alert" className="error-box" style={{flex:'0 0 auto',maxHeight:120,overflow:'auto'}}>{native.error}<button onClick={()=>native.adapter.clearError()}>Закрыть</button></div>}
-      {isNative&&(native.state?.externalChanges||native.state?.projectExternalChanges||native.story?.externalChanges)&&<div role="alert" className="error-box" style={{flex:'0 0 auto',maxHeight:120,overflow:'auto'}}>Файлы проекта изменены вне редактора. Сохранение поверх изменённой версии заблокировано. <button onClick={()=>runFileOperation(()=>window.sacuraDesktop.nativeReloadProject())}>Перечитать проект…</button><button onClick={()=>openProjectDialog('sceneCopy')}>Сохранить копию сцены…</button></div>}
+      {isNative&&native.error&&<div role="alert" className="error-box" style={{flex:'0 0 auto',maxHeight:120,overflow:'auto'}}>{native.error}<button onClick={()=>native.adapter.clearError()}>{tr("Закрыть")}</button></div>}
+      {isNative&&(native.state?.externalChanges||native.state?.projectExternalChanges||native.story?.externalChanges)&&<div role="alert" className="error-box" style={{flex:'0 0 auto',maxHeight:120,overflow:'auto'}}>{tr("Файлы проекта изменены вне редактора. Сохранение поверх изменённой версии заблокировано.")}<button onClick={()=>runFileOperation(()=>window.sacuraDesktop.nativeReloadProject())}>{tr("Перечитать проект…")}</button><button onClick={()=>openProjectDialog('sceneCopy')}>{tr("Сохранить копию сцены…")}</button></div>}
       <div className={'editor-workspace compact-'+compactPanel+(layout.hiddenHierarchy?' hierarchy-hidden':'')+(layout.hiddenInspector?' inspector-hidden':'')+(['scene','graph'].includes(maximized)?' focus-center':maximized==='hierarchy'?' focus-hierarchy':maximized==='inspector'?' focus-inspector':'')}>
         <nav className="compact-panel-tabs" aria-label={tr("Панели редактора")}>
           {[['hierarchy','ListTree','Объекты сцены'],['workspace','PanelsTopLeft','Рабочая область'],['inspector','Settings2','Свойства']].map(([id,icon,label])=><button key={id} aria-pressed={compactPanel===id} onClick={()=>{if(['hierarchy','inspector'].includes(maximized))setMaximized(null);setCompactPanel(id);}}><Icon name={icon} size={13}/>{tr(label)}</button>)}
@@ -3068,7 +3085,7 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
           className={"editor-menu"+(menu==='Окна'?' windows-menu-container':'')}
           style={menuAnchor}
         >
-          {isNative&&menu === "Файл" ? (<><button onClick={()=>openProjectDialog('new')}>Новый C++ проект…</button><button onClick={openProjectFile}>Открыть C++ проект…</button><button disabled={!native.connected} onClick={saveProject}>Сохранить сцену и историю <kbd>Ctrl S</kbd></button><button disabled={!native.connected} onClick={()=>nativeCommand('project.save',{useCurrentAsStartup:true})}>Использовать текущие сцену и историю при запуске</button><button disabled={!native.connected} onClick={()=>openProjectDialog('sceneNew')}>Новая сцена…</button><button disabled={!native.connected} onClick={()=>openProjectDialog('sceneCopy')}>Сохранить сцену как…</button></>) : menu === "Файл" ? (
+          {isNative&&menu === "Файл" ? (<><button onClick={()=>openProjectDialog('new')}>{tr("Новый C++ проект…")}</button><button onClick={openProjectFile}>{tr("Открыть C++ проект…")}</button><button disabled={!native.connected} onClick={saveProject}>{tr("Сохранить сцену и историю")}<kbd>Ctrl S</kbd></button><button disabled={!native.connected} onClick={()=>nativeCommand('project.save',{useCurrentAsStartup:true})}>{tr("Использовать текущие сцену и историю при запуске")}</button><button disabled={!native.connected} onClick={()=>openProjectDialog('sceneNew')}>{tr("Новая сцена…")}</button><button disabled={!native.connected} onClick={()=>openProjectDialog('sceneCopy')}>{tr("Сохранить сцену как…")}</button></>) : menu === "Файл" ? (
             <>
               <button disabled={projectFileBusy} onClick={()=>openProjectDialog('new')}><Icon name="FilePlus2"/>{tr("Новый пустой проект…")}</button>
               {serverStorageEnabled&&window.sacuraDesktop?.isDesktop!==true&&<button disabled={projectFileBusy} onClick={showServerProjects}><Icon name="Database"/>{tr("Открыть с сервера…")}</button>}
@@ -3086,7 +3103,7 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
               <button disabled={projectFileBusy} onClick={restorePreviousProject}><Icon name="History"/>{tr("Восстановить предыдущий проект")}</button>
             </>
           ) : menu === "Правка" ? (
-            <><button disabled={running} onClick={()=>editClipboard('copy')}><Icon name="Copy"/>{tr("Копировать ")}<kbd>Ctrl C</kbd></button><button disabled={running||!clipboard.current} onClick={()=>editClipboard('paste')}><Icon name="ClipboardPaste"/>{tr("Вставить ")}<kbd>Ctrl V</kbd></button><button onClick={resetLayout}><Icon name="PanelsTopLeft"/>{tr("Восстановить раскладку")}</button><button
+            <>{isNative && <button data-project-settings="true" disabled={!native.connected} onClick={() => {setMenu(null); selectWorkspace('project-settings');}}><Icon name="Settings2"/>{LocalizeEditorText('Editor.ProjectSettings.Title')}</button>}<button onClick={() => {setMenu(null); selectWorkspace('editor-settings');}}><Icon name="Settings"/>{LocalizeEditorText('Editor.Settings.Title')}</button><button disabled={running} onClick={()=>editClipboard('copy')}><Icon name="Copy"/>{tr("Копировать ")}<kbd>Ctrl C</kbd></button><button disabled={running||!clipboard.current} onClick={()=>editClipboard('paste')}><Icon name="ClipboardPaste"/>{tr("Вставить ")}<kbd>Ctrl V</kbd></button><button onClick={resetLayout}><Icon name="PanelsTopLeft"/>{tr("Восстановить раскладку")}</button><button
               disabled={isNative?!(nativeFocus==='story'?native.story?.canUndo:native.state?.canUndo):!history.length}
               onClick={() => {
                 undo();
@@ -3201,7 +3218,7 @@ if(rt?.running)return;mutate(p=>{const removed=p.objects.filter(object=>objectSe
                   </Field>
 
                 </div>
-                <Button icon="Puzzle" onClick={()=>setComponentDraft({id:'sacura.component.call',version:1,parameters:{}})}>Вызвать метод компонента</Button>
+                <Button icon="Puzzle" onClick={()=>setComponentDraft({id:'sacura.component.call',version:1,parameters:{}})}>{tr("Вызвать метод компонента")}</Button>
                 {componentDraft&&<ComponentStoryAction project={project} beatId={beat.id} phase={picker.phase||'ON_START'} batchId={picker.batchId||null} onChange={mutate} onAdded={()=>{setPicker(null);setDock('story');}}/>}
                 <input type="search" aria-label={tr("Поиск событий")} placeholder={tr("Найти событие…")} value={eventSearch} onChange={e=>setEventSearch(e.target.value)}/>
                 <div className="event-selection-list">

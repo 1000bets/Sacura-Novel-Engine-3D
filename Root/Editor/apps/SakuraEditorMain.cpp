@@ -1,4 +1,5 @@
 #include "Core/EnginePaths.h"
+#include "Localization/EditorLocalization.h"
 #include "Core/Threading/ThreadContext.h"
 #include "Shell/EditorMainWindow.h"
 #include "EditorReflectionAnchor.h"
@@ -40,6 +41,7 @@ int main(int ArgumentCount, char** Arguments)
     Q_INIT_RESOURCE(studio);
     Application.setApplicationName("SakuraNovel Studio");
     Application.setOrganizationName("SakuraNovel");
+    Application.installTranslator(&EditorLocalization::Get());
 
     const std::filesystem::path ExecutablePath = std::filesystem::absolute(Arguments[0]);
     EnginePaths::InitializeFromExecutable(ExecutablePath);

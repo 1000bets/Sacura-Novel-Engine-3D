@@ -256,7 +256,7 @@ bool NavigationWorld::ComputeSourceFingerprint(uint64_t& Fingerprint)
             for (PhysicsBodyComponent* Body : Owner->GetComponents<PhysicsBodyComponent>())
             {
                 if (!Body->IsEnabled() || Body->IsPendingRemoval() || !Body->bAffectsNavigation || Body->bTrigger || !Body->bSimulationEnabled
-                    || Body->MotionType == static_cast<int64_t>(PhysicsMotionType::Character) || Body->CollisionMask == 0)
+                    || Body->MotionType == PhysicsMotionType::Character || Body->CollisionMask == 0)
                 {
                     continue;
                 }
@@ -290,7 +290,7 @@ bool NavigationWorld::CollectInputs(std::map<std::string, NavigationBuildInput>&
             {
                 continue;
             }
-            if (Bounds->GenerationMode < 0 || Bounds->GenerationMode > 2 || Bounds->TileSize < 16 || Bounds->TileSize > 256
+            if (Bounds->GenerationMode < NavigationGenerationMode::Static || Bounds->GenerationMode > NavigationGenerationMode::DynamicModifiersOnly || Bounds->TileSize < 16 || Bounds->TileSize > 256
                 || Bounds->MinimumRegionArea < 0 || Bounds->MinimumRegionArea > 1024
                 || Bounds->MergeRegionArea < 0 || Bounds->MergeRegionArea > 1024
                 || Bounds->HalfExtents.x <= 0.f || Bounds->HalfExtents.y <= 0.f || Bounds->HalfExtents.z <= 0.f)
@@ -323,7 +323,7 @@ bool NavigationWorld::CollectInputs(std::map<std::string, NavigationBuildInput>&
             Input.Settings = Settings;
             Input.Bounds.push_back(Bounds->GetWorldBounds());
             ProfileState& Profile = Profiles[Settings.AgentProfile];
-            Profile.Mode = static_cast<NavigationGenerationMode>(Bounds->GenerationMode);
+            Profile.Mode = Bounds->GenerationMode;
             Profile.bAutoBuild = Bounds->bAutoBuild;
         }
     }
@@ -347,7 +347,7 @@ bool NavigationWorld::CollectInputs(std::map<std::string, NavigationBuildInput>&
         for (PhysicsBodyComponent* Body : Owner->GetComponents<PhysicsBodyComponent>())
         {
             if (!Body->IsEnabled() || Body->IsPendingRemoval() || !Body->bAffectsNavigation || Body->bTrigger || !Body->bSimulationEnabled
-                || Body->MotionType == static_cast<int64_t>(PhysicsMotionType::Character) || Body->CollisionMask == 0)
+                || Body->MotionType == PhysicsMotionType::Character || Body->CollisionMask == 0)
             {
                 continue;
             }
@@ -715,7 +715,7 @@ void NavigationWorld::UpdateCrowds(float DeltaTime)
             PhysicsBodyComponent* Controller = nullptr;
             for (PhysicsBodyComponent* Body : Owner->GetComponents<PhysicsBodyComponent>())
             {
-                if (Body->MotionType == static_cast<int64_t>(PhysicsMotionType::Character) && Body->IsEnabled() && !Body->IsPendingRemoval())
+                if (Body->MotionType == PhysicsMotionType::Character && Body->IsEnabled() && !Body->IsPendingRemoval())
                 {
                     Controller = Body;
                     break;

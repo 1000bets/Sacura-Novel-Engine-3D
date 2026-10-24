@@ -8,6 +8,7 @@
 
 AssetRegistry::AssetRegistry()
 {
+    RegisterAssetType({PythonScriptAssetType, "Python Script", {".py"}, true});
     RegisterAssetType({CharacterAssetType, "Character", {".character"}, true});
     RegisterAssetType({PrefabAssetType, "Prefab", {".prefab"}, true});
     RegisterAssetType({SceneAssetType, "Scene", {".scene"}, true});
@@ -241,7 +242,7 @@ AssetDiagnostic AssetRegistry::IngestMetaFile(AssetMount Mount, const std::files
             VirtualPath);
     }
 
-    if (Mount == AssetMount::Game && Metadata.SubAssets.empty()
+    if (Mount == AssetMount::Game && Metadata.Type != PythonScriptAssetType && Metadata.SubAssets.empty()
         && LeafNameExists(AbsoluteAssetPath.stem().string()))
     {
         return AssetDiagnostic::Fail(
@@ -477,7 +478,7 @@ AssetDiagnostic AssetRegistry::RegisterExistingAsset(const std::string& Relative
     }
     if (Metadata.SubAssets.empty())
     {
-        if (Mount == AssetMount::Game && LeafNameExists(std::filesystem::path(Normalized).stem().string()))
+        if (Mount == AssetMount::Game && Metadata.Type != PythonScriptAssetType && LeafNameExists(std::filesystem::path(Normalized).stem().string()))
         {
             return AssetDiagnostic::Fail(AssetErrorCode::ImportConflict, "AssetRegistry", "Asset name already exists in project", {Metadata.Guid}, VirtualPath);
         }
@@ -729,7 +730,7 @@ AssetDiagnostic AssetRegistry::RenamePair(const std::string& OldRelativeOrVirtua
     }
     AssetKey IgnoredKey{};
     IgnoredKey.Asset = Entry.Metadata.Guid;
-    if (Entry.Metadata.SubAssets.empty()
+    if (Entry.Metadata.SubAssets.empty() && Entry.Metadata.Type != PythonScriptAssetType
         && NewMount == AssetMount::Game
         && LeafNameExists(std::filesystem::path(NewNormalized).stem().string(), IgnoredKey))
     {
@@ -931,7 +932,7 @@ bool AssetRegistry::LeafNameExists(const std::string& Name, const AssetKey& Igno
     for (const auto& Pair : EntriesById)
     {
         const AssetRegistryEntry& Entry = Pair.second;
-        if (Entry.Mount != AssetMount::Game)
+        if (Entry.Mount != AssetMount::Game || Entry.Metadata.Type == PythonScriptAssetType)
         {
             continue;
         }

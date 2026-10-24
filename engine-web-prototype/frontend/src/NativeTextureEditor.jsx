@@ -1,9 +1,11 @@
+import {t as tr, useLocale} from './i18n.jsx';
 import React, {useEffect, useRef, useState} from 'react';
 import {Icon} from './StudioParts.jsx';
 import {ApplyTextureChannel} from './texturePreview.js';
 import './nativeTextureEditor.css';
 
 export default function NativeTextureEditor({snapshot: Snapshot, asset: Asset, focusRequest: FocusRequest, error: ErrorMessage}) {
+  useLocale();
   const [Channel, SetChannel] = useState('RGBA');
   const [Background, SetBackground] = useState('checker');
   const [Zoom, SetZoom] = useState(1);
@@ -65,26 +67,26 @@ export default function NativeTextureEditor({snapshot: Snapshot, asset: Asset, f
   if (Metadata.decodedBytes) {
     DecodedSize = (Metadata.decodedBytes / 1048576).toFixed(2) + ' МиБ';
   }
-  return <main className="native-texture-editor" aria-label="Редактор текстуры">
+  return <main className="native-texture-editor" aria-label={tr("Редактор текстуры")}>
     <header className="native-texture-toolbar">
       <Icon name="Image"/><strong title={Asset?.path}>{Asset?.name || 'Текстура'}</strong>
-      <button onClick={() => window.sacuraDesktop.nativeRevealAsset({assetId: Snapshot.assetId})}>Показать в Content Browser</button>
+      <button onClick={() => window.sacuraDesktop.nativeRevealAsset({assetId: Snapshot.assetId})}>{tr("Показать в Content Browser")}</button>
     </header>
     <div className="native-texture-body">
-      <section className="native-texture-preview" aria-label="Предпросмотр текстуры">
-        <nav aria-label="Настройки просмотра">
-          <label>Каналы<select aria-label="Каналы" value={Channel} onChange={Event => SetChannel(Event.target.value)}>{['RGBA', 'RGB', 'R', 'G', 'B', 'A'].map(Value => <option key={Value}>{Value}</option>)}</select></label>
-          <label>Фон<select aria-label="Фон" value={Background} onChange={Event => SetBackground(Event.target.value)}><option value="checker">Шахматный</option><option value="dark">Тёмный</option><option value="light">Светлый</option></select></label>
-          <button aria-pressed={Fit} onClick={() => SetFit(true)}>Вписать</button>
+      <section className="native-texture-preview" aria-label={tr("Предпросмотр текстуры")}>
+        <nav aria-label={tr("Настройки просмотра")}>
+          <label>{tr("Каналы")}<select aria-label={tr("Каналы")} value={Channel} onChange={Event => SetChannel(Event.target.value)}>{['RGBA', 'RGB', 'R', 'G', 'B', 'A'].map(Value => <option key={Value}>{Value}</option>)}</select></label>
+          <label>{tr("Фон")}<select aria-label={tr("Фон")} value={Background} onChange={Event => SetBackground(Event.target.value)}><option value="checker">{tr("Шахматный")}</option><option value="dark">{tr("Тёмный")}</option><option value="light">{tr("Светлый")}</option></select></label>
+          <button aria-pressed={Fit} onClick={() => SetFit(true)}>{tr("Вписать")}</button>
           <button aria-pressed={!Fit && Zoom === 1} onClick={() => ChangeZoom(1)}>1:1</button>
-          <label>Масштаб<input aria-label="Масштаб, %" type="number" min="1" max="800" value={Math.round(Zoom * 100)} onChange={Event => {
+          <label>{tr("Масштаб")}<input aria-label={tr("Масштаб, %")} type="number" min="1" max="800" value={Math.round(Zoom * 100)} onChange={Event => {
             const Value = Number(Event.target.value);
             if (Number.isFinite(Value) && Value > 0) {
               ChangeZoom(Value / 100);
             }
           }}/>%</label>
         </nav>
-        <div ref={Surface} className={'native-texture-surface ' + Background} tabIndex={0} aria-label="Область изображения" onKeyDown={Event => {
+        <div ref={Surface} className={'native-texture-surface ' + Background} tabIndex={0} aria-label={tr("Область изображения")} onKeyDown={Event => {
           if (Event.code === 'KeyF') {
             SetFit(true);
           }
@@ -104,19 +106,19 @@ export default function NativeTextureEditor({snapshot: Snapshot, asset: Asset, f
             Event.currentTarget.releasePointerCapture(Event.pointerId);
           }
         }} onLostPointerCapture={() => {Drag.current = null;}}>
-          {Snapshot.preparing && <p role="status">Загрузка текстуры…</p>}
+          {Snapshot.preparing && <p role="status">{tr("Загрузка текстуры…")}</p>}
           {Failure && <p role="alert">{Failure}</p>}
           {!Snapshot.preparing && !Failure && Snapshot.previewPng && <div className="native-texture-image-area"><canvas ref={Canvas} role="img" aria-label={Asset?.name || 'Текстура'} style={{width: Metadata.width * Zoom, height: Metadata.height * Zoom}}/></div>}
         </div>
       </section>
-      <aside className="native-texture-details" aria-label="Свойства текстуры">
-        <h3>Свойства текстуры</h3>
-        <details open><summary>Исходник</summary><dl><dt>Размер</dt><dd>{Metadata.width || '—'} × {Metadata.height || '—'}</dd><dt>Каналы декодирования</dt><dd>{SourceChannels}</dd><dt>Формат декодирования</dt><dd>{Metadata.format || '—'}</dd><dt>Цветовое пространство</dt><dd>{Metadata.colorSpace || '—'}</dd><dt>Декодировано в памяти</dt><dd>{DecodedSize}</dd></dl><p className="native-texture-path">{Asset?.path}</p></details>
-        <details open><summary>Компрессия</summary><p>Сжатие текстур пока не поддерживается загрузчиком. Параметры компрессии будут доступны после добавления обработки текстур.</p></details>
-        <details open><summary>Уровни детализации</summary><p>Выбор mip-уровня недоступен: текущий загрузчик предоставляет исходное изображение RGBA8.</p></details>
-        <details><summary>Просмотр</summary><p>Каналы, фон и масштаб изменяют только предпросмотр. Перетаскивание перемещает увеличенное изображение. F вписывает текстуру в окно.</p></details>
+      <aside className="native-texture-details" aria-label={tr("Свойства текстуры")}>
+        <h3>{tr("Свойства текстуры")}</h3>
+        <details open><summary>{tr("Исходник")}</summary><dl><dt>{tr("Размер")}</dt><dd>{Metadata.width || '—'} × {Metadata.height || '—'}</dd><dt>{tr("Каналы декодирования")}</dt><dd>{SourceChannels}</dd><dt>{tr("Формат декодирования")}</dt><dd>{Metadata.format || '—'}</dd><dt>{tr("Цветовое пространство")}</dt><dd>{Metadata.colorSpace || '—'}</dd><dt>{tr("Декодировано в памяти")}</dt><dd>{DecodedSize}</dd></dl><p className="native-texture-path">{Asset?.path}</p></details>
+        <details open><summary>{tr("Компрессия")}</summary><p>{tr("Сжатие текстур пока не поддерживается загрузчиком. Параметры компрессии будут доступны после добавления обработки текстур.")}</p></details>
+        <details open><summary>{tr("Уровни детализации")}</summary><p>{tr("Выбор mip-уровня недоступен: текущий загрузчик предоставляет исходное изображение RGBA8.")}</p></details>
+        <details><summary>{tr("Просмотр")}</summary><p>{tr("Каналы, фон и масштаб изменяют только предпросмотр. Перетаскивание перемещает увеличенное изображение. F вписывает текстуру в окно.")}</p></details>
       </aside>
     </div>
-    <footer><span>{Asset?.path}</span><span>Просмотр исходника</span>{Metadata.previewWidth && Metadata.previewWidth !== Metadata.width && <span>Предпросмотр: {Metadata.previewWidth} × {Metadata.previewHeight}</span>}</footer>
+    <footer><span>{Asset?.path}</span><span>{tr("Просмотр исходника")}</span>{Metadata.previewWidth && Metadata.previewWidth !== Metadata.width && <span>{tr("Предпросмотр:")}{Metadata.previewWidth} × {Metadata.previewHeight}</span>}</footer>
   </main>;
 }

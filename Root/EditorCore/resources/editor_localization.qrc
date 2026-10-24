@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/editor-localization">
+        <file alias="Editor.json">Localization/Editor.json</file>
+    </qresource>
+</RCC>

@@ -121,7 +121,7 @@ bool AssetCreationFactory::CreateAsset(AssetRegistry& Registry, const TypeId& Fa
         Error = "Choose an existing Content folder and a valid asset filename";
         return false;
     }
-    if (Registry.LeafNameExists(Name) || std::filesystem::exists(Destination) || std::filesystem::exists(Destination.u8string() + ".meta"))
+    if (((*Found)->GetAssetType() != PythonScriptAssetType && Registry.LeafNameExists(Name)) || std::filesystem::exists(Destination) || std::filesystem::exists(Destination.u8string() + ".meta"))
     {
         Error = "Asset name already exists";
         return false;

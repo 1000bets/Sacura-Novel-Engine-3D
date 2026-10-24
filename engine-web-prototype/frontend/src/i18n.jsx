@@ -1,4 +1,7 @@
 import {useSyncExternalStore} from 'react';
-import {getLanguage,subscribeLanguage} from './i18n.js';
+import {getLanguage,subscribeLanguage,GetLocaleRevision} from './i18n.js';
 export * from './i18n.js';
-export function useLocale() { return useSyncExternalStore(subscribeLanguage,getLanguage,()=> 'ru'); }
+export function useLocale() {
+  useSyncExternalStore(subscribeLanguage,GetLocaleRevision,() => 0);
+  return getLanguage();
+}

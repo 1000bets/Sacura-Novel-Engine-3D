@@ -94,11 +94,11 @@ def Object(Name, Position, Scale, Components, Rotation=None):
                     "components": Components})
 
 
-def Box(Name, Position, Scale, Surface, Motion=0, TriangleCollision=False):
-    Collision = {"motion_type": Motion, "shape_type": 0, "half_extents": [0.5, 0.5, 0.5],
-                 "affects_navigation": Motion == 0, "continuous_collision_detection": Motion == 1}
+def Box(Name, Position, Scale, Surface, Motion="Static", TriangleCollision=False):
+    Collision = {"motion_type": Motion, "shape_type": "Box", "half_extents": [0.5, 0.5, 0.5],
+                 "affects_navigation": Motion == "Static", "continuous_collision_detection": Motion == "Dynamic"}
     if TriangleCollision:
-        Collision["shape_type"] = 3
+        Collision["shape_type"] = "TriangleMesh"
     Object(Name, Position, Scale, [
         Component(Name + "Mesh", "MeshRendererComponent", {"mesh_asset_id": Identifier("CollisionCube.glb"),
                   "mesh_sub_asset_id": Identifier("CubeMesh"), "material_asset_id": Surface}),
@@ -115,11 +115,11 @@ Box("Wall", [0, 1, 0], [1, 2, 8], WallMaterial)
 for StepIndex in range(5):
     StepHeight = (StepIndex + 1) * 0.2
     Box(f"Step{StepIndex + 1}", [4, StepHeight * 0.5, -4 - StepIndex * 0.6], [2, StepHeight, 0.6], FloorMaterial)
-Box("FallingBox", [5.5, 4, 3], [0.8, 0.8, 0.8], BoxMaterial, Motion=1)
+Box("FallingBox", [5.5, 4, 3], [0.8, 0.8, 0.8], BoxMaterial, Motion="Dynamic")
 Box("FirstPlatform", [-3, 2, -11], [3, 1, 3], FloorMaterial)
 Box("SecondPlatform", [3, 2, -11], [3, 1, 3], FloorMaterial)
 Object("NavMeshBounds", [0, 2, -2], [1, 1, 1], [Component("Bounds", "NavMeshBoundsComponent", {
-    "half_extents": [10, 5, 13], "generation_mode": 1, "minimum_region_area": 0})])
+    "half_extents": [10, 5, 13], "generation_mode": "Dynamic", "minimum_region_area": 0})])
 Object("CostArea", [-4, 0.5, -3], [1, 1, 1], [Component("CostAreaModifier", "NavigationModifierComponent", {
     "half_extents": [1.5, 1, 2], "area": 2})])
 Object("PlatformLink", [0, 0, 0], [1, 1, 1], [Component("PlatformConnection", "NavigationLinkComponent", {
@@ -138,7 +138,7 @@ Object("Camera", [0, 12, 18], [1, 1, 1], [Component("CameraComponent", "CameraCo
     "field_of_view": 65, "near_plane": 0.1, "far_plane": 200, "primary": True})],
        [math.sin(Pitch * 0.5), 0, 0, math.cos(Pitch * 0.5)])
 Object("Sun", [0, 8, 4], [1, 1, 1], [Component("SunComponent", "LightComponent", {
-    "light_type": 0, "intensity": 3, "light_color": [1, 0.95, 0.9, 1], "cast_shadows": True})],
+    "light_type": "Directional", "intensity": 3, "light_color": [1, 0.95, 0.9, 1], "cast_shadows": True})],
        [-0.38268343, 0, 0, 0.92387953])
 ScenePath = Content / "Scenes" / "Navigation.scene"
 WriteJson(ScenePath, {"format": "sakura.scene", "formatVersion": 1, "name": "Physics and navigation", "objects": Objects})

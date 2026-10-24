@@ -19,8 +19,11 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const {render, screen, fireEvent, cleanup, within, act} = await import('@testing-library/react');
 const Server = await createServer({root:fileURLToPath(new URL('..',import.meta.url)),server:{middlewareMode:true,watch:null,hmr:false,ws:false}});
 const Model = await Server.ssrLoadModule('/src/editorWindows.js');
+const {setLanguage} = await Server.ssrLoadModule('/src/i18n.js');
+setLanguage('ru');
 const {default:Workspace, EditorWindowsMenu:Menu, EditorDockArea} = await Server.ssrLoadModule('/src/EditorWorkspace.jsx');
 const {EditorDockProvider, DockPanelMount} = await Server.ssrLoadModule('/src/EditorDocking.jsx');
+const {default:ProjectSettings} = await Server.ssrLoadModule('/src/ProjectSettings.jsx');
 let State, Change, Mounts;
 function Draft({identifier:Identifier}) {
   const [Text, SetText] = React.useState('');
@@ -43,6 +46,16 @@ function Show() {
   Mounts = {};
   return render(React.createElement(Harness));
 }
+Test('restored project settings wait for connection and reload for a new session', async () => {
+  let Reads = 0;
+  const Adapter = {command:async () => ({name:'Project '+(++Reads),engineVersion:'0.1',startupScene:'',startupStory:''})};
+  const View = render(React.createElement(ProjectSettings,{Adapter,Connected:false,Session:null}));
+  Assert.equal(Reads,0);
+  View.rerender(React.createElement(ProjectSettings,{Adapter,Connected:true,Session:'first'}));
+  Assert.equal((await screen.findByLabelText('Название проекта')).value,'Project 1');
+  View.rerender(React.createElement(ProjectSettings,{Adapter,Connected:true,Session:'second'}));
+  Assert.equal((await screen.findByLabelText('Название проекта')).value,'Project 2');
+});
 afterEach(() => {cleanup();for (const Popup of Popups.splice(0)) {Popup.close();}});
 after(async () => {await Server.close();Dom.window.close();});
 Test('base panels and tools are tabs; selection and reorder stay in their group', async () => {
@@ -68,6 +81,22 @@ Test('draft DOM and component state survive detach, grouping and return', async 
   await act(async () => {Change(Current => Model.dockWindow(Current,'files',null,'workspace'));});
   Assert.equal(screen.getByRole('textbox',{name:'Draft files'}),DraftElement);
   Assert.equal(Mounts.files,1);
+});
+Test('settings use ordinary tabs and preserve draft state through detach and docking', async () => {
+  Show();
+  for (const [Identifier, Caption] of [['project-settings','Настройки проекта'],['editor-settings','Настройки редактора']]) {
+    fireEvent.click(screen.getByRole('menuitemcheckbox',{name:Caption,exact:true}));
+    const Field = screen.getByRole('textbox',{name:'Draft '+Identifier});
+    fireEvent.change(Field,{target:{value:'Pending settings'}});
+    await act(async () => {Change(Current => Model.floatWindow(Current,Identifier));});
+    Assert.equal(Field.ownerDocument,Popups.at(-1).document);
+    Assert.equal(Field.value,'Pending settings');
+    await act(async () => {Change(Current => Model.dockWindow(Current,Identifier,null,'workspace'));});
+    Assert.equal(screen.getByRole('textbox',{name:'Draft '+Identifier}),Field);
+    Assert.equal(Mounts[Identifier],1);
+    await act(async () => {Change(Current => Model.closeWindow(Current,Identifier));});
+    Assert.equal(Model.isWindowOpen(State,Identifier),false);
+  }
 });
 Test('split groups keep both drafts mounted and close without closing a sibling', async () => {
   Show();

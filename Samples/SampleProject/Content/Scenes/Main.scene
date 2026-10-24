@@ -164,7 +164,7 @@
               1.0,
               1.0
             ],
-            "light_type": 0,
+            "light_type": "Directional",
             "outer_cone_angle": 45.0,
             "range": 10.0
           },

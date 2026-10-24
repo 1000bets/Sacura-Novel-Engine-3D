@@ -17,11 +17,22 @@ enum class NavigationAgentState
     Cancelled
 };
 
+ENGINE_REFLECT_ENUM(NavigationAgentState, "engine.NavigationAgentState",
+    ENGINE_ENUM_VALUE(NavigationAgentState, Idle),
+    ENGINE_ENUM_VALUE(NavigationAgentState, WaitingForNavigation),
+    ENGINE_ENUM_VALUE(NavigationAgentState, Moving),
+    ENGINE_ENUM_VALUE(NavigationAgentState, Reached),
+    ENGINE_ENUM_VALUE(NavigationAgentState, PartialReached),
+    ENGINE_ENUM_VALUE(NavigationAgentState, WaitingForLink),
+    ENGINE_ENUM_VALUE(NavigationAgentState, Blocked),
+    ENGINE_ENUM_VALUE(NavigationAgentState, Failed),
+    ENGINE_ENUM_VALUE(NavigationAgentState, Cancelled));
+
 class PhysicsBodyComponent;
 
 class NavigationAgentComponent : public Component
 {
-    ENGINE_CLASS(NavigationAgentComponent, Component, "engine.NavigationAgentComponent", "Навигация")
+    ENGINE_CLASS(NavigationAgentComponent, Component, "engine.NavigationAgentComponent", "Navigation Agent")
 public:
     std::string AgentProfile = "Default";
     ENGINE_REFLECT_FIELD(NavigationAgentComponent, AgentProfile, "agent_profile", RF_EDITOR_EDITABLE, RF_SERIALIZABLE,
@@ -68,9 +79,8 @@ public:
     bool GetSteeringTarget(Vector3& Target) const;
     bool SetAreaCost(int Area, float Cost);
     Vector3 GetPendingLinkEnd() const;
-    int64_t GetMovementStateValue() const { return static_cast<int64_t>(MovementState); }
-    ENGINE_REFLECT_READONLY(NavigationAgentComponent, StateProperty, "movement_state", int64_t,
-        GetMovementStateValue, RF_EDITOR_READONLY, RF_DISPLAY_NAME("Movement State"))
+    ENGINE_REFLECT_READONLY(NavigationAgentComponent, StateProperty, "movement_state", NavigationAgentState,
+        GetMovementState, RF_EDITOR_READONLY, RF_DISPLAY_NAME("Movement State"))
 protected:
     NavigationAgentComponent() = default;
 private:
@@ -101,5 +111,5 @@ ENGINE_IMPLEMENT_FIELD(NavigationAgentComponent, bAllowPartialPath)
 ENGINE_IMPLEMENT_FIELD(NavigationAgentComponent, bAvoidOtherAgents)
 ENGINE_IMPLEMENT_FIELD(NavigationAgentComponent, AvoidanceRadius)
 ENGINE_IMPLEMENT_FIELD(NavigationAgentComponent, ExcludedAreas)
-ENGINE_IMPLEMENT_READONLY(NavigationAgentComponent, StateProperty, int64_t, GetMovementStateValue)
+ENGINE_IMPLEMENT_READONLY(NavigationAgentComponent, StateProperty, NavigationAgentState, GetMovementState)
 

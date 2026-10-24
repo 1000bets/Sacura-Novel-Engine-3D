@@ -6,7 +6,7 @@ using namespace DirectX::SimpleMath;
 
 class SkyLightComponent : public Component
 {
-    ENGINE_CLASS(SkyLightComponent, Component, "engine.SkyLightComponent", "Освещение неба")
+    ENGINE_CLASS(SkyLightComponent, Component, "engine.SkyLightComponent", "Sky Light")
 public:
     std::string GetEditorIconPath() const override { return ":/component-icons/sun.png"; }
     Color LightColor = Color(1.f, 1.f, 1.f, 1.f);

@@ -51,6 +51,7 @@ class QVBoxLayout;
 class QStackedWidget;
 class EditorToolset;
 class MaterialEditorWindow;
+class PythonScriptEditorWindow;
 class StaticMeshEditorWindow;
 class CharacterWorkspaceView;
 class EditorMcpServer;
@@ -157,6 +158,8 @@ private:
     void RegisterBuiltInAssetEditors();
     MaterialEditorWindow* OpenMaterialEditor(const AssetKey& Asset);
     void RegisterMaterialTools();
+    PythonScriptEditorWindow* OpenPythonScriptEditor(const AssetKey& Asset);
+    void RegisterPythonScriptTools();
     StaticMeshEditorWindow* OpenStaticMeshEditor(const AssetKey& Asset);
     void RegisterStaticMeshTools();
     CharacterWorkspaceView* OpenCharacterWorkspace();

@@ -162,10 +162,19 @@ Json NativeBridge::Properties(Component* C) {
     for(const auto* P:C->GetClass()->GetAllProperties())if(Readable(*P)) {
         Json Item{{"id",P->Id.Value},{"typeId",P->ValueTypeId.Value},{"editable",Editable(*P)},
             {"label",P->Attributes.DisplayName?P->Attributes.DisplayName:P->Id.Value},
+            {"localizationKey", "Editor.Reflection." + C->GetTypeId().Value + "." + P->Id.Value + ".DisplayName"},
             {"category",P->Attributes.Category?P->Attributes.Category:""},{"value",nullptr}};
         ReflectedValue V;auto D=PropertyAccess::GetProperty(C,*P,V,PropertyAccessContext::Inspector);Json Value;
         if(D.bOk)D=ReflectionJson::ReflectedValueToJson(P->ValueTypeId,V,Value);
         if(D.bOk)Item["value"]=ConvertValue(P->ValueTypeId,Value,false);else Item["error"]=D.Message;
+        if (const auto* Enumeration = ReflectionSubsystem::Get().FindEnum(P->ValueTypeId))
+        {
+            Item["enumValues"] = Json::array();
+            for (const auto& Entry : Enumeration->Values)
+            {
+                Item["enumValues"].push_back(Entry.Name);
+            }
+        }
         if(P->Attributes.AssetTypeFilter||!P->Attributes.AllowedAssetTypes.empty()) {
             auto Types=P->Attributes.AllowedAssetTypes;
             if(P->Attributes.AssetTypeFilter)Types.push_back(P->Attributes.AssetTypeFilter);
@@ -227,7 +236,7 @@ Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
     if(M.rfind("mesh.",0)==0 || M=="assets.place") { return MeshTools(M, P); }
     if(M.rfind("story.",0)==0||M.rfind("assets.",0)==0)return DispatchDocuments(M,P);
     auto& Commands=Workspace.GetCommands();auto& Document=Workspace.GetDocument();auto& Play=Runtime.GetPlaySession();
-    const bool Read=M=="editor.actions"||M=="bridge.describe"||M=="scene.getHierarchy"||M=="object.getComponents"||M=="component.getProperties"||M=="transform.get"||M=="reflection.getComponentTypes"||M=="assets.getScenes"||M=="audio.resolveStartup";
+    const bool Read=M=="project.settings.get"||M=="editor.actions"||M=="bridge.describe"||M=="scene.getHierarchy"||M=="object.getComponents"||M=="component.getProperties"||M=="transform.get"||M=="reflection.getComponentTypes"||M=="assets.getScenes"||M=="audio.resolveStartup";
     if(!Read&&M!="selection.set"&&M.rfind("play.",0)!=0)Require(!Play.IsSimulating(),"PLAY_READ_ONLY","Stop play before editing or opening/saving a scene");
     if(!Read)ResetInput();
     if (M == "editor.actions")
@@ -285,6 +294,62 @@ Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
     }
     if(M=="bridge.describe")return Describe();
     if(M=="scene.getHierarchy")return Hierarchy();
+    if (M == "project.settings.get" || M == "project.settings.set")
+    {
+        Require(Project.GetProject() != nullptr, "NO_PROJECT", "No project is open");
+        if (M == "project.settings.set")
+        {
+            Require(!ProjectChanged(), "EXTERNAL_CHANGES", "Project descriptor changed on disk; reopen the project before saving settings");
+            const auto& Settings = P.at("settings");
+            Require(Settings.is_object() && Settings.size() == 3, "INVALID_ARGUMENT", "Expected name, startupScene and startupStory");
+            for (const auto* Key : {"name", "startupScene", "startupStory"})
+            {
+                Require(Settings.contains(Key) && Settings.at(Key).is_string(), "INVALID_ARGUMENT", "Project settings must be strings");
+            }
+            ProjectDescriptor Updated = *Project.GetProject();
+            Updated.Name = QString::fromStdString(Settings.at("name").get<std::string>()).trimmed().toStdString();
+            for (const auto* Key : {"startupScene", "startupStory"})
+            {
+                const auto Relative = std::filesystem::u8path(Settings.at(Key).get<std::string>());
+                Require(!Relative.is_absolute() && !Relative.has_root_name(), "INVALID_ARGUMENT", "Startup paths must be project-relative");
+                std::filesystem::path Absolute;
+                if (!Relative.empty())
+                {
+                    Absolute = (Updated.ProjectRoot / Relative).lexically_normal();
+                    std::string Extension = ".scene";
+                    if (std::string(Key) == "startupStory")
+                    {
+                        Extension = ".story";
+                    }
+                    Require(Absolute.extension() == Extension, "INVALID_ARGUMENT", "Unexpected startup document extension");
+                }
+                if (std::string(Key) == "startupScene")
+                {
+                    Updated.StartupScene = Absolute;
+                }
+                else
+                {
+                    Updated.StartupStory = Absolute;
+                }
+            }
+            std::string Error;
+            const bool bSaved = Project.UpdateSettings(Updated, Error);
+            Require(bSaved, "INVALID_ARGUMENT", Error);
+            AssetDiagnostic Diagnostic;
+            ContentHash::TryHashFile(Updated.ProjectFile.u8string(), ProjectFingerprint, Diagnostic);
+        }
+        const auto& Descriptor = *Project.GetProject();
+        auto RelativePath = [&Descriptor](const std::filesystem::path& Path)
+        {
+            if (Path.empty())
+            {
+                return std::string();
+            }
+            return Path.lexically_relative(Descriptor.ProjectRoot).generic_u8string();
+        };
+        return {{"name", Descriptor.Name}, {"engineVersion", Descriptor.EngineVersion},
+            {"startupScene", RelativePath(Descriptor.StartupScene)}, {"startupStory", RelativePath(Descriptor.StartupStory)}};
+    }
     if(M=="project.save") {
         Require(!ProjectChanged(),"EXTERNAL_CHANGES","Project descriptor changed on disk; reopen the project before saving startup settings");
         Require(!Document.HasExternalChanges()&&!Story.HasExternalChanges(),"EXTERNAL_CHANGES","A document changed on disk. Reload it or save a scene copy first");
@@ -293,7 +358,8 @@ Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
         if(Story.IsOpen()&&Story.IsDirty()) Require(Story.Save(Error),"STORY_ERROR",Error);
         for (auto& Entry : AssetDocuments)
         {
-            if (Entry.second.Mesh && Entry.second.Mesh->IsDirty())
+            if (Entry.second.Script && Entry.second.Script->IsDirty()) { return true; }
+        if (Entry.second.Mesh && Entry.second.Mesh->IsDirty())
             {
                 Require(Entry.second.Mesh->Save(Runtime.GetAssetManager(), Error), "IO_ERROR", Error);
             }
@@ -393,8 +459,12 @@ Json NativeBridge::Dispatch(const std::string& M,const Json& P) {
                     Commit(MakeSetPropertyCommand(World(),CreatedComponent,PropertyId{"mesh_sub_asset_id"},
                         ReflectedValue::MakeString(PrimitiveKey.SubAsset->ToString())));
                 }
-                if(ComponentType==TypeId{"engine.LightComponent"})Commit(MakeSetPropertyCommand(World(),CreatedComponent,
-                    PropertyId{"light_type"},ReflectedValue::MakeInt64(1)));
+                if (ComponentType == TypeId{"engine.LightComponent"})
+                {
+                    ReflectedValue LightType;
+                    Diagnostic(ReflectionValueCodec<RenderLightType>::ToReflected(RenderLightType::Point, LightType));
+                    Commit(MakeSetPropertyCommand(World(), CreatedComponent, PropertyId{"light_type"}, LightType));
+                }
                 if(HasPrimaryCamera)Commit(MakeSetPropertyCommand(World(),CreatedComponent,
                     PropertyId{"primary"},ReflectedValue::MakeBool(false)));
                 if(P.contains("cameraAspect"))Commit(MakeSetPropertyCommand(World(),CreatedComponent,
@@ -1046,17 +1116,32 @@ Json NativeBridge::MeshTools(const std::string& Method, const Json& Params)
         {
             if (Override.Slot == Slot) { Material = Override.Material; bInherited = false; }
         }
-        Slots.push_back({{"slot", Slot}, {"assetId", Material.Asset.ToString()}, {"inherited", bInherited}});
+        Json MaterialIdentity = nullptr;
+        if (Material.IsValid())
+        {
+            MaterialIdentity = Material.Asset.ToString();
+        }
+        Slots.push_back({{"slot", Slot}, {"assetId", MaterialIdentity}, {"inherited", bInherited}});
     }
     const auto* Body = Mesh->GetGameObject()->GetComponent<PhysicsBodyComponent>();
-    return {{"slots", Slots}, {"collision", Body && Body->IsEnabled()}, {"simulate", Body && Body->MotionType == 1},
-        {"motion", Body ? Body->MotionType : 0}};
+    PhysicsMotionType MotionType = PhysicsMotionType::Static;
+    if (Body)
+    {
+        MotionType = Body->MotionType;
+    }
+    ReflectedValue EncodedMotion;
+    Diagnostic(ReflectionValueCodec<PhysicsMotionType>::ToReflected(MotionType, EncodedMotion));
+    Json Motion;
+    Diagnostic(ReflectionJson::ReflectedValueToJson(ReflectionEnumType<PhysicsMotionType>::GetTypeId(), EncodedMotion, Motion));
+    return {{"slots", Slots}, {"collision", Body && Body->IsEnabled()}, {"simulate", Body && Body->MotionType == PhysicsMotionType::Dynamic},
+        {"motion", Motion}};
 }
 
 bool NativeBridge::HasDirtyAssetDocuments() const
 {
     for (const auto& Entry : AssetDocuments)
     {
+        if (Entry.second.Script && Entry.second.Script->IsDirty()) { return true; }
         if (Entry.second.Mesh && Entry.second.Mesh->IsDirty()) { return true; }
         if (Entry.second.Material && Entry.second.Material->GetDocument().IsDirty()) { return true; }
     }
@@ -1079,7 +1164,7 @@ Json NativeBridge::AssetDocumentTools(const Json& Params)
     Require(Registry.TryResolveKey(Key, Resolved, &Subasset), "NOT_FOUND", "Document asset unavailable");
     AssetType Type = Entry.Metadata.Type;
     if (Subasset) { Type = Subasset->Type; }
-    Require(Type == StaticMeshAssetType || Type == MaterialAssetType || Type == MaterialInstanceAssetType || Type == TextureAssetType,
+    Require(Type == StaticMeshAssetType || Type == MaterialAssetType || Type == MaterialInstanceAssetType || Type == TextureAssetType || Type == PythonScriptAssetType,
         "INVALID_ARGUMENT", "This asset type has no document editor");
     const std::string Identifier = Key.Asset.ToString() + Params.value("subAssetId", Json(nullptr)).dump();
     const std::string Operation = Params.at("operation");
@@ -1089,7 +1174,12 @@ Json NativeBridge::AssetDocumentTools(const Json& Params)
         Require(Operation == "open", "NOT_FOUND", "Open the asset document first");
         AssetDocumentState State;
         std::string Error;
-        if (Type == StaticMeshAssetType)
+        if (Type == PythonScriptAssetType)
+        {
+            State.Script = std::make_unique<PythonScriptDocument>(Registry);
+            Require(State.Script->Open(Key, Error), "DOCUMENT_ERROR", Error);
+        }
+        else if (Type == StaticMeshAssetType)
         {
             State.Mesh = std::make_unique<StaticMeshDocument>(Registry);
             Require(State.Mesh->Open(Key, Error), "DOCUMENT_ERROR", Error);
@@ -1103,6 +1193,47 @@ Json NativeBridge::AssetDocumentTools(const Json& Params)
         Found = AssetDocuments.emplace(Identifier, std::move(State)).first;
     }
     auto& State = Found->second;
+    if (State.Script)
+    {
+        if (Operation != "open" && Operation != "get" && Operation != "preview")
+        {
+            Require(!Runtime.GetPlaySession().IsSimulating(), "PLAY_READ_ONLY", "Stop Play before editing scripts");
+            Require(Params.contains("revision") && Params.at("revision") == State.Revision,
+                "STALE_DOCUMENT", "Refresh the script document before editing");
+            Require(Entry.Mount == AssetMount::Game, "READ_ONLY", "Engine scripts are read-only");
+            std::string Error;
+            if (Operation == "source")
+            {
+                Require(Params.at("value").is_string(), "INVALID_ARGUMENT", "Python source must be text");
+                Require(State.Script->Edit(Params.at("value").get<std::string>(), Error), "DOCUMENT_ERROR", Error);
+            }
+            else if (Operation == "save")
+            {
+                Require(State.Script->Save(Error), "DOCUMENT_ERROR", Error);
+            }
+            else if (Operation == "undo")
+            {
+                State.Script->Undo();
+            }
+            else if (Operation == "redo")
+            {
+                State.Script->Redo();
+            }
+            else if (Operation == "reload")
+            {
+                Require(!State.Script->IsDirty(), "UNSAVED_CHANGES", "Save or undo script changes before reloading");
+                Require(State.Script->Open(Key, Error), "DOCUMENT_ERROR", Error);
+            }
+            else
+            {
+                throw Failure("INVALID_ARGUMENT", "Unknown Python document operation");
+            }
+            ++State.Revision;
+        }
+        return {{"assetId", Key.Asset.ToString()}, {"type", "PythonScript"}, {"revision", State.Revision},
+            {"source", State.Script->GetSource()}, {"dirty", State.Script->IsDirty()},
+            {"readOnly", Entry.Mount == AssetMount::Engine}, {"document", Json::object()}};
+    }
     if (Type == TextureAssetType)
     {
         Require(Operation == "open" || Operation == "get" || Operation == "preview",

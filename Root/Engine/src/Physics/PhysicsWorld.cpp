@@ -21,7 +21,7 @@ static bool ValidatePhysicsBodyComposition(GameObject& Owner, std::string& Error
         if (Body->IsEnabled() && !Body->IsPendingRemoval())
         {
             ++BodyCount;
-            bHasMovableBody = bHasMovableBody || Body->MotionType != static_cast<int64_t>(PhysicsMotionType::Static);
+            bHasMovableBody = bHasMovableBody || Body->MotionType != PhysicsMotionType::Static;
         }
     }
     if (bHasMovableBody && BodyCount > 1)
@@ -174,7 +174,7 @@ bool PhysicsWorld::Synchronize()
             Present.insert(ComponentInstance->GetID());
             RuntimeBody& Body = Found->second;
             const bool bStoryControlled = Owner->IsStoryControllingTransform();
-            if (ComponentInstance->MotionType == static_cast<int64_t>(PhysicsMotionType::Dynamic)
+            if (ComponentInstance->MotionType == PhysicsMotionType::Dynamic
                 && Body.bStoryControlled != bStoryControlled)
             {
                 Backend->SetKinematic(Body.Body, bStoryControlled);
@@ -220,7 +220,7 @@ void PhysicsWorld::Step(float DeltaTime)
         {
             Backend->AddTorque(Body.Body, Body.FrameTorque, false);
         }
-        if (ComponentInstance == nullptr || Body.bStoryControlled || ComponentInstance->MotionType != 3)
+        if (ComponentInstance == nullptr || Body.bStoryControlled || ComponentInstance->MotionType != PhysicsMotionType::Character)
         {
             continue;
         }
@@ -433,7 +433,7 @@ Vector3 PhysicsWorld::GetVelocity(const PhysicsBodyComponent& ComponentInstance)
     {
         return Vector3::Zero;
     }
-    if (ComponentInstance.MotionType == 3)
+    if (ComponentInstance.MotionType == PhysicsMotionType::Character)
     {
         return Body->ActualVelocity;
     }
@@ -449,7 +449,7 @@ bool PhysicsWorld::AddForce(const PhysicsBodyComponent& ComponentInstance, const
 {
     AssertGameThread();
     RuntimeBody* Body = FindBody(ComponentInstance);
-    if (Body == nullptr || ComponentInstance.MotionType != static_cast<int64_t>(PhysicsMotionType::Dynamic)
+    if (Body == nullptr || ComponentInstance.MotionType != PhysicsMotionType::Dynamic
         || Body->bStoryControlled || !std::isfinite(Force.x) || !std::isfinite(Force.y) || !std::isfinite(Force.z))
     {
         return false;
@@ -466,7 +466,7 @@ bool PhysicsWorld::AddTorque(const PhysicsBodyComponent& ComponentInstance, cons
 {
     AssertGameThread();
     RuntimeBody* Body = FindBody(ComponentInstance);
-    if (Body == nullptr || ComponentInstance.MotionType != static_cast<int64_t>(PhysicsMotionType::Dynamic)
+    if (Body == nullptr || ComponentInstance.MotionType != PhysicsMotionType::Dynamic
         || Body->bStoryControlled || !std::isfinite(Torque.x) || !std::isfinite(Torque.y) || !std::isfinite(Torque.z))
     {
         return false;

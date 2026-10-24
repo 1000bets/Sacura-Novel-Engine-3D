@@ -1,3 +1,4 @@
+#include "UI/Presentation/LocalizedEditorUi.h"
 #include "UI/Views/AssetReferenceField.h"
 #include "UI/Adapters/AssetThumbnails.h"
 #include "UI/Views/CharacterWorkspaceView.h"
@@ -37,7 +38,7 @@ CharacterWorkspaceView::CharacterWorkspaceView(Engine& InRuntime, CharacterDocum
     EditorUi::EditorStyle::Apply(*this);
     static uint32_t NextView = 20000;
     ViewId = RenderViewId{NextView++};
-    setWindowTitle(tr("Персонажи"));
+    BindEditorProperty(this, "windowTitle", QString::fromUtf8("Персонажи"));
     resize(1120, 760);
     auto* Layout = new QVBoxLayout(this);
     auto* Toolbar = new QHBoxLayout();
@@ -101,7 +102,7 @@ CharacterWorkspaceView::CharacterWorkspaceView(Engine& InRuntime, CharacterDocum
     auto* Sidebar = new QWidget(Splitter);
     auto* SidebarLayout = new QVBoxLayout(Sidebar);
     auto* Search = new QLineEdit(Sidebar);
-    Search->setPlaceholderText(tr("Найти персонажа"));
+    BindEditorProperty(Search, "placeholderText", QString::fromUtf8("Найти персонажа"));
     SidebarLayout->addWidget(Search);
     Library = new QListWidget(Sidebar);
     SidebarLayout->addWidget(Library);
@@ -132,7 +133,7 @@ CharacterWorkspaceView::CharacterWorkspaceView(Engine& InRuntime, CharacterDocum
     Viewport->SetEditorToolsEnabled(true);
     Viewport->setMinimumSize(300, 320);
     PreviewLayout->addWidget(Viewport);
-    auto* Playback = new QPushButton(tr("Пауза / воспроизведение"), PreviewPanel);
+    auto* Playback = BindEditorCaption(new QPushButton(tr("Пауза / воспроизведение"), PreviewPanel), QString::fromUtf8("Пауза / воспроизведение"));
     PreviewLayout->addWidget(Playback);
     connect(Playback, &QPushButton::clicked, this, [this]() { bPlaying = !bPlaying; });
     auto* Scroll = new QScrollArea(Splitter);
@@ -262,7 +263,7 @@ void CharacterWorkspaceView::RefreshFields()
     }
     if (!Document)
     {
-        Fields->addWidget(new QLabel(tr("Создайте персонажа или выберите ресурс в списке."), FieldContainer));
+        Fields->addWidget(BindEditorCaption(new QLabel(tr("Создайте персонажа или выберите ресурс в списке."), FieldContainer), QString::fromUtf8("Создайте персонажа или выберите ресурс в списке.")));
         return;
     }
     const auto& Data = Document->GetData();
@@ -304,16 +305,16 @@ void CharacterWorkspaceView::RefreshFields()
         DialogueWidget->addItem(tr("Недоступный виджет"), QString::fromStdString(Data.DialogueWidget));
     }
     DialogueWidget->setCurrentIndex(std::max(0, DialogueWidget->findData(QString::fromStdString(Data.DialogueWidget))));
-    Form->addRow(tr("Виджет диалога"), DialogueWidget);
+    Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Виджет диалога")), DialogueWidget);
     connect(DialogueWidget, &QComboBox::currentIndexChanged, this, [this, DialogueWidget]()
     {
         Edit([&](CharacterDefinition& Value) { Value.DialogueWidget = DialogueWidget->currentData().toString().toStdString(); });
     });
-    auto* Enabled = new QCheckBox(tr("Персонаж включён"), FormWidget);
+    auto* Enabled = BindEditorCaption(new QCheckBox(tr("Персонаж включён"), FormWidget), QString::fromUtf8("Персонаж включён"));
     Enabled->setChecked(Data.bEnabled);
     Form->addRow(Enabled);
     connect(Enabled, &QCheckBox::toggled, this, [this](bool Value) { Edit([&](CharacterDefinition& Data) { Data.bEnabled = Value; }); });
-    auto* Color = new QPushButton(tr("Цвет стандартной модели"), FormWidget);
+    auto* Color = BindEditorCaption(new QPushButton(tr("Цвет стандартной модели"), FormWidget), QString::fromUtf8("Цвет стандартной модели"));
     Form->addRow(Color);
     connect(Color, &QPushButton::clicked, this, [this]()
     {
@@ -324,10 +325,10 @@ void CharacterWorkspaceView::RefreshFields()
             Edit([&](CharacterDefinition& Data) { Data.Color = {static_cast<float>(Chosen.redF()), static_cast<float>(Chosen.greenF()), static_cast<float>(Chosen.blueF()), 1.f}; });
         }
     });
-    auto* Model = new QPushButton(tr("Загрузить модель GLB"), FormWidget);
+    auto* Model = BindEditorCaption(new QPushButton(tr("Загрузить модель GLB"), FormWidget), QString::fromUtf8("Загрузить модель GLB"));
     Form->addRow(Model);
     connect(Model, &QPushButton::clicked, this, [this]() { Import(false); });
-    auto* Reset = new QPushButton(tr("Вернуть стандартную модель"), FormWidget);
+    auto* Reset = BindEditorCaption(new QPushButton(tr("Вернуть стандартную модель"), FormWidget), QString::fromUtf8("Вернуть стандартную модель"));
     Form->addRow(Reset);
     connect(Reset, &QPushButton::clicked, this, [this]()
     {
@@ -393,7 +394,7 @@ void CharacterWorkspaceView::RefreshFields()
             });
         });
     }
-    auto* AddAnimation = new QPushButton(tr("Добавить анимации GLB / Mixamo FBX"), FormWidget);
+    auto* AddAnimation = BindEditorCaption(new QPushButton(tr("Добавить анимации GLB / Mixamo FBX"), FormWidget), QString::fromUtf8("Добавить анимации GLB / Mixamo FBX"));
     Form->addRow(AddAnimation);
     connect(AddAnimation, &QPushButton::clicked, this, [this]() { Import(true); });
     for (const auto& Animation : Data.Animations)
@@ -419,20 +420,20 @@ void CharacterWorkspaceView::RefreshFields()
         };
         auto* Identity = new QLineEdit(QString::fromStdString(Identifier), Group);
         Identity->setReadOnly(true);
-        Row->addRow(tr("Идентификатор"), Identity);
+        Row->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Идентификатор")), Identity);
         auto* Name = new QLineEdit(QString::fromStdString(Animation.Name), Group);
-        Row->addRow(tr("Анимация"), Name);
+        Row->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Анимация")), Name);
         connect(Name, &QLineEdit::editingFinished, this, [Name, ChangeMotion]()
         { ChangeMotion([&](CharacterAnimation& Value) { Value.Name = Name->text().toStdString(); }); });
         auto* Description = new QLineEdit(QString::fromStdString(Animation.Description), Group);
-        Row->addRow(tr("Описание"), Description);
+        Row->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Описание")), Description);
         connect(Description, &QLineEdit::editingFinished, this, [Description, ChangeMotion]()
         { ChangeMotion([&](CharacterAnimation& Value) { Value.Description = Description->text().toStdString(); }); });
         auto* Speed = new QDoubleSpinBox(Group);
         Speed->setRange(0.1, 4.0);
         Speed->setSingleStep(0.1);
         Speed->setValue(Animation.Speed);
-        Row->addRow(tr("Скорость"), Speed);
+        Row->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Скорость")), Speed);
         connect(Speed, &QDoubleSpinBox::editingFinished, this, [Speed, ChangeMotion]()
         { ChangeMotion([&](CharacterAnimation& Value) { Value.Speed = static_cast<float>(Speed->value()); }); });
         for (const auto& Setting : {std::string("enabled"), std::string("loop"), std::string("inPlace")})
@@ -471,7 +472,7 @@ void CharacterWorkspaceView::RefreshFields()
                 });
             });
         }
-        auto* DuplicateMotion = new QPushButton(tr("Создать вариант"), Group);
+        auto* DuplicateMotion = BindEditorCaption(new QPushButton(tr("Создать вариант"), Group), QString::fromUtf8("Создать вариант"));
         Row->addRow(DuplicateMotion);
         connect(DuplicateMotion, &QPushButton::clicked, this, [this, Animation]()
         {
@@ -484,7 +485,7 @@ void CharacterWorkspaceView::RefreshFields()
             });
             RefreshFields();
         });
-        auto* RemoveMotion = new QPushButton(tr("Удалить анимацию"), Group);
+        auto* RemoveMotion = BindEditorCaption(new QPushButton(tr("Удалить анимацию"), Group), QString::fromUtf8("Удалить анимацию"));
         Row->addRow(RemoveMotion);
         connect(RemoveMotion, &QPushButton::clicked, this, [this, Identifier]()
         {
@@ -505,7 +506,7 @@ void CharacterWorkspaceView::RefreshFields()
             });
             RefreshFields();
         });
-        auto* Preview = new QPushButton(tr("Посмотреть"), Group);
+        auto* Preview = BindEditorCaption(new QPushButton(tr("Посмотреть"), Group), QString::fromUtf8("Посмотреть"));
         Row->addRow(Preview);
         connect(Preview, &QPushButton::clicked, this, [this, Identifier]()
         {

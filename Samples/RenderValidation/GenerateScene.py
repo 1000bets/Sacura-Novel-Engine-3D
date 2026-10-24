@@ -7,7 +7,7 @@ import zlib
 
 Root = Path(__file__).resolve().parent
 Content = Root / "Content"
-for Directory in [Content / "Meshes", Content / "Materials", Content / "Textures", Content / "Scenes", Root / "Scripts", Root / "Config"]:
+for Directory in [Content / "Meshes", Content / "Materials", Content / "Textures", Content / "Scenes", Content / "Scripts", Root / "Config"]:
     Directory.mkdir(parents=True, exist_ok=True)
 
 def Identifier(Name):
@@ -120,11 +120,11 @@ for Index in range(64):
 Object("Camera", [0, 2, 7], [1, 1, 1], [0, 0, 0, 1], "engine.CameraComponent",
     {"field_of_view": 60, "near_plane": 0.1, "far_plane": 200, "aspect_ratio": 1.7777778, "primary": True})
 Object("Sun", [0, 5, 3], [1, 1, 1], [-0.38268343, 0, 0, 0.92387953], "engine.LightComponent",
-    {"light_type": 0, "light_color": [1, 0.95, 0.85, 1], "intensity": 3, "cast_shadows": True})
+    {"light_type": "Directional", "light_color": [1, 0.95, 0.85, 1], "intensity": 3, "cast_shadows": True})
 Object("Point", [-2, 2.5, 2], [1, 1, 1], [0, 0, 0, 1], "engine.LightComponent",
-    {"light_type": 1, "light_color": [0.3, 0.5, 1, 1], "intensity": 12, "range": 8, "cast_shadows": True})
+    {"light_type": "Point", "light_color": [0.3, 0.5, 1, 1], "intensity": 12, "range": 8, "cast_shadows": True})
 Object("Spot", [2, 3, 2], [1, 1, 1], [-0.258819, 0, 0, 0.9659258], "engine.LightComponent",
-    {"light_type": 2, "light_color": [1, 0.3, 0.1, 1], "intensity": 15, "range": 8, "inner_cone_angle": 15, "outer_cone_angle": 35, "cast_shadows": True})
+    {"light_type": "Spot", "light_color": [1, 0.3, 0.1, 1], "intensity": 15, "range": 8, "inner_cone_angle": 15, "outer_cone_angle": 35, "cast_shadows": True})
 WriteJson(Content / "Scenes" / "Forward.scene", {"format": "sakura.scene", "formatVersion": 1, "name": "Forward validation", "objects": Objects})
 WriteJson(Root / "RenderValidation.project", {"name": "RenderValidation", "engineVersion": "0.1", "startupScene": "Content/Scenes/Forward.scene"})
 print(f"Generated {len(Objects)} objects and {len(list(Content.rglob('*.meta')))} assets")

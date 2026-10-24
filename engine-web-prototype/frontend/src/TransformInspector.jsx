@@ -6,6 +6,7 @@ import NumericInput from './NumericInput.jsx';
 
 export default function TransformInspector({object, scene, onChange, onInteraction, onReset, onFocus, onDuplicate, onDelete, disabled, compact=false, spawn=false}) {
   useLocale();
+  useLocale();
   const Value = objectTransform(object, scene.id, scene.kind);
   const Serialized = JSON.stringify(Value);
   const [Draft, SetDraft] = useState(Value);
@@ -132,12 +133,12 @@ export default function TransformInspector({object, scene, onChange, onInteracti
     <legend><Icon name="Move" size={14}/> {tr(Heading)}</legend>
     {spawn && <small className="player-spawn-note">{tr('Положение — место появления при запуске сцены.')}</small>}
     {[['position','Положение','м',0.01],['rotation','Поворот','°',0.5],['scale','Масштаб','×',0.01]].map(([Key, Label, Unit, Step]) => <div className="transform-vector" key={Key}>
-      <span>{tr(Label)}{Key === 'scale' && <button type="button" className="scale-axis-lock" aria-label="Сохранять пропорции масштаба" aria-pressed={ScaleLocked} title="Связать оси масштаба с сохранением пропорций" onClick={() => SetScaleLocked(Current => !Current)}><Icon name={LockIcon} size={13}/></button>}{Key !== 'scale' && <small>{Unit}</small>}</span>
+      <span>{tr(Label)}{Key === 'scale' && <button type="button" className="scale-axis-lock" aria-label={tr("Сохранять пропорции масштаба")} aria-pressed={ScaleLocked} title={tr("Связать оси масштаба с сохранением пропорций")} onClick={() => SetScaleLocked(Current => !Current)}><Icon name={LockIcon} size={13}/></button>}{Key !== 'scale' && <small>{Unit}</small>}</span>
       <div>{['X','Y','Z'].map((AxisName, Axis) => <label key={AxisName}><b className={'axis-' + AxisName}>{AxisName}</b>
         <NumericInput label={Label + ' ' + AxisName} value={Draft[Key][Axis]} disabled={disabled} step={Step} onBegin={Begin} onPreview={Next => Preview(Key, Axis, Next)} onCancel={Cancel} onCommit={(Next, IsDrag) => Commit(Key, Axis, Next, IsDrag)}/>
       </label>)}</div>
     </div>)}
     <div className="transform-actions"><Button icon="Focus" onClick={onFocus}>{tr('В кадр')}</Button><Button icon="RotateCcw" onClick={onReset}>{tr('Сбросить')}</Button><Button icon="Copy" disabled={!onDuplicate} onClick={onDuplicate}>{tr('Дубликат')}</Button><Button icon="Trash2" onClick={onDelete}>{tr('Удалить')}</Button></div>
-    {!compact && <p>Тяните число мышью или нажмите для ввода выражения. Shift — точнее, Ctrl — быстрее. Enter — применить, Escape — отменить.</p>}
+    {!compact && <p>{tr("Тяните число мышью или нажмите для ввода выражения. Shift — точнее, Ctrl — быстрее. Enter — применить, Escape — отменить.")}</p>}
   </fieldset>;
 }

@@ -14,7 +14,7 @@ bool PhysicsBodyComponent::PrepareCollisionMesh(AssetManager* Assets)
 {
     Diagnostic.clear();
     bCollisionMeshPending = false;
-    if (!bUseMeshDefaults && ShapeType != static_cast<int64_t>(PhysicsShapeType::TriangleMesh))
+    if (!bUseMeshDefaults && ShapeType != PhysicsShapeType::TriangleMesh)
     {
         CollisionMesh.reset();
         MeshFingerprint = 0;
@@ -67,7 +67,7 @@ bool PhysicsBodyComponent::PrepareCollisionMesh(AssetManager* Assets)
         if (!Defaults.CollisionElements.empty())
         {
             const auto& Element = Defaults.CollisionElements.front();
-            ShapeType = Element.ShapeType;
+            ShapeType = static_cast<PhysicsShapeType>(Element.ShapeType);
             Center = Element.Center;
             HalfExtents = Element.HalfExtents;
             Radius = Element.Radius;
@@ -96,14 +96,15 @@ bool PhysicsBodyComponent::PrepareCollisionMesh(AssetManager* Assets)
 bool PhysicsBodyComponent::BuildDefinition(PhysicsBodyDefinition& Definition, std::string& Error) const
 {
     Definition = PhysicsBodyDefinition{};
-    if (MotionType < 0 || MotionType > 3 || ShapeType < 0 || ShapeType > 3
+    if (MotionType < PhysicsMotionType::Static || MotionType > PhysicsMotionType::Character
+        || ShapeType < PhysicsShapeType::Box || ShapeType > PhysicsShapeType::TriangleMesh
         || CollisionLayer < 1 || CollisionLayer > UINT32_MAX || CollisionMask < 0 || CollisionMask > UINT32_MAX)
     {
         Error = "Physics motion, shape or collision filter is out of range";
         return false;
     }
-    Definition.MotionType = static_cast<PhysicsMotionType>(MotionType);
-    Definition.ShapeType = static_cast<PhysicsShapeType>(ShapeType);
+    Definition.MotionType = MotionType;
+    Definition.ShapeType = ShapeType;
     Definition.WorldTransform = GetGameObject()->GetWorldTransform();
     const Vector3 Scale = Definition.WorldTransform.Scale;
     const Vector3 AbsoluteScale(std::abs(Scale.x), std::abs(Scale.y), std::abs(Scale.z));

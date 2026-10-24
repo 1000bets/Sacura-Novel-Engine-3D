@@ -99,7 +99,7 @@ function HexField({label: Label, color: Color, srgb: Srgb, onChange: Change}) {
   }}/></label>;
 }
 
-function ColorPanel({label: Label, value: Value, onApply: Apply, onClose: Close}) {
+function ColorPanel({anchor: Anchor, label: Label, value: Value, onApply: Apply, onClose: Close}) {
   const Original = useRef(Channels(Value)).current;
   const [Draft, SetDraft] = useState(Original);
   const [Hsv, SetHsv] = useState(() => ToHsv(Original));
@@ -108,8 +108,15 @@ function ColorPanel({label: Label, value: Value, onApply: Apply, onClose: Close}
   const Dialog = useRef(null);
   const Title = useId();
   useEffect(() => {
-    Dialog.current.showModal();
-  }, []);
+    const Panel = Dialog.current;
+    Panel.showModal();
+    return () => {
+      Panel.close();
+      if (Anchor.isConnected) {
+        Anchor.focus({preventScroll: true});
+      }
+    };
+  }, [Anchor]);
   function ChangeColor(Color) {
     SetDraft(Color);
     SetHsv(ToHsv(Color));
@@ -202,21 +209,22 @@ function ColorPanel({label: Label, value: Value, onApply: Apply, onClose: Close}
       </div>
       <footer><button type="button" onClick={Close}>Отмена</button><button type="submit" autoFocus>Применить</button></footer>
     </form>
-  </dialog>, document.body);
+  </dialog>, Anchor.ownerDocument.body);
 }
 
 export default function ColorField({label: Label, value: Value, disabled: Disabled, onChange: Change}) {
   const [Open, SetOpen] = useState(false);
+  const Trigger = useRef(null);
   useEffect(() => {
     if (Disabled) {
       SetOpen(false);
     }
   }, [Disabled]);
   return <div className="color-field"><span>{Label}</span>
-    <button type="button" className="color-swatch" disabled={Disabled} aria-label={'Выбрать цвет: ' + Label} aria-haspopup="dialog" onClick={() => SetOpen(true)}>
+    <button ref={Trigger} type="button" className="color-swatch" disabled={Disabled} aria-label={'Выбрать цвет: ' + Label} aria-haspopup="dialog" onClick={() => SetOpen(true)}>
       <span style={{background: Preview(Channels(Value), true)}}/>
     </button>
-    {Open && !Disabled && <ColorPanel label={Label} value={Value} onClose={() => SetOpen(false)} onApply={Color => {
+    {Open && !Disabled && <ColorPanel anchor={Trigger.current} label={Label} value={Value} onClose={() => SetOpen(false)} onApply={Color => {
       SetOpen(false);
       if (Color.every((Channel, Index) => Channel === Channels(Value)[Index])) {
         return;

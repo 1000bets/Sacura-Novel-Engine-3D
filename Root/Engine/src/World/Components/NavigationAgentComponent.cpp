@@ -40,7 +40,7 @@ PhysicsBodyComponent* NavigationAgentComponent::GetCharacterController() const
 {
     for (PhysicsBodyComponent* Body : GetGameObject()->GetComponents<PhysicsBodyComponent>())
     {
-        if (Body->MotionType == static_cast<int64_t>(PhysicsMotionType::Character))
+        if (Body->MotionType == PhysicsMotionType::Character)
         {
             return Body;
         }
@@ -113,7 +113,7 @@ bool NavigationAgentComponent::PlanPath()
         return false;
     }
     const PhysicsBodyComponent* Controller = GetCharacterController();
-    if (Controller == nullptr || Controller->MotionType != static_cast<int64_t>(PhysicsMotionType::Character)
+    if (Controller == nullptr || Controller->MotionType != PhysicsMotionType::Character
         || !Controller->IsEnabled() || Controller->IsPendingRemoval())
     {
         Fail("Navigation agent requires an enabled character controller on the same GameObject");

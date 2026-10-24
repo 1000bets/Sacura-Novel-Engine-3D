@@ -8,6 +8,7 @@
 #include <map>
 #include <mutex>
 #include "Documents/StaticMeshDocument.h"
+#include "Documents/PythonScriptDocument.h"
 #include "Documents/MaterialEditingSession.h"
 
 // Single owner on Game thread. The wire contains persistent IDs, never pointers.
@@ -36,6 +37,7 @@ public:
 private:
     struct AssetDocumentState
     {
+        std::unique_ptr<PythonScriptDocument> Script;
         std::unique_ptr<StaticMeshDocument> Mesh;
         std::unique_ptr<MaterialEditingSession> Material;
         uint64_t Revision = 1;

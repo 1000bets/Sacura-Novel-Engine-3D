@@ -1,8 +1,10 @@
+import {t as tr, useLocale} from './i18n.jsx';
 import React, {useEffect, useRef, useState} from 'react';
 import {nativeScenePlacement, NativeAssetDragMimeType} from './nativeScenePlacement.js';
 
 const modifiers = e => ({ctrl: !!(e.ctrlKey || e.metaKey), alt: !!e.altKey, shift: !!e.shiftKey});
 export default function NativeViewport({desktop:Desktop = window.sacuraDesktop, CameraSpeed = 4, assetPreview = false, blocked = false, editing = false, onContext, onAssetDrop, editTool, editSpace, snap, showGrid, focusRequest, onActivate, onCreateProject}) {
+  useLocale();
   const surface = useRef(null);
   const rightGesture = useRef(null);
   const [status, setStatus] = useState({phase: 'starting'});
@@ -151,21 +153,21 @@ export default function NativeViewport({desktop:Desktop = window.sacuraDesktop, 
     </div>
     {ready && !assetPreview && <div data-native-overlay style={{position:'absolute',left:10,top:10,padding:'5px 8px',background:'#174e38',color:'#fff',fontSize:11,pointerEvents:'none',borderRadius:4}}>
       C++ · Diligent D3D12 · {Number(metrics.fps||0).toFixed(1)} FPS · {Number(metrics.frameMs||0).toFixed(1)} ms
-      <br/>{status.viewport?.data?.selection?.name || 'Нет выделения'} · {status.stats?.width||0}×{status.stats?.height||0}
+      <br/>{status.viewport?.data?.selection?.name || tr('Нет выделения')} · {status.stats?.width||0}×{status.stats?.height||0}
     </div>}
     {status.phase === 'idle' && <div data-native-project-prompt style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:12,padding:24,textAlign:'center'}}>
-      <h2 style={{margin:0}}>Создайте или откройте проект</h2>
-      <p style={{margin:0,color:'#b7bec9'}}>Выберите файл .project, чтобы загрузить сцену в C++ Engine.</p>
+      <h2 style={{margin:0}}>{tr("Создайте или откройте проект")}</h2>
+      <p style={{margin:0,color:'#b7bec9'}}>{tr("Выберите файл .project, чтобы загрузить сцену в C++ Engine.")}</p>
       <div style={{display:'flex',gap:12}}>
-        <button onClick={onCreateProject}>Новый проект…</button>
-        <select aria-label="Вид viewport" value={Visualization} onChange={Event=>SetVisualization(Event.target.value)}>{Modes.map(([Identifier,Caption])=><option key={Identifier} value={Identifier}>{Caption}</option>)}</select>{Visualization==='linear_depth'&&<input aria-label="Дальность глубины, м" type="number" min="0.01" max="100000" value={DepthRange} onChange={Event=>SetDepthRange(Number(Event.target.value))}/>}
-      <button onClick={()=>api.nativeOpenProject().catch(fail)}>Открыть проект…</button>
+        <button onClick={onCreateProject}>{tr("Новый проект…")}</button>
+        <select aria-label={tr("Вид viewport")} value={Visualization} onChange={Event=>SetVisualization(Event.target.value)}>{Modes.map(([Identifier,Caption])=><option key={Identifier} value={Identifier}>{tr(Caption)}</option>)}</select>{Visualization==='linear_depth'&&<input aria-label={tr("Дальность глубины, м")} type="number" min="0.01" max="100000" value={DepthRange} onChange={Event=>SetDepthRange(Number(Event.target.value))}/>}
+      <button onClick={()=>api.nativeOpenProject().catch(fail)}>{tr("Открыть проект…")}</button>
       </div>
     </div>}
     <div style={{position:'absolute',right:10,top:10,display:'flex',gap:8,fontSize:11}}>
-      <select aria-label="Вид viewport" value={Visualization} onChange={Event=>SetVisualization(Event.target.value)}>{Modes.map(([Identifier,Caption])=><option key={Identifier} value={Identifier}>{Caption}</option>)}</select>{Visualization==='linear_depth'&&<input aria-label="Дальность глубины, м" type="number" min="0.01" max="100000" value={DepthRange} onChange={Event=>SetDepthRange(Number(Event.target.value))}/>}
-      {!assetPreview && <button onClick={()=>api.nativeOpenProject().catch(fail)}>Открыть C++ проект…</button>}
-      {ready && <button onClick={()=>setHidden(v=>!v)}>{hidden?'Показать':'Скрыть'}</button>}
+      <select aria-label={tr("Вид viewport")} value={Visualization} onChange={Event=>SetVisualization(Event.target.value)}>{Modes.map(([Identifier,Caption])=><option key={Identifier} value={Identifier}>{tr(Caption)}</option>)}</select>{Visualization==='linear_depth'&&<input aria-label={tr("Дальность глубины, м")} type="number" min="0.01" max="100000" value={DepthRange} onChange={Event=>SetDepthRange(Number(Event.target.value))}/>}
+      {!assetPreview && <button onClick={()=>api.nativeOpenProject().catch(fail)}>{tr("Открыть C++ проект…")}</button>}
+      {ready && <button onClick={()=>setHidden(v=>!v)}>{tr(hidden?'Показать':'Скрыть')}</button>}
     </div>
     {(status.error||metrics.error) && <p role="alert" style={{position:'absolute',top:65,left:12,color:'#ff8d8d',background:'#20151d'}}>Engine: {status.error||metrics.error}</p>}
   </div>;

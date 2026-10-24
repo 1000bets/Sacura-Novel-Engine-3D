@@ -1,3 +1,4 @@
+#include "UI/Presentation/LocalizedEditorUi.h"
 #include "UI/Views/StudioControls.h"
 #include "UI/Styles/ControlStyle.h"
 #include "UI/Styles/EditorStyle.h"
@@ -245,12 +246,12 @@ void StudioSelect::showPopup()
     Layout->setSpacing(4);
     Search = new QLineEdit(Popup);
     Search->setObjectName("StudioSelectSearch");
-    Search->setPlaceholderText(tr("Поиск…"));
+    BindEditorProperty(Search, "placeholderText", QString::fromUtf8("Поиск…"));
     Search->setClearButtonEnabled(true);
     Search->setFixedHeight(30);
     Search->installEventFilter(this);
     Layout->addWidget(Search);
-    auto* Empty = new QLabel(tr("Ничего не найдено"), Popup);
+    auto* Empty = BindEditorCaption(new QLabel(tr("Ничего не найдено"), Popup), QString::fromUtf8("Ничего не найдено"));
     Empty->setObjectName("MutedLabel");
     Empty->setAlignment(Qt::AlignCenter);
     Empty->setFixedHeight(ControlStyle::OptionHeight);

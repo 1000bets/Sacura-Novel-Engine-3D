@@ -34,7 +34,7 @@ std::filesystem::path ProjectPaths::Content()
 
 std::filesystem::path ProjectPaths::Scripts()
 {
-    return ProjectRootPath / "Scripts";
+    return Content() / "Scripts";
 }
 
 std::filesystem::path ProjectPaths::Config()

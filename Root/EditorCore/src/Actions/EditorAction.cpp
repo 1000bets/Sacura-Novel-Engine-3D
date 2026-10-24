@@ -3,6 +3,7 @@
 #include "Commands/EditorCommands.h"
 #include "World/Scene.h"
 #include "World/GameObject.h"
+#include "World/Components/LightComponent.h"
 #include "Reflection/ReflectedValue.h"
 #include "Reflection/ReflectionSubsystem.h"
 
@@ -95,7 +96,7 @@ bool EditorAction::CreateObjectWithComponent(
     const std::string& ObjectName,
     const TypeId& ComponentType,
     bool bConfigureLightType,
-    int64_t LightTypeValue) const
+    RenderLightType LightType) const
 {
     if (!CanExecute(Context) || Context.CommandStack == nullptr)
     {
@@ -120,11 +121,13 @@ bool EditorAction::CreateObjectWithComponent(
     }
     if (bCreated && bConfigureLightType)
     {
+        ReflectedValue EncodedLight;
+        ReflectionValueCodec<RenderLightType>::ToReflected(LightType, EncodedLight);
         bCreated = Context.ExecuteCommand(MakeSetPropertyCommand(
             Context.EditScene,
             CreatedComponent,
             PropertyId{"light_type"},
-            ReflectedValue::MakeInt64(LightTypeValue)));
+            EncodedLight));
     }
     Context.CommandStack->EndGroup();
     if (bCreated && Context.SelectObject)

@@ -300,15 +300,7 @@ void Engine::InitializeHeadless(const std::filesystem::path& InContentRoot)
     SetContentRoot(InContentRoot);
     if (ScriptsRoot.empty() && !InContentRoot.empty())
     {
-        const std::filesystem::path SiblingScripts = InContentRoot.parent_path() / "Scripts";
-        if (std::filesystem::exists(SiblingScripts))
-        {
-            ScriptsRoot = SiblingScripts;
-        }
-        else
-        {
-            ScriptsRoot = InContentRoot / "Scripts";
-        }
+        ScriptsRoot = InContentRoot / "Scripts";
     }
     InitializeCommon(false);
     if (bInitialized)

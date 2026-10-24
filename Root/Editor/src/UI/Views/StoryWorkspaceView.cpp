@@ -1,3 +1,4 @@
+#include "UI/Presentation/LocalizedEditorUi.h"
 #include "UI/Views/StoryWorkspaceView.h"
 #include "UI/Views/StoryGraphicsScene.h"
 #include "UI/Views/StudioActionMenu.h"
@@ -87,11 +88,11 @@ class StoryCanvas final : public QGraphicsView
         Controls->setContentsMargins(0, 0, 0, 0);
         Controls->setSpacing(1);
         auto* ZoomIn = new QPushButton(QStringLiteral("+"), Navigation);
-        ZoomIn->setToolTip(tr("Приблизить"));
+        BindEditorProperty(ZoomIn, "toolTip", QString::fromUtf8("Приблизить"));
         auto* ZoomOut = new QPushButton(QString::fromUtf8("−"), Navigation);
-        ZoomOut->setToolTip(tr("Отдалить"));
+        BindEditorProperty(ZoomOut, "toolTip", QString::fromUtf8("Отдалить"));
         auto* Fit = new QPushButton(MakeStudioIcon(StudioIcon::Fit), {}, Navigation);
-        Fit->setToolTip(tr("Вся история"));
+        BindEditorProperty(Fit, "toolTip", QString::fromUtf8("Вся история"));
         for (auto* Button : {ZoomIn, ZoomOut, Fit})
         {
             Button->setFixedSize(32, 32);
@@ -107,9 +108,9 @@ class StoryCanvas final : public QGraphicsView
         FocusControls->setContentsMargins(4, 4, 4, 4);
         FocusControls->setSpacing(4);
         auto* Selected = new QPushButton(MakeStudioIcon(StudioIcon::Fit), {}, FocusNavigation);
-        Selected->setToolTip(tr("К реплике"));
+        BindEditorProperty(Selected, "toolTip", QString::fromUtf8("К реплике"));
         auto* Overview = new QPushButton(MakeStudioIcon(StudioIcon::Expand), {}, FocusNavigation);
-        Overview->setToolTip(tr("Вся история"));
+        BindEditorProperty(Overview, "toolTip", QString::fromUtf8("Вся история"));
         for (auto* Button : {Selected, Overview}) { Button->setFixedSize(32, 32); FocusControls->addWidget(Button); }
         connect(Selected, &QPushButton::clicked, this, [this]() { FocusSelection(); });
         connect(Overview, &QPushButton::clicked, this, [this]() { FitGraph(); });
@@ -456,13 +457,13 @@ StoryWorkspaceView::StoryWorkspaceView(QWidget* Parent) : QWidget(Parent)
     };
     UndoButton = MakeTool({}, "StoryUndo");
     UndoButton->setIcon(MakeFrontendIcon("Undo2"));
-    UndoButton->setToolTip(tr("Отменить (Ctrl+Z)"));
+    BindEditorProperty(UndoButton, "toolTip", QString::fromUtf8("Отменить (Ctrl+Z)"));
     RedoButton = MakeTool({}, "StoryRedo");
     RedoButton->setIcon(MakeFrontendIcon("Redo2"));
-    RedoButton->setToolTip(tr("Повторить (Ctrl+Shift+Z)"));
+    BindEditorProperty(RedoButton, "toolTip", QString::fromUtf8("Повторить (Ctrl+Shift+Z)"));
     OpenButton = MakeTool(tr("Открыть"), "StoryOpen");
     SaveButton = MakeTool(tr("Сохранить"), "StorySave");
-    SaveButton->setToolTip(tr("Сохранить историю (Ctrl+S)"));
+    BindEditorProperty(SaveButton, "toolTip", QString::fromUtf8("Сохранить историю (Ctrl+S)"));
     AddButton = MakeTool(tr("+ Нода"), "StoryAddNode");
     connect(AddButton, &QPushButton::clicked, this, [this]()
     {
@@ -531,23 +532,23 @@ StoryWorkspaceView::StoryWorkspaceView(QWidget* Parent) : QWidget(Parent)
     Sidebar->setSizeConstraint(QLayout::SetMinimumSize);
     Sidebar->setContentsMargins(13, 8, 15, 12);
     Sidebar->setSpacing(16);
-    auto* Heading = new QLabel(tr("Мой Blueprint"), Variables);
+    auto* Heading = BindEditorCaption(new QLabel(tr("Мой Blueprint"), Variables), QString::fromUtf8("Мой Blueprint"));
     Heading->setObjectName("BlueprintHeading");
     Sidebar->addWidget(Heading);
-    auto* VariablesLabel = new QLabel(tr("Переменные"), Variables);
+    auto* VariablesLabel = BindEditorCaption(new QLabel(tr("Переменные"), Variables), QString::fromUtf8("Переменные"));
     VariablesLabel->setObjectName("BlueprintVariablesTitle");
     Sidebar->addWidget(VariablesLabel);
     auto* Search = new QLineEdit(Variables);
-    Search->setPlaceholderText(tr("Поиск переменных…"));
+    BindEditorProperty(Search, "placeholderText", QString::fromUtf8("Поиск переменных…"));
     Search->setReadOnly(true);
     Search->setFixedHeight(42);
     Sidebar->addWidget(Search);
-    auto* Note = new QLabel(tr("В этой истории пока нет переменных."), Variables);
+    auto* Note = BindEditorCaption(new QLabel(tr("В этой истории пока нет переменных."), Variables), QString::fromUtf8("В этой истории пока нет переменных."));
     Note->setWordWrap(true);
     Note->setObjectName("MutedLabel");
     Sidebar->addWidget(Note);
     Sidebar->addStretch();
-    auto* Hint = new QLabel(tr("Колесо — прокрутка\nCtrl+колесо — масштаб"), Variables);
+    auto* Hint = BindEditorCaption(new QLabel(tr("Колесо — прокрутка\nCtrl+колесо — масштаб"), Variables), QString::fromUtf8("Колесо — прокрутка\nCtrl+колесо — масштаб"));
     Hint->setObjectName("MutedLabel");
     Hint->setProperty("uiRole", "graphHint");
     Sidebar->addWidget(Hint);

@@ -1,3 +1,4 @@
+#include "UI/Presentation/LocalizedEditorUi.h"
 #include "UI/Views/StudioControls.h"
 #include "UI/Views/StoryEventInspectorView.h"
 #include "UI/Views/StoryActionFieldsView.h"
@@ -230,8 +231,8 @@ void StoryEventInspectorView::Rebuild()
             Picker->setMinimumContentsLength(4);
             Picker->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
         }
-        Form->addRow(tr("Момент запуска"), Phase);
-        Form->addRow(tr("Продолжение"), Join);
+        Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Момент запуска")), Phase);
+        Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Продолжение")), Join);
         connect(Phase, &QComboBox::currentIndexChanged, this, [this, Phase, Join]() {
             Commit();
             bPending = true;
@@ -248,7 +249,7 @@ void StoryEventInspectorView::Rebuild()
                 PlacementChanged(Phase->currentIndex(), Join->currentIndex());
             }
         });
-        auto* Reset = new QPushButton(tr("Сбросить изменения здесь"), Fields);
+        auto* Reset = BindEditorCaption(new QPushButton(tr("Сбросить изменения здесь"), Fields), QString::fromUtf8("Сбросить изменения здесь"));
         Reset->setObjectName("StoryEventReset");
         Reset->setEnabled(!Binding.Overrides.isEmpty());
         Form->addRow(Reset);
@@ -329,7 +330,7 @@ void StoryEventInspectorView::Rebuild()
         Form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
         Name = new QLineEdit(Source.Name, Primary);
         Name->setObjectName("StoryEventName");
-        Form->addRow(tr("Название"), Name);
+        Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Название")), Name);
         connect(Name, &QLineEdit::editingFinished, this, &StoryEventInspectorView::Commit);
         if (!bEditingSource)
         {
@@ -421,7 +422,7 @@ void StoryEventInspectorView::Rebuild()
                 });
                 Stack->addLayout(ActionRow);
             }
-            auto* Add = new QPushButton(tr("+ Добавить действие"), Card);
+            auto* Add = BindEditorCaption(new QPushButton(tr("+ Добавить действие"), Card), QString::fromUtf8("+ Добавить действие"));
             Add->setObjectName("StoryEventAddAction");
             Stack->addWidget(Add);
             connect(Add, &QPushButton::clicked, this, [this, GroupIndex]() {
@@ -437,7 +438,7 @@ void StoryEventInspectorView::Rebuild()
             });
             GroupsLayout->addWidget(Card);
         }
-        auto* AddGroup = new QPushButton(tr("+ Следующий шаг"), Actions);
+        auto* AddGroup = BindEditorCaption(new QPushButton(tr("+ Следующий шаг"), Actions), QString::fromUtf8("+ Следующий шаг"));
         AddGroup->setObjectName("StoryEventAddGroup");
         GroupsLayout->addWidget(AddGroup);
         connect(AddGroup, &QPushButton::clicked, this, [this]() {
@@ -465,10 +466,10 @@ void StoryEventInspectorView::Rebuild()
         auto* FooterLayout = new QVBoxLayout(Footer);
         FooterLayout->setContentsMargins(StoryEventStyle::FieldsMargins());
         FooterLayout->setSpacing(StoryEventStyle::HeadingGap);
-        auto* Export = new QPushButton(tr("Экспорт события…"), Footer);
+        auto* Export = BindEditorCaption(new QPushButton(tr("Экспорт события…"), Footer), QString::fromUtf8("Экспорт события…"));
         FooterLayout->addWidget(Export);
         Export->setObjectName("StoryEventExport");
-        auto* Import = new QPushButton(tr("Импорт события…"), Footer);
+        auto* Import = BindEditorCaption(new QPushButton(tr("Импорт события…"), Footer), QString::fromUtf8("Импорт события…"));
         FooterLayout->addWidget(Import);
         Import->setObjectName("StoryEventImport");
         connect(Export, &QPushButton::clicked, this, [this]() {
@@ -485,7 +486,7 @@ void StoryEventInspectorView::Rebuild()
                 ImportRequested();
             }
         });
-        auto* Remove = new QPushButton(tr("Убрать из реплики"), Footer);
+        auto* Remove = BindEditorCaption(new QPushButton(tr("Убрать из реплики"), Footer), QString::fromUtf8("Убрать из реплики"));
         Remove->setObjectName("StoryEventRemove");
         FooterLayout->addWidget(Remove);
         connect(Remove, &QPushButton::clicked, this, [this]() {

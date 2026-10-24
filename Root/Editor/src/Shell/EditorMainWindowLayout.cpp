@@ -1,3 +1,4 @@
+#include "UI/Presentation/LocalizedEditorUi.h"
 #include "UI/Adapters/AssetThumbnails.h"
 #include "UI/Views/StudioControls.h"
 #include "UI/Views/AudioEnvironmentView.h"
@@ -118,17 +119,17 @@
 
 void EditorMainWindow::BuildMenus()
 {
-    QMenu* FileMenu = menuBar()->addMenu(QString::fromUtf8("\xD0\xA4\xD0\xB0\xD0\xB9\xD0\xBB"));
-    FileMenu->addAction(QString::fromUtf8("\xD0\x9D\xD0\xBE\xD0\xB2\xD1\x8B\xD0\xB9 \xD0\xBF\xD1\x80\xD0\xBE\xD0\xB5\xD0\xBA\xD1\x82..."), this, &EditorMainWindow::OnNewProject);
-    FileMenu->addAction(QString::fromUtf8("\xD0\x9E\xD1\x82\xD0\xBA\xD1\x80\xD1\x8B\xD1\x82\xD1\x8C..."), this, &EditorMainWindow::OnOpenProject);
-    FileMenu->addAction(QString::fromUtf8("\xD0\xA1\xD0\xBE\xD1\x85\xD1\x80\xD0\xB0\xD0\xBD\xD0\xB8\xD1\x82\xD1\x8C \xD1\x81\xD1\x86\xD0\xB5\xD0\xBD\xD1\x83"), this, &EditorMainWindow::OnSaveScene);
-    FileMenu->addAction(tr("Сохранить"), this, &EditorMainWindow::SaveActiveDocument, QKeySequence::Save);
-    FileMenu->addAction(tr("Сохранить историю"), this, [this]() { SaveStory(); });
-    FileMenu->addAction(tr("Экспорт игры в exe..."), this, &EditorMainWindow::OnExportGame);
+    QMenu* FileMenu = BindEditorCaption(menuBar()->addMenu(tr("Файл")), QString::fromUtf8("Файл"));
+    BindEditorCaption(FileMenu->addAction(tr("Новый проект..."), this, &EditorMainWindow::OnNewProject), QString::fromUtf8("Новый проект..."));
+    BindEditorCaption(FileMenu->addAction(tr("Открыть..."), this, &EditorMainWindow::OnOpenProject), QString::fromUtf8("Открыть..."));
+    BindEditorCaption(FileMenu->addAction(tr("Сохранить сцену"), this, &EditorMainWindow::OnSaveScene), QString::fromUtf8("Сохранить сцену"));
+    BindEditorCaption(FileMenu->addAction(tr("Сохранить"), this, &EditorMainWindow::SaveActiveDocument, QKeySequence::Save), QString::fromUtf8("Сохранить"));
+    BindEditorCaption(FileMenu->addAction(tr("Сохранить историю"), this, [this]() { SaveStory(); }), QString::fromUtf8("Сохранить историю"));
+    BindEditorCaption(FileMenu->addAction(tr("Экспорт игры в exe..."), this, &EditorMainWindow::OnExportGame), QString::fromUtf8("Экспорт игры в exe..."));
     FileMenu->addSeparator();
-    FileMenu->addAction(QString::fromUtf8("\xD0\x92\xD1\x8B\xD1\x85\xD0\xBE\xD0\xB4"), this, &QWidget::close);
+    BindEditorCaption(FileMenu->addAction(tr("Выход"), this, &QWidget::close), QString::fromUtf8("Выход"));
 
-    QMenu* EditMenu = menuBar()->addMenu(QString::fromUtf8("\xD0\x9F\xD1\x80\xD0\xB0\xD0\xB2\xD0\xBA\xD0\xB0"));
+    QMenu* EditMenu = BindEditorCaption(menuBar()->addMenu(tr("Правка")), QString::fromUtf8("Правка"));
     EditMenu->addAction(QString::fromUtf8("Undo"), this, &EditorMainWindow::OnUndo, QKeySequence::Undo);
     EditMenu->addAction(QString::fromUtf8("Redo"), this, &EditorMainWindow::OnRedo, QKeySequence::Redo);
     EditMenu->addSeparator();
@@ -138,17 +139,17 @@ void EditorMainWindow::BuildMenus()
     EditMenu->addAction(QString::fromUtf8("Create Object"), this, &EditorMainWindow::OnCreateEmptyObject);
     EditMenu->addAction(QString::fromUtf8("Delete Object"), this, &EditorMainWindow::OnDeleteSelectedObject, QKeySequence::Delete);
     EditMenu->addSeparator();
-    EditMenu->addAction(tr("Настройки проекта…"), this, [this]() { ShowSettings(0); });
-    EditMenu->addAction(tr("Настройки редактора…"), this, [this]() { ShowSettings(1); });
-    EditMenu->addAction(tr("MCP Server и Toolset…"), this, [this]() { ShowSettings(2); });
-    EditMenu->addAction(tr("Консоль"), this, [this]() { Docking->Open(*ConsolePage); }, QKeySequence("Ctrl+`"));
+    BindEditorCaption(EditMenu->addAction(tr("Настройки проекта…"), this, [this]() { ShowSettings(0); }), QString::fromUtf8("Настройки проекта…"));
+    BindEditorCaption(EditMenu->addAction(tr("Настройки редактора…"), this, [this]() { ShowSettings(1); }), QString::fromUtf8("Настройки редактора…"));
+    BindEditorCaption(EditMenu->addAction(tr("MCP Server и Toolset…"), this, [this]() { ShowSettings(2); }), QString::fromUtf8("MCP Server и Toolset…"));
+    BindEditorCaption(EditMenu->addAction(tr("Консоль"), this, [this]() { Docking->Open(*ConsolePage); }, QKeySequence("Ctrl+`")), QString::fromUtf8("Консоль"));
 
-    QMenu* CreateMenu = menuBar()->addMenu(QString::fromUtf8("\xD0\xA1\xD0\xBE\xD0\xB7\xD0\xB4\xD0\xB0\xD1\x82\xD1\x8C"));
-    QMenu* CreateObjectsMenu = CreateMenu->addMenu(QString::fromUtf8("\xD0\x9E\xD0\xB1\xD1\x8A\xD0\xB5\xD0\xBA\xD1\x82\xD1\x8B"));
-    QMenu* CreateComponentsMenu = CreateMenu->addMenu(QString::fromUtf8("\xD0\x9A\xD0\xBE\xD0\xBC\xD0\xBF\xD0\xBE\xD0\xBD\xD0\xB5\xD0\xBD\xD1\x82\xD1\x8B"));
+    QMenu* CreateMenu = BindEditorCaption(menuBar()->addMenu(tr("Создать")), QString::fromUtf8("Создать"));
+    QMenu* CreateObjectsMenu = BindEditorCaption(CreateMenu->addMenu(tr("Объекты")), QString::fromUtf8("Объекты"));
+    QMenu* CreateComponentsMenu = BindEditorCaption(CreateMenu->addMenu(tr("Компоненты")), QString::fromUtf8("Компоненты"));
     PopulateCreateMenus(CreateObjectsMenu, CreateComponentsMenu);
-    CreateMenu->addAction(tr("Историю…"), this, [this]() { CreateStoryFromDialog(); });
-    QMenu* NavigationMenu = CreateMenu->addMenu(tr("Навигация"));
+    BindEditorCaption(CreateMenu->addAction(tr("Историю…"), this, [this]() { CreateStoryFromDialog(); }), QString::fromUtf8("Историю…"));
+    QMenu* NavigationMenu = BindEditorCaption(CreateMenu->addMenu(tr("Навигация")), QString::fromUtf8("Навигация"));
     QAction* BuildNavigation = NavigationMenu->addAction(QString::fromUtf8("Перестроить навигацию"), this, [this]()
     {
         Scene* World = GetEditScene();
@@ -181,18 +182,18 @@ void EditorMainWindow::BuildMenus()
         }
     });
     CreateMenu->addSeparator();
-    CreateMenu->addAction(QString::fromUtf8("\xD0\x94\xD0\xB5\xD0\xB9\xD1\x81\xD1\x82\xD0\xB2\xD0\xB8\xD1\x8F \xD0\xB8 \xD1\x81\xD0\xBE\xD0\xB1\xD1\x8B\xD1\x82\xD0\xB8\xD1\x8F"), this, &EditorMainWindow::OnFocusActionsAndEvents);
+    BindEditorCaption(CreateMenu->addAction(tr("Действия и события"), this, &EditorMainWindow::OnFocusActionsAndEvents), QString::fromUtf8("Действия и события"));
 
-    QMenu* WindowMenu = menuBar()->addMenu(QString::fromUtf8("\xD0\x9E\xD0\xBA\xD0\xBD\xD0\xBE"));
+    QMenu* WindowMenu = BindEditorCaption(menuBar()->addMenu(tr("Окно")), QString::fromUtf8("Окно"));
     WindowMenu->setObjectName("WindowsMenu");
     WindowMenu->setTitle(tr("Окна"));
-    WindowMenu->addAction(tr("Ввод"), this, [this]()
+    BindEditorCaption(WindowMenu->addAction(tr("Ввод"), this, [this]()
     {
         auto* Workspace = new InputWorkspaceView(BoundEngine, this);
         Workspace->setAttribute(Qt::WA_DeleteOnClose);
         Workspace->show();
-    });
-    auto* RestoreLayout = WindowMenu->addAction(tr("Восстановить раскладку"), this, [this]()
+    }), QString::fromUtf8("Ввод"));
+    auto* RestoreLayout = BindEditorCaption(WindowMenu->addAction(tr("Восстановить раскладку"), this, [this]()
     {
         if (LayoutCombo != nullptr)
         {
@@ -213,7 +214,7 @@ void EditorMainWindow::BuildMenus()
             EditorUi::WorkspaceLayoutAdapter::Reset(*WorkspaceSplitter, *CenterSplitter, height());
             Docking->Save();
         }
-    });
+    }), QString::fromUtf8("Восстановить раскладку"));
     RestoreLayout->setObjectName("RestoreWorkspaceLayout");
 
     ProjectTitleLabel = new QLabel(this);
@@ -342,7 +343,7 @@ void EditorMainWindow::BuildUi()
     auto* TabsLayout = new QHBoxLayout(ViewportTabs);
     TabsLayout->setContentsMargins(8, 0, 8, 0);
     TabsLayout->setSpacing(22);
-    LocationTab = new QPushButton(tr("Локация"), ViewportTabs);
+    LocationTab = BindEditorCaption(new QPushButton(tr("Локация"), ViewportTabs), QString::fromUtf8("Локация"));
     LocationTab->setObjectName("ViewportLocationTab");
     LocationTab->setProperty("uiRole", "viewportTab");
     LocationTab->setCheckable(true);
@@ -350,19 +351,19 @@ void EditorMainWindow::BuildUi()
     LocationTab->setAutoExclusive(true);
     connect(LocationTab, &QPushButton::clicked, this, [this]() { PlayButton->setChecked(false); });
     TabsLayout->addWidget(LocationTab);
-    GameTab = new QPushButton(tr("Игра"), ViewportTabs);
+    GameTab = BindEditorCaption(new QPushButton(tr("Игра"), ViewportTabs), QString::fromUtf8("Игра"));
     GameTab->setObjectName("ViewportGameTab");
     GameTab->setProperty("uiRole", "viewportTab");
     GameTab->setCheckable(true);
     GameTab->setAutoExclusive(true);
-    GameTab->setToolTip(tr("Запустить игровую сцену"));
+    BindEditorProperty(GameTab, "toolTip", QString::fromUtf8("Запустить игровую сцену"));
     connect(GameTab, &QPushButton::clicked, this, [this]() { PlayButton->setChecked(true); });
     TabsLayout->addWidget(GameTab);
     TabsLayout->addStretch();
     auto* MaximizeViewport = new QPushButton(EditorUi::MakeStudioIcon(EditorUi::StudioIcon::Expand), {}, ViewportTabs);
     MaximizeViewport->setProperty("uiRole", "chromeButton");
     MaximizeViewport->setProperty("workspaceExpand", true);
-    MaximizeViewport->setToolTip(tr("Развернуть / восстановить локацию"));
+    BindEditorProperty(MaximizeViewport, "toolTip", QString::fromUtf8("Развернуть / восстановить локацию"));
     MaximizeViewport->setCheckable(true);
     connect(MaximizeViewport, &QPushButton::toggled, this, [this](bool bMaximized)
     {
@@ -383,7 +384,7 @@ void EditorMainWindow::BuildUi()
     auto* ViewportHeaderLayout = new QHBoxLayout(ViewportHeader);
     ViewportHeaderLayout->setContentsMargins(4, 3, 8, 3);
     ViewportHeaderLayout->setSpacing(2);
-    auto* VisualizationLabel = new QLabel(tr("Вид:"), ViewportHeader);
+    auto* VisualizationLabel = BindEditorCaption(new QLabel(tr("Вид:"), ViewportHeader), QString::fromUtf8("Вид:"));
     ViewportHeaderLayout->addWidget(VisualizationLabel);
     ViewportVisualization = new QComboBox(ViewportHeader);
     ViewportVisualization->setObjectName("ViewportVisualization");
@@ -392,7 +393,13 @@ void EditorMainWindow::BuildUi()
     ViewportVisualization->setAccessibleName(tr("Визуализация буферов и материалов"));
     for (const auto& Descriptor : RenderVisualizations)
     {
-        ViewportVisualization->addItem(QString::fromUtf8(Descriptor.Label), static_cast<int>(Descriptor.Mode));
+        const int ItemIndex = ViewportVisualization->count();
+        const QString Caption = QString::fromUtf8(Descriptor.Label);
+        ViewportVisualization->addItem(EditorLocalization::Get().Caption(Caption), static_cast<int>(Descriptor.Mode));
+        EditorLocalization::Get().Bind(ViewportVisualization, [this, ItemIndex, Caption]()
+        {
+            ViewportVisualization->setItemText(ItemIndex, EditorLocalization::Get().Caption(Caption));
+        });
         ViewportVisualization->setItemData(ViewportVisualization->count() - 1, QString::fromUtf8(Descriptor.Description), Qt::ToolTipRole);
     }
     ViewportHeaderLayout->addWidget(ViewportVisualization);
@@ -401,7 +408,7 @@ void EditorMainWindow::BuildUi()
     ViewportDepthRange->setRange(0.01, 100000.0);
     ViewportDepthRange->setValue(RenderConfiguration.VisualizationDepthRange);
     ViewportDepthRange->setSuffix(tr(" м"));
-    ViewportDepthRange->setToolTip(tr("Дальность, соответствующая белому цвету в режиме глубины"));
+    BindEditorProperty(ViewportDepthRange, "toolTip", QString::fromUtf8("Дальность, соответствующая белому цвету в режиме глубины"));
     ViewportDepthRange->setKeyboardTracking(false);
     ViewportDepthRange->setMaximumWidth(100);
     ViewportDepthRange->hide();
@@ -483,7 +490,7 @@ void EditorMainWindow::BuildUi()
     Help->setIcon(EditorUi::MakeStudioIcon(EditorUi::StudioIcon::Help));
     Help->setIconSize(QSize(15, 15));
     Help->setFixedSize(26, 26);
-    Help->setToolTip(tr("Управление сценой"));
+    BindEditorProperty(Help, "toolTip", QString::fromUtf8("Управление сценой"));
     Help->setAccessibleName(Help->toolTip());
     Help->setPopupMode(QToolButton::InstantPopup);
     auto* HelpMenu = new QMenu(Help);
@@ -510,19 +517,19 @@ void EditorMainWindow::BuildUi()
     CameraSpeedSpin->setValue(PrimaryViewport->GetCameraMoveSpeed());
     CameraSpeedSpin->setSuffix(tr(" u/s"));
     CameraSpeedSpin->setFixedWidth(88);
-    CameraSpeedSpin->setToolTip(tr("Editor camera fly speed. Shift multiplies, Ctrl divides, RMB+wheel adjusts."));
+    BindEditorProperty(CameraSpeedSpin, "toolTip", QString::fromUtf8("Editor camera fly speed. Shift multiplies, Ctrl divides, RMB+wheel adjusts."));
     auto* CameraOptions = new QToolButton(ViewportHeader);
     CameraOptions->setProperty("uiRole", "viewportUtility");
     CameraOptions->setFixedSize(26, 26);
     CameraOptions->setIconSize(QSize(14, 14));
     CameraOptions->setIcon(EditorUi::MakeStudioIcon(EditorUi::StudioIcon::Camera));
-    CameraOptions->setToolTip(tr("Настройки камеры и отображения"));
+    BindEditorProperty(CameraOptions, "toolTip", QString::fromUtf8("Настройки камеры и отображения"));
     CameraOptions->setPopupMode(QToolButton::InstantPopup);
     auto* Options = new QMenu(CameraOptions);
     auto* SpeedAction = new QWidgetAction(Options);
     auto* CameraSettings = new QWidget(Options);
     auto* CameraLayout = new QHBoxLayout(CameraSettings);
-    CameraLayout->addWidget(new QLabel(tr("Скорость камеры"), CameraSettings));
+    CameraLayout->addWidget(BindEditorCaption(new QLabel(tr("Скорость камеры"), CameraSettings), QString::fromUtf8("Скорость камеры")));
     CameraLayout->addWidget(CameraSpeedSpin);
     SpeedAction->setDefaultWidget(CameraSettings);
     Options->addAction(SpeedAction);
@@ -565,7 +572,7 @@ void EditorMainWindow::BuildUi()
     InspectorPages = new QStackedWidget(InspectorTabs);
     EmptyInspectorPage = new QWidget(InspectorPages);
     auto* EmptyLayout = new QVBoxLayout(EmptyInspectorPage);
-    auto* EmptyHint = new QLabel(tr("Выберите объект или блок истории"), EmptyInspectorPage);
+    auto* EmptyHint = BindEditorCaption(new QLabel(tr("Выберите объект или блок истории"), EmptyInspectorPage), QString::fromUtf8("Выберите объект или блок истории"));
     EmptyHint->setObjectName("MutedLabel");
     EmptyHint->setWordWrap(true);
     EmptyLayout->addWidget(EmptyHint);
@@ -581,7 +588,7 @@ void EditorMainWindow::BuildUi()
     auto* CameraPreviewLayout = new QVBoxLayout(CameraPreviewPanel);
     CameraPreviewLayout->setContentsMargins(12, 10, 12, 10);
     CameraPreviewLayout->setSpacing(7);
-    auto* CameraPreviewTitle = new QLabel(tr("Вид камеры"), CameraPreviewPanel);
+    auto* CameraPreviewTitle = BindEditorCaption(new QLabel(tr("Вид камеры"), CameraPreviewPanel), QString::fromUtf8("Вид камеры"));
     CameraPreviewTitle->setProperty("uiRole", "objectSectionTitle");
     CameraPreviewLayout->addWidget(CameraPreviewTitle);
     CameraPreviewViewport = new RenderViewportWidget(CameraPreviewPanel);
@@ -591,7 +598,7 @@ void EditorMainWindow::BuildUi()
     CameraPreviewViewport->setFixedHeight(158);
     CameraPreviewViewport->setFocusPolicy(Qt::NoFocus);
     CameraPreviewLayout->addWidget(CameraPreviewViewport);
-    CameraPreviewUnavailableLabel = new QLabel(tr("Предпросмотр требует D3D12 или Vulkan"), CameraPreviewPanel);
+    CameraPreviewUnavailableLabel = BindEditorCaption(new QLabel(tr("Предпросмотр требует D3D12 или Vulkan"), CameraPreviewPanel), QString::fromUtf8("Предпросмотр требует D3D12 или Vulkan"));
     CameraPreviewUnavailableLabel->setWordWrap(true);
     CameraPreviewUnavailableLabel->hide();
     CameraPreviewLayout->addWidget(CameraPreviewUnavailableLabel);
@@ -683,7 +690,7 @@ void EditorMainWindow::BuildUi()
     InspectorPages->addWidget(ObjectInspectorPage);
     StoryInspector = new EditorUi::StoryInspectorView(InspectorPages);
     InspectorPages->addWidget(StoryInspector);
-    InspectorTabs->addTab(InspectorPages, QString::fromUtf8("\xD0\x98\xD0\xBD\xD1\x81\xD0\xBF\xD0\xB5\xD0\xBA\xD1\x82\xD0\xBE\xD1\x80"));
+    InspectorTabs->addTab(InspectorPages, tr("Инспектор"));
     InitializePrefabPanel(InspectorLayout);
     InspectorLayout->addWidget(InspectorTabs);
 
@@ -703,7 +710,7 @@ void EditorMainWindow::BuildUi()
         auto* Expand = new QPushButton(EditorUi::MakeStudioIcon(EditorUi::StudioIcon::Expand), {}, Controls);
         Expand->setProperty("uiRole", "chromeButton");
         Expand->setProperty("workspaceExpand", true);
-        Expand->setToolTip(tr("Развернуть / восстановить панель"));
+        BindEditorProperty(Expand, "toolTip", QString::fromUtf8("Развернуть / восстановить панель"));
         Expand->setCheckable(true);
         ControlLayout->addWidget(Expand);
         connect(Expand, &QPushButton::toggled, this, [this, Panel](bool bExpanded)
@@ -720,7 +727,7 @@ void EditorMainWindow::BuildUi()
         });
         auto* Collapse = new QPushButton(EditorUi::MakeStudioIcon(EditorUi::StudioIcon::Panel), {}, Controls);
         Collapse->setProperty("uiRole", "chromeButton");
-        Collapse->setToolTip(tr("Закрыть текущую вкладку; вернуть через меню «Окна»"));
+        BindEditorProperty(Collapse, "toolTip", QString::fromUtf8("Закрыть текущую вкладку; вернуть через меню «Окна»"));
         ControlLayout->addWidget(Collapse);
         connect(Collapse, &QPushButton::clicked, this, [this, Tabs]()
         { if (auto* Page = Tabs->currentWidget()) { Docking->SetOpen(*Page, false); } });
@@ -734,7 +741,7 @@ void EditorMainWindow::BuildUi()
     auto* ExpandGraph = new QPushButton(EditorUi::MakeStudioIcon(EditorUi::StudioIcon::Expand), {}, DockControls);
     ExpandGraph->setProperty("uiRole", "chromeButton");
     ExpandGraph->setProperty("workspaceExpand", true);
-    ExpandGraph->setToolTip(tr("Развернуть / восстановить поток истории"));
+    BindEditorProperty(ExpandGraph, "toolTip", QString::fromUtf8("Развернуть / восстановить поток истории"));
     ExpandGraph->setCheckable(true);
     DockControlsLayout->addWidget(ExpandGraph);
     connect(ExpandGraph, &QPushButton::toggled, this, [this](bool bExpanded)
@@ -795,7 +802,7 @@ void EditorMainWindow::BuildRenderStatisticsDockPage()
     auto* Layout = new QVBoxLayout(Page);
     Layout->setContentsMargins(16, 16, 16, 16);
     Layout->setSpacing(8);
-    auto* TitleLabel = new QLabel(QString::fromUtf8("\xD0\x9D\xD0\xB0\xD1\x81\xD1\x82\xD1\x80\xD0\xBE\xD0\xB9\xD0\xBA\xD0\xB8 \xD1\x81\xD1\x82\xD0\xB0\xD1\x82\xD0\xB8\xD1\x81\xD1\x82\xD0\xB8\xD0\xBA\xD0\xB8"), Page);
+    auto* TitleLabel = new QLabel(tr("Настройки статистики"), Page);
     TitleLabel->setProperty("uiRole", "sectionTitle");
     Layout->addWidget(TitleLabel);
     RenderStatisticsLabel = new QLabel(Page);
@@ -809,7 +816,7 @@ void EditorMainWindow::BuildRenderStatisticsDockPage()
     NavigationStatisticsLabel->setWordWrap(true);
     Layout->addWidget(NavigationStatisticsLabel);
     Layout->addStretch(1);
-    DockTabs->addTab(Page, QString::fromUtf8("\xD0\x9D\xD0\xB0\xD1\x81\xD1\x82\xD1\x80\xD0\xBE\xD0\xB9\xD0\xBA\xD0\xB8 \xD1\x81\xD1\x82\xD0\xB0\xD1\x82\xD0\xB8\xD1\x81\xD1\x82\xD0\xB8\xD0\xBA\xD0\xB8"));
+    DockTabs->addTab(Page, tr("Настройки статистики"));
 }
 
 void EditorMainWindow::BuildPostprocessDockPage()
@@ -818,7 +825,7 @@ void EditorMainWindow::BuildPostprocessDockPage()
     auto* Layout = new QVBoxLayout(Page);
     Layout->setContentsMargins(16, 16, 16, 16);
     Layout->setSpacing(8);
-    auto* TitleLabel = new QLabel(QString::fromUtf8("\xD0\x9D\xD0\xB0\xD1\x81\xD1\x82\xD1\x80\xD0\xBE\xD0\xB9\xD0\xBA\xD0\xB8 \xD0\xBF\xD0\xBE\xD1\x81\xD1\x82\xD0\xBE\xD0\xB1\xD1\x80\xD0\xB0\xD0\xB1\xD0\xBE\xD1\x82\xD0\xBA\xD0\xB8"), Page);
+    auto* TitleLabel = new QLabel(tr("Настройки постобработки"), Page);
     TitleLabel->setProperty("uiRole", "sectionTitle");
     Layout->addWidget(TitleLabel);
 
@@ -831,7 +838,7 @@ void EditorMainWindow::BuildPostprocessDockPage()
     Exposure->setSingleStep(0.1);
     Exposure->setDecimals(2);
     Exposure->setValue(RenderConfiguration.Exposure);
-    Form->addRow(tr("Exposure"), Exposure);
+    Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Exposure")), Exposure);
     connect(Exposure, qOverload<double>(&QDoubleSpinBox::valueChanged), this, [this](double Value)
     {
         RenderConfiguration.Exposure = static_cast<float>(Value);
@@ -842,7 +849,7 @@ void EditorMainWindow::BuildPostprocessDockPage()
     Environment->setSingleStep(0.1);
     Environment->setDecimals(2);
     Environment->setValue(RenderConfiguration.EnvironmentIntensity);
-    Form->addRow(tr("IBL"), Environment);
+    Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("IBL")), Environment);
     connect(Environment, qOverload<double>(&QDoubleSpinBox::valueChanged), this, [this](double Value)
     {
         RenderConfiguration.EnvironmentIntensity = static_cast<float>(Value);
@@ -853,7 +860,7 @@ void EditorMainWindow::BuildPostprocessDockPage()
     Bloom->setSingleStep(0.01);
     Bloom->setDecimals(2);
     Bloom->setValue(RenderConfiguration.BloomIntensity);
-    Form->addRow(tr("Bloom"), Bloom);
+    Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Bloom")), Bloom);
     connect(Bloom, qOverload<double>(&QDoubleSpinBox::valueChanged), this, [this](double Value)
     {
         RenderConfiguration.BloomIntensity = static_cast<float>(Value);
@@ -876,7 +883,7 @@ void EditorMainWindow::BuildPostprocessDockPage()
     });
     Layout->addLayout(Form);
     Layout->addStretch(1);
-    DockTabs->addTab(Page, QString::fromUtf8("\xD0\x9D\xD0\xB0\xD1\x81\xD1\x82\xD1\x80\xD0\xBE\xD0\xB9\xD0\xBA\xD0\xB8 \xD0\xBF\xD0\xBE\xD1\x81\xD1\x82\xD0\xBE\xD0\xB1\xD1\x80\xD0\xB0\xD0\xB1\xD0\xBE\xD1\x82\xD0\xBA\xD0\xB8"));
+    DockTabs->addTab(Page, tr("Настройки постобработки"));
 }
 
 void EditorMainWindow::PopulateDockPages()
@@ -980,7 +987,7 @@ void EditorMainWindow::BuildWindowsMenuView()
     SearchLayout->addWidget(SearchIcon);
     auto* Search = new QLineEdit(SearchBox);
     Search->setObjectName("WindowsMenuSearch");
-    Search->setPlaceholderText(tr("Найти окно…"));
+    BindEditorProperty(Search, "placeholderText", QString::fromUtf8("Найти окно…"));
     Search->setAccessibleName(tr("Найти окно"));
     SearchLayout->addWidget(Search, 1);
     Layout->addWidget(SearchBox);
@@ -1043,7 +1050,7 @@ void EditorMainWindow::BuildWindowsMenuView()
         Toggle->setIconSize(QSize(13, 13));
         if (!Visibility && Id != "characters")
         {
-            Toggle->setToolTip(tr("Это окно пока недоступно в нативном редакторе"));
+            BindEditorProperty(Toggle, "toolTip", QString::fromUtf8("Это окно пока недоступно в нативном редакторе"));
         }
         RowLayout->addWidget(Toggle, 1);
         auto* Reveal = new QPushButton(Row);
@@ -1112,7 +1119,7 @@ void EditorMainWindow::BuildWindowsMenuView()
     auto* FooterLayout = new QVBoxLayout(Footer);
     FooterLayout->setContentsMargins(8, 6, 8, 2);
     FooterLayout->setSpacing(3);
-    FooterLayout->addWidget(new QLabel(tr("Рабочая область"), Footer));
+    FooterLayout->addWidget(BindEditorCaption(new QLabel(tr("Рабочая область"), Footer), QString::fromUtf8("Рабочая область")));
     auto* Position = new QComboBox(Footer);
     Position->setObjectName("WindowsMenuPosition");
     Position->setAccessibleName(tr("Расположение рабочей области"));
@@ -1125,7 +1132,7 @@ void EditorMainWindow::BuildWindowsMenuView()
     FooterLayout->addWidget(Position);
     connect(Position, qOverload<int>(&QComboBox::currentIndexChanged), this, [this, Position](int Index)
     { Docking->SetWorkspacePosition(Position->itemData(Index).toString()); });
-    auto* Hint = new QLabel(tr("Перетаскивайте вкладки между областями. Кнопка рядом с вкладками открепляет окно. Раскладка сохраняется автоматически."), Footer);
+    auto* Hint = BindEditorCaption(new QLabel(tr("Перетаскивайте вкладки между областями. Кнопка рядом с вкладками открепляет окно. Раскладка сохраняется автоматически."), Footer), QString::fromUtf8("Перетаскивайте вкладки между областями. Кнопка рядом с вкладками открепляет окно. Раскладка сохраняется автоматически."));
     Hint->setObjectName("WindowsMenuHint");
     Hint->setWordWrap(true);
     FooterLayout->addWidget(Hint);

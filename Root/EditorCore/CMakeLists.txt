@@ -1,9 +1,12 @@
 set(EDITOR_CORE_SRC
+    src/Localization/EditorLocalization.cpp
+    resources/editor_localization.qrc
     src/Actions/SharedEditorRegistrars.cpp
     src/Assets/AssetPreview.cpp
     src/Assets/AssetCreationFactory.cpp
     src/Assets/BuiltinAssetCreationFactories.cpp
     src/Commands/StaticMeshCommands.cpp
+    src/Documents/PythonScriptDocument.cpp
     src/Documents/StaticMeshDocument.cpp
     src/Project/GameExporter.cpp
     src/Documents/CharacterDocument.cpp
@@ -51,6 +54,7 @@ set(EDITOR_CORE_HDR
 )
 
 add_library(EditorCore STATIC ${EDITOR_CORE_SRC} ${EDITOR_CORE_HDR})
+set_target_properties(EditorCore PROPERTIES AUTORCC ON)
 add_library(Sakura::EditorCore ALIAS EditorCore)
 
 target_include_directories(EditorCore PUBLIC

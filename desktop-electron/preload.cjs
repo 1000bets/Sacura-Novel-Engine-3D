@@ -120,6 +120,7 @@ contextBridge.exposeInMainWorld('sacuraDesktop', Object.freeze({
     WorkspaceDocuments.set(Name, window.open('', Name));
     return true;
   },
+  focusWorkspaceWindow: Name => ipcRenderer.invoke('desktop:workspace-focus-window', Name),
   closeWorkspaceWindow: Name => {
     WorkspaceDocuments.delete(Name);
     return ipcRenderer.invoke('desktop:workspace-close-window', Name);
@@ -158,6 +159,12 @@ contextBridge.exposeInMainWorld('sacuraDesktop', Object.freeze({
     };
     ipcRenderer.on('native-document-event', Listener);
     return () => ipcRenderer.removeListener('native-document-event', Listener);
+  },
+  editorLocalization: Values => ipcRenderer.invoke('desktop:editor-localization', Values),
+  onEditorLocalization: Callback => {
+    const Listener = (_, Values) => Callback(Values);
+    ipcRenderer.on('editor-localization-changed', Listener);
+    return () => ipcRenderer.removeListener('editor-localization-changed', Listener);
   },
   bridge: Object.freeze({
     connect: () => ipcRenderer.invoke('desktop:bridge-connect'),

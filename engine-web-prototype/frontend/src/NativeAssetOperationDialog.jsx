@@ -1,7 +1,9 @@
+import {ActiveWorkspaceDocument} from './workspaceDocuments.js';
 import React, {useEffect, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 
 export default function NativeAssetOperationDialog({operation: Operation, submit: Submit, close: Close}) {
+  const [OwnerDocument] = useState(ActiveWorkspaceDocument);
   const [Value, SetValue] = useState(Operation.value || '');
   const [Busy, SetBusy] = useState(false);
   const [ErrorMessage, SetErrorMessage] = useState('');
@@ -36,5 +38,5 @@ export default function NativeAssetOperationDialog({operation: Operation, submit
     {!Operation.deleting && <label>Имя<input ref={Input} aria-label="Имя" required disabled={Busy} value={Value} onChange={Event => SetValue(Event.target.value)}/></label>}
     {ErrorMessage && <p role="alert">{ErrorMessage}</p>}
     <footer><button type="button" disabled={Busy} onClick={Close}>Отмена</button><button type="submit" disabled={Busy || !Operation.deleting && !Value.trim()}>{Operation.button}</button></footer>
-  </form></div>, document.body);
+  </form></div>, OwnerDocument.body);
 }

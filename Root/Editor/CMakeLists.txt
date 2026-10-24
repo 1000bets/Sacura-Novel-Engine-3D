@@ -16,6 +16,8 @@ set(EDITOR_SRC
     src/UI/Views/StaticMeshEditorWindow.cpp
     src/Shell/EditorMainWindowCharacters.cpp
     src/UI/Views/CharacterWorkspaceView.cpp
+    src/Shell/EditorMainWindowPython.cpp
+    src/UI/Views/PythonScriptEditorWindow.cpp
     src/Shell/EditorMainWindowMaterials.cpp
     src/UI/Views/MaterialEditorWindow.cpp
     src/Automation/InputTools.cpp
@@ -180,3 +182,15 @@ target_compile_definitions(Editor PUBLIC
 )
 
 target_sources(Editor PRIVATE src/Panels/MaterialBindingsDialog.cpp)
+
+if(BUILD_TESTING)
+    add_executable(SakuraEditorLocalizationTest tests/EditorLocalizationTest.cpp)
+    target_include_directories(SakuraEditorLocalizationTest PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/inc)
+    target_link_libraries(SakuraEditorLocalizationTest PRIVATE EditorCore Qt6::Widgets)
+    sakura_copy_engine_runtime_dlls(SakuraEditorLocalizationTest)
+    add_custom_command(TARGET SakuraEditorLocalizationTest POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:SakuraEditorLocalizationTest>/platforms"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Qt6::QOffscreenIntegrationPlugin>" "$<TARGET_FILE_DIR:SakuraEditorLocalizationTest>/platforms"
+    )
+    add_test(NAME Editor.Localization COMMAND SakuraEditorLocalizationTest -platform offscreen)
+endif()

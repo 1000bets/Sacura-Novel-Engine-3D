@@ -1,3 +1,4 @@
+import {t as tr, useLocale} from './i18n.jsx';
 import React, {createContext, useContext, useEffect, useState} from 'react';
 import {Icon} from './StudioParts.jsx';
 import './nativeAssets.css';
@@ -69,19 +70,26 @@ export function AssetReferenceField({assetId: AssetId, subAssetId: SubAssetId, a
     }
   }
   const Identity = {assetId: AssetId, subAssetId: SubAssetId};
-  const Open = () => Context.open?.(Identity);
+  const CanOpen = Available && typeof Context.open === 'function' &&
+    (['Scene', 'Story', 'StaticMesh', 'Material', 'MaterialInstance', 'Texture', 'PythonScript'].includes(Type) ||
+      Type === 'Model' && Asset.subassets?.some(Entry => Entry.typeId === 'StaticMesh'));
+  const Open = () => {
+    if (CanOpen) {
+      Context.open(Identity);
+    }
+  };
   const Browse = () => Context.reveal?.(Identity);
   const Clear = () => { Change?.({assetId: null, subAssetId: null}); SetMenu(false); };
   return <div className="native-asset-field" onContextMenu={Event => { Event.preventDefault(); SetMenu(true); }}>
-    <button type="button" className="native-asset-preview-button" title="Открыть ассет" disabled={!Available} onDoubleClick={Open} onClick={Browse}><AssetThumbnail assetId={AssetId} subAssetId={SubAssetId} type={Type}/></button>
+    <button type="button" className="native-asset-preview-button" title={tr("Выделить в Проводнике; двойной щелчок — открыть")} disabled={!Available} onDoubleClick={Open} onClick={Browse}><AssetThumbnail assetId={AssetId} subAssetId={SubAssetId} type={Type}/></button>
     <details className="native-asset-picker"><summary aria-label={Label} aria-disabled={Disabled}>{Caption}</summary>
-      <div className="native-asset-options"><input aria-label="Поиск ассета" value={Search} onChange={Event => SetSearch(Event.target.value)}/>
+      <div className="native-asset-options"><input aria-label={tr("Поиск ассета")} value={Search} onChange={Event => SetSearch(Event.target.value)}/>
         {Choices.filter(Entry => Entry.label.toLowerCase().includes(Search.toLowerCase())).map(Entry => <button type="button" key={Entry.assetId + (Entry.subAssetId || '')} disabled={Disabled} onClick={Event => { Change?.(Entry); Event.currentTarget.closest('details').open = false; }}><AssetThumbnail assetId={Entry.assetId} subAssetId={Entry.subAssetId} type={Entry.type}/><span>{Entry.label}</span></button>)}
       </div>
     </details>
-    <button type="button" title="Открыть ассет" aria-label="Открыть ассет" disabled={!Available} onClick={Open}><Icon name="ExternalLink" size={15}/></button>
-    <button type="button" title="Выделить в Проводнике" aria-label="Выделить в Проводнике" disabled={!Available} onClick={Browse}><Icon name="Search" size={15}/></button>
-    <button type="button" title="Очистить ссылку" aria-label="Очистить ссылку" disabled={Disabled || !AssetId} onClick={Clear}><Icon name="Trash2" size={15}/></button>
-    {Menu && <div className="native-asset-context" onMouseLeave={() => SetMenu(false)}><button type="button" disabled={!Available} onClick={() => { Open(); SetMenu(false); }}>Открыть ассет</button><button type="button" disabled={!Available} onClick={() => { Browse(); SetMenu(false); }}>Выделить в Проводнике</button><button type="button" disabled={Disabled || !AssetId} onClick={Clear}>Очистить ссылку</button><button type="button" onClick={() => SetMenu(false)}>Закрыть</button></div>}
+    <button type="button" title={tr("Открыть ассет")} aria-label={tr("Открыть ассет")} disabled={!CanOpen} onClick={Open}><Icon name="FolderOpen" size={15}/></button>
+    <button type="button" title={tr("Выделить в Проводнике")} aria-label={tr("Выделить в Проводнике")} disabled={!Available} onClick={Browse}><Icon name="Search" size={15}/></button>
+    <button type="button" title={tr("Очистить ссылку")} aria-label={tr("Очистить ссылку")} disabled={Disabled || !AssetId} onClick={Clear}><Icon name="Trash2" size={15}/></button>
+    {Menu && <div className="native-asset-context" onMouseLeave={() => SetMenu(false)}><button type="button" disabled={!CanOpen} onClick={() => { Open(); SetMenu(false); }}>{tr("Открыть ассет")}</button><button type="button" disabled={!Available} onClick={() => { Browse(); SetMenu(false); }}>{tr("Выделить в Проводнике")}</button><button type="button" disabled={Disabled || !AssetId} onClick={Clear}>{tr("Очистить ссылку")}</button><button type="button" onClick={() => SetMenu(false)}>{tr("Закрыть")}</button></div>}
   </div>;
 }

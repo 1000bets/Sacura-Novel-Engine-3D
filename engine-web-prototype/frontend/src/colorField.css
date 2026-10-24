@@ -3,7 +3,7 @@
 .color-swatch>span {position:absolute;inset:0;display:block}
 .color-swatch:disabled {cursor:default;opacity:.5}
 .color-swatch:focus-visible,.color-panel-wheel:focus-visible {outline:2px solid var(--accent);outline-offset:3px}
-.color-panel {box-sizing:border-box;width:600px;max-width:calc(100vw - 24px);max-height:calc(100vh - 24px);overflow:auto;padding:0;border:1px solid var(--border-strong);border-radius:6px;background:var(--bg-panel);color:var(--text-primary);box-shadow:var(--shadow-popup);font:inherit;font-size:12px}
+.color-panel {box-sizing:border-box;width:520px;max-width:calc(100vw - 24px);max-height:calc(100vh - 24px);overflow:auto;padding:0;border:1px solid var(--border-strong);border-radius:6px;background:var(--bg-panel);color:var(--text-primary);box-shadow:var(--shadow-popup);font:inherit;font-size:12px}
 .color-panel::backdrop {background:var(--overlay-scrim)}
 .color-panel * {box-sizing:border-box}
 .color-panel header,.color-panel footer {display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:var(--bg-panel-elevated)}
@@ -11,7 +11,7 @@
 .color-panel button {border:1px solid var(--border-strong);border-radius:3px;padding:6px 12px;background:var(--bg-input);color:var(--text-primary);font:inherit;cursor:pointer}
 .color-panel button:hover {background:var(--bg-hover)}
 .color-panel button[type=submit] {border-color:var(--accent)}
-.color-panel-content {display:grid;grid-template-columns:220px minmax(0,1fr);gap:20px;padding:18px}
+.color-panel-content {display:grid;grid-template-columns:180px minmax(0,1fr);gap:14px;padding:14px}
 .color-panel label {display:grid;grid-template-columns:75px minmax(0,1fr);align-items:center;gap:8px;margin:8px 0}
 .color-panel input {min-width:0;width:100%;border:1px solid var(--border-subtle);border-radius:3px;padding:5px;background:var(--bg-input);color:var(--text-primary);font:inherit}
 .color-panel input:focus-visible {outline:1px solid var(--accent)}
@@ -27,4 +27,4 @@
 .color-panel legend {color:var(--text-secondary);padding:0}
 .color-panel fieldset label {grid-template-columns:16px minmax(0,1fr)}
 .color-panel small {display:block;color:var(--text-muted);line-height:1.5}
-@media(max-width:540px) {.color-panel-content {grid-template-columns:minmax(0,1fr);gap:12px}.color-panel-picker {max-width:220px;width:100%;justify-self:center}}
+@media(max-width:460px) {.color-panel-content {grid-template-columns:minmax(0,1fr);gap:12px}.color-panel-picker {max-width:220px;width:100%;justify-self:center}}

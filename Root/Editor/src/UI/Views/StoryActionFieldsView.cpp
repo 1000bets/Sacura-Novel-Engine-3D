@@ -1,3 +1,4 @@
+#include "UI/Presentation/LocalizedEditorUi.h"
 #include "UI/Views/StudioControls.h"
 #include "UI/Views/StoryActionFieldsView.h"
 #include "UI/Styles/StoryEventStyle.h"
@@ -28,7 +29,7 @@ StoryActionFieldsView::StoryActionFieldsView(StoryGraphAction Action, const Stor
     Type->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
     Type->addItems(StoryEventStyle::ActionTypes());
     Type->setCurrentIndex(Value.Kind);
-    Form->addRow(tr("Тип"), Type);
+    Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Тип")), Type);
     connect(Type, &QComboBox::currentIndexChanged, this, [this](int Kind) {
         Commit();
         Value.Kind = Kind;
@@ -94,7 +95,7 @@ StoryActionFieldsView::StoryActionFieldsView(StoryGraphAction Action, const Stor
             Index = Target->count() - 1;
         }
         Target->setCurrentIndex(Index);
-        Form->addRow(tr("Объект"), Target);
+        Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Объект")), Target);
         connect(Target, &QComboBox::currentIndexChanged, this, [this, Target]() {
             Commit();
             Value.Target = Target->currentData().toString();
@@ -119,7 +120,7 @@ StoryActionFieldsView::StoryActionFieldsView(StoryGraphAction Action, const Stor
             Animation->addItem(tr("Недоступная анимация: ") + Value.AnimationId, Value.AnimationId);
         }
         Animation->setCurrentIndex(std::max(0, Animation->findData(Value.AnimationId)));
-        Form->addRow(tr("Анимация"), Animation);
+        Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Анимация")), Animation);
         connect(Animation, &QComboBox::currentIndexChanged, this, [this, Animation]()
         {
             Value.AnimationId = Animation->currentData().toString();
@@ -149,7 +150,7 @@ StoryActionFieldsView::StoryActionFieldsView(StoryGraphAction Action, const Stor
             Cell->addWidget(Position);
             CoordinateRow->addLayout(Cell);
         }
-        Form->addRow(tr("Положение"), Coordinates);
+        Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Положение")), Coordinates);
         if (Value.Kind == 2)
         {
             auto* Rotate = new EditorUi::StudioCheckBox(tr("Задать поворот"), this);

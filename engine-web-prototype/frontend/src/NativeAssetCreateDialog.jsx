@@ -1,3 +1,4 @@
+import {ActiveWorkspaceDocument} from './workspaceDocuments.js';
 import React, {useEffect, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {AssetReferenceField} from './NativeAssets.jsx';
@@ -5,6 +6,7 @@ import {SchemaValue} from './SchemaFields.jsx';
 import ColorField from './ColorField.jsx';
 
 export default function NativeAssetCreateDialog({type: Type, folder: Folder, selectedAsset: SelectedAsset, create: Create, close: Close}) {
+  const [OwnerDocument] = useState(ActiveWorkspaceDocument);
   const [Name, SetName] = useState('');
   const [Settings, SetSettings] = useState(() => {
     const Defaults = Object.fromEntries(Type.settings.map(Field => [Field.id, Field.value]));
@@ -60,5 +62,5 @@ export default function NativeAssetCreateDialog({type: Type, folder: Folder, sel
       {ErrorMessage && <p role="alert">{ErrorMessage}</p>}
       <footer><button type="button" disabled={Busy} onClick={Close}>Отмена</button><button type="submit" disabled={Busy || !Name.trim() || MissingRequired}>{Busy && 'Создание…'}{!Busy && 'Создать'}</button></footer>
     </form>
-  </div>,document.body);
+  </div>,OwnerDocument.body);
 }

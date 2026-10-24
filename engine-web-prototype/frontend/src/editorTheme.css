@@ -459,3 +459,7 @@ button:focus-visible { outline-color: var(--accent); }
 .viewport-camera-speed input { width: 100%; min-width: 0; box-sizing: border-box; }
 .viewport-camera-speed span { color: var(--text-secondary); line-height: 1.5; }
 .viewport-camera-speed[open] summary { color: var(--accent); background: var(--surface-active); }
+
+.editor-app:has(> .error-box) {display:flex;flex-direction:column}
+.editor-app:has(> .error-box) > .editor-workspace {flex:1;min-height:0}
+.editor-app:has(> .error-box) > header,.editor-app:has(> .error-box) > footer {flex-shrink:0}

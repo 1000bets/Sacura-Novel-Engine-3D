@@ -141,7 +141,7 @@ bool BuildProjectTemplateContent(const std::string& TemplateId,
             {{"primary", true}, {"field_of_view", bShooter ? 75.0 : 60.0}})})));
     Objects.push_back(SceneObject("Key Light", Guid::Generate().ToString(),
         Json::array({0.0, 4.0, 0.0}), Json::array({SceneComponentJson("engine.LightComponent",
-            {{"light_type", 0}, {"intensity", bHorror ? 0.35 : 1.0}})})));
+            {{"light_type", "Directional"}, {"intensity", bHorror ? 0.35 : 1.0}})})));
     Objects.push_back(SceneObject("Stage Floor", Guid::Generate().ToString(),
         Json::array({0.0, -0.75, -1.0}), Json::array({BlockMesh()}),
         Json::array({8.0, 0.15, 8.0})));

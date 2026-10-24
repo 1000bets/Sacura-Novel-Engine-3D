@@ -3,6 +3,7 @@ import React,{useState} from 'react';
 import {Icon,Button} from './StudioParts.jsx';
 const fresh=()=>({position:[0,0,0],rotation:[0,0,0],scale:[1,1,1]});
 export default function MultiTransformInspector({objects,onChange,onFocus,onReset,onDuplicate,onDelete,disabled}){
+  useLocale();
  useLocale();
  const [draft,setDraft]=useState(fresh);
  return <><div className="inspector-identity"><Icon name="Boxes" size={27}/><div><strong>{tr("Выбрано объектов: ")}{objects.length}</strong><small>{objects.map(object=>object.name).join(', ')}</small></div></div>

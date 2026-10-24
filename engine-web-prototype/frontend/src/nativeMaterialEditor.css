@@ -165,3 +165,27 @@
 .native-material-status>span:first-child {
   flex: 1;
 }
+
+.native-python-editor {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 100%;
+  width: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--bg-app);
+  color: var(--text-primary);
+}
+.native-python-editor .native-material-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.native-python-editor > [role=alert] {
+  margin: 0;
+  padding: 8px 12px;
+  color: var(--danger);
+}

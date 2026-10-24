@@ -206,7 +206,7 @@ test('real Engine / EditorCore bridge, errors, events and restart', {skip:proces
     const lightInfo=(await call('scene.getHierarchy')).find(o=>o.id===light.id);
     assert.deepEqual(lightInfo.transform,placed);
     assert.ok(lightInfo.components.some(c=>c.typeId==='engine.LightComponent'));
-    assert.equal((await call('component.getProperties',{objectId:light.id,componentId:lightInfo.components.find(c=>c.typeId==='engine.LightComponent').id})).find(p=>p.id==='light_type').value,'1');
+    assert.equal((await call('component.getProperties',{objectId:light.id,componentId:lightInfo.components.find(c=>c.typeId==='engine.LightComponent').id})).find(p=>p.id==='light_type').value,'Point');
     const builtins=await call('assets.list');
     for(const [shape,path] of [['cube','StarterBlock'],['sphere','PrimitiveSphere'],['cylinder','PrimitiveCylinder']]){
       const asset=builtins.find(item=>item.path===`/Engine/Models/${path}.glb`);
@@ -253,16 +253,19 @@ test('real Engine / EditorCore bridge, errors, events and restart', {skip:proces
     assert.ok((await call('object.getComponents',{objectId:id})).some(c=>c.id===component.id));
     const cp={objectId:id,componentId:component.id};
     const props=await call('component.getProperties',cp);
-    assert.ok(props.some(p=>p.id==='light_type'&&p.typeId==='engine.int64'&&typeof p.value==='string'));
-    await call('component.setProperty',{...cp,property:'light_type',value:'1'});
-    assert.equal((await call('component.getProperties',cp)).find(p=>p.id==='light_type').value,'1');
-    await fail('component.setProperty',{...cp,property:'light_type',value:'9223372036854775808'},'INVALID_ARGUMENT');
+    assert.ok(props.some(p=>p.id==='light_type'&&p.typeId==='engine.RenderLightType'&&p.enumValues.join(',')==='Directional,Point,Spot'));
+    await call('component.setProperty',{...cp,property:'light_type',value:2});
+    assert.equal((await call('component.getProperties',cp)).find(p=>p.id==='light_type').value,'Spot');
+    await call('editor.undo');
+    await call('component.setProperty',{...cp,property:'light_type',value:'Point'});
+    assert.equal((await call('component.getProperties',cp)).find(p=>p.id==='light_type').value,'Point');
+    await fail('component.setProperty',{...cp,property:'light_type',value:'UnknownLight'},'PROPERTY_INVALID');
     await fail('component.setProperty',{...cp,property:'missing',value:1},'PROPERTY_READ_ONLY');
     await fail('component.getProperties',{...cp,objectId:parent.id},'NOT_FOUND');
     await call('object.removeComponent',cp);await fail('component.getProperties',cp,'NOT_FOUND');
     await call('editor.undo');assert.ok((await call('object.getComponents',{objectId:id})).some(c=>c.id===component.id));
     // Older commands must resolve the restored component through its persistent ID.
-    await call('editor.undo');assert.equal((await call('component.getProperties',cp)).find(p=>p.id==='light_type').value,'0');
+    await call('editor.undo');assert.equal((await call('component.getProperties',cp)).find(p=>p.id==='light_type').value,'Directional');
     await call('editor.redo');
     await call('object.destroy',{objectId:id});await fail('transform.get',{objectId:id},'NOT_FOUND');
     assert.equal((await call('bridge.describe')).selection,null);
@@ -501,7 +504,7 @@ test('React asset migration uses native previews, placement, documents and undo'
     assert.equal(MissingParent.ok,false);
     assert.equal((await Call('assets.creationTypes')).find(Type=>Type.id==='editor.CreateMaterialInstanceAssetFactory').settings[0].value,null);
     const Actions=await Call('editor.actions');
-    for (const [Identifier,Expected] of [['editor.CreatePointLightObjectAction','1'],['editor.CreateSpotLightObjectAction','2'],['editor.CreateDirectionalLightObjectAction','0']]) {
+    for (const [Identifier,Expected] of [['editor.CreatePointLightObjectAction','Point'],['editor.CreateSpotLightObjectAction','Spot'],['editor.CreateDirectionalLightObjectAction','Directional']]) {
       assert.ok(Actions.some(Action=>Action.id===Identifier));
       const Created=await Call('editor.executeAction',{actionId:Identifier});
       const Objects=await Call('scene.getHierarchy');

@@ -1,3 +1,4 @@
+#include "UI/Presentation/LocalizedEditorUi.h"
 #include "UI/Views/AssetExplorerView.h"
 #include "UI/Styles/StudioIcons.h"
 
@@ -48,7 +49,7 @@ AssetExplorerView::AssetExplorerView(QWidget* Parent) : QWidget(Parent)
     ActionLayout->setSpacing(8);
     Search = new QLineEdit(Actions);
     Search->setObjectName("ContentBrowserSearch");
-    Search->setPlaceholderText(tr("Поиск файлов…"));
+    BindEditorProperty(Search, "placeholderText", QString::fromUtf8("Поиск файлов…"));
     Search->setAccessibleName(tr("Поиск файлов в папке"));
     Search->setMinimumWidth(100);
     Search->setMaximumWidth(240);

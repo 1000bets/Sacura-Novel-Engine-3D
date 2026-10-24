@@ -263,6 +263,10 @@
       "transaction": "id",
       "operation": "string",
       "transform?": "transform"
+    },
+    "project.settings.get": {},
+    "project.settings.set": {
+      "settings": "json"
     }
   }
 }

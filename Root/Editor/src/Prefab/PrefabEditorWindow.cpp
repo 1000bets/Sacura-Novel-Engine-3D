@@ -1,3 +1,4 @@
+#include "UI/Presentation/LocalizedEditorUi.h"
 #include "Prefab/PrefabEditorWindow.h"
 #include "Commands/StaticMeshCommands.h"
 
@@ -317,23 +318,23 @@ void PrefabEditorWindow::BuildToolbar()
     QToolBar* Toolbar = addToolBar(tr("Prefab"));
     Toolbar->setMovable(false);
 
-    QAction* SaveAction = Toolbar->addAction(tr("Save"), this, [this]() { Save(); });
+    QAction* SaveAction = BindEditorCaption(Toolbar->addAction(tr("Save"), this, [this]() { Save(); }), QString::fromUtf8("Save"));
     SaveAction->setShortcut(QKeySequence::Save);
-    QAction* SaveAsAction = Toolbar->addAction(tr("Save As..."), this, [this]() { SaveAs(); });
+    QAction* SaveAsAction = BindEditorCaption(Toolbar->addAction(tr("Save As..."), this, [this]() { SaveAs(); }), QString::fromUtf8("Save As..."));
     SaveAsAction->setShortcut(QKeySequence::SaveAs);
     Toolbar->addSeparator();
-    QAction* UndoAction = Toolbar->addAction(tr("Undo"), this, [this]() { Undo(); });
+    QAction* UndoAction = BindEditorCaption(Toolbar->addAction(tr("Undo"), this, [this]() { Undo(); }), QString::fromUtf8("Undo"));
     UndoAction->setShortcut(QKeySequence::Undo);
-    QAction* RedoAction = Toolbar->addAction(tr("Redo"), this, [this]() { Redo(); });
+    QAction* RedoAction = BindEditorCaption(Toolbar->addAction(tr("Redo"), this, [this]() { Redo(); }), QString::fromUtf8("Redo"));
     RedoAction->setShortcut(QKeySequence::Redo);
     Toolbar->addSeparator();
 
-    auto* CreateButton = new QPushButton(tr("Create"), Toolbar);
+    auto* CreateButton = BindEditorCaption(new QPushButton(tr("Create"), Toolbar), QString::fromUtf8("Create"));
     auto* CreateMenu = new QMenu(CreateButton);
     connect(CreateMenu, &QMenu::aboutToShow, this, [this, CreateMenu]()
     {
         CreateMenu->clear();
-        PopulateCreateMenus(CreateMenu->addMenu(tr("Objects")), CreateMenu->addMenu(tr("Components")));
+        PopulateCreateMenus(BindEditorCaption(CreateMenu->addMenu(tr("Objects")), QString::fromUtf8("Objects")), BindEditorCaption(CreateMenu->addMenu(tr("Components")), QString::fromUtf8("Components")));
     });
     CreateButton->setMenu(CreateMenu);
     Toolbar->addWidget(CreateButton);
@@ -381,7 +382,7 @@ void PrefabEditorWindow::BuildUi()
     InspectorLayout->addWidget(PrefabPanel);
 
     NameEdit = new QLineEdit(InspectorPanel);
-    NameEdit->setPlaceholderText(tr("Object name"));
+    BindEditorProperty(NameEdit, "placeholderText", QString::fromUtf8("Object name"));
     InspectorLayout->addWidget(NameEdit);
     connect(NameEdit, &QLineEdit::editingFinished, this, &PrefabEditorWindow::OnNameEdited);
 
@@ -402,12 +403,12 @@ void PrefabEditorWindow::BuildUi()
         }
         return Row;
     };
-    TransformForm->addRow(tr("Position"), MakeRow(PositionSpins));
-    TransformForm->addRow(tr("Rotation"), MakeRow(RotationSpins));
-    TransformForm->addRow(tr("Scale"), MakeRow(ScaleSpins));
+    TransformForm->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Position")), MakeRow(PositionSpins));
+    TransformForm->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Rotation")), MakeRow(RotationSpins));
+    TransformForm->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Scale")), MakeRow(ScaleSpins));
     InspectorLayout->addLayout(TransformForm);
 
-    AddComponentButton = new QPushButton(tr("Add Component"), InspectorPanel);
+    AddComponentButton = BindEditorCaption(new QPushButton(tr("Add Component"), InspectorPanel), QString::fromUtf8("Add Component"));
     auto* AddComponentMenu = new QMenu(AddComponentButton);
     connect(AddComponentMenu, &QMenu::aboutToShow, this, [this, AddComponentMenu]()
     {
@@ -439,7 +440,7 @@ void PrefabEditorWindow::BuildUi()
     Header->setObjectName("ViewportHeader");
     auto* HeaderLayout = new QHBoxLayout(Header);
     HeaderLayout->setContentsMargins(10, 4, 10, 4);
-    auto* HeaderLabel = new QLabel(tr("Prefab Preview"), Header);
+    auto* HeaderLabel = BindEditorCaption(new QLabel(tr("Prefab Preview"), Header), QString::fromUtf8("Prefab Preview"));
     HeaderLabel->setObjectName("RoseLabel");
     HeaderLayout->addWidget(HeaderLabel);
     HeaderLayout->addStretch(1);
@@ -716,7 +717,7 @@ void PrefabEditorWindow::RebuildComponentInspectors()
             auto* CardLayout = new QVBoxLayout(Card);
             CardLayout->setContentsMargins(6, 8, 6, 6);
 
-            auto* RemoveButton = new QPushButton(tr("Remove Component"), Card);
+            auto* RemoveButton = BindEditorCaption(new QPushButton(tr("Remove Component"), Card), QString::fromUtf8("Remove Component"));
             const ObjectHandle Owner = SelectedObject->GetObjectHandle();
             const ObjectHandle Target = ComponentInstance->GetObjectHandle();
             connect(RemoveButton, &QPushButton::clicked, this, [this, Owner, Target]()
@@ -1033,14 +1034,14 @@ void PrefabEditorWindow::OnHierarchyContextMenu(const QPoint& Position)
         const AssetId Nested = InstanceRoot->GetPrefabInstance()->Prefab;
         Menu.addSeparator();
         QMenu* PrefabMenu = Menu.addMenu(tr("Prefab"));
-        PrefabMenu->addAction(tr("Open Prefab"), this, [this, Nested]()
+        BindEditorCaption(PrefabMenu->addAction(tr("Open Prefab"), this, [this, Nested]()
         {
             emit OpenPrefabRequested(QString::fromStdString(Nested.ToString()));
-        });
-        PrefabMenu->addAction(tr("Revert All Overrides"), this, [this, RootHandle]() { RevertInstance(RootHandle, {}); });
-        PrefabMenu->addAction(tr("Apply All to Inner Prefab"), this, [this, RootHandle]() { ApplyInstance(RootHandle, {}); });
-        PrefabMenu->addAction(tr("Unpack"), this, [this, RootHandle]() { UnpackInstance(RootHandle, PrefabUnpackMode::OutermostRoot); });
-        PrefabMenu->addAction(tr("Unpack Completely"), this, [this, RootHandle]() { UnpackInstance(RootHandle, PrefabUnpackMode::Completely); });
+        }), QString::fromUtf8("Open Prefab"));
+        BindEditorCaption(PrefabMenu->addAction(tr("Revert All Overrides"), this, [this, RootHandle]() { RevertInstance(RootHandle, {}); }), QString::fromUtf8("Revert All Overrides"));
+        BindEditorCaption(PrefabMenu->addAction(tr("Apply All to Inner Prefab"), this, [this, RootHandle]() { ApplyInstance(RootHandle, {}); }), QString::fromUtf8("Apply All to Inner Prefab"));
+        BindEditorCaption(PrefabMenu->addAction(tr("Unpack"), this, [this, RootHandle]() { UnpackInstance(RootHandle, PrefabUnpackMode::OutermostRoot); }), QString::fromUtf8("Unpack"));
+        BindEditorCaption(PrefabMenu->addAction(tr("Unpack Completely"), this, [this, RootHandle]() { UnpackInstance(RootHandle, PrefabUnpackMode::Completely); }), QString::fromUtf8("Unpack Completely"));
     }
     Menu.exec(HierarchyTree->viewport()->mapToGlobal(Position));
 }

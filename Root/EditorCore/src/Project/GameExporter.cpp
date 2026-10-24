@@ -132,7 +132,7 @@ bool GameExporter::Export(const std::filesystem::path& ProjectFile,
         DescriptorOutput.exceptions(std::ios::badbit | std::ios::failbit);
         DescriptorOutput << DescriptorJson.dump(2);
         DescriptorOutput.close();
-        for (const auto& Folder : {"Content", "Scripts", "Config"})
+        for (const auto& Folder : {"Content", "Config"})
         {
             if (std::filesystem::exists(Project.ProjectRoot / Folder))
             {

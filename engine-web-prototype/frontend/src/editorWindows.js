@@ -1,5 +1,7 @@
 // Workspace preferences are local editor settings, never part of an authored project.
 export const EDITOR_WINDOWS = [
+  ['project-settings', 'Editor.ProjectSettings.Title', 'Settings2'],
+  ['editor-settings', 'Editor.Settings.Title', 'Settings'],
   ['scene-view', 'Локация и игра', 'Box'],
   ['hierarchy-view', 'Иерархия', 'ListTree'],
   ['inspector-view', 'Инспектор', 'Settings2'],

@@ -1,4 +1,5 @@
 #include "Assets/BuiltinAssetCreationFactories.h"
+#include <set>
 #include "Assets/MaterialAssetCreation.h"
 #include "Assets/StoryAssetCreation.h"
 #include "Core/IO/AtomicFileWriter.h"
@@ -92,8 +93,60 @@ bool CreateWidgetLibraryAssetFactory::Create(AssetRegistry& Registry, const std:
     return AtomicFileWriter::WriteText(Destination, QJsonDocument(WidgetLayout::Defaults()).toJson().toStdString(), Error);
 }
 
+bool CreatePythonScriptAssetFactory::Create(AssetRegistry& Registry, const std::filesystem::path& Destination, std::string& Error) const
+{
+    const auto Relative = Destination.lexically_relative(Registry.GetGameContentRoot() / "Scripts");
+    if (Relative.empty() || *Relative.begin() == "..")
+    {
+        Error = "Create Python scripts inside Content/Scripts";
+        return false;
+    }
+    const std::string ClassName = Destination.stem().u8string();
+    if (ClassName.empty() || !((ClassName.front() >= 'A' && ClassName.front() <= 'Z')
+        || (ClassName.front() >= 'a' && ClassName.front() <= 'z') || ClassName.front() == '_'))
+    {
+        Error = "A Python script name must be a valid identifier";
+        return false;
+    }
+    for (const char Character : ClassName)
+    {
+        if (!((Character >= 'A' && Character <= 'Z') || (Character >= 'a' && Character <= 'z')
+            || (Character >= '0' && Character <= '9') || Character == '_'))
+        {
+            Error = "A Python script name must be a valid identifier";
+            return false;
+        }
+    }
+    const std::set<std::string> ReservedNames{"False", "None", "True", "and", "as", "assert", "async",
+        "await", "break", "class", "continue", "def", "del", "elif", "else", "except", "finally",
+        "for", "from", "global", "if", "import", "in", "is", "lambda", "nonlocal", "not", "or",
+        "pass", "raise", "return", "try", "while", "with", "yield", "__init__"};
+    if (ReservedNames.count(ClassName) != 0)
+    {
+        Error = "Choose a script name that is not a Python keyword or package initializer";
+        return false;
+    }
+    auto ModulePath = Relative;
+    ModulePath.replace_extension();
+    std::string ModuleName = ModulePath.generic_u8string();
+    for (char& Character : ModuleName)
+    {
+        if (Character == '/')
+        {
+            Character = '.';
+        }
+    }
+    const std::string TypeIdentifier = "game." + ModuleName;
+    const std::string Source = "from engine import ScriptComponent, register_class\n\n\n"
+        "@register_class(type_id=\"" + TypeIdentifier + "\")\nclass " + ClassName
+        + "(ScriptComponent):\n    def OnCreate(self):\n        pass\n\n"
+        "    def OnUpdate(self, DeltaTime):\n        pass\n";
+    return AtomicFileWriter::WriteText(Destination, Source, Error);
+}
+
 void ForceTouchBuiltinAssetCreationFactories()
 {
+    (void)&CreatePythonScriptAssetFactory::s_ReflectionClassRegistrar;
     (void)&AssetCreationFactory::s_ReflectionClassRegistrar;
     (void)&CreateSceneAssetFactory::s_ReflectionClassRegistrar;
     (void)&CreateStoryAssetFactory::s_ReflectionClassRegistrar;

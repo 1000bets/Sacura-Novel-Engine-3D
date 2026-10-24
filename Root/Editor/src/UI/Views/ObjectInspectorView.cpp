@@ -1,3 +1,4 @@
+#include "UI/Presentation/LocalizedEditorUi.h"
 #include "UI/Views/ObjectInspectorView.h"
 #include "UI/Views/StudioControls.h"
 #include "UI/Styles/StudioIcons.h"
@@ -53,7 +54,7 @@ void ObjectInspectorView::AddComponentSection(const QString& Identity, const QSt
     Fields.setVisible(Expanded);
     if (Mesh)
     {
-        auto* Remove = new QPushButton(tr("Удалить компонент"), Card);
+        auto* Remove = BindEditorCaption(new QPushButton(tr("Удалить компонент"), Card), QString::fromUtf8("Удалить компонент"));
         Remove->setObjectName("RemoveStaticMeshComponent");
         connect(Remove, &QPushButton::clicked, this, [this, Identity]() {
             if (RemoveComponentRequested) { RemoveComponentRequested(Identity); }
@@ -72,7 +73,7 @@ void ObjectInspectorView::AddComponentSection(const QString& Identity, const QSt
     Row->setProperty("uiRole", "componentInstance");
     Row->setProperty("componentIdentity", Identity);
     Row->setProperty("searchText", ComponentCaption(Type) + " " + Type);
-    Row->setToolTip(tr("Показать только отмеченные компоненты. Снимите все отметки, чтобы показать все."));
+    BindEditorProperty(Row, "toolTip", QString::fromUtf8("Показать только отмеченные компоненты. Снимите все отметки, чтобы показать все."));
     Row->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     Row->setMinimumWidth(0);
     Row->setVisible(Row->property("searchText").toString().contains(ComponentSearch->text(), Qt::CaseInsensitive));
@@ -191,18 +192,18 @@ ObjectInspectorView::ObjectInspectorView(QWidget* Parent) : QWidget(Parent)
     IdentityText->setSpacing(4);
     Name = new QLineEdit(Identity);
     Name->setObjectName("ObjectName");
-    Name->setPlaceholderText(tr("Имя объекта"));
+    BindEditorProperty(Name, "placeholderText", QString::fromUtf8("Имя объекта"));
     Name->setAccessibleName(tr("Имя объекта"));
     Name->setMinimumWidth(0);
     IdentityText->addWidget(Name);
-    ObjectKind = new QLabel(tr("Объект сцены"), Identity);
+    ObjectKind = BindEditorCaption(new QLabel(tr("Объект сцены"), Identity), QString::fromUtf8("Объект сцены"));
     ObjectKind->setObjectName("ObjectKind");
     IdentityText->addWidget(ObjectKind);
     IdentityLayout->addLayout(IdentityText, 1);
     Active = new StudioCheckBox(Identity);
     Active->setObjectName("ObjectActive");
     Active->setAccessibleName(tr("Объект активен"));
-    Active->setToolTip(tr("Объект активен"));
+    BindEditorProperty(Active, "toolTip", QString::fromUtf8("Объект активен"));
     Active->setFixedWidth(16);
     Active->setChecked(true);
     IdentityLayout->addWidget(Active);
@@ -213,7 +214,7 @@ ObjectInspectorView::ObjectInspectorView(QWidget* Parent) : QWidget(Parent)
     ComponentLayout->setContentsMargins(16, 12, 16, 12);
     ComponentLayout->setSpacing(6);
     auto* Heading = new QHBoxLayout();
-    auto* HeadingText = new QLabel(tr("Компоненты"), ComponentTools);
+    auto* HeadingText = BindEditorCaption(new QLabel(tr("Компоненты"), ComponentTools), QString::fromUtf8("Компоненты"));
     HeadingText->setProperty("uiRole", "objectSectionTitle");
     Heading->addWidget(HeadingText);
     ComponentCount = new QLabel("0", ComponentTools);
@@ -227,7 +228,7 @@ ObjectInspectorView::ObjectInspectorView(QWidget* Parent) : QWidget(Parent)
     Heading->addWidget(SearchButton);
     ComponentLayout->addLayout(Heading);
     ComponentSearch = new QLineEdit(ComponentTools);
-    ComponentSearch->setPlaceholderText(tr("Название или тип…"));
+    BindEditorProperty(ComponentSearch, "placeholderText", QString::fromUtf8("Название или тип…"));
     ComponentSearch->setAccessibleName(tr("Поиск компонентов"));
     ComponentSearch->hide();
     ComponentLayout->addWidget(ComponentSearch);
@@ -250,7 +251,7 @@ ObjectInspectorView::ObjectInspectorView(QWidget* Parent) : QWidget(Parent)
         EmptyComponents->setText(ComponentRows->count() ? tr("Ничего не найдено") : tr("Нет компонентов"));
         EmptyComponents->setVisible(!Found);
     });
-    EmptyComponents = new QLabel(tr("Нет компонентов"), ComponentTools);
+    EmptyComponents = BindEditorCaption(new QLabel(tr("Нет компонентов"), ComponentTools), QString::fromUtf8("Нет компонентов"));
     EmptyComponents->setObjectName("ObjectComponentEmpty");
     ComponentLayout->addWidget(EmptyComponents);
     auto* AddToggle = new QPushButton(MakeStudioIcon(StudioIcon::Plus, "--accent"), tr("Добавить компонент"), ComponentTools);
@@ -263,7 +264,7 @@ ObjectInspectorView::ObjectInspectorView(QWidget* Parent) : QWidget(Parent)
     AddComponentType = new StudioSelect(AddForm);
     AddComponentType->setAccessibleName(tr("Компонент"));
     AddLayout->addWidget(AddComponentType);
-    AddComponent = new QPushButton(tr("Добавить"), AddForm);
+    AddComponent = BindEditorCaption(new QPushButton(tr("Добавить"), AddForm), QString::fromUtf8("Добавить"));
     AddLayout->addWidget(AddComponent);
     ComponentLayout->addWidget(AddForm);
     AddForm->hide();
@@ -279,7 +280,7 @@ ObjectInspectorView::ObjectInspectorView(QWidget* Parent) : QWidget(Parent)
     auto* Fields = new QVBoxLayout(Transform);
     Fields->setContentsMargins(16, 12, 16, 14);
     Fields->setSpacing(10);
-    auto* Title = new QLabel(tr("Трансформация"), Transform);
+    auto* Title = BindEditorCaption(new QLabel(tr("Трансформация"), Transform), QString::fromUtf8("Трансформация"));
     Title->setProperty("uiRole", "objectSectionTitle");
     auto* TitleRow = new QHBoxLayout();
     auto* Icon = new QLabel(Transform);
@@ -328,7 +329,7 @@ ObjectInspectorView::ObjectInspectorView(QWidget* Parent) : QWidget(Parent)
             Spin->setRange(-1.0e6, 1.0e6);
             Spin->setSingleStep(Row == 1 ? 1 : .1);
             Spin->SetScrubStep(Row == 1 ? 1.0 : Row == 2 ? 0.01 : 0.1);
-            Spin->setToolTip(tr("Тяните влево/вправо для изменения. Shift — точнее, Ctrl — быстрее.\nЩелчок — ввод числа. Esc — отмена перетягивания."));
+            BindEditorProperty(Spin, "toolTip", QString::fromUtf8("Тяните влево/вправо для изменения. Shift — точнее, Ctrl — быстрее.\nЩелчок — ввод числа. Esc — отмена перетягивания."));
             AxisLayout->addWidget(Spin, 1);
             Label->setBuddy(Spin);
             TransformFields[Row * 3 + Axis] = Spin;

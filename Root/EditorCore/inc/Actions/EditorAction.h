@@ -4,8 +4,8 @@
 #include "Core/Object/Object.h"
 #include "Reflection/ReflectionMacros.h"
 #include "Reflection/TypeId.h"
+#include "Rendering/RenderLight.h"
 
-#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -34,7 +34,7 @@ protected:
         const std::string& ObjectName,
         const TypeId& ComponentType,
         bool bConfigureLightType = false,
-        int64_t LightTypeValue = 0) const;
+        RenderLightType LightType = RenderLightType::Directional) const;
 
     bool AddComponentToSelection(EditorActionContext& Context, const TypeId& ComponentType) const;
 };

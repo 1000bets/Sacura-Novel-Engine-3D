@@ -1,3 +1,4 @@
+#include "UI/Presentation/LocalizedEditorUi.h"
 #include "UI/Views/AssetReferenceField.h"
 #include "UI/Adapters/AssetThumbnails.h"
 #include "Panels/ReflectionInspector.h"
@@ -120,9 +121,9 @@ bool ReflectionInspector::BuildMeshPresentation()
     auto* AssetActions = new QWidget(this);
     auto* AssetLayout = new QHBoxLayout(AssetActions);
     AssetLayout->setContentsMargins(0, 0, 0, 0);
-    auto* Open = new QPushButton(tr("Открыть меш"), AssetActions);
+    auto* Open = BindEditorCaption(new QPushButton(tr("Открыть меш"), AssetActions), QString::fromUtf8("Открыть меш"));
     Open->setObjectName("MeshOpenAsset");
-    Open->setToolTip(tr("Открыть материалы и коллизию ресурса меша"));
+    BindEditorProperty(Open, "toolTip", QString::fromUtf8("Открыть материалы и коллизию ресурса меша"));
     Open->setEnabled(Mesh->GetMeshAssetKey().IsValid() && static_cast<bool>(OpenMesh));
     connect(Open, &QPushButton::clicked, this, [this]()
     {
@@ -133,7 +134,7 @@ bool ReflectionInspector::BuildMeshPresentation()
         }
     });
     AssetLayout->addWidget(Open);
-    auto* Import = new QPushButton(tr("Импортировать…"), AssetActions);
+    auto* Import = BindEditorCaption(new QPushButton(tr("Импортировать…"), AssetActions), QString::fromUtf8("Импортировать…"));
     Import->setObjectName("MeshUpload");
     Import->setEnabled(Registry != nullptr);
     AssetLayout->addWidget(Import);
@@ -231,13 +232,13 @@ bool ReflectionInspector::BuildMeshPresentation()
             Current->GetObjectHandle(), Slot, Material, Error);
         QueueMeshCommand(std::move(Command), QString::fromStdString(Error));
     };
-    auto* All = new QPushButton(tr("Назначить всем слотам…"), this);
+    auto* All = BindEditorCaption(new QPushButton(tr("Назначить всем слотам…"), this), QString::fromUtf8("Назначить всем слотам…"));
     All->setObjectName("MeshAssignAllMaterials");
     All->setEnabled(!Slots.empty() && static_cast<bool>(ExecuteMeshCommand));
     auto* Menu = new QMenu(All);
     Menu->setObjectName("StudioActionMenu");
     All->setMenu(Menu);
-    connect(Menu->addAction(tr("Вернуть материалы меша")), &QAction::triggered, this, [Assign]() { Assign(-1, {}); });
+    connect(BindEditorCaption(Menu->addAction(tr("Вернуть материалы меша")), QString::fromUtf8("Вернуть материалы меша")), &QAction::triggered, this, [Assign]() { Assign(-1, {}); });
     Menu->addSeparator();
     for (const auto& Entry : Materials)
     {
@@ -278,9 +279,9 @@ bool ReflectionInspector::BuildMeshPresentation()
             Caption += tr(" (нет в меше)");
         }
         Header->addWidget(new QLabel(Caption, Card), 1);
-        auto* Reset = new QPushButton(tr("Из меша"), Card);
+        auto* Reset = BindEditorCaption(new QPushButton(tr("Из меша"), Card), QString::fromUtf8("Из меша"));
         Reset->setObjectName(QString("MeshResetMaterial_%1").arg(Slot));
-        Reset->setToolTip(tr("Убрать переопределение этого слота и использовать материал ресурса меша"));
+        BindEditorProperty(Reset, "toolTip", QString::fromUtf8("Убрать переопределение этого слота и использовать материал ресурса меша"));
         Header->addWidget(Reset);
         Layout->addLayout(Header);
         auto* Material = new EditorUi::StudioSelect(Card);
@@ -357,28 +358,28 @@ bool ReflectionInspector::BuildMeshPresentation()
     {
         Body = Bodies.front();
     }
-    const bool bSpecialized = Bodies.size() > 1 || (Body && (dynamic_cast<CharacterControllerComponent*>(Body) || Body->MotionType == 3));
-    auto* Collision = new QCheckBox(tr("Коллизия"), this);
+    const bool bSpecialized = Bodies.size() > 1 || (Body && (dynamic_cast<CharacterControllerComponent*>(Body) || Body->MotionType == PhysicsMotionType::Character));
+    auto* Collision = BindEditorCaption(new QCheckBox(tr("Коллизия"), this), QString::fromUtf8("Коллизия"));
     Collision->setObjectName("MeshPhysicsEnabled");
-    Collision->setToolTip(tr("Участие объекта в столкновениях и физических запросах"));
+    BindEditorProperty(Collision, "toolTip", QString::fromUtf8("Участие объекта в столкновениях и физических запросах"));
     Collision->setChecked(Body && Body->IsEnabled());
     Collision->setEnabled(!bSpecialized && Mesh->GetMeshAssetKey().IsValid() && static_cast<bool>(ExecuteMeshCommand));
     PropertiesLayout->addRow(Collision);
-    auto* Simulate = new QCheckBox(tr("Симулировать физику"), this);
+    auto* Simulate = BindEditorCaption(new QCheckBox(tr("Симулировать физику"), this), QString::fromUtf8("Симулировать физику"));
     Simulate->setObjectName("MeshPhysicsSimulate");
-    Simulate->setToolTip(tr("Динамическое тело: движется под действием гравитации, сил и столкновений в Play"));
-    Simulate->setChecked(Body && Body->MotionType == 1);
+    BindEditorProperty(Simulate, "toolTip", QString::fromUtf8("Динамическое тело: движется под действием гравитации, сил и столкновений в Play"));
+    Simulate->setChecked(Body && Body->MotionType == PhysicsMotionType::Dynamic);
     Simulate->setEnabled(Collision->isEnabled() && Collision->isChecked());
     PropertiesLayout->addRow(Simulate);
     if (bSpecialized)
     {
         AddNote(tr("У объекта контроллер персонажа или несколько физических тел. Настройте их в соответствующих компонентах."));
     }
-    else if (Body && Body->IsEnabled() && Body->MotionType == 2)
+    else if (Body && Body->IsEnabled() && Body->MotionType == PhysicsMotionType::Kinematic)
     {
         AddNote(tr("Кинематическое тело: перемещается из кода, участвует в столкновениях."));
     }
-    else if (Body && Body->IsEnabled() && Body->MotionType == 1)
+    else if (Body && Body->IsEnabled() && Body->MotionType == PhysicsMotionType::Dynamic)
     {
         AddNote(tr("Динамическое тело. Масса и остальные параметры доступны в компоненте физики."));
     }

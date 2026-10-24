@@ -1,3 +1,4 @@
+#include "UI/Presentation/LocalizedEditorUi.h"
 #include "Prefab/PrefabOverridesPanel.h"
 
 #include "World/Scene.h"
@@ -117,9 +118,9 @@ PrefabOverridesPanel::PrefabOverridesPanel(QWidget* Parent)
     Layout->addWidget(DetailLabel);
 
     auto* FirstRow = new QHBoxLayout();
-    OpenButton = new QPushButton(tr("Open"), this);
-    OpenNestedButton = new QPushButton(tr("Open Nested"), this);
-    SelectRootButton = new QPushButton(tr("Select Root"), this);
+    OpenButton = BindEditorCaption(new QPushButton(tr("Open"), this), QString::fromUtf8("Open"));
+    OpenNestedButton = BindEditorCaption(new QPushButton(tr("Open Nested"), this), QString::fromUtf8("Open Nested"));
+    SelectRootButton = BindEditorCaption(new QPushButton(tr("Select Root"), this), QString::fromUtf8("Select Root"));
     FirstRow->addWidget(OpenButton);
     FirstRow->addWidget(OpenNestedButton);
     FirstRow->addWidget(SelectRootButton);
@@ -128,9 +129,9 @@ PrefabOverridesPanel::PrefabOverridesPanel(QWidget* Parent)
 
     auto* SecondRow = new QHBoxLayout();
     OverridesButton = new QPushButton(this);
-    RevertAllButton = new QPushButton(tr("Revert All"), this);
-    ApplyAllButton = new QPushButton(tr("Apply All"), this);
-    UnpackButton = new QPushButton(tr("Unpack"), this);
+    RevertAllButton = BindEditorCaption(new QPushButton(tr("Revert All"), this), QString::fromUtf8("Revert All"));
+    ApplyAllButton = BindEditorCaption(new QPushButton(tr("Apply All"), this), QString::fromUtf8("Apply All"));
+    UnpackButton = BindEditorCaption(new QPushButton(tr("Unpack"), this), QString::fromUtf8("Unpack"));
     SecondRow->addWidget(OverridesButton);
     SecondRow->addWidget(RevertAllButton);
     SecondRow->addWidget(ApplyAllButton);
@@ -139,20 +140,20 @@ PrefabOverridesPanel::PrefabOverridesPanel(QWidget* Parent)
     Layout->addLayout(SecondRow);
 
     auto* UnpackMenu = new QMenu(UnpackButton);
-    UnpackMenu->addAction(tr("Unpack (outermost level)"), this, [this]()
+    BindEditorCaption(UnpackMenu->addAction(tr("Unpack (outermost level)"), this, [this]()
     {
         if (Handlers.Unpack && InstanceRoot.IsValid())
         {
             Handlers.Unpack(InstanceRoot, PrefabUnpackMode::OutermostRoot);
         }
-    });
-    UnpackMenu->addAction(tr("Unpack Completely"), this, [this]()
+    }), QString::fromUtf8("Unpack (outermost level)"));
+    BindEditorCaption(UnpackMenu->addAction(tr("Unpack Completely"), this, [this]()
     {
         if (Handlers.Unpack && InstanceRoot.IsValid())
         {
             Handlers.Unpack(InstanceRoot, PrefabUnpackMode::Completely);
         }
-    });
+    }), QString::fromUtf8("Unpack Completely"));
     UnpackButton->setMenu(UnpackMenu);
 
     connect(OpenButton, &QPushButton::clicked, this, [this]()

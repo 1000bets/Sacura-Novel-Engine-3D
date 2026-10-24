@@ -1,3 +1,4 @@
+#include "UI/Presentation/LocalizedEditorUi.h"
 #include "UI/Views/InputWorkspaceView.h"
 #include "Engine.h"
 #include "Documents/InputPackage.h"
@@ -86,7 +87,7 @@ static void InputNumber(QFormLayout* Form, const QString& Label, double Value, d
 InputWorkspaceView::InputWorkspaceView(Engine& InRuntime, QWidget* Parent)
     : QDialog(Parent), Runtime(InRuntime)
 {
-    setWindowTitle(tr("Ввод"));
+    BindEditorProperty(this, "windowTitle", QString::fromUtf8("Ввод"));
     setObjectName("InputWorkspace");
     setProperty("uiRole", "workspaceFloating");
     resize(960, 720);
@@ -111,8 +112,8 @@ InputWorkspaceView::InputWorkspaceView(Engine& InRuntime, QWidget* Parent)
     Button(tr("События"), [this]() { ShowStoryBindings(); });
     auto* Exchange = new QHBoxLayout;
     Layout->addLayout(Exchange);
-    auto* Export = new QPushButton(tr("Экспортировать с зависимостями"));
-    auto* Import = new QPushButton(tr("Импортировать пакет"));
+    auto* Export = BindEditorCaption(new QPushButton(tr("Экспортировать с зависимостями")), QString::fromUtf8("Экспортировать с зависимостями"));
+    auto* Import = BindEditorCaption(new QPushButton(tr("Импортировать пакет")), QString::fromUtf8("Импортировать пакет"));
     Exchange->addWidget(Export);
     Exchange->addWidget(Import);
     Exchange->addStretch();
@@ -334,7 +335,7 @@ void InputWorkspaceView::RefreshEditor()
     }
     if (!bOpen)
     {
-        EditorLayout->addWidget(new QLabel(tr("Создайте действие и контекст или откройте ресурс двойным щелчком.")));
+        EditorLayout->addWidget(BindEditorCaption(new QLabel(tr("Создайте действие и контекст или откройте ресурс двойным щелчком.")), QString::fromUtf8("Создайте действие и контекст или откройте ресурс двойным щелчком.")));
         EditorLayout->addStretch();
         return;
     }
@@ -352,7 +353,7 @@ void InputWorkspaceView::RefreshEditor()
     const auto& Data = Document.GetData().at(Root);
     auto* Name = new QLineEdit(QString::fromStdString(Data.value("Name", std::string{})));
     Name->setObjectName("InputAssetName");
-    Form->addRow(tr("Название"), Name);
+    Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Название")), Name);
     connect(Name, &QLineEdit::editingFinished, this, [this, Name, Root]()
     {
         Edit([&](auto& Candidate) { Candidate[Root]["Name"] = Name->text().toStdString(); });
@@ -390,12 +391,12 @@ void InputWorkspaceView::RefreshEditor()
             }
         }
         Chord->setCurrentIndex(Chord->findData(QString::fromStdString(Action.ChordAction)));
-        Form->addRow(tr("Удерживать другое действие"), Chord);
+        Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Удерживать другое действие")), Chord);
         connect(Chord, &QComboBox::activated, this, [this, Chord]()
         {
             Edit([&](auto& Candidate) { Candidate["Action"]["ChordAction"] = Chord->currentData().toString().toStdString(); });
         });
-        auto* Paused = new QCheckBox(tr("Работает во время паузы"));
+        auto* Paused = BindEditorCaption(new QCheckBox(tr("Работает во время паузы")), QString::fromUtf8("Работает во время паузы"));
         Paused->setChecked(Action.bExecuteWhenPaused);
         Form->addRow(Paused);
         connect(Paused, &QCheckBox::toggled, this, [this](bool bChecked)
@@ -406,7 +407,7 @@ void InputWorkspaceView::RefreshEditor()
             [this](double Value) { Edit([&](auto& Candidate) { Candidate["Action"]["Threshold"] = Value; }); });
         InputNumber(Form, tr("Мёртвая зона действия"), Action.Modifiers.DeadZone, 0, 0.99,
             [this](double Value) { Edit([&](auto& Candidate) { Candidate["Action"]["Modifiers"]["DeadZone"] = Value; }); });
-        auto* Normalize = new QCheckBox(tr("Нормализовать значение"));
+        auto* Normalize = BindEditorCaption(new QCheckBox(tr("Нормализовать значение")), QString::fromUtf8("Нормализовать значение"));
         Normalize->setChecked(Action.Modifiers.bNormalize);
         Form->addRow(Normalize);
         connect(Normalize, &QCheckBox::toggled, this, [this](bool bChecked)
@@ -434,7 +435,7 @@ void InputWorkspaceView::RefreshEditor()
                 ActionChoice->addItem(QString::fromStdString(Action.Name), QString::fromStdString(Action.Identifier));
             }
             ActionChoice->setCurrentIndex(ActionChoice->findData(QString::fromStdString(Binding.Action)));
-            BindingForm->addRow(tr("Действие"), ActionChoice);
+            BindingForm->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Действие")), ActionChoice);
             connect(ActionChoice, &QComboBox::activated, this, [this, Index, ActionChoice]()
             {
                 Edit([&](auto& Candidate) { Candidate["Context"]["Bindings"][Index]["Action"] = ActionChoice->currentData().toString().toStdString(); });
@@ -453,7 +454,7 @@ void InputWorkspaceView::RefreshEditor()
             if (Binding.Device == "Keyboard")
             {
                 auto* Capture = new InputKeyCapture(QString::fromStdString(Binding.Control));
-                BindingForm->addRow(tr("Клавиша"), Capture);
+                BindingForm->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Клавиша")), Capture);
                 Capture->Captured = [this, Index](const std::string& Control)
                 {
                     Edit([&](auto& Candidate) { Candidate["Context"]["Bindings"][Index]["Control"] = Control; });
@@ -476,7 +477,7 @@ void InputWorkspaceView::RefreshEditor()
                     Control->addItem(QString::fromStdString(Binding.Control));
                 }
                 Control->setCurrentText(QString::fromStdString(Binding.Control));
-                BindingForm->addRow(tr("Кнопка или ось"), Control);
+                BindingForm->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Кнопка или ось")), Control);
                 connect(Control, &QComboBox::currentTextChanged, this, [this, Index](const QString& Value)
                 {
                     Edit([&](auto& Candidate) { Candidate["Context"]["Bindings"][Index]["Control"] = Value.toStdString(); });
@@ -515,21 +516,21 @@ void InputWorkspaceView::RefreshEditor()
             }
             InputNumber(BindingForm, tr("Мёртвая зона"), Binding.Modifiers.DeadZone, 0, 0.99,
                 [this, Index](double Value) { Edit([&](auto& Candidate) { Candidate["Context"]["Bindings"][Index]["Modifiers"]["DeadZone"] = Value; }); });
-            auto* Consume = new QCheckBox(tr("Перехватывать ввод"));
+            auto* Consume = BindEditorCaption(new QCheckBox(tr("Перехватывать ввод")), QString::fromUtf8("Перехватывать ввод"));
             Consume->setChecked(Binding.bConsume);
             BindingForm->addRow(Consume);
             connect(Consume, &QCheckBox::toggled, this, [this, Index](bool bChecked)
             {
                 Edit([&](auto& Candidate) { Candidate["Context"]["Bindings"][Index]["bConsume"] = bChecked; });
             });
-            auto* Remove = new QPushButton(tr("Удалить привязку"));
+            auto* Remove = BindEditorCaption(new QPushButton(tr("Удалить привязку")), QString::fromUtf8("Удалить привязку"));
             BindingForm->addRow(Remove);
             connect(Remove, &QPushButton::clicked, this, [this, Index]()
             {
                 Edit([&](auto& Candidate) { Candidate["Context"]["Bindings"].erase(Index); });
             });
         }
-        auto* Add = new QPushButton(tr("Добавить привязку"));
+        auto* Add = BindEditorCaption(new QPushButton(tr("Добавить привязку")), QString::fromUtf8("Добавить привязку"));
         Form->addRow(Add);
         connect(Add, &QPushButton::clicked, this, [this, Configuration]()
         {
@@ -561,7 +562,7 @@ void InputWorkspaceView::ShowSettings()
         return;
     }
     QDialog Settings(this);
-    Settings.setWindowTitle(tr("Начальные контексты проекта"));
+    BindEditorProperty(&Settings, "windowTitle", QString::fromUtf8("Начальные контексты проекта"));
     auto* Form = new QFormLayout(&Settings);
     std::vector<std::pair<QCheckBox*, QSpinBox*>> Controls;
     for (const auto& Context : Configuration.Contexts)
@@ -580,8 +581,8 @@ void InputWorkspaceView::ShowSettings()
         Form->addRow(Enabled, Priority);
         Controls.push_back({Enabled, Priority});
     }
-    auto* Apply = new QPushButton(tr("Сохранить"));
-    Form->addRow(new QLabel(tr("Число справа — приоритет контекста.")));
+    auto* Apply = BindEditorCaption(new QPushButton(tr("Сохранить")), QString::fromUtf8("Сохранить"));
+    Form->addRow(BindEditorCaption(new QLabel(tr("Число справа — приоритет контекста.")), QString::fromUtf8("Число справа — приоритет контекста.")));
     Form->addRow(Apply);
     connect(Apply, &QPushButton::clicked, &Settings, &QDialog::accept);
     if (Settings.exec() != QDialog::Accepted)
@@ -612,7 +613,7 @@ void InputWorkspaceView::ShowProfile()
         return;
     }
     QDialog Settings(this);
-    Settings.setWindowTitle(tr("Пользовательские переназначения"));
+    BindEditorProperty(&Settings, "windowTitle", QString::fromUtf8("Пользовательские переназначения"));
     Settings.resize(520, 500);
     auto* Layout = new QVBoxLayout(&Settings);
     auto* Scroll = new QScrollArea;
@@ -687,10 +688,10 @@ void InputWorkspaceView::ShowProfile()
             }
         }
     }
-    auto* Reset = new QPushButton(tr("Сбросить переназначения"));
+    auto* Reset = BindEditorCaption(new QPushButton(tr("Сбросить переназначения")), QString::fromUtf8("Сбросить переназначения"));
     Layout->addWidget(Reset);
     connect(Reset, &QPushButton::clicked, &Settings, [&Overrides, &Settings]() { Overrides.clear(); Settings.accept(); });
-    auto* SaveButton = new QPushButton(tr("Сохранить профиль"));
+    auto* SaveButton = BindEditorCaption(new QPushButton(tr("Сохранить профиль")), QString::fromUtf8("Сохранить профиль"));
     Layout->addWidget(SaveButton);
     connect(SaveButton, &QPushButton::clicked, &Settings, &QDialog::accept);
     if (Settings.exec() == QDialog::Accepted
@@ -762,7 +763,7 @@ void InputWorkspaceView::ShowStoryBindings()
         }
     }
     QDialog Settings(this);
-    Settings.setWindowTitle(tr("Действия ввода → события истории"));
+    BindEditorProperty(&Settings, "windowTitle", QString::fromUtf8("Действия ввода → события истории"));
     auto* Layout = new QVBoxLayout(&Settings);
     auto* List = new QListWidget;
     Layout->addWidget(List);
@@ -806,12 +807,12 @@ void InputWorkspaceView::ShowStoryBindings()
     {
         Event->addItem(QString::fromStdString(Definition.Name), QString::fromStdString(Definition.Id));
     }
-    Form->addRow(tr("Действие"), Action);
-    Form->addRow(tr("Фаза"), Phase);
-    Form->addRow(tr("Событие"), Event);
-    auto* Add = new QPushButton(tr("Добавить подписку"));
-    auto* Remove = new QPushButton(tr("Удалить выбранную"));
-    auto* SaveButton = new QPushButton(tr("Сохранить"));
+    Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Действие")), Action);
+    Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Фаза")), Phase);
+    Form->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Событие")), Event);
+    auto* Add = BindEditorCaption(new QPushButton(tr("Добавить подписку")), QString::fromUtf8("Добавить подписку"));
+    auto* Remove = BindEditorCaption(new QPushButton(tr("Удалить выбранную")), QString::fromUtf8("Удалить выбранную"));
+    auto* SaveButton = BindEditorCaption(new QPushButton(tr("Сохранить")), QString::fromUtf8("Сохранить"));
     Layout->addWidget(Add);
     Layout->addWidget(Remove);
     Layout->addWidget(SaveButton);

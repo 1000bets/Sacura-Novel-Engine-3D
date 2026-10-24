@@ -3155,7 +3155,7 @@
           "typeVersion": 1,
           "bEnabled": true,
           "properties": {
-            "light_type": 0,
+            "light_type": "Directional",
             "light_color": [
               1,
               0.95,
@@ -3199,7 +3199,7 @@
           "typeVersion": 1,
           "bEnabled": true,
           "properties": {
-            "light_type": 1,
+            "light_type": "Point",
             "light_color": [
               0.3,
               0.5,
@@ -3244,7 +3244,7 @@
           "typeVersion": 1,
           "bEnabled": true,
           "properties": {
-            "light_type": 2,
+            "light_type": "Spot",
             "light_color": [
               1,
               0.3,

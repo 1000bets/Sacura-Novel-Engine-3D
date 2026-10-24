@@ -269,3 +269,24 @@ QMainWindow#MaterialEditorWindow QToolBar QToolButton {
 }
 QMainWindow#MaterialEditorWindow QToolBar QToolButton:hover { background: @--bg-hover@; }
 QMainWindow#MaterialEditorWindow QToolBar QToolButton:focus { border-color: @--accent@; }
+
+QMainWindow#PythonScriptEditorWindow, QPlainTextEdit#PythonSourceEditor {
+    background: @--bg-app@;
+    color: @--text-primary@;
+}
+QPlainTextEdit#PythonSourceEditor {
+    font-family: "Cascadia Mono", "Consolas", monospace;
+    selection-background-color: @--accent-muted@;
+}
+QMainWindow#PythonScriptEditorWindow QToolBar {
+    background: @--bg-panel@;
+    border-bottom: 1px solid @--divider@;
+    spacing: 6px;
+}
+QMainWindow#PythonScriptEditorWindow QToolButton {
+    background: @--bg-input@;
+    color: @--text-primary@;
+    border: 1px solid @--border-subtle@;
+    padding: 6px;
+}
+QMainWindow#PythonScriptEditorWindow QToolButton:hover { background: @--bg-hover@; }

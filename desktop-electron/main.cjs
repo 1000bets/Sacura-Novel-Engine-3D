@@ -28,6 +28,7 @@ const AssetReferenceCheck = process.argv.includes('--asset-reference-check');
 const ComponentNamesCheck = process.argv.includes('--component-names-check');
 const WorkspaceTabsRestore = process.argv.includes('--workspace-tabs-restore-check');
 const WorkspaceTabsCheck = WorkspaceTabsRestore || process.argv.includes('--workspace-tabs-check');
+const LocalizationCheck = process.argv.includes('--localization-check');
 const CameraSpeedCheck = process.argv.includes('--camera-speed-check');
 const SceneShortcutsCheck = process.argv.includes('--scene-shortcuts-check');
 const MaterialDropCheck = process.argv.includes('--material-drop-check');
@@ -35,7 +36,7 @@ const MaterialCapture = process.argv.find(Argument => Argument.startsWith('--scr
 const nativeSmoke = process.argv.includes('--native-smoke')||compatibilityTest||assetTransferTest;
 // CLI rendering checks must keep Chromium producing frames when another app
 // covers the test window. Production keeps normal background/visibility policy.
-if(AssetReferenceCheck || WorkspaceTabsCheck || nativeSmoke || MaterialCapture || ComponentNamesCheck || CameraSpeedCheck || SceneShortcutsCheck || MaterialDropCheck){
+if(LocalizationCheck || AssetReferenceCheck || WorkspaceTabsCheck || nativeSmoke || MaterialCapture || ComponentNamesCheck || CameraSpeedCheck || SceneShortcutsCheck || MaterialDropCheck){
   app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
   app.commandLine.appendSwitch('disable-features','CalculateNativeWinOcclusion');
 }
@@ -70,6 +71,28 @@ function handle(channel, action) {
   ipcMain.handle('desktop:' + channel, async (event, ...args) => {trusted(event);
     return action(...args);});
 }
+let LocalizationQueue = Promise.resolve();
+handle('editor-localization', Values => {
+  const Operation = async () => {
+    let Input;
+    if (Values !== undefined) {
+      Input = JSON.stringify(Values);
+      if (Buffer.byteLength(Input) > 4 * 1024 * 1024) {
+        throw new Error('Localization preferences exceed the size limit');
+      }
+    }
+    const Result = await projectCli(hostPath(app), ['--editor-localization'], Input);
+    if (Values !== undefined) {
+      for (const Target of BrowserWindow.getAllWindows()) {
+        Target.webContents.send('editor-localization-changed', Result);
+      }
+    }
+    return Result;
+  };
+  const Result = LocalizationQueue.then(Operation);
+  LocalizationQueue = Result.catch(() => {});
+  return Result;
+});
 async function openRoot(root) {
   const real = await fs.realpath(root);
   const project = await store.readProject(real);
@@ -151,6 +174,31 @@ app.whenReady().then(async () => {
     handle('document-list', () => AssetWindows.list());
     handle('document-close', Identifier => AssetWindows.close(Identifier));
     handle('workspace-drag-surfaces', () => [...WorkspaceWindows.entries(), ['', window]].filter(([, Surface]) => !Surface.isDestroyed()).map(([Name, Surface]) => ({name:Name,bounds:Surface.getContentBounds(),visible:Surface.isVisible() && !Surface.isMinimized()})));
+    handle('workspace-focus-window', Name => {
+      let Surface = window;
+      if (Name !== '') {
+        Surface = WorkspaceWindows.get(Name);
+      }
+      if (!Surface || Surface.isDestroyed()) {
+        return false;
+      }
+      if (Surface.isMinimized()) {
+        Surface.restore();
+      }
+      const Bounds = Surface.getBounds();
+      const Visible = screen.getAllDisplays().some(Display => {
+        const Work = Display.workArea;
+        return Bounds.x >= Work.x && Bounds.y >= Work.y &&
+          Bounds.x + Math.min(Bounds.width, 160) <= Work.x + Work.width && Bounds.y + 40 <= Work.y + Work.height;
+      });
+      if (!Visible) {
+        const Work = screen.getDisplayMatching(Bounds).workArea;
+        Surface.setBounds({x:Work.x,y:Work.y,width:Math.min(Bounds.width,Work.width),height:Math.min(Bounds.height,Work.height)});
+      }
+      Surface.show();
+      Surface.focus();
+      return true;
+    });
     handle('workspace-close-window', Name => {
       const Child = WorkspaceWindows.get(Name);
       if (Child) {
@@ -258,11 +306,12 @@ app.whenReady().then(async () => {
         closed=true;window.close();
       }).catch(error=>{closing=false;dialog.showErrorBox('Проект остаётся открытым',error.message);});
     });
-    if (AssetReferenceCheck) require('./scripts/asset-reference-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
+    if (AssetReferenceCheck) require('./scripts/asset-reference-check.cjs').run({app,window,editors:AssetWindows,windows:WorkspaceWindows,getViewport:()=>nativeViewport,createNativeProject});
     if (ComponentNamesCheck) require('./scripts/component-names-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
     if (WorkspaceTabsCheck) {
       require('./scripts/workspace-tabs-check.cjs').run({app,window,editors:AssetWindows,windows:WorkspaceWindows,getViewport:()=>nativeViewport,createNativeProject,restore:WorkspaceTabsRestore});
     }
+    if (LocalizationCheck) require('./scripts/localization-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
     if (CameraSpeedCheck) require('./scripts/camera-speed-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
     if (SceneShortcutsCheck) require('./scripts/scene-shortcuts-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});
     if (MaterialDropCheck) require('./scripts/material-drop-check.cjs').run({app,window,getViewport:()=>nativeViewport,createNativeProject});

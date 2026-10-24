@@ -1,4 +1,4 @@
-import {initializeLanguage} from './i18n.js';
+import {initializeLanguage,InitializeEditorPreferences} from './i18n.js';
 import {initializeTheme,applyTheme,saveTheme} from './themes.js';
 import React from 'react';
 import {createRoot} from 'react-dom/client';
@@ -18,9 +18,9 @@ initializeLanguage();
 const root=createRoot(document.getElementById('root'),{onUncaughtError:error=>console.error('React render failed:',error.stack||error.message)});
 // Native panels read exclusively from the Bridge. The empty legacy shape supplies
 // existing shell/layout defaults; it is never saved or simulated in desktop.
-root.render(window.sacuraDesktop?.nativeViewport
+InitializeEditorPreferences().catch(Error => console.error('Editor preferences failed:', Error.message)).finally(() => root.render(window.sacuraDesktop?.nativeViewport
   ? (window.sacuraDesktop.assetEditorIdentity ? <NativeAssetEditorRoot/> : <NativeProjectHome/>)
-  : window.sacuraDesktop?.isDesktop===true?<ProjectHome/>:<AuthGate/>);
+  : window.sacuraDesktop?.isDesktop===true?<ProjectHome/>:<AuthGate/>));
 
 import "./editorTheme.css";
 import "./editorWindows.css";

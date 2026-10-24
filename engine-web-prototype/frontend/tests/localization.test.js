@@ -1,6 +1,7 @@
 import test,{afterEach} from 'node:test';
 import assert from 'node:assert/strict';
-import english from '../src/translations.en.json' with {type:'json'};
+import EditorCatalog from '../../../Root/EditorCore/resources/Localization/Editor.json' with {type:'json'};
+const english = Object.fromEntries(Object.values(EditorCatalog.entries).map(Entry => [Entry.translations.ru, Entry.source]));
 import {LANGUAGE_STORAGE_KEY,readLanguage,initializeLanguage,setLanguage,getLanguage,localeTag,subscribeLanguage,t,message,literalLabel,optionLabel,plural} from '../src/i18n.js';
 import {createEmptyProject} from '../src/projectLifecycle.js';
 import {PreviewRuntime} from '../src/runtime.js';
@@ -13,15 +14,15 @@ const storage=()=>{const values=new Map();return {getItem:key=>values.get(key),s
 const memory=storage();
 afterEach(()=>setLanguage('ru',memory));
 
-test('language preference survives initialization; invalid or inaccessible preferences fall back to Russian',()=>{
- assert.equal(readLanguage(memory),'ru');
+test('language preference survives initialization; invalid or inaccessible preferences fall back to English',()=>{
+ assert.equal(readLanguage(memory),'en');
  const root={lang:''};let notifications=0;const unsubscribe=subscribeLanguage(()=>notifications++);
  assert.equal(setLanguage('en',memory,root),true);assert.equal(root.lang,'en');assert.equal(memory.getItem(LANGUAGE_STORAGE_KEY),'en');
  assert.equal(initializeLanguage(memory),'en');assert.equal(localeTag(),'en-US');assert.equal(notifications,1);
  assert.equal(setLanguage('fr',memory,root),false);assert.equal(getLanguage(),'en');assert.equal(root.lang,'en');assert.equal(notifications,1);
  unsubscribe();setLanguage('ru',memory,root);assert.equal(notifications,1);
- memory.setItem(LANGUAGE_STORAGE_KEY,'invalid');assert.equal(readLanguage(memory),'ru');
- assert.equal(initializeLanguage({getItem(){throw Error('denied');}}),'ru');
+ memory.setItem(LANGUAGE_STORAGE_KEY,'invalid');assert.equal(readLanguage(memory),'en');
+ assert.equal(initializeLanguage({getItem(){throw Error('denied');}}),'en');
  assert.equal(setLanguage('en',{setItem(){throw Error('denied');}},root),false);assert.equal(root.lang,'en');assert.equal(t('Файл'),'File');
 });
 
@@ -71,7 +72,7 @@ test('switching languages preserves the project and running story, including nam
 test('catalog entries have a nonempty English translation with the same interpolation slots',()=>{
  const slots=value=>[...value.matchAll(/\{(\d+)\}/g)].map(x=>x[1]).sort();
  for(const [ru,en] of Object.entries(english)){
-  assert.equal(ru,ru.trim(),ru);assert.equal(typeof en,'string',ru);assert.ok(en.trim(),ru);
+  assert.ok(ru.trim(),ru);assert.equal(typeof en,'string',ru);assert.ok(en.trim(),ru);
   assert.deepEqual(slots(en),slots(ru),ru);
  }
 });

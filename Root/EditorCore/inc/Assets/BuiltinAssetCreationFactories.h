@@ -3,6 +3,17 @@
 #include "Input/InputTypes.h"
 #include "Materials/MaterialDefinition.h"
 
+class CreatePythonScriptAssetFactory : public AssetCreationFactory
+{
+    ENGINE_CLASS(CreatePythonScriptAssetFactory, AssetCreationFactory, "editor.CreatePythonScriptAssetFactory")
+public:
+    AssetType GetAssetType() const override { return PythonScriptAssetType; }
+    const char* GetDisplayName() const override { return "Python Script"; }
+    const char* GetExtension() const override { return ".py"; }
+    bool Create(AssetRegistry& Registry, const std::filesystem::path& Destination, std::string& Error) const override;
+};
+ENGINE_CLASS_END(CreatePythonScriptAssetFactory)
+
 class CreateSceneAssetFactory : public AssetCreationFactory
 {
     ENGINE_CLASS(CreateSceneAssetFactory, AssetCreationFactory, "editor.CreateSceneAssetFactory")

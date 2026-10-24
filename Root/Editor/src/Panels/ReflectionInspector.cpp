@@ -1,3 +1,4 @@
+#include "UI/Presentation/LocalizedEditorUi.h"
 #include "UI/Views/AssetReferenceField.h"
 #include "UI/Adapters/AssetThumbnails.h"
 #include "UI/Views/StudioControls.h"
@@ -142,8 +143,16 @@ ReflectionInspector::ReflectionInspector(QWidget* Parent)
     TypeLabel = new QLabel(this);
     TypeLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
     TypeLabel->setWordWrap(true);
+    EditorLocalization::Get().Bind(TypeLabel, [this]()
+    {
+        if (GetInspectedObject())
+        {
+            const QString Identifier = "Editor.Reflection." + QString::fromStdString(GetInspectedObject()->GetTypeId().Value) + ".DisplayName";
+            TypeLabel->setText(EditorLocalization::Get().Text(Identifier, QString::fromStdString(GetInspectedObject()->GetClass()->GetDisplayName())));
+        }
+    });
     TypeLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
-    ResetAllButton = new QPushButton(tr("Сбросить свойства"), this);
+    ResetAllButton = BindEditorCaption(new QPushButton(tr("Сбросить свойства"), this), QString::fromUtf8("Сбросить свойства"));
     PropertiesLayout = new QFormLayout();
     PropertiesLayout->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
     PropertiesLayout->setRowWrapPolicy(QFormLayout::WrapAllRows);
@@ -261,7 +270,7 @@ void ReflectionInspector::Rebuild()
             DisplayedValues.emplace_back(Property->Id, std::move(Value));
         }
     }
-    TypeLabel->setText(QString::fromStdString(GetInspectedObject()->GetClass()->GetDisplayName()));
+    TypeLabel->setText(EditorLocalization::Get().Caption(QString::fromStdString(GetInspectedObject()->GetClass()->GetDisplayName())));
     TypeLabel->setToolTip(QString::fromStdString(GetInspectedObject()->GetClass()->GetTypeId().Value));
     ResetAllButton->setEnabled(true);
     ResetAllButton->setVisible(true);
@@ -895,7 +904,7 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
     }
     else
     {
-        QLabel* Unsupported = new QLabel(tr("unsupported"), FieldWidget);
+        QLabel* Unsupported = BindEditorCaption(new QLabel(tr("unsupported"), FieldWidget), QString::fromUtf8("unsupported"));
         FieldLayout->addWidget(Unsupported);
     }
 
@@ -903,7 +912,7 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
     {
         QPushButton* ResetButton = new QPushButton(EditorUi::MakeStudioIcon(EditorUi::StudioIcon::Rotate), {}, FieldWidget);
         ResetButton->setProperty("uiRole", "propertyReset");
-        ResetButton->setToolTip(tr("Сбросить свойство"));
+        BindEditorProperty(ResetButton, "toolTip", QString::fromUtf8("Сбросить свойство"));
         ResetButton->setAccessibleName(tr("Reset property to default"));
         ResetButton->setFixedWidth(24);
         FieldLayout->addWidget(ResetButton);
@@ -938,13 +947,20 @@ void ReflectionInspector::AddPropertyEditor(const PropertyDescriptor& Descriptor
         ColumnLayout->setContentsMargins(0, 0, 0, 0);
         ColumnLayout->setSpacing(4);
         QLabel* PropertyLabel = new QLabel(Label, Column);
+        const QString LocalizationKey = "Editor.Reflection." + QString::fromStdString(GetInspectedObject()->GetTypeId().Value)
+            + "." + QString::fromStdString(Descriptor.Id.Value) + ".DisplayName";
+        const QString SourceCaption = Label;
+        EditorLocalization::Get().Bind(PropertyLabel, [PropertyLabel, LocalizationKey, SourceCaption]()
+        {
+            PropertyLabel->setText(EditorLocalization::Get().Text(LocalizationKey, SourceCaption));
+        });
         PropertyLabel->setWordWrap(true);
         if (OverrideMarker && OverrideMarker(GetInspectedObject(), Descriptor.Id))
         {
             QFont Font = PropertyLabel->font();
             Font.setBold(true);
             PropertyLabel->setFont(Font);
-            PropertyLabel->setToolTip(tr("Prefab override"));
+            BindEditorProperty(PropertyLabel, "toolTip", QString::fromUtf8("Prefab override"));
         }
         ColumnLayout->addWidget(PropertyLabel);
         ColumnLayout->addWidget(FieldWidget);

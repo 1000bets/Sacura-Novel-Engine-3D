@@ -93,6 +93,11 @@ ctest --test-dir build -C Debug -R '^Editor.Mcp.Integration$' --output-on-failur
 
 ## Python Narrative
 
+Python-исходники доступны через `python_document`: параметры `path` и `operation` (inspect, source, undo, redo, reload, save).
+Изменения требуют актуальной `revision`; source дополнительно требует строку `source`.
+Путь — виртуальный путь Python-ассета, например `/Game/Scripts/Health.py`. Команда редактирует общий черновик,
+не выполняет Python и записывает файл только при save. Создание использует опубликованную фабрику `editor.CreatePythonScriptAssetFactory`.
+
 Команды `narrative_*` редактируют активную историю через `StoryGraphController` и её общую историю изменений. Типы литералов, пины и циклы данных проверяются до изменения; установка литерала отключает прежний провод с возможностью Undo. Изменения запрещены во время Play. Сохранение выполняется явно. Аргументы и границы покрытия описаны в [Python Narrative](PYTHON-NARRATIVE.md). Проверка реестра и команд: `Editor.Narrative`; транспорт проверяется отдельно в `Editor.Mcp.Integration`.
 
 ## Материалы и физика меша

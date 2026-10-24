@@ -1,22 +1,33 @@
+import {t as tr, useLocale} from './i18n.jsx';
 import React, {useEffect, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {RegisterWorkspaceDocument} from './workspaceDocuments.js';
 import {Icon, Button} from './StudioParts.jsx';
-import {EDITOR_WINDOWS, DOCK_AREAS, BaseTabs, windowLabel, windowArea, dockTabs, activeDockWindow, isWindowOpen, openWindow, moveWindowTab, updateWindowRect} from './editorWindows.js';
+import {EDITOR_WINDOWS, DOCK_AREAS, BaseTabs, windowLabel as OriginalWindowLabel, windowArea, dockTabs, activeDockWindow, isWindowOpen, openWindow, moveWindowTab, updateWindowRect} from './editorWindows.js';
 import {EditorDockBody, EditorDockStrip, DockPanelMount, useDocking} from './EditorDocking.jsx';
 
+function LocalizedWindowLabel(Identifier) {
+  const Caption = OriginalWindowLabel(Identifier);
+  if (EDITOR_WINDOWS.some(([Builtin]) => Builtin === Identifier)) {
+    return tr(Caption);
+  }
+  return Caption;
+}
+
 export function EditorWindowsMenu({windows:Windows, onSelect:Select, onClose:Close, onReset:Reset}) {
+  useLocale();
   const [Query, SetQuery] = useState('');
-  return <div className="editor-windows-menu" role="menu" aria-label="Вкладки редактора">
-    <label className="window-menu-search"><Icon name="Search" size={14}/><input autoFocus type="search" aria-label="Найти вкладку" placeholder="Найти вкладку…" value={Query} onChange={Event => SetQuery(Event.target.value)}/></label>
-    {[...EDITOR_WINDOWS, ...Object.entries(Windows.documents || {}).map(([Identifier, Definition]) => [Identifier, Definition.label, 'File'])].filter(([,Label]) => Label.toLocaleLowerCase().includes(Query.toLocaleLowerCase())).map(([Identifier, Label, IconName]) => <div className="window-menu-row" key={Identifier}>
+  return <div className="editor-windows-menu" role="menu" aria-label={tr("Вкладки редактора")}>
+    <label className="window-menu-search"><Icon name="Search" size={14}/><input autoFocus type="search" aria-label={tr("Найти вкладку")} placeholder={tr("Найти вкладку…")} value={Query} onChange={Event => SetQuery(Event.target.value)}/></label>
+    {[...EDITOR_WINDOWS.map(([Identifier, Caption, Icon]) => [Identifier, tr(Caption), Icon]), ...Object.entries(Windows.documents || {}).map(([Identifier, Definition]) => [Identifier, Definition.label, 'File'])].filter(([,Label]) => Label.toLocaleLowerCase().includes(Query.toLocaleLowerCase())).map(([Identifier, Label, IconName]) => <div className="window-menu-row" key={Identifier}>
       <button role="menuitemcheckbox" aria-checked={isWindowOpen(Windows, Identifier)} onClick={() => Select(Identifier)}><Icon name={IconName} size={15}/><span>{Label}</span></button>
       {isWindowOpen(Windows, Identifier) && <button className="window-reveal" aria-label={'Закрыть вкладку «' + Label + '»'} onClick={() => Close(Identifier)}><Icon name="X" size={14}/></button>}
     </div>)}
-    <button role="menuitem" onClick={Reset}><Icon name="RotateCcw" size={15}/>Восстановить раскладку</button>
+    <button role="menuitem" onClick={Reset}><Icon name="RotateCcw" size={15}/>{tr("Восстановить раскладку")}</button>
   </div>;
 }
 export function EditorDockTabs({area:Area = 'workspace', maximized:Maximized, onMaximize:Maximize}) {
+  useLocale();
   const Docking = useDocking();
   const {windows:Windows} = Docking;
   const Group = dockTabs(Windows, Area);
@@ -27,7 +38,7 @@ export function EditorDockTabs({area:Area = 'workspace', maximized:Maximized, on
     Docking.popups.current.get(Area)?.focus();
   }
   return <EditorDockStrip area={Area} className="panel-tabs dock-tabs managed-dock-tabs">
-    <div className="workspace-tab-list" role="tablist" aria-label="Вкладки">
+    <div className="workspace-tab-list" role="tablist" aria-label={tr("Вкладки")}>
       {Group.map(Identifier => <div key={Identifier} className={'workspace-tab' + (Active === Identifier ? ' active' : '')} data-dock-window={Identifier}>
         <button role="tab" id={'editor-tab-' + Identifier} aria-selected={Active === Identifier} tabIndex={Active === Identifier ? 0 : -1} draggable={false}
           onPointerDown={Event => Docking.startDrag(Event, Identifier)} onClick={() => Select(Identifier)} onDoubleClick={() => Docking.detach(Identifier)}
@@ -50,12 +61,12 @@ export function EditorDockTabs({area:Area = 'workspace', maximized:Maximized, on
                 Event.currentTarget.ownerDocument.getElementById('editor-tab-' + Next)?.focus();
               }
             }
-          }}>{windowLabel(Identifier)}</button>
-        <button className="workspace-tab-close" aria-label={'Закрыть вкладку «' + windowLabel(Identifier) + '»'} onClick={() => Docking.onClose(Identifier)}><Icon name="X" size={12}/></button>
+          }}>{LocalizedWindowLabel(Identifier)}</button>
+        <button className="workspace-tab-close" aria-label={'Закрыть вкладку «' + LocalizedWindowLabel(Identifier) + '»'} onClick={() => Docking.onClose(Identifier)}><Icon name="X" size={12}/></button>
       </div>)}
     </div>
     <div className="workspace-tab-actions">
-      <details className="workspace-tab-menu"><summary aria-label="Переместить вкладку" title="Переместить вкладку" onClick={Event => {
+      <details className="workspace-tab-menu"><summary aria-label={tr("Переместить вкладку")} title={tr("Переместить вкладку")} onClick={Event => {
         const Bounds = Event.currentTarget.getBoundingClientRect();
         const Owner = Event.currentTarget.ownerDocument.defaultView;
         const Menu = Event.currentTarget.nextElementSibling;
@@ -66,12 +77,12 @@ export function EditorDockTabs({area:Area = 'workspace', maximized:Maximized, on
         {Destinations.filter(([Identifier]) => Identifier !== Area).map(([Identifier, Label]) => <button key={Identifier} disabled={!Active} role="menuitem" onClick={Event => {
           Event.currentTarget.closest('details').open = false;
           Docking.place(Active, Identifier);
-        }}>В {Label}</button>)}
-        <button disabled={!Active || Group.length < 2} onClick={() => Docking.split(Active, Area, 'right')}>Новая группа справа</button>
-        <button disabled={!Active || Group.length < 2} onClick={() => Docking.split(Active, Area, 'bottom')}>Новая группа снизу</button>
+        }}>{tr("В")}{Label}</button>)}
+        <button disabled={!Active || Group.length < 2} onClick={() => Docking.split(Active, Area, 'right')}>{tr("Новая группа справа")}</button>
+        <button disabled={!Active || Group.length < 2} onClick={() => Docking.split(Active, Area, 'bottom')}>{tr("Новая группа снизу")}</button>
       </div></details>
-      <Button icon="AppWindow" disabled={!Active} aria-label="Открепить окно" title="Открепить вкладку в отдельное окно" onClick={() => Docking.detach(Active)}/>
-      {Maximize && <Button icon={Maximized ? 'Minimize2' : 'Maximize2'} title="Развернуть рабочую область" onClick={Maximize}/>}
+      <Button icon="AppWindow" disabled={!Active} aria-label={tr("Открепить окно")} title={tr("Открепить вкладку в отдельное окно")} onClick={() => Docking.detach(Active)}/>
+      {Maximize && <Button icon={Maximized ? 'Minimize2' : 'Maximize2'} title={tr("Развернуть рабочую область")} onClick={Maximize}/>}
     </div>
   </EditorDockStrip>;
 }
@@ -83,6 +94,7 @@ function GroupHasTabs(Windows, Area, Seen = new Set()) {
   return dockTabs(Windows, Area).length > 0 || Object.entries(Windows.containers || {}).some(([Identifier, Container]) => Container.parent === Area && GroupHasTabs(Windows, Identifier, Seen));
 }
 export function EditorDockArea({area:Area, onMaximize:Maximize, maximized:Maximized}) {
+  useLocale();
   const Docking = useDocking();
   const Children = Object.entries(Docking.windows.containers || {}).filter(([Identifier, Container]) => Container.parent === Area && GroupHasTabs(Docking.windows, Identifier));
   let Over = null;
@@ -92,8 +104,8 @@ export function EditorDockArea({area:Area, onMaximize:Maximize, maximized:Maximi
   let Content = <section className="universal-dock-group" data-dock-root={Area}>
     <EditorDockTabs area={Area} onMaximize={Maximize} maximized={Maximized}/>
     <EditorDockBody area={Area}/>
-    {dockTabs(Docking.windows, Area).length === 0 && <div className="workspace-empty">Перетащите вкладку сюда</div>}
-    {Over && Docking.drag && <div className={'workspace-drop-preview ' + Over}>Разместить вкладку</div>}
+    {dockTabs(Docking.windows, Area).length === 0 && <div className="workspace-empty">{tr("Перетащите вкладку сюда")}</div>}
+    {Over && Docking.drag && <div className={'workspace-drop-preview ' + Over}>{tr("Разместить вкладку")}</div>}
   </section>;
   for (const [Identifier, Container] of Children) {
     Content = <SplitGroup key={Identifier} identifier={Identifier} direction={Container.direction} first={Content} second={<EditorDockArea area={Identifier}/>}/>;
@@ -101,6 +113,7 @@ export function EditorDockArea({area:Area, onMaximize:Maximize, maximized:Maximi
   return Content;
 }
 function SplitGroup({identifier:Identifier, direction:Direction, first:First, second:Second}) {
+  useLocale();
   const Docking = useDocking();
   const Ratio = Docking.windows.containers[Identifier]?.ratio || 50;
   const SetRatio = Value => Docking.onChange(Current => {
@@ -118,7 +131,7 @@ function SplitGroup({identifier:Identifier, direction:Direction, first:First, se
     }
     SetRatio(Math.max(15, Math.min(85, Value * 100)));
   }
-  return <div className={'workspace-split ' + Direction} style={{'--split-ratio':Ratio + '%'}}><div>{First}</div><div role="separator" tabIndex={0} aria-label="Размер групп вкладок" className="workspace-split-divider" onPointerDown={Event => {
+  return <div className={'workspace-split ' + Direction} style={{'--split-ratio':Ratio + '%'}}><div>{First}</div><div role="separator" tabIndex={0} aria-label={tr("Размер групп вкладок")} className="workspace-split-divider" onPointerDown={Event => {
     Event.currentTarget.setPointerCapture(Event.pointerId);
     Resize(Event);
   }} onPointerMove={Event => {
@@ -137,11 +150,12 @@ function SplitGroup({identifier:Identifier, direction:Direction, first:First, se
   }}/><div>{Second}</div></div>;
 }
 function DetachedWorkspace({area:Area, descriptor:Descriptor}) {
+  useLocale();
   const Docking = useDocking();
   const [Surface, SetSurface] = useState(null);
   useEffect(() => {
     if (Surface) {
-      Surface.ownerDocument.title = (windowLabel(activeDockWindow(Docking.windows, Area)) || Descriptor.label) + ' — Sacura';
+      Surface.ownerDocument.title = (LocalizedWindowLabel(activeDockWindow(Docking.windows, Area)) || Descriptor.label) + ' — Sacura';
     }
   }, [Surface, Docking.windows.selected[Area]]);
   useEffect(() => {
@@ -204,6 +218,7 @@ function DetachedWorkspace({area:Area, descriptor:Descriptor}) {
   return createPortal(<EditorDockArea area={Area}/>, Surface);
 }
 export default function EditorWorkspace({renderPanel:RenderPanel, maximized:Maximized, onMaximize:Maximize}) {
+  useLocale();
   const Docking = useDocking();
   const {windows:Windows} = Docking;
   const Visited = useRef(new Set());
@@ -215,7 +230,7 @@ export default function EditorWorkspace({renderPanel:RenderPanel, maximized:Maxi
   return <>
     <section className="graph-dock managed-workspace"><EditorDockArea area="workspace" onMaximize={Maximize} maximized={Maximized}/></section>
     {[...Visited.current].filter(Identifier => !Identifier.startsWith('asset:') || Windows.tabs.includes(Identifier)).map(Identifier => <DockPanelMount key={Identifier} id={Identifier}>
-      <section className="editor-window-panel is-docked" id={'editor-window-' + Identifier} role="tabpanel" aria-label={windowLabel(Identifier)} onFocusCapture={() => Docking.onChange(Current => openWindow(Current, Identifier))}>
+      <section className="editor-window-panel is-docked" id={'editor-window-' + Identifier} role="tabpanel" aria-label={LocalizedWindowLabel(Identifier)} onFocusCapture={() => Docking.onChange(Current => openWindow(Current, Identifier))}>
         <div className="editor-window-body">{RenderPanel(Identifier, isWindowOpen(Windows, Identifier) && activeDockWindow(Windows, windowArea(Windows, Identifier)) === Identifier)}</div>
       </section>
     </DockPanelMount>)}

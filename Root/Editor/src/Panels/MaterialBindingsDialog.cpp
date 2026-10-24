@@ -1,3 +1,4 @@
+#include "UI/Presentation/LocalizedEditorUi.h"
 #include "UI/Views/StudioControls.h"
 #include "Panels/MaterialBindingsDialog.h"
 #include <QComboBox>
@@ -13,7 +14,7 @@
 MaterialBindingsDialog::MaterialBindingsDialog(AssetRegistry& Registry, nlohmann::json Entries, bool bEffects, QWidget* Parent)
     : QDialog(Parent), BoundRegistry(Registry), bPostProcess(bEffects)
 {
-    setWindowTitle(tr("Material Bindings"));
+    BindEditorProperty(this, "windowTitle", QString::fromUtf8("Material Bindings"));
     resize(650, 400);
     auto* Layout = new QVBoxLayout(this);
     Table = new QTableWidget(this);
@@ -34,10 +35,10 @@ MaterialBindingsDialog::MaterialBindingsDialog(AssetRegistry& Registry, nlohmann
         AppendRow(Entry);
     }
     auto* Actions = new QHBoxLayout;
-    auto* Add = new QPushButton(tr("Add"), this);
-    auto* Remove = new QPushButton(tr("Remove"), this);
-    auto* Up = new QPushButton(tr("Move Up"), this);
-    auto* Down = new QPushButton(tr("Move Down"), this);
+    auto* Add = BindEditorCaption(new QPushButton(tr("Add"), this), QString::fromUtf8("Add"));
+    auto* Remove = BindEditorCaption(new QPushButton(tr("Remove"), this), QString::fromUtf8("Remove"));
+    auto* Up = BindEditorCaption(new QPushButton(tr("Move Up"), this), QString::fromUtf8("Move Up"));
+    auto* Down = BindEditorCaption(new QPushButton(tr("Move Down"), this), QString::fromUtf8("Move Down"));
     Actions->addWidget(Add);
     Actions->addWidget(Remove);
     Actions->addWidget(Up);

@@ -172,7 +172,7 @@ bool ProjectGenerator::CreateProject(
         ProjectRoot / "Content" / "Models",
         ProjectRoot / "Content" / "Audio",
         ProjectRoot / "Content" / "Stories",
-        ProjectRoot / "Scripts",
+        ProjectRoot / "Content" / "Scripts",
         ProjectRoot / "Config",
     };
 
@@ -261,7 +261,7 @@ bool ProjectGenerator::CreateProject(
 
     if (Parsed.TemplateId == "VisualNovel" || Parsed.TemplateId == "KineticNovel")
     {
-        const std::filesystem::path StarterScript = ProjectRoot / "Scripts" / "story_controller.py";
+        const std::filesystem::path StarterScript = ProjectRoot / "Content" / "Scripts" / "story_controller.py";
         std::ofstream ScriptFile(StarterScript);
         ScriptFile <<
             "from engine import ScriptComponent, register_class, field\n"

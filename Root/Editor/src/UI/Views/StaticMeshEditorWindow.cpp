@@ -1,3 +1,4 @@
+#include "UI/Presentation/LocalizedEditorUi.h"
 #include "UI/Styles/StudioIcons.h"
 #include "UI/Views/AssetReferenceField.h"
 #include "UI/Adapters/AssetThumbnails.h"
@@ -53,9 +54,9 @@ StaticMeshEditorWindow::StaticMeshEditorWindow(Engine& InRuntime, const AssetKey
     Content->setObjectName("StaticMeshEditorContent");
     setCentralWidget(Content);
     auto* Layout = new QVBoxLayout(Content);
-    auto* FileMenu = menuBar()->addMenu(tr("Файл"));
-    auto* EditMenu = menuBar()->addMenu(tr("Правка"));
-    auto* ViewMenu = menuBar()->addMenu(tr("Вид"));
+    auto* FileMenu = BindEditorCaption(menuBar()->addMenu(tr("Файл")), QString::fromUtf8("Файл"));
+    auto* EditMenu = BindEditorCaption(menuBar()->addMenu(tr("Правка")), QString::fromUtf8("Правка"));
+    auto* ViewMenu = BindEditorCaption(menuBar()->addMenu(tr("Вид")), QString::fromUtf8("Вид"));
     auto* Toolbar = new QToolBar(tr("Документ"), this);
     Toolbar->setObjectName("StaticMeshDocumentToolbar");
     Toolbar->setMovable(false);
@@ -70,7 +71,7 @@ StaticMeshEditorWindow::StaticMeshEditorWindow(Engine& InRuntime, const AssetKey
         {
             Command->setShortcut(QKeySequence::Save);
             Command->setIcon(EditorUi::MakeFrontendIcon("Save"));
-            Command->setToolTip(tr("Сохранить (Ctrl+S)"));
+            BindEditorProperty(Command, "toolTip", QString::fromUtf8("Сохранить (Ctrl+S)"));
             Toolbar->addAction(Command);
             FileMenu->addAction(Command);
         }
@@ -103,10 +104,10 @@ StaticMeshEditorWindow::StaticMeshEditorWindow(Engine& InRuntime, const AssetKey
         });
     }
     FileMenu->addSeparator();
-    auto* CloseAction = FileMenu->addAction(tr("Закрыть"));
+    auto* CloseAction = BindEditorCaption(FileMenu->addAction(tr("Закрыть")), QString::fromUtf8("Закрыть"));
     CloseAction->setShortcut(QKeySequence::Close);
     connect(CloseAction, &QAction::triggered, this, [this]() { close(); });
-    auto* ShowCollision = ViewMenu->addAction(tr("Показать коллизию"));
+    auto* ShowCollision = BindEditorCaption(ViewMenu->addAction(tr("Показать коллизию")), QString::fromUtf8("Показать коллизию"));
     ShowCollision->setCheckable(true);
     ShowCollision->setChecked(true);
     auto* Splitter = new QSplitter(this);
@@ -173,7 +174,7 @@ StaticMeshEditorWindow::StaticMeshEditorWindow(Engine& InRuntime, const AssetKey
         Shortcut->setContext(Qt::WidgetWithChildrenShortcut);
         connect(Shortcut, &QShortcut::activated, this, [this, bMesh]() { FrameSelection(bMesh); });
     }
-    auto* Help = new QLabel(tr("ПКМ + WASD/QE — полёт; Alt + ЛКМ — орбита; СКМ — сдвиг; колесо — приближение"), this);
+    auto* Help = BindEditorCaption(new QLabel(tr("ПКМ + WASD/QE — полёт; Alt + ЛКМ — орбита; СКМ — сдвиг; колесо — приближение"), this), QString::fromUtf8("ПКМ + WASD/QE — полёт; Alt + ЛКМ — орбита; СКМ — сдвиг; колесо — приближение"));
     Help->setWordWrap(true);
     FrameToolbar->addWidget(Help, 1);
     Layout->addLayout(FrameToolbar);
@@ -316,7 +317,7 @@ void StaticMeshEditorWindow::RebuildFields()
         Elements->addItem(tr("Элемент %1 — %2").arg(Index + 1).arg(ShapeNames[Defaults.CollisionElements[Index].ShapeType]));
     }
     Elements->setCurrentRow(static_cast<int>(SelectedCollisionElement));
-    Fields->addRow(new QLabel(tr("Элементы коллизии"), this));
+    Fields->addRow(BindEditorCaption(new QLabel(tr("Элементы коллизии"), this), QString::fromUtf8("Элементы коллизии")));
     Fields->addRow(Elements);
     connect(Elements, &QListWidget::currentRowChanged, this, [this](int Index)
     {
@@ -331,13 +332,13 @@ void StaticMeshEditorWindow::RebuildFields()
     auto* ElementActions = new QWidget(this);
     auto* ElementLayout = new QHBoxLayout(ElementActions);
     ElementLayout->setContentsMargins(0, 0, 0, 0);
-    auto* AddElement = new QPushButton(tr("Добавить"), ElementActions);
+    auto* AddElement = BindEditorCaption(new QPushButton(tr("Добавить"), ElementActions), QString::fromUtf8("Добавить"));
     AddElement->setObjectName("StaticMeshAddCollisionElement");
     ElementLayout->addWidget(AddElement);
-    auto* DuplicateElement = new QPushButton(tr("Дублировать"), ElementActions);
+    auto* DuplicateElement = BindEditorCaption(new QPushButton(tr("Дублировать"), ElementActions), QString::fromUtf8("Дублировать"));
     DuplicateElement->setEnabled(!Defaults.CollisionElements.empty());
     ElementLayout->addWidget(DuplicateElement);
-    auto* RemoveElement = new QPushButton(tr("Удалить"), ElementActions);
+    auto* RemoveElement = BindEditorCaption(new QPushButton(tr("Удалить"), ElementActions), QString::fromUtf8("Удалить"));
     RemoveElement->setObjectName("StaticMeshRemoveCollisionElement");
     RemoveElement->setEnabled(!Defaults.CollisionElements.empty());
     ElementLayout->addWidget(RemoveElement);
@@ -381,9 +382,9 @@ void StaticMeshEditorWindow::RebuildFields()
         QTimer::singleShot(0, this, &StaticMeshEditorWindow::RebuildFields);
     });
     auto* Enabled = new QCheckBox(this);
-    Enabled->setToolTip(tr("Включает физическую коллизию у объектов, использующих настройки меша. Формы остаются видимыми для редактирования."));
+    BindEditorProperty(Enabled, "toolTip", QString::fromUtf8("Включает физическую коллизию у объектов, использующих настройки меша. Формы остаются видимыми для редактирования."));
     Enabled->setChecked(Defaults.bCollisionEnabled);
-    Fields->addRow(tr("Коллизия по умолчанию"), Enabled);
+    Fields->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Коллизия по умолчанию")), Enabled);
     connect(Enabled, &QCheckBox::toggled, this, [this](bool bEnabled)
     {
         auto Value = Document.GetDefaults().ToJson();
@@ -402,7 +403,7 @@ void StaticMeshEditorWindow::RebuildFields()
         Shape->setObjectName("StaticMeshCollisionShape");
         Shape->addItems({tr("Параллелепипед"), tr("Сфера"), tr("Капсула"), tr("Треугольники меша (Static / Kinematic)")});
         Shape->setCurrentIndex(static_cast<int>(Element.ShapeType));
-        Fields->addRow(tr("Форма коллизии"), Shape);
+        Fields->addRow(BindEditorCaption(new QLabel(), QString::fromUtf8("Форма коллизии")), Shape);
         connect(Shape, &QComboBox::currentIndexChanged, this, [this](int Index)
         {
             auto Value = Document.GetDefaults().ToJson();
@@ -486,11 +487,11 @@ void StaticMeshEditorWindow::RebuildFields()
         }
         if (Element.ShapeType == 3)
         {
-            auto* Explanation = new QLabel(tr("Геометрия исходного меша. Доступны перемещение и поворот. Только Static / Kinematic."), this);
+            auto* Explanation = BindEditorCaption(new QLabel(tr("Геометрия исходного меша. Доступны перемещение и поворот. Только Static / Kinematic."), this), QString::fromUtf8("Геометрия исходного меша. Доступны перемещение и поворот. Только Static / Kinematic."));
             Explanation->setWordWrap(true);
             Fields->addRow(Explanation);
         }
-        auto* Fit = new QPushButton(tr("Подогнать коллизию по границам меша"), this);
+        auto* Fit = BindEditorCaption(new QPushButton(tr("Подогнать коллизию по границам меша"), this), QString::fromUtf8("Подогнать коллизию по границам меша"));
         Fit->setEnabled(Element.ShapeType != 3);
         Fields->addRow(Fit);
         connect(Fit, &QPushButton::clicked, this, [this]()

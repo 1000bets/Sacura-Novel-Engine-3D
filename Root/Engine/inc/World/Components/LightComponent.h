@@ -8,9 +8,14 @@
 
 using namespace DirectX::SimpleMath;
 
+ENGINE_REFLECT_ENUM(RenderLightType, "engine.RenderLightType",
+    ENGINE_ENUM_VALUE(RenderLightType, Directional),
+    ENGINE_ENUM_VALUE(RenderLightType, Point),
+    ENGINE_ENUM_VALUE(RenderLightType, Spot));
+
 class LightComponent : public Component
 {
-    ENGINE_CLASS(LightComponent, Component, "engine.LightComponent", "Освещение")
+    ENGINE_CLASS(LightComponent, Component, "engine.LightComponent", "Light")
 
 public:
     std::string GetEditorIconPath() const override
@@ -37,28 +42,13 @@ public:
     float OuterConeAngle = 45.f;
     bool bCastShadows = true;
 
-    int64_t GetLightTypeValue() const { return static_cast<int64_t>(Type); }
-    void SetLightTypeValue(int64_t Value)
-    {
-        if (Value < static_cast<int64_t>(RenderLightType::Directional)
-            || Value > static_cast<int64_t>(RenderLightType::Spot))
-        {
-            return;
-        }
-        Type = static_cast<RenderLightType>(Value);
-    }
-
-    ENGINE_REFLECT_PROPERTY(
+    ENGINE_REFLECT_FIELD(
         LightComponent,
-        LightType,
+        Type,
         "light_type",
-        int64_t,
-        GetLightTypeValue,
-        SetLightTypeValue,
         RF_EDITOR_EDITABLE,
         RF_SERIALIZABLE,
         RF_SCRIPT_READ_WRITE,
-        RF_UI_RANGE(0.0, 2.0),
         RF_DISPLAY_NAME("Light Type"))
 
     ENGINE_REFLECT_FIELD(
@@ -122,7 +112,7 @@ protected:
 };
 
 ENGINE_CLASS_END(LightComponent)
-ENGINE_IMPLEMENT_PROPERTY(LightComponent, LightType, int64_t, GetLightTypeValue, SetLightTypeValue)
+ENGINE_IMPLEMENT_FIELD(LightComponent, Type)
 ENGINE_IMPLEMENT_FIELD(LightComponent, LightColor)
 ENGINE_IMPLEMENT_FIELD(LightComponent, Intensity)
 ENGINE_IMPLEMENT_FIELD(LightComponent, Range)

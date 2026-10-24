@@ -2,8 +2,10 @@ const {spawn}=require('node:child_process');
 const {createInterface}=require('node:readline');
 const path=require('node:path');
 function hostPath(app){return process.env.SACURA_NATIVE_HOST||(app.isPackaged?path.join(process.resourcesPath,'native','SakuraElectronHost.exe'):path.resolve(__dirname,'../build/windows-msvc-debug/ElectronNative/Debug/SakuraElectronHost.exe'));}
-function projectCli(executable,args){return new Promise((resolve,reject)=>{
-  const child=spawn(executable,args,{windowsHide:true,stdio:['ignore','pipe','pipe']});
+function projectCli(executable,args,Input){return new Promise((resolve,reject)=>{
+  const child=spawn(executable,args,{windowsHide:true,stdio:['pipe','pipe','pipe']});
+  child.stdin.on('error', () => {});
+  child.stdin.end(Input);
   let result,errors='';const timer=setTimeout(()=>{child.kill();reject(Error('Project operation timed out'));},120000);
   child.on('error',e=>{clearTimeout(timer);reject(e);});
   child.stderr.on('data',b=>{errors=(errors+b).slice(-8000);});

@@ -2,6 +2,7 @@
 #include "UI/Views/CharacterWorkspaceView.h"
 #include "UI/Views/InputWorkspaceView.h"
 #include "UI/Views/MaterialEditorWindow.h"
+#include "UI/Views/PythonScriptEditorWindow.h"
 #include "UI/Views/StaticMeshEditorWindow.h"
 #include "Shell/EditorMainWindow.h"
 #include "UI/Views/WidgetWorkspaceView.h"
@@ -125,7 +126,7 @@ void EditorMainWindow::RefreshProjectTitle()
     const ProjectDescriptor* Descriptor = BoundSession.GetProject();
     if (Descriptor == nullptr)
     {
-        ProjectTitleLabel->setText(QString::fromUtf8("\xD0\x9D\xD0\xB5\xD1\x82 \xD0\xBF\xD1\x80\xD0\xBE\xD0\xB5\xD0\xBA\xD1\x82\xD0\xB0"));
+        ProjectTitleLabel->setText(tr("Нет проекта"));
         setWindowTitle("Sacura Novel Studio");
         return;
     }
@@ -152,7 +153,7 @@ void EditorMainWindow::UpdateWindowTitleDirty()
 void EditorMainWindow::UpdateStatus()
 {
     const int IssueCount = BoundSession.GetIssueCount();
-    QString IssuesText = QString::fromUtf8("\xD0\x9E\xD1\x88\xD0\xB8\xD0\xB1\xD0\xBA\xD0\xB8: %1").arg(IssueCount);
+    QString IssuesText = tr("Ошибки: %1").arg(IssueCount);
     if (BoundSession.GetHealth() == ProjectSessionHealth::Degraded)
     {
         IssuesText += QString::fromUtf8(" (degraded)");
@@ -170,12 +171,12 @@ void EditorMainWindow::UpdateStatus()
     if (GameObject* Selected = GetSelectedGameObject())
     {
         StatusSelectionLabel->setText(
-            QString::fromUtf8("\xD0\x92\xD1\x8B\xD0\xB4\xD0\xB5\xD0\xBB\xD0\xB5\xD0\xBD\xD0\xBE: ")
+            tr("Выделено: ")
             + QString::fromStdString(Selected->GetName()));
     }
     else
     {
-        StatusSelectionLabel->setText(QString::fromUtf8("\xD0\x9D\xD0\xB5\xD1\x82 \xD0\xB2\xD1\x8B\xD0\xB4\xD0\xB5\xD0\xBB\xD0\xB5\xD0\xBD\xD0\xB8\xD1\x8F"));
+        StatusSelectionLabel->setText(tr("Нет выделения"));
     }
 }
 
@@ -190,7 +191,7 @@ bool EditorMainWindow::LaunchEditorProcessForProject(const std::filesystem::path
         QMessageBox::warning(
             this,
             "Open Project",
-            QString::fromUtf8("\xD0\x9D\xD0\xB5 \xD1\x83\xD0\xB4\xD0\xB0\xD0\xBB\xD0\xBE\xD1\x81\xD1\x8C \xD0\xB7\xD0\xB0\xD0\xBF\xD1\x83\xD1\x81\xD1\x82\xD0\xB8\xD1\x82\xD1\x8C \xD0\xBD\xD0\xBE\xD0\xB2\xD1\x8B\xD0\xB9 \xD0\xBF\xD1\x80\xD0\xBE\xD1\x86\xD0\xB5\xD1\x81\xD1\x81 \xD1\x80\xD0\xB5\xD0\xB4\xD0\xB0\xD0\xBA\xD1\x82\xD0\xBE\xD1\x80\xD0\xB0"));
+            tr("Не удалось запустить новый процесс редактора"));
         PrintString("EditorMainWindow: failed to launch editor process for another project");
     }
     return bStarted;
@@ -230,7 +231,7 @@ void EditorMainWindow::OnOpenProject()
 {
     const QString Selected = QFileDialog::getOpenFileName(
         this,
-        QString::fromUtf8("\xD0\x9E\xD1\x82\xD0\xBA\xD1\x80\xD1\x8B\xD1\x82\xD1\x8C \xD0\xBF\xD1\x80\xD0\xBE\xD0\xB5\xD0\xBA\xD1\x82"),
+        tr("Открыть проект"),
         QString(),
         "Sakura Project (*.project)");
     if (Selected.isEmpty())
@@ -430,6 +431,14 @@ void EditorMainWindow::closeEvent(QCloseEvent* Event)
     }
     for (QMainWindow* AssetWindow : findChildren<QMainWindow*>())
     {
+        if (auto* PythonWindow = dynamic_cast<PythonScriptEditorWindow*>(AssetWindow))
+        {
+            if (!PythonWindow->close())
+            {
+                Event->ignore();
+                return;
+            }
+        }
         if (auto* MaterialWindow = dynamic_cast<MaterialEditorWindow*>(AssetWindow))
         {
             if (!MaterialWindow->close())

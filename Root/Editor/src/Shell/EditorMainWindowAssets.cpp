@@ -106,6 +106,10 @@ bool EditorMainWindow::RegisterAssetEditor(const AssetType& Type, AssetEditorHan
 
 void EditorMainWindow::RegisterBuiltInAssetEditors()
 {
+    RegisterAssetEditor(PythonScriptAssetType, [this](const AssetKey& Asset, const AssetRegistryEntry&, const QString&)
+    {
+        OpenPythonScriptEditor(Asset);
+    });
     for (const auto& Type : {StaticMeshAssetType, ModelAssetType})
     {
         RegisterAssetEditor(Type, [this](const AssetKey& Asset, const AssetRegistryEntry&, const QString&)

@@ -110,7 +110,7 @@ public:
             "DirectionalLight",
             TypeId{LightComponent::StaticReflectionTypeId()},
             true,
-            static_cast<int64_t>(RenderLightType::Directional));
+            RenderLightType::Directional);
     }
 
 protected:
@@ -135,7 +135,7 @@ public:
             "PointLight",
             TypeId{LightComponent::StaticReflectionTypeId()},
             true,
-            static_cast<int64_t>(RenderLightType::Point));
+            RenderLightType::Point);
     }
 
 protected:
@@ -160,7 +160,7 @@ public:
             "SpotLight",
             TypeId{LightComponent::StaticReflectionTypeId()},
             true,
-            static_cast<int64_t>(RenderLightType::Spot));
+            RenderLightType::Spot);
     }
 
 protected:

@@ -1,3 +1,5 @@
+#include "UI/Presentation/LocalizedEditorUi.h"
+#include "Localization/EditorLocalization.h"
 #include "Assets/AssetOperations.h"
 #include "Assets/AssetCreationFactory.h"
 #include "UI/Views/AssetReferenceField.h"
@@ -53,6 +55,7 @@ void EditorMainWindow::InitializeTools()
     RegisterPrefabTools();
     RegisterInputTools(*Toolset, BoundEngine);
     RegisterMaterialTools();
+    RegisterPythonScriptTools();
     RegisterStaticMeshTools();
     RegisterCharacterTools();
     const QJsonObject Text{{"type", "string"}};
@@ -714,8 +717,24 @@ void EditorMainWindow::InitializeTools()
     Toolset->Register("project_settings_set", "Persist project settings; startup changes apply at next open", {{"name", Text}, {"startupScene", Text}, {"startupStory", Text}}, {}, false,
         [this](const QJsonObject& Arguments) { return ApplyProjectSettings(Arguments); });
     Toolset->Register("editor_settings_get", "Read per-user editor preferences", {}, {}, true, [this](const QJsonObject&) { return EditorToolset::Success(ReadEditorSettings()); });
-    Toolset->Register("editor_settings_set", "Persist per-user editor preferences", {{"cameraSpeed", Number}, {"consoleLines", Number}, {"mcpAutoStart", Boolean}}, {}, false,
+    Toolset->Register("editor_settings_set", "Persist per-user editor preferences", {{"language", Text}, {"cameraSpeed", Number}, {"consoleLines", Number}, {"mcpAutoStart", Boolean}}, {}, false,
         [this](const QJsonObject& Arguments) { return ApplyEditorSettings(Arguments); });
+    Toolset->Register("editor_localization_get", "Read editor language and translation overrides", {}, {}, true,
+        [](const QJsonObject&)
+    {
+        return EditorToolset::Success(EditorLocalization::Get().Preferences());
+    });
+    Toolset->Register("editor_localization_set", "Save editor language and validated translation overrides",
+        {{"language", Text}, {"overrides", QJsonObject{{"type", "object"}}}}, {}, false,
+        [](const QJsonObject& Arguments)
+    {
+        QString Error;
+        if (!EditorLocalization::Get().ApplyPreferences(Arguments, Error))
+        {
+            return EditorToolset::Failure(Error);
+        }
+        return EditorToolset::Success(EditorLocalization::Get().Preferences());
+    });
     Toolset->Register("logs_read", "Read the bounded recent engine log", {}, {}, true, [](const QJsonObject&)
     {
         uint64_t Sequence = 0;
@@ -746,7 +765,7 @@ void EditorMainWindow::BuildConsoleDockPage()
     Layout->addWidget(ConsoleOutput);
     auto* Input = new QLineEdit(ConsolePage);
     Input->setObjectName("ConsoleInput");
-    Input->setPlaceholderText(tr("help или имя_инструмента {\"аргумент\":\"значение\"}"));
+    BindEditorProperty(Input, "placeholderText", QString::fromUtf8("help или имя_инструмента {\"аргумент\":\"значение\"}"));
     QStringList Names{"help", "clear"};
     for (const QJsonValue& Tool : Toolset->List())
     {

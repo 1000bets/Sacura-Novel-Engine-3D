@@ -1,3 +1,4 @@
+#include "UI/Presentation/LocalizedEditorUi.h"
 #include "UI/Adapters/AssetThumbnails.h"
 #include "Panels/ContentBrowserWidget.h"
 #include "UI/Styles/StudioIcons.h"
@@ -291,7 +292,7 @@ ContentBrowserWidget::ContentBrowserWidget(QWidget* Parent)
     TypeFilterMenu = new QMenu(this);
     TypeFilterMenu->setObjectName("ContentBrowserTypeFilters");
     FilterAction = Search->addAction(EditorUi::MakeFrontendIcon("ListFilter"), QLineEdit::TrailingPosition);
-    FilterAction->setToolTip(tr("Фильтр по типу ресурса"));
+    BindEditorProperty(FilterAction, "toolTip", QString::fromUtf8("Фильтр по типу ресурса"));
     connect(FilterAction, &QAction::triggered, this, [this]()
     {
         TypeFilterMenu->popup(Search->mapToGlobal(QPoint(0, Search->height())));

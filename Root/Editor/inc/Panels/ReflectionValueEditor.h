@@ -349,7 +349,8 @@ private:
                 Options.clear();
                 for (const auto& Entry : ReflectionSubsystem::Get().FindEnum(ValueType)->Values)
                 {
-                    Editor->addItem(QString::fromStdString(Entry.Name));
+                    const QString Name = QString::fromStdString(Entry.Name);
+                    Editor->addItem(EditorLocalization::Get().Text("Editor.Enum." + QString::fromStdString(ValueType.Value) + "." + Name, Name));
                     ReflectedValue Option = Current;
                     Option.Int64Value = Entry.Value;
                     Options.push_back(std::move(Option));

@@ -1,0 +1,16 @@
+.editor-preferences {width:min(720px,calc(100vw - 24px));max-height:calc(100vh - 24px);display:flex;flex-direction:column}
+.editor-preferences-body {padding:16px;overflow:auto;display:grid;gap:12px}
+.editor-preferences-body label {display:grid;gap:6px}
+.editor-preferences-body details[open] {display:grid;gap:10px}
+.editor-preferences-body input:not([hidden]),.editor-preferences-body textarea,.editor-preferences-body select {width:100%;box-sizing:border-box;font:inherit;color:var(--text-primary);background:var(--bg-panel-elevated);border:1px solid var(--border-subtle);border-radius:4px;padding:8px}
+.editor-preferences-body textarea {min-height:68px;resize:vertical}
+.editor-preferences-actions {display:flex;gap:8px;flex-wrap:wrap}
+
+.settings-workspace.editor-preferences {width:100%;height:100%;max-height:none;min-height:0;box-sizing:border-box;overflow:auto;background:var(--bg-panel);color:var(--text-primary);padding:16px;gap:12px}
+.settings-workspace>header h2 {font-size:16px;margin:0}
+.settings-workspace .editor-preferences-body {padding:0;overflow:visible;max-width:760px}
+.settings-workspace form {max-width:760px}
+.settings-workspace p {font-size:12px;line-height:1.5;margin:0}
+.settings-workspace .project-dialog-error {color:var(--error)}
+.settings-workspace button {font:inherit;color:var(--text-primary);background:var(--bg-panel-elevated);border:1px solid var(--border-subtle);border-radius:4px;padding:6px 10px}
+.settings-workspace button:disabled {opacity:.5}

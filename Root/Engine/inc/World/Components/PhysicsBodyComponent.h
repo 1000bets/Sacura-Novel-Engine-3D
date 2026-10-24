@@ -7,22 +7,34 @@
 #include <memory>
 #include <optional>
 
+ENGINE_REFLECT_ENUM(PhysicsMotionType, "engine.PhysicsMotionType",
+    ENGINE_ENUM_VALUE(PhysicsMotionType, Static),
+    ENGINE_ENUM_VALUE(PhysicsMotionType, Dynamic),
+    ENGINE_ENUM_VALUE(PhysicsMotionType, Kinematic),
+    ENGINE_ENUM_VALUE(PhysicsMotionType, Character));
+
+ENGINE_REFLECT_ENUM(PhysicsShapeType, "engine.PhysicsShapeType",
+    ENGINE_ENUM_VALUE(PhysicsShapeType, Box),
+    ENGINE_ENUM_VALUE(PhysicsShapeType, Sphere),
+    ENGINE_ENUM_VALUE(PhysicsShapeType, Capsule),
+    ENGINE_ENUM_VALUE(PhysicsShapeType, TriangleMesh));
+
 class AssetManager;
 
 class PhysicsBodyComponent : public Component
 {
-    ENGINE_CLASS(PhysicsBodyComponent, Component, "engine.PhysicsBodyComponent", "Коллизия")
+    ENGINE_CLASS(PhysicsBodyComponent, Component, "engine.PhysicsBodyComponent", "Physics Body")
 
 public:
     bool bUseMeshDefaults = false;
     ENGINE_REFLECT_FIELD(PhysicsBodyComponent, bUseMeshDefaults, "use_mesh_defaults", RF_EDITOR_EDITABLE, RF_SERIALIZABLE,
         RF_CATEGORY("Physics"), RF_DISPLAY_NAME("Use Static Mesh Collision Defaults"))
-    int64_t MotionType = 0;
+    PhysicsMotionType MotionType = PhysicsMotionType::Static;
     ENGINE_REFLECT_FIELD(PhysicsBodyComponent, MotionType, "motion_type", RF_EDITOR_EDITABLE, RF_SERIALIZABLE,
-        RF_SCRIPT_READ_WRITE, RF_CATEGORY("Physics"), RF_DISPLAY_NAME("Motion Type (0 Static, 1 Dynamic, 2 Kinematic, 3 Character)"), RF_UI_RANGE(0, 3))
-    int64_t ShapeType = 0;
+        RF_SCRIPT_READ_WRITE, RF_CATEGORY("Physics"), RF_DISPLAY_NAME("Motion Type"))
+    PhysicsShapeType ShapeType = PhysicsShapeType::Box;
     ENGINE_REFLECT_FIELD(PhysicsBodyComponent, ShapeType, "shape_type", RF_EDITOR_EDITABLE, RF_SERIALIZABLE,
-        RF_SCRIPT_READ_WRITE, RF_CATEGORY("Physics"), RF_DISPLAY_NAME("Shape (0 Box, 1 Sphere, 2 Capsule, 3 Triangle Mesh)"), RF_UI_RANGE(0, 3))
+        RF_SCRIPT_READ_WRITE, RF_CATEGORY("Physics"), RF_DISPLAY_NAME("Collision Shape"))
     Vector3 HalfExtents = Vector3(0.5f, 0.5f, 0.5f);
     ENGINE_REFLECT_FIELD(PhysicsBodyComponent, HalfExtents, "half_extents", RF_EDITOR_EDITABLE, RF_SERIALIZABLE,
         RF_SCRIPT_READ_WRITE, RF_CATEGORY("Physics"), RF_DISPLAY_NAME("Box Half Extents"))
@@ -151,12 +163,12 @@ ENGINE_IMPLEMENT_READONLY(PhysicsBodyComponent, DiagnosticProperty, std::string,
 
 class CharacterControllerComponent : public PhysicsBodyComponent
 {
-    ENGINE_CLASS(CharacterControllerComponent, PhysicsBodyComponent, "engine.CharacterControllerComponent", "Контроллер персонажа")
+    ENGINE_CLASS(CharacterControllerComponent, PhysicsBodyComponent, "engine.CharacterControllerComponent", "Character Controller")
 protected:
     CharacterControllerComponent()
     {
-        MotionType = 3;
-        ShapeType = 2;
+        MotionType = PhysicsMotionType::Character;
+        ShapeType = PhysicsShapeType::Capsule;
         bAffectsNavigation = false;
     }
 };

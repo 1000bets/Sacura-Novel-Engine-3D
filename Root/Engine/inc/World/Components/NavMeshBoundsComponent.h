@@ -4,9 +4,14 @@
 #include "Reflection/ReflectionMacros.h"
 #include "Navigation/NavigationTypes.h"
 
+ENGINE_REFLECT_ENUM(NavigationGenerationMode, "engine.NavigationGenerationMode",
+    ENGINE_ENUM_VALUE(NavigationGenerationMode, Static),
+    ENGINE_ENUM_VALUE(NavigationGenerationMode, Dynamic),
+    ENGINE_ENUM_VALUE(NavigationGenerationMode, DynamicModifiersOnly));
+
 class NavMeshBoundsComponent : public Component
 {
-    ENGINE_CLASS(NavMeshBoundsComponent, Component, "engine.NavMeshBoundsComponent", "Границы навигации")
+    ENGINE_CLASS(NavMeshBoundsComponent, Component, "engine.NavMeshBoundsComponent", "Navigation Bounds")
 public:
     Vector3 HalfExtents = Vector3(10.f, 3.f, 10.f);
     ENGINE_REFLECT_FIELD(NavMeshBoundsComponent, HalfExtents, "half_extents", RF_EDITOR_EDITABLE, RF_SERIALIZABLE,
@@ -44,9 +49,9 @@ public:
     float MaximumSimplificationError = 1.3f;
     ENGINE_REFLECT_FIELD(NavMeshBoundsComponent, MaximumSimplificationError, "maximum_simplification_error", RF_EDITOR_EDITABLE, RF_SERIALIZABLE,
         RF_SCRIPT_READ_WRITE, RF_CATEGORY("Navigation"), RF_DISPLAY_NAME("Maximum Simplification Error"), RF_UI_RANGE(0, 10))
-    int64_t GenerationMode = 0;
+    NavigationGenerationMode GenerationMode = NavigationGenerationMode::Static;
     ENGINE_REFLECT_FIELD(NavMeshBoundsComponent, GenerationMode, "generation_mode", RF_EDITOR_EDITABLE, RF_SERIALIZABLE,
-        RF_SCRIPT_READ_WRITE, RF_CATEGORY("Navigation"), RF_DISPLAY_NAME("Generation (0 Static, 1 Dynamic, 2 Modifiers Only)"), RF_UI_RANGE(0, 2))
+        RF_SCRIPT_READ_WRITE, RF_CATEGORY("Navigation"), RF_DISPLAY_NAME("Generation Mode"))
     bool bAutoBuild = true;
     ENGINE_REFLECT_FIELD(NavMeshBoundsComponent, bAutoBuild, "auto_build", RF_EDITOR_EDITABLE, RF_SERIALIZABLE,
         RF_SCRIPT_READ_WRITE, RF_CATEGORY("Navigation"), RF_DISPLAY_NAME("Build Automatically in Editor"))
